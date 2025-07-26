@@ -47,6 +47,7 @@
     "dayjs": "^1.11.13",
     "drizzle-orm": "^0.43.1",
     "drizzle-zod": "^0.7.1",
+    "fabric": "^6.7.1",
     "framer-motion": "^12.23.9",
     "jotai": "^2.12.5",
     "js-cookie": "^3.0.5",
@@ -73,6 +74,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.11",
     "@tanstack/react-query-devtools": "^5.83.0",
+    "@types/fabric": "^5.3.10",
     "@types/js-cookie": "^3.0.6",
     "@types/ms": "^2.1.0",
     "@types/node": "^20.19.9",

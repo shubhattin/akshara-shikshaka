@@ -5,9 +5,15 @@ import { text_data } from '~/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 const add_text_data_route = protectedAdminProcedure
-  .input(z.object({ text: z.string().min(1), svg: z.string().min(1) }))
+  .input(z.object({ text: z.string().min(1), svg_json: z.any() }))
   .mutation(async ({ input }) => {
-    const result = await db.insert(text_data).values(input).returning();
+    const result = await db
+      .insert(text_data)
+      .values({
+        text: input.text,
+        svg_json: input.svg_json!
+      })
+      .returning();
     return {
       id: result[0].id,
       uuid: result[0].uuid
@@ -20,7 +26,7 @@ const edit_text_data_route = protectedAdminProcedure
       id: z.number(),
       uuid: z.string().uuid(),
       text: z.string().min(1),
-      svg: z.string().min(1)
+      svg_json: z.any()
     })
   )
   .mutation(async ({ input }) => {

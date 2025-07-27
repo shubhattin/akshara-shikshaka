@@ -54,7 +54,7 @@ export default function AddEditTextData({ text_data, location }: Props) {
   const [text, setText] = useState(text_data.text);
   const [savedText, setSavedText] = useState(text_data.text);
   const [textEditMode, setTextEditMode] = useState(location === 'add' && true);
-  const [scaleDownFactor, setScaleDownFactor] = useState(4);
+  const [scaleDownFactor, setScaleDownFactor] = useState(4.5);
 
   const initCanvas = async () => {
     if (!canvasRef.current) return;
@@ -238,14 +238,14 @@ const SaveEditMode = ({
     if (is_addition) {
       add_text_data_mut.mutate({
         text,
-        svg: JSON.stringify(fabricjs_svg_dump)
+        svg_json: fabricjs_svg_dump
       });
     } else {
       update_text_data_mut.mutate({
         id: text_data.id!,
         uuid: text_data.uuid!,
         text,
-        svg: JSON.stringify(fabricjs_svg_dump)
+        svg_json: fabricjs_svg_dump
       });
     }
   };

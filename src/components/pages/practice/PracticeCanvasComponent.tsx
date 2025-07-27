@@ -7,7 +7,7 @@ import { type Canvas } from 'fabric';
 import * as fabric from 'fabric';
 
 type Props = {
-  fabricjs_svg_dump: string;
+  fabricjs_svg_dump: object;
   characterText?: string;
 };
 
@@ -45,7 +45,11 @@ const CanvasComponent = ({ fabricjs_svg_dump, characterText }: Props) => {
       height: 400,
       backgroundColor: '#ffffff'
     });
-    canvas = await canvas.loadFromJSON(JSON.parse(fabricjs_svg_dump));
+
+    // Store reference on the canvas element itself for cleanup / duplicate-mount protection
+    (canvasRef.current as any).__fabric = canvas;
+
+    canvas = await canvas.loadFromJSON(fabricjs_svg_dump);
 
     // Set up drawing mode with red pen
     canvas.isDrawingMode = isDrawingMode;

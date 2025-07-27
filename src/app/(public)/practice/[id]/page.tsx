@@ -14,7 +14,7 @@ const get_cached_text_data = cache(async (id: number) => {
       id: true,
       uuid: true,
       text: true,
-      svg: true
+      svg_json: true
     }
   });
   return text_data;
@@ -42,7 +42,7 @@ const MainEdit = async ({ params }: Props) => {
 
   return (
     <div className="flex h-screen flex-col items-center justify-center">
-      <CanvasComponent fabricjs_svg_dump={text_data!.svg} characterText={text_data?.text} />
+      <CanvasComponent fabricjs_svg_dump={text_data!.svg_json} characterText={text_data?.text} />
     </div>
   );
 };

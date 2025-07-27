@@ -234,20 +234,19 @@ const SaveEditMode = ({
 
   const handle_save = () => {
     if (text.trim().length === 0 || !fabricCanvasRef.current) return;
-    const fabricjs_svg_dump = fabricCanvasRef.current.toSVG();
+    const fabricjs_svg_dump = fabricCanvasRef.current.toJSON();
     if (is_addition) {
       add_text_data_mut.mutate({
         text,
-        svg: fabricjs_svg_dump
+        svg: JSON.stringify(fabricjs_svg_dump)
       });
     } else {
-      console.log(JSON.stringify(fabricCanvasRef.current.toJSON()));
-      // update_text_data_mut.mutate({
-      //   id: text_data.id!,
-      //   uuid: text_data.uuid!,
-      //   text,
-      //   svg: fabricjs_svg_dump
-      // });
+      update_text_data_mut.mutate({
+        id: text_data.id!,
+        uuid: text_data.uuid!,
+        text,
+        svg: JSON.stringify(fabricjs_svg_dump)
+      });
     }
   };
 

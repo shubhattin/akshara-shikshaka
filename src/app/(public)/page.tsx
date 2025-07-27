@@ -17,6 +17,11 @@ export default async function Home() {
         <h1 className="text-4xl font-bold">Akshara</h1>
         <p className="text-lg text-gray-600">Learn to write Indian script characters</p>
       </div>
+      <div className="flex justify-center">
+        <Link href="/list">
+          <Button variant="blue">Manage List</Button>
+        </Link>
+      </div>
 
       <Card className="p-6">
         <h2 className="mb-4 text-2xl font-semibold">Available Characters</h2>

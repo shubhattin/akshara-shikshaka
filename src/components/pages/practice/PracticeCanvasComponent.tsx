@@ -15,7 +15,7 @@ const CanvasComponent = ({ fabricjs_svg_dump, characterText }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<Canvas>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(true);
-  const [brushThickness, setBrushThickness] = useState(6);
+  const [brushThickness, setBrushThickness] = useState(8);
   const canceledRef = useRef(false);
 
   const initCanvas = async () => {
@@ -40,12 +40,12 @@ const CanvasComponent = ({ fabricjs_svg_dump, characterText }: Props) => {
     }
 
     // Initialize Fabric.js canvas
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width: 600,
+    let canvas = new fabric.Canvas(canvasRef.current, {
+      width: 400,
       height: 400,
       backgroundColor: '#ffffff'
     });
-    // canvas.loadFromJSON(fabricjs_svg_dump);
+    canvas = await canvas.loadFromJSON(JSON.parse(fabricjs_svg_dump));
 
     // Set up drawing mode with red pen
     canvas.isDrawingMode = isDrawingMode;
@@ -129,9 +129,9 @@ const CanvasComponent = ({ fabricjs_svg_dump, characterText }: Props) => {
         )}
 
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <Button onClick={toggleDrawingMode} variant={isDrawingMode ? 'default' : 'outline'}>
+          {/* <Button onClick={toggleDrawingMode} variant={isDrawingMode ? 'default' : 'outline'}>
             {isDrawingMode ? 'Drawing Mode' : 'Selection Mode'}
-          </Button>
+          </Button> */}
           <Button onClick={clearCanvas} variant="outline">
             Clear Drawing
           </Button>

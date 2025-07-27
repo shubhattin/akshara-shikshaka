@@ -16,7 +16,6 @@ const get_cached_text_data = cache(async (id: number) => {
     columns: {
       id: true,
       uuid: true,
-      svg: true,
       text: true
     }
   });

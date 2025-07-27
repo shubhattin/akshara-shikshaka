@@ -40,3 +40,5 @@ export const metadata: Metadata = {
     apple: '/favicon.ico'
   }
 };
+
+export const dynamic = 'force-dynamic';

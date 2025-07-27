@@ -29,7 +29,6 @@ import { toast } from 'sonner';
 
 type text_data_type = {
   text: string;
-  svg: string;
   id?: number;
   uuid?: string;
 };

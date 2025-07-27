@@ -10,8 +10,7 @@ const List = async () => {
   if (!session || session.user.role !== 'admin' || !session.user.is_approved) redirect('/');
 
   const text_data = {
-    text: '',
-    svg: ''
+    text: ''
   };
   return (
     <div>

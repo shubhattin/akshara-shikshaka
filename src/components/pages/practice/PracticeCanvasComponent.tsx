@@ -1,10 +1,8 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Card } from './ui/card';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { useEffect, useRef, useState } from 'react';
+import { Card } from '~/components/ui/card';
+import { Button } from '~/components/ui/button';
 import { type Canvas } from 'fabric';
 
 type Props = {

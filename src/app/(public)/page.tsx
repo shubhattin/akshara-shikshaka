@@ -22,7 +22,7 @@ export default async function Home() {
         <h2 className="mb-4 text-2xl font-semibold">Available Characters</h2>
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
           {texts.map((text) => (
-            <Link href={`/practice/${text.id}`}>
+            <Link href={`/practice/${text.id}`} key={text.id}>
               <Button
                 key={text.id}
                 variant="outline"

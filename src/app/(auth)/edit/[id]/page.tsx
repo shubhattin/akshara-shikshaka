@@ -4,6 +4,9 @@ import { cache } from 'react';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 import { db } from '~/db/db';
 import CanvasComponent from '~/components/pages/practice/PracticeCanvasComponent';
+import Link from 'next/link';
+import AddEditTextData from '~/components/pages/add_edit/AddEditTextData';
+import { IoMdArrowRoundBack } from 'react-icons/io';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -13,8 +16,8 @@ const get_cached_text_data = cache(async (id: number) => {
     columns: {
       id: true,
       uuid: true,
-      text: true,
-      svg: true
+      svg: true,
+      text: true
     }
   });
   return text_data;
@@ -28,8 +31,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     ...getMetadata({
-      title: text_data ? text_data.text + ' - Aksara' : 'Not Found',
-      description: text_data ? text_data.text + ' - Practice' : null
+      title: text_data ? text_data.text + ' - Edit' : 'Not Found',
+      description: text_data ? text_data.text + ' - Edit' : null
     })
   };
 }
@@ -41,8 +44,14 @@ const MainEdit = async ({ params }: Props) => {
   const text_data = await get_cached_text_data(id);
 
   return (
-    <div className="flex h-screen flex-col items-center justify-center">
-      <CanvasComponent fabricjs_svg_dump={text_data!.svg} characterText={text_data?.text} />
+    <div>
+      <div className="my-2 mb-4 px-2">
+        <Link href="/list" className="flex items-center gap-1 text-lg font-semibold">
+          <IoMdArrowRoundBack className="inline-block text-xl" />
+          सूची
+        </Link>
+      </div>
+      <AddEditTextData location="add" text_data={text_data!} />
     </div>
   );
 };

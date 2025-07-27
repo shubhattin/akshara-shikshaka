@@ -32,7 +32,7 @@ const List = async () => {
       </div>
       <div className="mt-2 mb-5 flex items-center justify-center gap-4 px-2">
         <Link href="/add">
-          <Button variant={'outline'} className="gap-2 text-lg font-semibold">
+          <Button variant={'blue'} className="gap-2 text-lg font-semibold">
             <IoMdAdd className="size-5.5" /> नवाक्षरं युञ्जतु
           </Button>
         </Link>

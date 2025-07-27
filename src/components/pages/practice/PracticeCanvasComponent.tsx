@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Card } from '~/components/ui/card';
 import { Button } from '~/components/ui/button';
 import { type Canvas } from 'fabric';
+import * as fabric from 'fabric';
 
 type Props = {
-  svgPath?: string;
+  fabricjs_svg_dump: string;
   characterText?: string;
 };
 
-const CanvasComponent = ({ svgPath, characterText }: Props) => {
+const CanvasComponent = ({ fabricjs_svg_dump, characterText }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<Canvas>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(true);
@@ -27,8 +28,7 @@ const CanvasComponent = ({ svgPath, characterText }: Props) => {
     }
 
     // Dynamic import to avoid SSR issues
-    const fabricModule = await import('fabric');
-    const fab = (fabricModule as any).fabric || (fabricModule as any).default || fabricModule;
+
     if (canceledRef.current) return;
 
     // Check if the canvas element already has a Fabric instance
@@ -40,44 +40,24 @@ const CanvasComponent = ({ svgPath, characterText }: Props) => {
     }
 
     // Initialize Fabric.js canvas
-    const canvas = new fab.Canvas(canvasRef.current, {
+    const canvas = new fabric.Canvas(canvasRef.current, {
       width: 600,
       height: 400,
       backgroundColor: '#ffffff'
     });
-
-    // Store reference on the canvas element itself for cleanup
-    (canvasRef.current as any).__fabric = canvas;
+    // canvas.loadFromJSON(fabricjs_svg_dump);
 
     // Set up drawing mode with red pen
     canvas.isDrawingMode = isDrawingMode;
     // Ensure brush exists and configure
     if (!canvas.freeDrawingBrush) {
-      canvas.freeDrawingBrush = new fab.PencilBrush(canvas);
+      canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
     }
+
     canvas.freeDrawingBrush.color = '#ef4444'; // red-500
     canvas.freeDrawingBrush.width = brushThickness;
 
     fabricCanvasRef.current = canvas;
-
-    // If we have an SVG path, render the character
-    if (svgPath) {
-      const SACLING_FACTOR = 1 / 4;
-      const pathObject = new fab.Path(svgPath, {
-        fill: 'black',
-        stroke: '#000000', // black
-        strokeWidth: 2,
-        selectable: true,
-        scaleX: SACLING_FACTOR,
-        scaleY: SACLING_FACTOR,
-        evented: false
-      });
-
-      // Center the character on canvas
-      canvas.centerObject(pathObject);
-      canvas.add(pathObject);
-      canvas.renderAll();
-    }
   };
 
   useEffect(() => {

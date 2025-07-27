@@ -7,10 +7,31 @@ import { Card } from '~/components/ui/card';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import * as fabric from 'fabric';
+import { client_q } from '~/api/client';
+import { useRouter } from 'next/navigation';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTrigger
+} from '~/components/ui/alert-dialog';
+import { IoMdAdd } from 'react-icons/io';
+import {
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogDescription,
+  AlertDialogTitle
+} from '@radix-ui/react-alert-dialog';
+import { FiSave } from 'react-icons/fi';
+import { MdDeleteOutline } from 'react-icons/md';
+import { toast } from 'sonner';
 
 type text_data_type = {
   text: string;
   svg: string;
+  id?: number;
+  uuid?: string;
 };
 
 type Props =
@@ -174,6 +195,128 @@ export default function AddEditTextData({ text_data, location }: Props) {
           </div>
         </div>
       </div>
+      <SaveEditMode text_data={text_data} text={text} fabricCanvasRef={fabricCanvasRef} />
     </Card>
   );
 }
+
+const SaveEditMode = ({
+  text_data,
+  text,
+  fabricCanvasRef
+}: {
+  text_data: Props['text_data'];
+  text: string;
+  fabricCanvasRef: React.RefObject<Canvas | null>;
+}) => {
+  const is_addition = text_data.id === undefined && text_data.uuid === undefined;
+
+  const router = useRouter();
+  const add_text_data_mut = client_q.text_data.add_text_data.useMutation({
+    onSuccess(data) {
+      toast.success('Text Added');
+      router.push(`/edit/${data.id}`);
+    }
+  });
+
+  const update_text_data_mut = client_q.text_data.edit_text_data.useMutation({
+    onSuccess(data) {
+      toast.success('Text Updated');
+    }
+  });
+
+  const delete_text_data_mut = client_q.text_data.delete_text_data.useMutation({
+    onSuccess(data) {
+      toast.success('Text Deleted');
+      router.push('/list');
+    }
+  });
+
+  const handle_save = () => {
+    if (text.trim().length === 0 || !fabricCanvasRef.current) return;
+    const fabricjs_svg_dump = fabricCanvasRef.current.toSVG();
+    if (is_addition) {
+      add_text_data_mut.mutate({
+        text,
+        svg: fabricjs_svg_dump
+      });
+    } else {
+      console.log(JSON.stringify(fabricCanvasRef.current.toJSON()));
+      // update_text_data_mut.mutate({
+      //   id: text_data.id!,
+      //   uuid: text_data.uuid!,
+      //   text,
+      //   svg: fabricjs_svg_dump
+      // });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!is_addition) {
+      await delete_text_data_mut.mutateAsync({
+        id: text_data.id!,
+        uuid: text_data.uuid!
+      });
+    }
+  };
+
+  return (
+    <div className="mx-2 mt-2 flex items-center justify-between sm:mx-4">
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
+            className="flex text-lg"
+            variant={'blue'}
+          >
+            {is_addition ? (
+              <>
+                <IoMdAdd className="text-lg" /> {!add_text_data_mut.isPending ? 'Add' : 'Adding...'}
+              </>
+            ) : (
+              <>
+                <FiSave className="text-lg" />{' '}
+                {!update_text_data_mut.isPending ? 'Save' : 'Saving...'}
+              </>
+            )}
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sure to Save</AlertDialogTitle>
+            <AlertDialogDescription>
+              {is_addition ? 'Are you sure to Add this Text ?' : 'Are you sure to Save this Text ?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handle_save}>Save</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {!is_addition && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button className="flex gap-1 px-1 py-0 text-sm" variant="destructive">
+              <MdDeleteOutline className="text-base" />
+              Delete
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Sure to Delete</AlertDialogTitle>
+              <AlertDialogDescription>Are you sure to Delete this Text ?</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-400">
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+    </div>
+  );
+};

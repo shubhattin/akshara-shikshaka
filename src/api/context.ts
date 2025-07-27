@@ -1,11 +1,13 @@
-import { auth } from '@/lib/auth';
+import get_seesion_from_cookie from '@/lib/get_auth_from_cookie';
 
 export const createContext = async ({ req }: { req: Request }) => {
-  const session = await auth.api.getSession({ headers: req.headers });
+  const cookie = req.headers.get('cookie') ?? '';
+  const session = await get_seesion_from_cookie(cookie);
   const user = session?.user;
 
   return {
-    user
+    user,
+    cookie
   };
 };
 

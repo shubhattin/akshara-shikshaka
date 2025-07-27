@@ -1,32 +1,39 @@
 import { z } from 'zod';
-import { t, publicProcedure } from '../trpc_init';
-import * as fs from 'fs/promises';
-import db_json from './db.json';
+import { t, protectedAdminProcedure } from '~/api/trpc_init';
+import { db } from '~/db/db';
+import { text_data } from '~/db/schema';
+import { and, eq } from 'drizzle-orm';
 
-const schema = z.object({
-  text: z.string().min(1),
-  path: z.string().min(1),
-  font_size: z.number().nullable().default(null),
-  stroke_data: z.array(z.any()).nullable().default(null)
-});
+export const add_text_data_route = protectedAdminProcedure
+  .input(z.object({ text: z.string().min(1), svg: z.string().min(1) }))
+  .mutation(async ({ input }) => {
+    const result = await db.insert(text_data).values(input).returning();
+    return {
+      id: result[0].id,
+      uuid: result[0].uuid
+    };
+  });
 
-export const get_text_data_func = async (text: string) => {
-  const data_json = schema.array().parse(db_json);
-  const data_item = data_json.find((item: any) => item.text === text);
-  return schema.parse(data_item);
-};
-
-export const get_texts_list_func = async () => {
-  const data_json = schema.array().parse(db_json);
-  return data_json.map((item) => item.text);
-};
-
-const get_text_data_route = publicProcedure
-  .input(z.object({ text: z.string().min(1) }))
-  .query(async ({ input }) => {
-    return get_text_data_func(input.text);
+export const edit_text_data_route = protectedAdminProcedure
+  .input(
+    z.object({
+      id: z.number(),
+      uuid: z.string().uuid(),
+      text: z.string().min(1),
+      svg: z.string().min(1)
+    })
+  )
+  .mutation(async ({ input }) => {
+    await db
+      .update(text_data)
+      .set(input)
+      .where(and(eq(text_data.uuid, input.uuid), eq(text_data.id, input.id)));
+    return {
+      updated: true
+    };
   });
 
 export const text_data_router = t.router({
-  get_text_data: get_text_data_route
+  add_text_data: add_text_data_route,
+  edit_text_data: edit_text_data_route
 });

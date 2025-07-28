@@ -4,12 +4,36 @@ import { db } from '~/db/db';
 import { text_data } from '~/db/schema';
 import { and, eq } from 'drizzle-orm';
 
+// Define proper types for strokes data
+const StrokePointSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  timestamp: z.number()
+});
+
+const StrokeSchema = z.object({
+  order: z.number(),
+  points: z.array(StrokePointSchema)
+});
+
+const GestureSchema = z.object({
+  order: z.number(),
+  strokes: z.array(StrokeSchema),
+  brush_width: z.number(),
+  brush_color: z.string(),
+  animation_duration: z.number()
+});
+
+const StrokeDataSchema = z.object({
+  gestures: z.array(GestureSchema)
+});
+
 const add_text_data_route = protectedAdminProcedure
   .input(
     z.object({
       text: z.string().min(1),
       svg_json: z.any(),
-      strokes_json: z.any().optional()
+      strokes_json: StrokeDataSchema.optional()
     })
   )
   .mutation(async ({ input }) => {
@@ -34,7 +58,7 @@ const edit_text_data_route = protectedAdminProcedure
       uuid: z.string().uuid(),
       text: z.string().min(1),
       svg_json: z.any(),
-      strokes_json: z.any().optional()
+      strokes_json: StrokeDataSchema.optional()
     })
   )
   .mutation(async ({ input }) => {

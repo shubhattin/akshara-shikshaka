@@ -37,18 +37,20 @@ type StrokePoint = {
 };
 
 type Stroke = {
+  order: number;
   points: StrokePoint[];
 };
 
 type Gesture = {
-  id: string;
-  name: string;
+  order: number;
   strokes: Stroke[];
+  brush_width: number;
+  brush_color: string;
+  animation_duration: number;
 };
 
 type StrokeData = {
   gestures: Gesture[];
-  animationDuration: number; // 50-1000ms
 };
 
 type text_data_type = {
@@ -83,8 +85,7 @@ export default function AddEditTextData({ text_data, location }: Props) {
   // Gesture Recording State
   const [strokeData, setStrokeData] = useState<StrokeData>(
     text_data.strokes_json || {
-      gestures: [],
-      animationDuration: 300
+      gestures: []
     }
   );
   const [selectedGestureId, setSelectedGestureId] = useState<string | null>(null);
@@ -178,15 +179,15 @@ export default function AddEditTextData({ text_data, location }: Props) {
   };
 
   const setupGestureRecording = () => {
-    if (!fabricCanvasRef.current) return;
+    if (!fabricCanvasRef.current || !selectedGesture) return;
 
     const canvas = fabricCanvasRef.current;
 
     // Enable free drawing mode
     canvas.isDrawingMode = true;
     canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-    canvas.freeDrawingBrush.color = '#ff0000';
-    canvas.freeDrawingBrush.width = 3;
+    canvas.freeDrawingBrush.color = selectedGesture.brush_color;
+    canvas.freeDrawingBrush.width = selectedGesture.brush_width;
 
     // Clear all previous listeners first
     canvas.off('path:created');
@@ -207,7 +208,7 @@ export default function AddEditTextData({ text_data, location }: Props) {
       // Extract points from the path
       const pathData = e.path.path;
       const points: StrokePoint[] = [];
-      const currentTime = Date.now();
+      const baseTime = recordingStartTime;
 
       // Convert SVG path commands to points
       pathData.forEach((cmd: any, index: number) => {
@@ -215,14 +216,14 @@ export default function AddEditTextData({ text_data, location }: Props) {
           points.push({
             x: cmd[1],
             y: cmd[2],
-            timestamp: currentTime + index * 10
+            timestamp: index * 10 // Relative timestamps starting from 0
           });
         } else if (cmd[0] === 'Q' && cmd.length >= 5) {
           // Quadratic bezier curve - add end point
           points.push({
             x: cmd[3],
             y: cmd[4],
-            timestamp: currentTime + index * 10
+            timestamp: index * 10 // Relative timestamps starting from 0
           });
         }
       });
@@ -235,7 +236,7 @@ export default function AddEditTextData({ text_data, location }: Props) {
 
         console.log('Adding stroke with', approximatedPoints.length, 'points');
         setTempStrokes((prev) => {
-          const newStrokes = [...prev, { points: approximatedPoints }];
+          const newStrokes = [...prev, { order: prev.length, points: approximatedPoints }];
           console.log('Total temp strokes:', newStrokes.length);
           return newStrokes;
         });
@@ -288,15 +289,18 @@ export default function AddEditTextData({ text_data, location }: Props) {
 
   const addNewGesture = () => {
     const newGesture: Gesture = {
-      id: crypto.randomUUID(),
-      name: `Gesture ${strokeData.gestures.length + 1}`,
-      strokes: []
+      order: strokeData.gestures.length,
+      strokes: [],
+      brush_width: 6,
+      brush_color: '#ff0000', // red
+      animation_duration: 600
     };
     setStrokeData((prev) => ({
       ...prev,
       gestures: [...prev.gestures, newGesture]
     }));
-    setSelectedGestureId(newGesture.id);
+    clearGestureVisualization();
+    setSelectedGestureId(newGesture.order.toString());
   };
 
   const clearCurrentGesture = () => {
@@ -304,18 +308,18 @@ export default function AddEditTextData({ text_data, location }: Props) {
     setStrokeData((prev) => ({
       ...prev,
       gestures: prev.gestures.map((gesture) =>
-        gesture.id === selectedGestureId ? { ...gesture, strokes: [] } : gesture
+        gesture.order === parseInt(selectedGestureId, 10) ? { ...gesture, strokes: [] } : gesture
       )
     }));
     clearGestureVisualization();
   };
 
-  const deleteGesture = (gestureId: string) => {
+  const deleteGesture = (gestureOrder: number) => {
     setStrokeData((prev) => ({
       ...prev,
-      gestures: prev.gestures.filter((g) => g.id !== gestureId)
+      gestures: prev.gestures.filter((g) => g.order !== gestureOrder)
     }));
-    if (selectedGestureId === gestureId) {
+    if (selectedGestureId === gestureOrder.toString()) {
       setSelectedGestureId(null);
     }
   };
@@ -372,7 +376,7 @@ export default function AddEditTextData({ text_data, location }: Props) {
     setStrokeData((prev) => ({
       ...prev,
       gestures: prev.gestures.map((gesture) =>
-        gesture.id === selectedGestureId
+        gesture.order === parseInt(selectedGestureId, 10)
           ? {
               ...gesture,
               strokes: [...gesture.strokes, ...tempStrokes]
@@ -409,8 +413,8 @@ export default function AddEditTextData({ text_data, location }: Props) {
     fabricCanvasRef.current.renderAll();
   };
 
-  const playGesture = async (gestureId: string) => {
-    const gesture = strokeData.gestures.find((g) => g.id === gestureId);
+  const playGesture = async (gestureOrder: number) => {
+    const gesture = strokeData.gestures.find((g) => g.order === gestureOrder);
     if (!gesture || !fabricCanvasRef.current) return;
 
     setIsPlaying(true);
@@ -431,8 +435,8 @@ export default function AddEditTextData({ text_data, location }: Props) {
 
       // Create the full path but make it invisible initially
       const fullPath = new fabric.Path(pathString, {
-        stroke: '#ff0000',
-        strokeWidth: 3,
+        stroke: gesture.brush_color,
+        strokeWidth: gesture.brush_width,
         fill: '',
         selectable: false,
         evented: false,
@@ -478,9 +482,92 @@ export default function AddEditTextData({ text_data, location }: Props) {
         fabricCanvasRef.current.renderAll();
 
         // Wait based on animation duration
-        const delay = strokeData.animationDuration / animationSteps;
+        const delay = gesture.animation_duration / animationSteps;
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
+    }
+
+    setIsPlaying(false);
+  };
+
+  const playGestureWithoutClear = async (gesture: Gesture) => {
+    if (!fabricCanvasRef.current) return;
+
+    for (const stroke of gesture.strokes) {
+      if (stroke.points.length < 2) continue;
+
+      // Create a path for smooth animation
+      let pathString = '';
+      stroke.points.forEach((point, index) => {
+        if (index === 0) {
+          pathString += `M ${point.x} ${point.y}`;
+        } else {
+          pathString += ` L ${point.x} ${point.y}`;
+        }
+      });
+
+      // Create the full path but make it invisible initially
+      const fullPath = new fabric.Path(pathString, {
+        stroke: gesture.brush_color,
+        strokeWidth: gesture.brush_width,
+        fill: '',
+        selectable: false,
+        evented: false,
+        isGestureVisualization: true,
+        opacity: 0
+      } as any);
+
+      fabricCanvasRef.current.add(fullPath);
+
+      // Animate the path drawing
+      const totalPoints = stroke.points.length;
+      const animationSteps = Math.min(totalPoints * 2, 50); // More steps for smoother animation
+
+      for (let step = 1; step <= animationSteps; step++) {
+        const progress = step / animationSteps;
+        const pointIndex = Math.floor(progress * (totalPoints - 1));
+
+        // Create partial path up to current point
+        let partialPath = '';
+        for (let i = 0; i <= pointIndex; i++) {
+          if (i === 0) {
+            partialPath += `M ${stroke.points[i].x} ${stroke.points[i].y}`;
+          } else {
+            partialPath += ` L ${stroke.points[i].x} ${stroke.points[i].y}`;
+          }
+        }
+
+        // Add interpolated point for smooth animation
+        if (pointIndex < totalPoints - 1) {
+          const currentPoint = stroke.points[pointIndex];
+          const nextPoint = stroke.points[pointIndex + 1];
+          const subProgress = (progress * (totalPoints - 1)) % 1;
+
+          const interpolatedX = currentPoint.x + (nextPoint.x - currentPoint.x) * subProgress;
+          const interpolatedY = currentPoint.y + (nextPoint.y - currentPoint.y) * subProgress;
+
+          partialPath += ` L ${interpolatedX} ${interpolatedY}`;
+        }
+
+        // Update the path
+        fullPath.set('path', fabric.util.parsePath(partialPath));
+        fullPath.set('opacity', 1);
+        fabricCanvasRef.current.renderAll();
+
+        // Wait based on animation duration
+        const delay = gesture.animation_duration / animationSteps;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  };
+
+  const playAllGestures = async () => {
+    setIsPlaying(true);
+
+    for (const gesture of strokeData.gestures) {
+      if (gesture.strokes.length === 0) continue;
+      await playGestureWithoutClear(gesture);
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay between gestures
     }
 
     setIsPlaying(false);
@@ -509,7 +596,18 @@ export default function AddEditTextData({ text_data, location }: Props) {
     render_text_path(savedText);
   }, [savedText, scaleDownFactor]);
 
-  const selectedGesture = strokeData.gestures.find((g) => g.id === selectedGestureId);
+  const selectedGesture = strokeData.gestures.find((g) => g.order.toString() === selectedGestureId);
+
+  // Update brush settings when selected gesture changes during recording
+  useEffect(() => {
+    if (isRecording && selectedGesture && fabricCanvasRef.current) {
+      const canvas = fabricCanvasRef.current;
+      if (canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.color = selectedGesture.brush_color;
+        canvas.freeDrawingBrush.width = selectedGesture.brush_width;
+      }
+    }
+  }, [selectedGesture?.brush_color, selectedGesture?.brush_width, isRecording]);
 
   return (
     <Card className="p-6">
@@ -563,20 +661,55 @@ export default function AddEditTextData({ text_data, location }: Props) {
             </Button>
           </div>
 
+          {/* Play All and Clear Controls */}
+          {strokeData.gestures.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={playAllGestures}
+                disabled={
+                  isRecording ||
+                  isPlaying ||
+                  strokeData.gestures.every((g) => g.strokes.length === 0)
+                }
+              >
+                <MdPlayArrow className="mr-1" />
+                Play All
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={clearGestureVisualization}
+                disabled={isRecording || isPlaying}
+              >
+                <MdClear className="mr-1" />
+                Clear Canvas
+              </Button>
+            </div>
+          )}
+
           {/* Gesture List */}
           <div className="flex flex-wrap gap-2">
             {strokeData.gestures.map((gesture) => (
               <div
-                key={gesture.id}
+                key={gesture.order}
                 className={cn(
                   'flex cursor-pointer items-center gap-2 rounded border p-2 transition-colors',
-                  selectedGestureId === gesture.id
+                  selectedGestureId === gesture.order.toString()
                     ? 'border-primary bg-primary/10'
                     : 'border-border hover:border-primary/50 hover:bg-muted/50'
                 )}
-                onClick={() => setSelectedGestureId(gesture.id)}
+                onClick={() => {
+                  clearGestureVisualization();
+                  if (selectedGestureId === gesture.order.toString()) {
+                    setSelectedGestureId(null);
+                  } else {
+                    setSelectedGestureId(gesture.order.toString());
+                  }
+                }}
               >
-                <span className="text-sm">{gesture.name}</span>
+                <span className="text-sm">Gesture {gesture.order + 1}</span>
                 <span className="text-xs text-muted-foreground">
                   ({gesture.strokes.length} strokes)
                 </span>
@@ -586,7 +719,7 @@ export default function AddEditTextData({ text_data, location }: Props) {
                   className="h-6 w-6 p-0"
                   onClick={(e) => {
                     e.stopPropagation();
-                    deleteGesture(gesture.id);
+                    deleteGesture(gesture.order);
                   }}
                 >
                   <MdDeleteOutline className="h-3 w-3" />
@@ -599,7 +732,7 @@ export default function AddEditTextData({ text_data, location }: Props) {
           {selectedGesture && (
             <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
               <div className="flex items-center justify-between">
-                <span className="font-medium">Selected: {selectedGesture.name}</span>
+                <span className="font-medium">Selected: Gesture {selectedGesture.order + 1}</span>
                 <div className="flex gap-2">
                   <Button
                     size="sm"
@@ -641,12 +774,91 @@ export default function AddEditTextData({ text_data, location }: Props) {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => playGesture(selectedGesture.id)}
+                    onClick={() => playGesture(selectedGesture.order)}
                     disabled={isRecording || isPlaying || selectedGesture.strokes.length === 0}
                   >
                     <MdPlayArrow className="mr-1" />
                     Play
                   </Button>
+                </div>
+              </div>
+
+              {/* Gesture Settings */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {/* Brush Color */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Brush Color</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={selectedGesture.brush_color}
+                      onChange={(e) =>
+                        setStrokeData((prev) => ({
+                          ...prev,
+                          gestures: prev.gestures.map((gesture) =>
+                            gesture.order === parseInt(selectedGestureId || '0', 10)
+                              ? { ...gesture, brush_color: e.target.value }
+                              : gesture
+                          )
+                        }))
+                      }
+                      className="h-8 w-12 rounded border border-input"
+                      disabled={isRecording || isPlaying}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {selectedGesture.brush_color}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Brush Width */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    Brush Width: {selectedGesture.brush_width}px
+                  </Label>
+                  <Slider
+                    value={[selectedGesture.brush_width]}
+                    onValueChange={(value) =>
+                      setStrokeData((prev) => ({
+                        ...prev,
+                        gestures: prev.gestures.map((gesture) =>
+                          gesture.order === parseInt(selectedGestureId || '0', 10)
+                            ? { ...gesture, brush_width: value[0] }
+                            : gesture
+                        )
+                      }))
+                    }
+                    min={1}
+                    max={10}
+                    step={1}
+                    className="w-full"
+                    disabled={isRecording || isPlaying}
+                  />
+                </div>
+
+                {/* Animation Duration */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    Animation: {selectedGesture.animation_duration}ms
+                  </Label>
+                  <Slider
+                    value={[selectedGesture.animation_duration]}
+                    onValueChange={(value) =>
+                      setStrokeData((prev) => ({
+                        ...prev,
+                        gestures: prev.gestures.map((gesture) =>
+                          gesture.order === parseInt(selectedGestureId || '0', 10)
+                            ? { ...gesture, animation_duration: value[0] }
+                            : gesture
+                        )
+                      }))
+                    }
+                    min={50}
+                    max={1000}
+                    step={10}
+                    className="w-full"
+                    disabled={isRecording || isPlaying}
+                  />
                 </div>
               </div>
 
@@ -657,23 +869,6 @@ export default function AddEditTextData({ text_data, location }: Props) {
               )}
             </div>
           )}
-
-          {/* Animation Duration Slider */}
-          <div className="space-y-2">
-            <Label className="font-bold">
-              Animation Duration: {strokeData.animationDuration}ms
-            </Label>
-            <Slider
-              value={[strokeData.animationDuration]}
-              onValueChange={(value) =>
-                setStrokeData((prev) => ({ ...prev, animationDuration: value[0] }))
-              }
-              min={50}
-              max={1000}
-              step={10}
-              className="w-full"
-            />
-          </div>
         </div>
 
         <div className="flex justify-center">
@@ -733,7 +928,24 @@ const SaveEditMode = ({
 
   const handle_save = () => {
     if (text.trim().length === 0 || !fabricCanvasRef.current) return;
+
+    // Temporarily hide gesture visualization objects
+    const gestureObjects = fabricCanvasRef.current
+      .getObjects()
+      .filter((obj) => obj.get('isGestureVisualization'));
+    gestureObjects.forEach((obj) => {
+      fabricCanvasRef.current?.remove(obj);
+    });
+
+    // Get JSON with only text path objects
     const fabricjs_svg_dump = fabricCanvasRef.current.toJSON();
+
+    // Restore gesture visualization objects
+    gestureObjects.forEach((obj) => {
+      fabricCanvasRef.current?.add(obj);
+    });
+    fabricCanvasRef.current.renderAll();
+
     if (is_addition) {
       add_text_data_mut.mutate({
         text,

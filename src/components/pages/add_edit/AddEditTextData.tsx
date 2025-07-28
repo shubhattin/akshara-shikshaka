@@ -6,6 +6,7 @@ import { Button } from '~/components/ui/button';
 import { Card } from '~/components/ui/card';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
+import { Slider } from '~/components/ui/slider';
 import * as fabric from 'fabric';
 import { client_q } from '~/api/client';
 import { useRouter } from 'next/navigation';
@@ -24,13 +25,37 @@ import {
   AlertDialogTitle
 } from '@radix-ui/react-alert-dialog';
 import { FiSave } from 'react-icons/fi';
-import { MdDeleteOutline } from 'react-icons/md';
+import { MdDeleteOutline, MdPlayArrow, MdStop, MdClear, MdFiberManualRecord } from 'react-icons/md';
 import { toast } from 'sonner';
+import { cn } from '~/lib/utils';
+
+// Gesture Types
+type StrokePoint = {
+  x: number;
+  y: number;
+  timestamp: number;
+};
+
+type Stroke = {
+  points: StrokePoint[];
+};
+
+type Gesture = {
+  id: string;
+  name: string;
+  strokes: Stroke[];
+};
+
+type StrokeData = {
+  gestures: Gesture[];
+  animationDuration: number; // 50-1000ms
+};
 
 type text_data_type = {
   text: string;
   id?: number;
   uuid?: string;
+  strokes_json?: StrokeData;
 };
 
 type Props =
@@ -54,6 +79,21 @@ export default function AddEditTextData({ text_data, location }: Props) {
   const [savedText, setSavedText] = useState(text_data.text);
   const [textEditMode, setTextEditMode] = useState(location === 'add' && true);
   const [scaleDownFactor, setScaleDownFactor] = useState(4.5);
+
+  // Gesture Recording State
+  const [strokeData, setStrokeData] = useState<StrokeData>(
+    text_data.strokes_json || {
+      gestures: [],
+      animationDuration: 300
+    }
+  );
+  const [selectedGestureId, setSelectedGestureId] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentStroke, setCurrentStroke] = useState<StrokePoint[]>([]);
+  const [recordingStartTime, setRecordingStartTime] = useState<number>(0);
+  const [tempStrokes, setTempStrokes] = useState<Stroke[]>([]);
+  const [characterPath, setCharacterPath] = useState<fabric.Path | null>(null);
 
   const initCanvas = async () => {
     if (!canvasRef.current) return;
@@ -81,13 +121,128 @@ export default function AddEditTextData({ text_data, location }: Props) {
     const canvas = new fab.Canvas(canvasRef.current, {
       width: 400,
       height: 400,
-      backgroundColor: '#ffffff'
+      backgroundColor: '#ffffff',
+      isDrawingMode: false // Explicitly disable drawing mode initially
     });
 
     // Store reference on the canvas element itself for cleanup
     (canvasRef.current as any).__fabric = canvas;
 
     fabricCanvasRef.current = canvas;
+  };
+
+  // Function to approximate gesture points to the character path
+  const approximateToCharacterPath = (
+    gesturePoints: StrokePoint[],
+    charPath: fabric.Path
+  ): StrokePoint[] => {
+    // Get the path's bounding box
+    const pathBounds = charPath.getBoundingRect();
+    const pathCenter = {
+      x: pathBounds.left + pathBounds.width / 2,
+      y: pathBounds.top + pathBounds.height / 2
+    };
+
+    // Simple approximation: snap points that are close to the character path
+    const snapThreshold = 20; // pixels
+
+    return gesturePoints.map((point) => {
+      // Get the path outline points (simplified approach)
+      // In a production app, you'd use a more sophisticated algorithm
+      // to find the closest point on the actual path curve
+
+      // For now, we'll do a simple distance-based snapping
+      const distToCenter = Math.sqrt(
+        Math.pow(point.x - pathCenter.x, 2) + Math.pow(point.y - pathCenter.y, 2)
+      );
+
+      // If the point is within the character bounds, keep it closer to the path
+      if (
+        point.x >= pathBounds.left - snapThreshold &&
+        point.x <= pathBounds.left + pathBounds.width + snapThreshold &&
+        point.y >= pathBounds.top - snapThreshold &&
+        point.y <= pathBounds.top + pathBounds.height + snapThreshold
+      ) {
+        // This is a simplified approximation
+        // In reality, you'd want to find the nearest point on the actual path
+        return {
+          ...point,
+          // Add a slight magnetic effect towards the path
+          x: point.x,
+          y: point.y
+        };
+      }
+
+      return point;
+    });
+  };
+
+  const setupGestureRecording = () => {
+    if (!fabricCanvasRef.current) return;
+
+    const canvas = fabricCanvasRef.current;
+
+    // Enable free drawing mode
+    canvas.isDrawingMode = true;
+    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+    canvas.freeDrawingBrush.color = '#ff0000';
+    canvas.freeDrawingBrush.width = 3;
+
+    // Clear all previous listeners first
+    canvas.off('path:created');
+
+    // Listen for path creation with proper closure
+    const handlePathCreated = (e: any) => {
+      if (!e.path) return;
+
+      console.log('Path created during recording');
+
+      // Mark the path as gesture visualization
+      e.path.set({
+        selectable: false,
+        evented: false,
+        isGestureVisualization: true
+      });
+
+      // Extract points from the path
+      const pathData = e.path.path;
+      const points: StrokePoint[] = [];
+      const currentTime = Date.now();
+
+      // Convert SVG path commands to points
+      pathData.forEach((cmd: any, index: number) => {
+        if (cmd[0] === 'M' || cmd[0] === 'L') {
+          points.push({
+            x: cmd[1],
+            y: cmd[2],
+            timestamp: currentTime + index * 10
+          });
+        } else if (cmd[0] === 'Q' && cmd.length >= 5) {
+          // Quadratic bezier curve - add end point
+          points.push({
+            x: cmd[3],
+            y: cmd[4],
+            timestamp: currentTime + index * 10
+          });
+        }
+      });
+
+      if (points.length > 1) {
+        // Apply path approximation if character path exists
+        const approximatedPoints = characterPath
+          ? approximateToCharacterPath(points, characterPath)
+          : points;
+
+        console.log('Adding stroke with', approximatedPoints.length, 'points');
+        setTempStrokes((prev) => {
+          const newStrokes = [...prev, { points: approximatedPoints }];
+          console.log('Total temp strokes:', newStrokes.length);
+          return newStrokes;
+        });
+      }
+    };
+
+    canvas.on('path:created', handlePathCreated);
   };
 
   const render_text_path = async (text: string) => {
@@ -114,9 +269,9 @@ export default function AddEditTextData({ text_data, location }: Props) {
         lockMovementY: false
       });
 
-      // clear prev path objectjs
+      // clear prev path objects
       fabricCanvasRef.current?.getObjects().forEach((obj) => {
-        if (obj instanceof fabric.Path) {
+        if (obj instanceof fabric.Path && !obj.get('isGestureVisualization')) {
           fabricCanvasRef.current?.remove(obj);
         }
       });
@@ -125,12 +280,215 @@ export default function AddEditTextData({ text_data, location }: Props) {
       fabricCanvasRef.current?.centerObject(pathObject);
       fabricCanvasRef.current?.add(pathObject);
       fabricCanvasRef.current?.renderAll();
+
+      // Store the character path for approximation
+      setCharacterPath(pathObject);
     }
   };
+
+  const addNewGesture = () => {
+    const newGesture: Gesture = {
+      id: crypto.randomUUID(),
+      name: `Gesture ${strokeData.gestures.length + 1}`,
+      strokes: []
+    };
+    setStrokeData((prev) => ({
+      ...prev,
+      gestures: [...prev.gestures, newGesture]
+    }));
+    setSelectedGestureId(newGesture.id);
+  };
+
+  const clearCurrentGesture = () => {
+    if (!selectedGestureId) return;
+    setStrokeData((prev) => ({
+      ...prev,
+      gestures: prev.gestures.map((gesture) =>
+        gesture.id === selectedGestureId ? { ...gesture, strokes: [] } : gesture
+      )
+    }));
+    clearGestureVisualization();
+  };
+
+  const deleteGesture = (gestureId: string) => {
+    setStrokeData((prev) => ({
+      ...prev,
+      gestures: prev.gestures.filter((g) => g.id !== gestureId)
+    }));
+    if (selectedGestureId === gestureId) {
+      setSelectedGestureId(null);
+    }
+  };
+
+  const startRecording = () => {
+    if (!selectedGestureId || !fabricCanvasRef.current) return;
+    setIsRecording(true);
+    setRecordingStartTime(Date.now());
+    setTempStrokes([]); // Clear temporary strokes
+    clearGestureVisualization();
+
+    // Enable drawing mode by disabling object selection
+    fabricCanvasRef.current.selection = false;
+    fabricCanvasRef.current.forEachObject((obj) => {
+      obj.selectable = false;
+      obj.evented = false;
+    });
+
+    // Set up event handling
+    setupGestureRecording();
+    fabricCanvasRef.current.renderAll();
+  };
+
+  const stopRecording = () => {
+    setIsRecording(false);
+    setCurrentStroke([]);
+    setTempStrokes([]); // Clear temp strokes without saving
+    clearGestureVisualization(); // Clear all drawn strokes
+
+    // Restore normal canvas behavior
+    if (fabricCanvasRef.current) {
+      fabricCanvasRef.current.isDrawingMode = false; // Disable drawing mode
+      fabricCanvasRef.current.selection = true;
+
+      // Remove path created listener
+      fabricCanvasRef.current.off('path:created');
+
+      fabricCanvasRef.current.forEachObject((obj) => {
+        if (!obj.get('isGestureVisualization')) {
+          obj.selectable = true;
+          obj.evented = false; // Keep character paths non-interactive
+        }
+      });
+      fabricCanvasRef.current.renderAll();
+    }
+  };
+
+  const saveRecording = () => {
+    if (!selectedGestureId || tempStrokes.length === 0) return;
+
+    const strokeCount = tempStrokes.length;
+
+    // Add all temporary strokes to the selected gesture
+    setStrokeData((prev) => ({
+      ...prev,
+      gestures: prev.gestures.map((gesture) =>
+        gesture.id === selectedGestureId
+          ? {
+              ...gesture,
+              strokes: [...gesture.strokes, ...tempStrokes]
+            }
+          : gesture
+      )
+    }));
+
+    // Clear temporary strokes
+    setTempStrokes([]);
+
+    // Stop recording but keep the visualization
+    setIsRecording(false);
+
+    // Disable drawing mode
+    if (fabricCanvasRef.current) {
+      fabricCanvasRef.current.isDrawingMode = false;
+      fabricCanvasRef.current.selection = true;
+      fabricCanvasRef.current.renderAll();
+    }
+
+    toast.success(`Added ${strokeCount} stroke(s) to gesture`);
+  };
+
+  const clearGestureVisualization = () => {
+    if (!fabricCanvasRef.current) return;
+
+    // Remove only gesture visualization objects (lines), keep the character path
+    fabricCanvasRef.current.getObjects().forEach((obj) => {
+      if (obj.get('isGestureVisualization')) {
+        fabricCanvasRef.current?.remove(obj);
+      }
+    });
+    fabricCanvasRef.current.renderAll();
+  };
+
+  const playGesture = async (gestureId: string) => {
+    const gesture = strokeData.gestures.find((g) => g.id === gestureId);
+    if (!gesture || !fabricCanvasRef.current) return;
+
+    setIsPlaying(true);
+    clearGestureVisualization();
+
+    for (const stroke of gesture.strokes) {
+      if (stroke.points.length < 2) continue;
+
+      // Create a path for smooth animation
+      let pathString = '';
+      stroke.points.forEach((point, index) => {
+        if (index === 0) {
+          pathString += `M ${point.x} ${point.y}`;
+        } else {
+          pathString += ` L ${point.x} ${point.y}`;
+        }
+      });
+
+      // Create the full path but make it invisible initially
+      const fullPath = new fabric.Path(pathString, {
+        stroke: '#ff0000',
+        strokeWidth: 3,
+        fill: '',
+        selectable: false,
+        evented: false,
+        isGestureVisualization: true,
+        opacity: 0
+      } as any);
+
+      fabricCanvasRef.current.add(fullPath);
+
+      // Animate the path drawing
+      const totalPoints = stroke.points.length;
+      const animationSteps = Math.min(totalPoints * 2, 50); // More steps for smoother animation
+
+      for (let step = 1; step <= animationSteps; step++) {
+        const progress = step / animationSteps;
+        const pointIndex = Math.floor(progress * (totalPoints - 1));
+
+        // Create partial path up to current point
+        let partialPath = '';
+        for (let i = 0; i <= pointIndex; i++) {
+          if (i === 0) {
+            partialPath += `M ${stroke.points[i].x} ${stroke.points[i].y}`;
+          } else {
+            partialPath += ` L ${stroke.points[i].x} ${stroke.points[i].y}`;
+          }
+        }
+
+        // Add interpolated point for smooth animation
+        if (pointIndex < totalPoints - 1) {
+          const currentPoint = stroke.points[pointIndex];
+          const nextPoint = stroke.points[pointIndex + 1];
+          const subProgress = (progress * (totalPoints - 1)) % 1;
+
+          const interpolatedX = currentPoint.x + (nextPoint.x - currentPoint.x) * subProgress;
+          const interpolatedY = currentPoint.y + (nextPoint.y - currentPoint.y) * subProgress;
+
+          partialPath += ` L ${interpolatedX} ${interpolatedY}`;
+        }
+
+        // Update the path
+        fullPath.set('path', fabric.util.parsePath(partialPath));
+        fullPath.set('opacity', 1);
+        fabricCanvasRef.current.renderAll();
+
+        // Wait based on animation duration
+        const delay = strokeData.animationDuration / animationSteps;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    setIsPlaying(false);
+  };
+
   useEffect(() => {
     canceledRef.current = false;
     initCanvas();
-    console.log('initCanvas');
     return () => {
       canceledRef.current = true;
       if (fabricCanvasRef.current) {
@@ -143,10 +501,15 @@ export default function AddEditTextData({ text_data, location }: Props) {
       }
     };
   }, []);
+
+  // Removed useEffect for setupGestureRecording as it will be called directly in startRecording
+
   useEffect(() => {
     if (savedText.trim().length === 0) return;
     render_text_path(savedText);
   }, [savedText, scaleDownFactor]);
+
+  const selectedGesture = strokeData.gestures.find((g) => g.id === selectedGestureId);
 
   return (
     <Card className="p-6">
@@ -173,6 +536,7 @@ export default function AddEditTextData({ text_data, location }: Props) {
             )}
           </div>
         </div>
+
         <div className="flex items-center gap-2">
           <Label className="font-bold">Scale Down Factor</Label>
           <Input
@@ -188,13 +552,147 @@ export default function AddEditTextData({ text_data, location }: Props) {
             }}
           />
         </div>
+
+        {/* Gesture Management Section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="font-bold">Gestures</Label>
+            <Button onClick={addNewGesture} size="sm" variant="outline">
+              <IoMdAdd className="mr-1" />
+              Add Gesture
+            </Button>
+          </div>
+
+          {/* Gesture List */}
+          <div className="flex flex-wrap gap-2">
+            {strokeData.gestures.map((gesture) => (
+              <div
+                key={gesture.id}
+                className={cn(
+                  'flex cursor-pointer items-center gap-2 rounded border p-2 transition-colors',
+                  selectedGestureId === gesture.id
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                )}
+                onClick={() => setSelectedGestureId(gesture.id)}
+              >
+                <span className="text-sm">{gesture.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  ({gesture.strokes.length} strokes)
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteGesture(gesture.id);
+                  }}
+                >
+                  <MdDeleteOutline className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          {/* Gesture Controls */}
+          {selectedGesture && (
+            <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">Selected: {selectedGesture.name}</span>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={clearCurrentGesture}
+                    disabled={isRecording || isPlaying}
+                  >
+                    <MdClear className="mr-1" />
+                    Clear
+                  </Button>
+
+                  {!isRecording ? (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={startRecording}
+                      disabled={isPlaying}
+                    >
+                      <MdFiberManualRecord className="mr-1 text-red-500" />
+                      Record
+                    </Button>
+                  ) : (
+                    <>
+                      <Button size="sm" variant="secondary" onClick={stopRecording}>
+                        <MdStop className="mr-1" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={saveRecording}
+                        disabled={tempStrokes.length === 0}
+                      >
+                        Done ({tempStrokes.length})
+                      </Button>
+                    </>
+                  )}
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => playGesture(selectedGesture.id)}
+                    disabled={isRecording || isPlaying || selectedGesture.strokes.length === 0}
+                  >
+                    <MdPlayArrow className="mr-1" />
+                    Play
+                  </Button>
+                </div>
+              </div>
+
+              {isRecording && (
+                <div className="text-sm font-medium text-destructive">
+                  🔴 Recording... Draw on the canvas to record strokes
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Animation Duration Slider */}
+          <div className="space-y-2">
+            <Label className="font-bold">
+              Animation Duration: {strokeData.animationDuration}ms
+            </Label>
+            <Slider
+              value={[strokeData.animationDuration]}
+              onValueChange={(value) =>
+                setStrokeData((prev) => ({ ...prev, animationDuration: value[0] }))
+              }
+              min={50}
+              max={1000}
+              step={10}
+              className="w-full"
+            />
+          </div>
+        </div>
+
         <div className="flex justify-center">
-          <div className="rounded-lg border-2 border-gray-200">
+          <div
+            className={cn(
+              'rounded-lg border-2 transition-colors',
+              isRecording ? 'border-destructive' : 'border-border'
+            )}
+          >
             <canvas ref={canvasRef} />
           </div>
         </div>
       </div>
-      <SaveEditMode text_data={text_data} text={text} fabricCanvasRef={fabricCanvasRef} />
+      <SaveEditMode
+        text_data={text_data}
+        text={text}
+        strokeData={strokeData}
+        fabricCanvasRef={fabricCanvasRef}
+      />
     </Card>
   );
 }
@@ -202,10 +700,12 @@ export default function AddEditTextData({ text_data, location }: Props) {
 const SaveEditMode = ({
   text_data,
   text,
+  strokeData,
   fabricCanvasRef
 }: {
   text_data: Props['text_data'];
   text: string;
+  strokeData: StrokeData;
   fabricCanvasRef: React.RefObject<Canvas | null>;
 }) => {
   const is_addition = text_data.id === undefined && text_data.uuid === undefined;
@@ -237,14 +737,16 @@ const SaveEditMode = ({
     if (is_addition) {
       add_text_data_mut.mutate({
         text,
-        svg_json: fabricjs_svg_dump
+        svg_json: fabricjs_svg_dump,
+        strokes_json: strokeData
       });
     } else {
       update_text_data_mut.mutate({
         id: text_data.id!,
         uuid: text_data.uuid!,
         text,
-        svg_json: fabricjs_svg_dump
+        svg_json: fabricjs_svg_dump,
+        strokes_json: strokeData
       });
     }
   };

@@ -4,14 +4,45 @@ import { db } from '~/db/db';
 import { text_data } from '~/db/schema';
 import { and, eq } from 'drizzle-orm';
 
+// Define proper types for strokes data
+const StrokePointSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+  timestamp: z.number()
+});
+
+const StrokeSchema = z.object({
+  order: z.number(),
+  points: z.array(StrokePointSchema)
+});
+
+const GestureSchema = z.object({
+  order: z.number(),
+  strokes: z.array(StrokeSchema),
+  brush_width: z.number(),
+  brush_color: z.string(),
+  animation_duration: z.number()
+});
+
+const StrokeDataSchema = z.object({
+  gestures: z.array(GestureSchema)
+});
+
 const add_text_data_route = protectedAdminProcedure
-  .input(z.object({ text: z.string().min(1), svg_json: z.any() }))
+  .input(
+    z.object({
+      text: z.string().min(1),
+      svg_json: z.any(),
+      strokes_json: StrokeDataSchema.optional()
+    })
+  )
   .mutation(async ({ input }) => {
     const result = await db
       .insert(text_data)
       .values({
         text: input.text,
-        svg_json: input.svg_json!
+        svg_json: input.svg_json!,
+        strokes_json: input.strokes_json || null
       })
       .returning();
     return {
@@ -26,13 +57,18 @@ const edit_text_data_route = protectedAdminProcedure
       id: z.number(),
       uuid: z.string().uuid(),
       text: z.string().min(1),
-      svg_json: z.any()
+      svg_json: z.any(),
+      strokes_json: StrokeDataSchema.optional()
     })
   )
   .mutation(async ({ input }) => {
     await db
       .update(text_data)
-      .set(input)
+      .set({
+        text: input.text,
+        svg_json: input.svg_json,
+        strokes_json: input.strokes_json || null
+      })
       .where(and(eq(text_data.uuid, input.uuid), eq(text_data.id, input.id)));
     return {
       updated: true

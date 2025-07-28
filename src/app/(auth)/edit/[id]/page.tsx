@@ -16,7 +16,8 @@ const get_cached_text_data = cache(async (id: number) => {
     columns: {
       id: true,
       uuid: true,
-      text: true
+      text: true,
+      strokes_json: true
     }
   });
   return text_data;
@@ -50,7 +51,17 @@ const MainEdit = async ({ params }: Props) => {
           सूची
         </Link>
       </div>
-      <AddEditTextData location="add" text_data={text_data!} />
+      {text_data ? (
+        <AddEditTextData
+          location="edit"
+          text_data={{
+            ...text_data,
+            strokes_json: text_data.strokes_json ?? undefined
+          }}
+        />
+      ) : (
+        <div>Text data not found</div>
+      )}
     </div>
   );
 };

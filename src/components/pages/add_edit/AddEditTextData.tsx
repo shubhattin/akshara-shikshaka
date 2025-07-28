@@ -12,18 +12,16 @@ import { client_q } from '~/api/client';
 import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogTitle,
   AlertDialogTrigger
 } from '~/components/ui/alert-dialog';
 import { IoMdAdd } from 'react-icons/io';
-import {
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogDescription,
-  AlertDialogTitle
-} from '@radix-ui/react-alert-dialog';
 import { FiSave } from 'react-icons/fi';
 import { MdDeleteOutline, MdPlayArrow, MdStop, MdClear, MdFiberManualRecord } from 'react-icons/md';
 import { toast } from 'sonner';
@@ -563,6 +561,7 @@ export default function AddEditTextData({ text_data, location }: Props) {
 
   const playAllGestures = async () => {
     setIsPlaying(true);
+    clearGestureVisualization();
 
     for (const gesture of strokeData.gestures) {
       if (gesture.strokes.length === 0) continue;

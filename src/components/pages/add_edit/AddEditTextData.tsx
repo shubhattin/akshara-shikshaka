@@ -23,9 +23,107 @@ import {
 } from '~/components/ui/alert-dialog';
 import { IoMdAdd } from 'react-icons/io';
 import { FiSave } from 'react-icons/fi';
-import { MdDeleteOutline, MdPlayArrow, MdStop, MdClear, MdFiberManualRecord } from 'react-icons/md';
+import {
+  MdDeleteOutline,
+  MdPlayArrow,
+  MdStop,
+  MdClear,
+  MdFiberManualRecord,
+  MdDragHandle
+} from 'react-icons/md';
 import { toast } from 'sonner';
 import { cn } from '~/lib/utils';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Sortable Gesture Item Component
+type SortableGestureItemProps = {
+  gesture: Gesture;
+  selectedGestureId: string | null;
+  onSelect: (gestureId: string | null) => void;
+  onDelete: (gestureOrder: number) => void;
+  disabled?: boolean;
+};
+
+function SortableGestureItem({
+  gesture,
+  selectedGestureId,
+  onSelect,
+  onDelete,
+  disabled = false
+}: SortableGestureItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: gesture.order.toString(),
+    disabled: disabled
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'flex cursor-pointer items-center gap-2 rounded border p-2 transition-colors',
+        selectedGestureId === gesture.order.toString()
+          ? 'border-primary bg-primary/10'
+          : 'border-border hover:border-primary/50 hover:bg-muted/50',
+        isDragging && 'z-10 shadow-lg'
+      )}
+      onClick={() => {
+        if (!disabled) {
+          if (selectedGestureId === gesture.order.toString()) {
+            onSelect(null);
+          } else {
+            onSelect(gesture.order.toString());
+          }
+        }
+      }}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab rounded p-1 hover:cursor-grabbing hover:bg-muted"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <MdDragHandle className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <span className="text-sm">Gesture {gesture.order + 1}</span>
+      <span className="text-xs text-muted-foreground">({gesture.strokes.length} strokes)</span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 w-6 p-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(gesture.order);
+        }}
+        disabled={disabled}
+      >
+        <MdDeleteOutline className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}
 
 // Gesture Types
 type StrokePoint = {
@@ -93,6 +191,57 @@ export default function AddEditTextData({ text_data, location }: Props) {
   const [recordingStartTime, setRecordingStartTime] = useState<number>(0);
   const [tempStrokes, setTempStrokes] = useState<Stroke[]>([]);
   const [characterPath, setCharacterPath] = useState<fabric.Path | null>(null);
+
+  // Drag and Drop Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates
+    })
+  );
+
+  // Handle gesture reordering
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const activeOrder = parseInt(active.id.toString(), 10);
+      const isSelectedBeingMoved = selectedGestureId === active.id.toString();
+
+      setStrokeData((prev) => {
+        const oldIndex = prev.gestures.findIndex((g) => g.order === activeOrder);
+        const newIndex = prev.gestures.findIndex((g) => g.order.toString() === over.id);
+
+        if (oldIndex === -1 || newIndex === -1) return prev;
+
+        // Reorder the gestures array
+        const newGestures = arrayMove(prev.gestures, oldIndex, newIndex);
+
+        // Update the order property for each gesture to reflect new positions
+        const updatedGestures = newGestures.map((gesture, index) => ({
+          ...gesture,
+          order: index
+        }));
+
+        return {
+          ...prev,
+          gestures: updatedGestures
+        };
+      });
+
+      // Update selectedGestureId if the selected gesture was moved
+      if (isSelectedBeingMoved) {
+        const oldIndex = strokeData.gestures.findIndex((g) => g.order === activeOrder);
+        const newIndex = strokeData.gestures.findIndex((g) => g.order.toString() === over.id);
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newGestures = arrayMove(strokeData.gestures, oldIndex, newIndex);
+          // The selected gesture will now be at position newIndex, so its new order is newIndex
+          setSelectedGestureId(newIndex.toString());
+        }
+      }
+    }
+  };
 
   const initCanvas = async () => {
     if (!canvasRef.current) return;
@@ -689,43 +838,32 @@ export default function AddEditTextData({ text_data, location }: Props) {
           )}
 
           {/* Gesture List */}
-          <div className="flex flex-wrap gap-2">
-            {strokeData.gestures.map((gesture) => (
-              <div
-                key={gesture.order}
-                className={cn(
-                  'flex cursor-pointer items-center gap-2 rounded border p-2 transition-colors',
-                  selectedGestureId === gesture.order.toString()
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-primary/50 hover:bg-muted/50'
-                )}
-                onClick={() => {
-                  clearGestureVisualization();
-                  if (selectedGestureId === gesture.order.toString()) {
-                    setSelectedGestureId(null);
-                  } else {
-                    setSelectedGestureId(gesture.order.toString());
-                  }
-                }}
-              >
-                <span className="text-sm">Gesture {gesture.order + 1}</span>
-                <span className="text-xs text-muted-foreground">
-                  ({gesture.strokes.length} strokes)
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 w-6 p-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteGesture(gesture.order);
-                  }}
-                >
-                  <MdDeleteOutline className="h-3 w-3" />
-                </Button>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={strokeData.gestures.map((g) => g.order.toString())}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="flex flex-col gap-2">
+                {strokeData.gestures.map((gesture) => (
+                  <SortableGestureItem
+                    key={gesture.order}
+                    gesture={gesture}
+                    selectedGestureId={selectedGestureId}
+                    onSelect={(gestureId) => {
+                      clearGestureVisualization();
+                      setSelectedGestureId(gestureId);
+                    }}
+                    onDelete={deleteGesture}
+                    disabled={isRecording || isPlaying}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
 
           {/* Gesture Controls */}
           {selectedGesture && (

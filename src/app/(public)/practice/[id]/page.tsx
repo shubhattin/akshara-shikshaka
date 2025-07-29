@@ -3,7 +3,7 @@ import { type Metadata } from 'next';
 import { cache } from 'react';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 import { db } from '~/db/db';
-import CanvasComponent from '~/components/pages/practice/PracticeCanvasComponent';
+import PracticeCanvasComponent from '~/components/pages/practice/PracticeCanvasComponent';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -14,7 +14,7 @@ const get_cached_text_data = cache(async (id: number) => {
       id: true,
       uuid: true,
       text: true,
-      svg_json: true
+      strokes_json: true
     }
   });
   return text_data;
@@ -40,9 +40,22 @@ const MainEdit = async ({ params }: Props) => {
 
   const text_data = await get_cached_text_data(id);
 
+  if (!text_data) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center">
+        <div className="text-center text-muted-foreground">Text data not found.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col items-center justify-center">
-      <CanvasComponent fabricjs_svg_dump={text_data!.svg_json} characterText={text_data?.text} />
+      <PracticeCanvasComponent
+        text_data={{
+          ...text_data,
+          strokes_json: text_data.strokes_json || undefined
+        }}
+      />
     </div>
   );
 };

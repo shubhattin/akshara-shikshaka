@@ -55,6 +55,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [completedStrokes, setCompletedStrokes] = useState<number[]>([]);
   const [showCongratulations, setShowCongratulations] = useState(false);
+  const [isAnimatingCurrentStroke, setIsAnimatingCurrentStroke] = useState(false);
 
   const strokeData = text_data.strokes_json || { gestures: [] };
 
@@ -105,9 +106,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     (canvasRef.current as any).__fabric = canvas;
     fabricCanvasRef.current = canvas;
 
-    // Render character path and pre-rendered strokes
-    await renderCharacterPath();
-    prerenderAllStrokes();
+    // Start with a clean, empty canvas (no character path or pre-rendered strokes)
   };
 
   const renderCharacterPath = async () => {
@@ -138,42 +137,8 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
   };
 
   const prerenderAllStrokes = () => {
-    if (!fabricCanvasRef.current) return;
-
-    // Remove any existing prerendered strokes
-    fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get('isPrerenderStroke')) {
-        fabricCanvasRef.current?.remove(obj);
-      }
-    });
-
-    // Render all strokes in light gray
-    allStrokes.forEach((stroke, index) => {
-      if (stroke.points.length < 2) return;
-
-      let pathString = '';
-      stroke.points.forEach((point, pointIndex) => {
-        if (pointIndex === 0) {
-          pathString += `M ${point.x} ${point.y}`;
-        } else {
-          pathString += ` L ${point.x} ${point.y}`;
-        }
-      });
-
-      const pathObject = new fabric.Path(pathString, {
-        stroke: '#e0e0e0',
-        strokeWidth: stroke.gesture.brush_width * 0.8,
-        fill: '',
-        selectable: false,
-        evented: false,
-        isPrerenderStroke: true,
-        originalStrokeIndex: index
-      } as any);
-
-      fabricCanvasRef.current?.add(pathObject);
-    });
-
-    fabricCanvasRef.current?.renderAll();
+    // Intentionally no-op to keep canvas empty at start
+    return;
   };
 
   const playAllStrokes = async () => {
@@ -269,6 +234,9 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
   const showCurrentStroke = async () => {
     if (!currentStroke) return;
 
+    // Disable drawing while playing the guided animation for the current stroke
+    disableDrawingMode();
+    setIsAnimatingCurrentStroke(true);
     clearCurrentAnimatedStroke();
     await animateStroke(
       currentStroke,
@@ -276,6 +244,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
       currentStroke.gesture.brush_width,
       currentStroke.gesture.animation_duration
     );
+    setIsAnimatingCurrentStroke(false);
     enableDrawingMode();
   };
 
@@ -348,31 +317,105 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     userPoints: StrokePoint[],
     targetPoints: StrokePoint[]
   ): number => {
-    if (userPoints.length === 0 || targetPoints.length === 0) return 0;
+    if (userPoints.length < 2 || targetPoints.length < 2) return 0;
 
-    const maxDistance = 50;
-    let totalAccuracy = 0;
-    let comparisons = 0;
+    // 1) Normalize and resample both sequences to fixed length
+    const SAMPLE_SIZE = 64;
+    const normalize = (pts: StrokePoint[]) => {
+      const xs = pts.map((p) => p.x);
+      const ys = pts.map((p) => p.y);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      const maxX = Math.max(...xs);
+      const maxY = Math.max(...ys);
+      const w = Math.max(1, maxX - minX);
+      const h = Math.max(1, maxY - minY);
+      const scale = 1 / Math.max(w, h);
+      return pts.map((p) => ({ x: (p.x - minX) * scale, y: (p.y - minY) * scale, timestamp: 0 }));
+    };
 
-    const sampleCount = Math.min(userPoints.length, targetPoints.length, 20);
+    const resample = (pts: StrokePoint[], n: number) => {
+      if (pts.length === n) return pts;
+      const dists: number[] = [0];
+      for (let i = 1; i < pts.length; i++) {
+        const dx = pts[i].x - pts[i - 1].x;
+        const dy = pts[i].y - pts[i - 1].y;
+        dists[i] = dists[i - 1] + Math.hypot(dx, dy);
+      }
+      const total = dists[dists.length - 1] || 1;
+      const step = total / (n - 1);
+      const res: StrokePoint[] = [];
+      let target = 0;
+      let j = 0;
+      for (let i = 0; i < n; i++) {
+        while (j < dists.length - 1 && dists[j] < target) j++;
+        const prev = Math.max(0, j - 1);
+        const t = dists[j] === dists[prev] ? 0 : (target - dists[prev]) / (dists[j] - dists[prev]);
+        const x = pts[prev].x + (pts[j].x - pts[prev].x) * t;
+        const y = pts[prev].y + (pts[j].y - pts[prev].y) * t;
+        res.push({ x, y, timestamp: i });
+        target = i * step;
+      }
+      return res;
+    };
 
-    for (let i = 0; i < sampleCount; i++) {
-      const userIndex = Math.floor((i / sampleCount) * (userPoints.length - 1));
-      const targetIndex = Math.floor((i / sampleCount) * (targetPoints.length - 1));
+    const uNorm = normalize(userPoints);
+    const tNorm = normalize(targetPoints);
+    const u = resample(uNorm, SAMPLE_SIZE);
+    const t = resample(tNorm, SAMPLE_SIZE);
 
-      const userPoint = userPoints[userIndex];
-      const targetPoint = targetPoints[targetIndex];
+    // 2) Compute direction similarity (cosine between overall vectors)
+    const vec = (pts: StrokePoint[]) => ({
+      x: pts[pts.length - 1].x - pts[0].x,
+      y: pts[pts.length - 1].y - pts[0].y
+    });
+    const dot = (a: { x: number; y: number }, b: { x: number; y: number }) => a.x * b.x + a.y * b.y;
+    const mag = (a: { x: number; y: number }) => Math.hypot(a.x, a.y) || 1e-6;
+    const vU = vec(u);
+    const vT = vec(t);
+    const directionCos = Math.max(0, Math.min(1, dot(vU, vT) / (mag(vU) * mag(vT))));
 
-      const distance = Math.sqrt(
-        Math.pow(userPoint.x - targetPoint.x, 2) + Math.pow(userPoint.y - targetPoint.y, 2)
-      );
+    // 3) Endpoint proximity
+    const endDist = Math.hypot(
+      u[u.length - 1].x - t[t.length - 1].x,
+      u[u.length - 1].y - t[t.length - 1].y
+    );
+    const startDist = Math.hypot(u[0].x - t[0].x, u[0].y - t[0].y);
+    const endpointScore = Math.max(0, 1 - (startDist + endDist) / 2);
 
-      const pointAccuracy = Math.max(0, 1 - distance / maxDistance);
-      totalAccuracy += pointAccuracy;
-      comparisons++;
-    }
+    // 4) DTW path similarity for shape matching
+    const dtw = (a: StrokePoint[], b: StrokePoint[]) => {
+      const n = a.length;
+      const m = b.length;
+      const dp = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(Infinity));
+      dp[0][0] = 0;
+      const cost = (i: number, j: number) => Math.hypot(a[i].x - b[j].x, a[i].y - b[j].y);
+      for (let i = 1; i <= n; i++) {
+        for (let j = 1; j <= m; j++) {
+          const c = cost(i - 1, j - 1);
+          dp[i][j] = c + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+        }
+      }
+      return dp[n][m] / (n + m);
+    };
 
-    return comparisons > 0 ? totalAccuracy / comparisons : 0;
+    const dtwDist = dtw(u, t);
+    const dtwScore = Math.max(0, 1 - dtwDist); // since coords are normalized to ~[0,1], distance ~[0,2]
+
+    // 5) Path length ratio (to discourage overly short/long)
+    const lengthOf = (pts: StrokePoint[]) =>
+      pts.reduce((acc, p, i) => {
+        if (i === 0) return 0;
+        return acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y);
+      }, 0);
+    const lenU = lengthOf(u);
+    const lenT = lengthOf(t);
+    const lenRatio = lenT > 0 ? Math.min(lenU, lenT) / Math.max(lenU, lenT) : 0;
+
+    // Weighted aggregate score
+    const score = 0.45 * dtwScore + 0.2 * directionCos + 0.2 * endpointScore + 0.15 * lenRatio;
+
+    return Math.max(0, Math.min(1, score));
   };
 
   const completeCurrentStroke = () => {
@@ -467,8 +510,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
   };
 
   const replayCurrentStroke = () => {
-    if (!currentStroke || practiceMode !== 'practicing') return;
-
+    if (!currentStroke || practiceMode !== 'practicing' || isAnimatingCurrentStroke) return;
     clearCurrentAnimatedStroke();
     showCurrentStroke();
   };
@@ -480,7 +522,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     setShowCongratulations(false);
     disableDrawingMode();
     clearPracticeStrokes();
-    prerenderAllStrokes();
+    // Keep canvas empty on reset
   };
 
   useEffect(() => {
@@ -542,9 +584,14 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
 
           {practiceMode === 'practicing' && (
             <>
-              <Button onClick={replayCurrentStroke} variant="outline" size="sm">
+              <Button
+                onClick={replayCurrentStroke}
+                variant="outline"
+                size="sm"
+                disabled={isAnimatingCurrentStroke}
+              >
                 <MdPlayArrow className="mr-1" />
-                Replay Stroke
+                Play Stroke
               </Button>
               <Button onClick={resetPractice} variant="outline" size="sm">
                 <MdClear className="mr-1" />
@@ -579,7 +626,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
 
         {practiceMode === 'practicing' && (
           <div className="text-center text-sm text-muted-foreground">
-            Progress: {completedStrokes.length}/{totalStrokes} strokes completed
+            Stroke {currentStrokeIndex + 1}/{totalStrokes} • Completed: {completedStrokes.length}
           </div>
         )}
       </div>

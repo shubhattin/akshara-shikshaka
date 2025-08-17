@@ -169,10 +169,18 @@ type Props =
       };
     };
 
+const CANVAS_DIMS = {
+  width: 400,
+  height: 400
+} as const;
+
+const DEFAULT_GESTURE_BRUSH_WIDTH = 8;
+const DEFAULT_GESTURE_BRUSH_COLOR = '#ff0000'; // red
+const DEFAULT_GESTURE_ANIMATION_DURATION = 600;
+
 export default function AddEditTextData({ text_data, location }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<Canvas>(null);
-  const canceledRef = useRef(false);
   const [text, setText] = useState(text_data.text);
   const [savedText, setSavedText] = useState(text_data.text);
   const [textEditMode, setTextEditMode] = useState(location === 'add' && true);
@@ -252,11 +260,6 @@ export default function AddEditTextData({ text_data, location }: Props) {
       fabricCanvasRef.current = null;
     }
 
-    // Dynamic import to avoid SSR issues
-    const fabricModule = await import('fabric');
-    const fab = (fabricModule as any).fabric || (fabricModule as any).default || fabricModule;
-    if (canceledRef.current) return;
-
     // Check if the canvas element already has a Fabric instance
     // This can happen in React StrictMode
     const existingCanvas = (canvasRef.current as any).__fabric;
@@ -266,9 +269,9 @@ export default function AddEditTextData({ text_data, location }: Props) {
     }
 
     // Initialize Fabric.js canvas
-    const canvas = new fab.Canvas(canvasRef.current, {
-      width: 400,
-      height: 400,
+    const canvas = new fabric.Canvas(canvasRef.current, {
+      width: CANVAS_DIMS.width,
+      height: CANVAS_DIMS.height,
       backgroundColor: '#ffffff',
       isDrawingMode: false // Explicitly disable drawing mode initially
     });
@@ -438,9 +441,9 @@ export default function AddEditTextData({ text_data, location }: Props) {
     const newGesture: Gesture = {
       order: strokeData.gestures.length,
       strokes: [],
-      brush_width: 6,
-      brush_color: '#ff0000', // red
-      animation_duration: 600
+      brush_width: DEFAULT_GESTURE_BRUSH_WIDTH,
+      brush_color: DEFAULT_GESTURE_BRUSH_COLOR, // red
+      animation_duration: DEFAULT_GESTURE_ANIMATION_DURATION
     };
     setStrokeData((prev) => ({
       ...prev,
@@ -722,10 +725,9 @@ export default function AddEditTextData({ text_data, location }: Props) {
   };
 
   useEffect(() => {
-    canceledRef.current = false;
+    if (typeof window === 'undefined') return;
     initCanvas();
     return () => {
-      canceledRef.current = true;
       if (fabricCanvasRef.current) {
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
@@ -758,7 +760,7 @@ export default function AddEditTextData({ text_data, location }: Props) {
   }, [selectedGesture?.brush_color, selectedGesture?.brush_width, isRecording]);
 
   return (
-    <Card className="p-6">
+    <>
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Label className="font-bold">Text</Label>
@@ -801,14 +803,10 @@ export default function AddEditTextData({ text_data, location }: Props) {
 
         {/* Gesture Management Section */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="font-bold">Gestures</Label>
-            <Button onClick={addNewGesture} size="sm" variant="outline">
-              <IoMdAdd className="mr-1" />
-              Add Gesture
-            </Button>
-          </div>
-
+          <Button onClick={addNewGesture} size="sm" variant="outline">
+            <IoMdAdd className="mr-1" />
+            Add Gesture
+          </Button>
           {/* Play All and Clear Controls */}
           {strokeData.gestures.length > 0 && (
             <div className="flex items-center gap-2">
@@ -867,144 +865,19 @@ export default function AddEditTextData({ text_data, location }: Props) {
 
           {/* Gesture Controls */}
           {selectedGesture && (
-            <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">Selected: Gesture {selectedGesture.order + 1}</span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={clearCurrentGesture}
-                    disabled={isRecording || isPlaying}
-                  >
-                    <MdClear className="mr-1" />
-                    Clear
-                  </Button>
-
-                  {!isRecording ? (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={startRecording}
-                      disabled={isPlaying}
-                    >
-                      <MdFiberManualRecord className="mr-1 text-red-500" />
-                      Record
-                    </Button>
-                  ) : (
-                    <>
-                      <Button size="sm" variant="secondary" onClick={stopRecording}>
-                        <MdStop className="mr-1" />
-                        Cancel
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={saveRecording}
-                        disabled={tempStrokes.length === 0}
-                      >
-                        Done ({tempStrokes.length})
-                      </Button>
-                    </>
-                  )}
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => playGesture(selectedGesture.order)}
-                    disabled={isRecording || isPlaying || selectedGesture.strokes.length === 0}
-                  >
-                    <MdPlayArrow className="mr-1" />
-                    Play
-                  </Button>
-                </div>
-              </div>
-
-              {/* Gesture Settings */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                {/* Brush Color */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Brush Color</Label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={selectedGesture.brush_color}
-                      onChange={(e) =>
-                        setStrokeData((prev) => ({
-                          ...prev,
-                          gestures: prev.gestures.map((gesture) =>
-                            gesture.order === parseInt(selectedGestureId || '0', 10)
-                              ? { ...gesture, brush_color: e.target.value }
-                              : gesture
-                          )
-                        }))
-                      }
-                      className="h-8 w-12 rounded border border-input"
-                      disabled={isRecording || isPlaying}
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      {selectedGesture.brush_color}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Brush Width */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    Brush Width: {selectedGesture.brush_width}px
-                  </Label>
-                  <Slider
-                    value={[selectedGesture.brush_width]}
-                    onValueChange={(value) =>
-                      setStrokeData((prev) => ({
-                        ...prev,
-                        gestures: prev.gestures.map((gesture) =>
-                          gesture.order === parseInt(selectedGestureId || '0', 10)
-                            ? { ...gesture, brush_width: value[0] }
-                            : gesture
-                        )
-                      }))
-                    }
-                    min={1}
-                    max={10}
-                    step={1}
-                    className="w-full"
-                    disabled={isRecording || isPlaying}
-                  />
-                </div>
-
-                {/* Animation Duration */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    Animation: {selectedGesture.animation_duration}ms
-                  </Label>
-                  <Slider
-                    value={[selectedGesture.animation_duration]}
-                    onValueChange={(value) =>
-                      setStrokeData((prev) => ({
-                        ...prev,
-                        gestures: prev.gestures.map((gesture) =>
-                          gesture.order === parseInt(selectedGestureId || '0', 10)
-                            ? { ...gesture, animation_duration: value[0] }
-                            : gesture
-                        )
-                      }))
-                    }
-                    min={50}
-                    max={1000}
-                    step={10}
-                    className="w-full"
-                    disabled={isRecording || isPlaying}
-                  />
-                </div>
-              </div>
-
-              {isRecording && (
-                <div className="text-sm font-medium text-destructive">
-                  🔴 Recording... Draw on the canvas to record strokes
-                </div>
-              )}
-            </div>
+            <SelectedGestureControls
+              selectedGesture={selectedGesture}
+              clearCurrentGesture={clearCurrentGesture}
+              isRecording={isRecording}
+              isPlaying={isPlaying}
+              startRecording={startRecording}
+              stopRecording={stopRecording}
+              saveRecording={saveRecording}
+              tempStrokes={tempStrokes}
+              playGesture={playGesture}
+              setStrokeData={setStrokeData}
+              selectedGestureId={selectedGestureId}
+            />
           )}
         </div>
 
@@ -1025,9 +898,169 @@ export default function AddEditTextData({ text_data, location }: Props) {
         strokeData={strokeData}
         fabricCanvasRef={fabricCanvasRef}
       />
-    </Card>
+    </>
   );
 }
+
+const SelectedGestureControls = ({
+  selectedGesture,
+  clearCurrentGesture,
+  isRecording,
+  isPlaying,
+  startRecording,
+  stopRecording,
+  saveRecording,
+  tempStrokes,
+  playGesture,
+  setStrokeData,
+  selectedGestureId
+}: {
+  selectedGesture: Gesture;
+  clearCurrentGesture: () => void;
+  isRecording: boolean;
+  isPlaying: boolean;
+  startRecording: () => void;
+  stopRecording: () => void;
+  saveRecording: () => void;
+  tempStrokes: Stroke[];
+  playGesture: (gestureOrder: number) => void;
+  setStrokeData: React.Dispatch<React.SetStateAction<StrokeData>>;
+  selectedGestureId: string | null;
+}) => {
+  return (
+    <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+      <div className="flex items-center justify-between">
+        <span className="font-medium">Selected: Gesture {selectedGesture.order + 1}</span>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={clearCurrentGesture}
+            disabled={isRecording || isPlaying}
+          >
+            <MdClear className="mr-1" />
+            Clear
+          </Button>
+
+          {!isRecording ? (
+            <Button size="sm" variant="default" onClick={startRecording} disabled={isPlaying}>
+              <MdFiberManualRecord className="mr-1 text-red-500" />
+              Record
+            </Button>
+          ) : (
+            <>
+              <Button size="sm" variant="secondary" onClick={stopRecording}>
+                <MdStop className="mr-1" />
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={saveRecording}
+                disabled={tempStrokes.length === 0}
+              >
+                Done ({tempStrokes.length})
+              </Button>
+            </>
+          )}
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => playGesture(selectedGesture.order)}
+            disabled={isRecording || isPlaying || selectedGesture.strokes.length === 0}
+          >
+            <MdPlayArrow className="mr-1" />
+            Play
+          </Button>
+        </div>
+      </div>
+
+      {/* Gesture Settings */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {/* Brush Color */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Brush Color</Label>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={selectedGesture.brush_color}
+              onChange={(e) =>
+                setStrokeData((prev) => ({
+                  ...prev,
+                  gestures: prev.gestures.map((gesture) =>
+                    gesture.order === parseInt(selectedGestureId || '0', 10)
+                      ? { ...gesture, brush_color: e.target.value }
+                      : gesture
+                  )
+                }))
+              }
+              className="h-8 w-12 rounded border border-input"
+              disabled={isRecording || isPlaying}
+            />
+            <span className="text-xs text-muted-foreground">{selectedGesture.brush_color}</span>
+          </div>
+        </div>
+
+        {/* Brush Width */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">
+            Brush Width: {selectedGesture.brush_width}px
+          </Label>
+          <Slider
+            value={[selectedGesture.brush_width]}
+            onValueChange={(value) =>
+              setStrokeData((prev) => ({
+                ...prev,
+                gestures: prev.gestures.map((gesture) =>
+                  gesture.order === parseInt(selectedGestureId || '0', 10)
+                    ? { ...gesture, brush_width: value[0] }
+                    : gesture
+                )
+              }))
+            }
+            min={4}
+            max={14}
+            step={1}
+            className="w-full"
+            disabled={isRecording || isPlaying}
+          />
+        </div>
+
+        {/* Animation Duration */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">
+            Animation: {selectedGesture.animation_duration}ms
+          </Label>
+          <Slider
+            value={[selectedGesture.animation_duration]}
+            onValueChange={(value) =>
+              setStrokeData((prev) => ({
+                ...prev,
+                gestures: prev.gestures.map((gesture) =>
+                  gesture.order === parseInt(selectedGestureId || '0', 10)
+                    ? { ...gesture, animation_duration: value[0] }
+                    : gesture
+                )
+              }))
+            }
+            min={50}
+            max={1000}
+            step={10}
+            className="w-full"
+            disabled={isRecording || isPlaying}
+          />
+        </div>
+      </div>
+
+      {isRecording && (
+        <div className="text-sm font-medium text-destructive">
+          🔴 Recording... Draw on the canvas to record strokes
+        </div>
+      )}
+    </div>
+  );
+};
 
 const SaveEditMode = ({
   text_data,

@@ -4,10 +4,11 @@ import { cache } from 'react';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 import { db } from '~/db/db';
 import Link from 'next/link';
-import AddEditTextData from '~/components/pages/add_edit/AddEditTextData';
+import AddEditTextDataWrapper from '~/components/pages/add_edit/AddEditTextData';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { getCachedSession } from '~/lib/cache_server_route_data';
 import { redirect } from 'next/navigation';
+import { Provider as JotaiProvider } from 'jotai';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -56,13 +57,15 @@ const MainEdit = async ({ params }: Props) => {
         </Link>
       </div>
       {text_data ? (
-        <AddEditTextData
-          location="edit"
-          text_data={{
-            ...text_data,
-            strokes_json: text_data.strokes_json ?? undefined
-          }}
-        />
+        <JotaiProvider key={`edit_akdhara_page-${id}`}>
+          <AddEditTextDataWrapper
+            location="edit"
+            text_data={{
+              ...text_data,
+              strokes_json: text_data.strokes_json ?? undefined
+            }}
+          />
+        </JotaiProvider>
       ) : (
         <div>Text data not found</div>
       )}

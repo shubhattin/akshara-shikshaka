@@ -51,6 +51,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
+import { Switch } from '@/components/ui/switch';
 
 // Gesture Types
 type StrokePoint = {
@@ -107,7 +108,8 @@ const DEFAULT_GESTURE_ANIMATION_DURATION = 600;
 const DEFAULT_SCALE_DOWN_FACTOR = 4.5;
 
 const GESTURE_FLAGS = {
-  isGestureVisualization: 'isGestureVisualization'
+  isGestureVisualization: 'isGestureVisualization',
+  isMainCharacterPath: 'isMainCharacterPath'
 } as const;
 
 const text_atom = atom('');
@@ -123,6 +125,7 @@ const current_stroke_atom = atom<StrokePoint[]>([]);
 const recording_start_time_atom = atom<number>(0);
 const temp_strokes_atom = atom<Stroke[]>([]);
 const character_path_atom = atom<fabric.Path | null>(null);
+const main_text_path_visible_atom = atom(true);
 
 export default function AddEditTextDataWrapper(props: Props) {
   useHydrateAtoms([
@@ -157,6 +160,7 @@ function AddEditTextData({
   const [text, setText] = useAtom(text_atom);
   const [textEditMode, setTextEditMode] = useAtom(text_edit_mode_atom);
   const [scaleDownFactor, setScaleDownFactor] = useAtom(scale_down_factor_atom);
+  const [mainTextPathVisible, setMainTextPathVisible] = useAtom(main_text_path_visible_atom);
 
   // Gesture Recording State
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
@@ -270,6 +274,7 @@ function AddEditTextData({
         lockMovementX: false,
         lockMovementY: false
       });
+      pathObject.set(GESTURE_FLAGS.isMainCharacterPath, true);
 
       // clear prev path objects
       fabricCanvasRef.current?.getObjects().forEach((obj) => {
@@ -436,6 +441,18 @@ function AddEditTextData({
     };
   }, []);
 
+  useEffect(() => {
+    if (!fabricCanvasRef.current) return;
+    // get object by its isMainCharacterPath flag
+    const mainCharacterPath = fabricCanvasRef.current
+      .getObjects()
+      .find((obj) => obj.get(GESTURE_FLAGS.isMainCharacterPath));
+    if (mainCharacterPath) {
+      mainCharacterPath.visible = mainTextPathVisible;
+      fabricCanvasRef.current.renderAll();
+    }
+  }, [mainTextPathVisible]);
+
   // Removed useEffect for setupGestureRecording as it will be called directly in startRecording
 
   useEffect(() => {
@@ -447,20 +464,9 @@ function AddEditTextData({
     (g) => g.order.toString() === selectedGestureOrder
   );
 
-  // Update brush settings when selected gesture changes during recording
-  useEffect(() => {
-    if (isRecording && selectedGesture && fabricCanvasRef.current) {
-      const canvas = fabricCanvasRef.current;
-      if (canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush.color = selectedGesture.brush_color;
-        canvas.freeDrawingBrush.width = selectedGesture.brush_width;
-      }
-    }
-  }, [selectedGesture?.brush_color, selectedGesture?.brush_width, isRecording]);
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <Label className="font-bold">Text</Label>
         <div className="flex items-center gap-2">
           <Input
@@ -481,6 +487,14 @@ function AddEditTextData({
             </Button>
           )}
         </div>
+        <Label className="flex items-center gap-2">
+          Main Character Path
+          <Switch
+            checked={mainTextPathVisible}
+            onCheckedChange={setMainTextPathVisible}
+            className=""
+          />
+        </Label>
       </div>
       <div className="flex items-center gap-2">
         <Label className="font-bold">Scale Down Factor</Label>
@@ -677,6 +691,7 @@ const SelectedGestureControls = ({
       // Convert SVG path commands to points
       pathData.forEach((cmd: any, index: number) => {
         if (cmd[0] === 'M' || cmd[0] === 'L') {
+          // M -> Move to, L -> Line to
           points.push({
             x: cmd[1],
             y: cmd[2],
@@ -875,6 +890,17 @@ const SelectedGestureControls = ({
 
     setIsPlaying(false);
   };
+
+  // Update brush settings when selected gesture changes during recording
+  useEffect(() => {
+    if (isRecording && selectedGesture && fabricCanvasRef.current) {
+      const canvas = fabricCanvasRef.current;
+      if (canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush.color = selectedGesture.brush_color;
+        canvas.freeDrawingBrush.width = selectedGesture.brush_width;
+      }
+    }
+  }, [selectedGesture?.brush_color, selectedGesture?.brush_width, isRecording]);
 
   return (
     <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
@@ -1128,6 +1154,14 @@ const SaveEditMode = ({
     gestureObjects.forEach((obj) => {
       fabricCanvasRef.current?.remove(obj);
     });
+
+    // make character path visible if hidden
+    const mainCharacterPath = fabricCanvasRef.current
+      .getObjects()
+      .find((obj) => obj.get(GESTURE_FLAGS.isMainCharacterPath));
+    if (mainCharacterPath) {
+      mainCharacterPath.visible = true;
+    }
 
     // Get JSON with only text path objects
     const fabricjs_svg_dump = fabricCanvasRef.current.toJSON();

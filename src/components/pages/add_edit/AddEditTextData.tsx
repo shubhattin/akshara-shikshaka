@@ -566,79 +566,78 @@ const SelectedGestureControls = ({
     canvas.freeDrawingBrush.width = selectedGesture.brush_width;
 
     // Clear all previous listeners first
-    canvas.off('path:created');
-
-    // Listen for path creation with proper closure
-    const handlePathCreated = (e: any) => {
-      if (!e.path) return;
-
-      console.log('Path created during recording');
-
-      // Mark the path as gesture visualization
-      e.path.set({
-        selectable: false,
-        evented: false,
-        [GESTURE_FLAGS.isGestureVisualization]: true
-      });
-
-      // Extract points from the path
-      const pathData = e.path.path;
-      const points: StrokePoint[] = [];
-      const baseTime = recordingStartTime;
-
-      // Convert SVG path commands to points
-      pathData.forEach((cmd: any, index: number) => {
-        if (cmd[0] === 'M' && cmd.length >= 3) {
-          points.push({
-            x: cmd[1],
-            y: cmd[2],
-            timestamp: index * 10,
-            cmd: 'M'
-          });
-        } else if (cmd[0] === 'L' && cmd.length >= 3) {
-          points.push({
-            x: cmd[1],
-            y: cmd[2],
-            timestamp: index * 10,
-            cmd: 'L'
-          });
-        } else if (cmd[0] === 'Q' && cmd.length >= 5) {
-          // Quadratic bezier. curve - store control and end point
-          points.push({
-            x: cmd[3],
-            y: cmd[4],
-            timestamp: index * 10,
-            cmd: 'Q',
-            cx: cmd[1],
-            cy: cmd[2]
-          });
-        }
-      });
-
-      // Syntax
-      // M x y : Move to x,y
-      // L x y : Line to x,y
-      // Q x1 y1 x2 y2 : Quadratic bezier curve to x2,y2 from x1,y1
-      // C x1 y1 x2 y2 x3 y3 : Cubic bezier curve to x3,y3 from x1,y1 via x2,y2
-
-      if (points.length > 1) {
-        // Apply path approximation if character path exists
-        const approximatedPoints = characterPath
-          ? approximateToCharacterPath(points, characterPath)
-          : points;
-
-        console.log('Adding stroke with', approximatedPoints.length, 'points');
-        setTempStrokes((prev) => {
-          const newStrokes = [...prev, { order: prev.length, points: approximatedPoints }];
-          console.log('Total temp strokes:', newStrokes.length);
-          return newStrokes;
-        });
-      }
-    };
+    canvas.off('path:created', handlePathCreated);
 
     canvas.on('path:created', handlePathCreated);
   };
 
+  // Listen for path creation with proper closure
+  const handlePathCreated = (e: any) => {
+    if (!e.path) return;
+
+    console.log('Path created during recording');
+
+    // Mark the path as gesture visualization
+    e.path.set({
+      selectable: false,
+      evented: false,
+      [GESTURE_FLAGS.isGestureVisualization]: true
+    });
+
+    // Extract points from the path
+    const pathData = e.path.path;
+    const points: StrokePoint[] = [];
+    const baseTime = recordingStartTime;
+
+    // Convert SVG path commands to points
+    pathData.forEach((cmd: any, index: number) => {
+      if (cmd[0] === 'M' && cmd.length >= 3) {
+        points.push({
+          x: cmd[1],
+          y: cmd[2],
+          timestamp: index * 10,
+          cmd: 'M'
+        });
+      } else if (cmd[0] === 'L' && cmd.length >= 3) {
+        points.push({
+          x: cmd[1],
+          y: cmd[2],
+          timestamp: index * 10,
+          cmd: 'L'
+        });
+      } else if (cmd[0] === 'Q' && cmd.length >= 5) {
+        // Quadratic bezier. curve - store control and end point
+        points.push({
+          x: cmd[3],
+          y: cmd[4],
+          timestamp: index * 10,
+          cmd: 'Q',
+          cx: cmd[1],
+          cy: cmd[2]
+        });
+      }
+    });
+
+    // Syntax
+    // M x y : Move to x,y
+    // L x y : Line to x,y
+    // Q x1 y1 x2 y2 : Quadratic bezier curve to x2,y2 from x1,y1
+    // C x1 y1 x2 y2 x3 y3 : Cubic bezier curve to x3,y3 from x1,y1 via x2,y2
+
+    if (points.length > 1) {
+      // Apply path approximation if character path exists
+      const approximatedPoints = characterPath
+        ? approximateToCharacterPath(points, characterPath)
+        : points;
+
+      console.log('Adding stroke with', approximatedPoints.length, 'points');
+      setTempStrokes((prev) => {
+        const newStrokes = [...prev, { order: prev.length, points: approximatedPoints }];
+        console.log('Total temp strokes:', newStrokes.length);
+        return newStrokes;
+      });
+    }
+  };
   const startRecording = () => {
     if (!selectedGestureOrder || !fabricCanvasRef.current) return;
     setIsRecording(true);
@@ -670,7 +669,7 @@ const SelectedGestureControls = ({
       fabricCanvasRef.current.selection = true;
 
       // Remove path created listener
-      fabricCanvasRef.current.off('path:created');
+      fabricCanvasRef.current.off('path:created', handlePathCreated);
 
       fabricCanvasRef.current.forEachObject((obj) => {
         if (!obj.get(GESTURE_FLAGS.isGestureVisualization)) {

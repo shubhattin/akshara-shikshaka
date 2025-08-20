@@ -8,36 +8,14 @@ import * as fabric from 'fabric';
 import { cn } from '~/lib/utils';
 import { MdPlayArrow, MdClear, MdFiberManualRecord } from 'react-icons/md';
 import { toast } from 'sonner';
-
-// Types from AddEditTextData
-type StrokePoint = {
-  x: number;
-  y: number;
-  timestamp: number;
-};
-
-type Stroke = {
-  order: number;
-  points: StrokePoint[];
-};
-
-type Gesture = {
-  order: number;
-  strokes: Stroke[];
-  brush_width: number;
-  brush_color: string;
-  animation_duration: number;
-};
-
-type StrokeData = {
-  gestures: Gesture[];
-};
+import { sampleStrokeToPolyline, playStrokeWithoutClear } from '~/tools/stroke_data/utils';
+import { StrokePoint, GestureData, CANVAS_DIMS } from '~/tools/stroke_data/types';
 
 type text_data_type = {
   id: number;
   uuid: string;
   text: string;
-  strokes_json?: StrokeData;
+  strokes_json?: GestureData;
 };
 
 type Props = {
@@ -83,8 +61,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     }
 
     // Dynamic import to avoid SSR issues
-    const fabricModule = await import('fabric');
-    const fab = (fabricModule as any).fabric || (fabricModule as any).default || fabricModule;
+
     if (canceledRef.current) return;
 
     // Check if the canvas element already has a Fabric instance
@@ -95,9 +72,9 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     }
 
     // Initialize Fabric.js canvas
-    const canvas = new fab.Canvas(canvasRef.current, {
-      width: 400,
-      height: 400,
+    const canvas = new fabric.Canvas(canvasRef.current, {
+      width: CANVAS_DIMS.width,
+      height: CANVAS_DIMS.height,
       backgroundColor: '#ffffff',
       isDrawingMode: false
     });
@@ -109,38 +86,6 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     // Start with a clean, empty canvas (no character path or pre-rendered strokes)
   };
 
-  const renderCharacterPath = async () => {
-    if (!text_data.text || !fabricCanvasRef.current) return;
-
-    const hbjs = await import('~/tools/harfbuzz/index');
-    const FONT_URL = '/fonts/regular/Nirmala.ttf';
-    await Promise.all([hbjs.preload_harfbuzzjs_wasm(), hbjs.preload_font_from_url(FONT_URL)]);
-
-    const svg_path = await hbjs.get_text_svg_path(text_data.text, FONT_URL);
-    if (svg_path) {
-      const SCALE_FACTOR = 1 / 4.5;
-      const pathObject = new fabric.Path(svg_path, {
-        fill: 'rgba(0,0,0,0.1)',
-        stroke: '#cccccc',
-        strokeWidth: 1,
-        selectable: false,
-        evented: false,
-        scaleX: SCALE_FACTOR,
-        scaleY: SCALE_FACTOR,
-        isCharacterPath: true
-      });
-
-      fabricCanvasRef.current?.centerObject(pathObject);
-      fabricCanvasRef.current?.add(pathObject);
-      fabricCanvasRef.current?.renderAll();
-    }
-  };
-
-  const prerenderAllStrokes = () => {
-    // Intentionally no-op to keep canvas empty at start
-    return;
-  };
-
   const playAllStrokes = async () => {
     if (!fabricCanvasRef.current) return;
 
@@ -149,11 +94,13 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
 
     for (const stroke of allStrokes) {
       if (stroke.points.length < 2) continue;
-      await animateStroke(
+      await playStrokeWithoutClear(
         stroke,
         stroke.gesture.brush_color,
         stroke.gesture.brush_width,
-        stroke.gesture.animation_duration
+        stroke.gesture.animation_duration,
+        fabricCanvasRef,
+        { isAnimatedStroke: true }
       );
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
@@ -162,63 +109,9 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
   };
 
   const animateStroke = async (stroke: any, color: string, width: number, duration: number) => {
-    if (!fabricCanvasRef.current || stroke.points.length < 2) return;
-
-    let pathString = '';
-    stroke.points.forEach((point: StrokePoint, index: number) => {
-      if (index === 0) {
-        pathString += `M ${point.x} ${point.y}`;
-      } else {
-        pathString += ` L ${point.x} ${point.y}`;
-      }
+    await playStrokeWithoutClear(stroke, color, width, duration, fabricCanvasRef, {
+      isAnimatedStroke: true
     });
-
-    const fullPath = new fabric.Path(pathString, {
-      stroke: color,
-      strokeWidth: width,
-      fill: '',
-      selectable: false,
-      evented: false,
-      isAnimatedStroke: true,
-      opacity: 0
-    } as any);
-
-    fabricCanvasRef.current.add(fullPath);
-
-    const totalPoints = stroke.points.length;
-    const animationSteps = Math.min(totalPoints * 2, 50);
-
-    for (let step = 1; step <= animationSteps; step++) {
-      const progress = step / animationSteps;
-      const pointIndex = Math.floor(progress * (totalPoints - 1));
-
-      let partialPath = '';
-      for (let i = 0; i <= pointIndex; i++) {
-        if (i === 0) {
-          partialPath += `M ${stroke.points[i].x} ${stroke.points[i].y}`;
-        } else {
-          partialPath += ` L ${stroke.points[i].x} ${stroke.points[i].y}`;
-        }
-      }
-
-      if (pointIndex < totalPoints - 1) {
-        const currentPoint = stroke.points[pointIndex];
-        const nextPoint = stroke.points[pointIndex + 1];
-        const subProgress = (progress * (totalPoints - 1)) % 1;
-
-        const interpolatedX = currentPoint.x + (nextPoint.x - currentPoint.x) * subProgress;
-        const interpolatedY = currentPoint.y + (nextPoint.y - currentPoint.y) * subProgress;
-
-        partialPath += ` L ${interpolatedX} ${interpolatedY}`;
-      }
-
-      fullPath.set('path', fabric.util.parsePath(partialPath));
-      fullPath.set('opacity', 1);
-      fabricCanvasRef.current.renderAll();
-
-      const delay = duration / animationSteps;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
   };
 
   const startPracticeMode = () => {
@@ -286,17 +179,18 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     const userPoints: StrokePoint[] = [];
 
     pathData.forEach((cmd: any, index: number) => {
-      if (cmd[0] === 'M' || cmd[0] === 'L') {
-        userPoints.push({
-          x: cmd[1],
-          y: cmd[2],
-          timestamp: index * 10
-        });
+      if (cmd[0] === 'M' && cmd.length >= 3) {
+        userPoints.push({ x: cmd[1], y: cmd[2], timestamp: index * 10, cmd: 'M' });
+      } else if (cmd[0] === 'L' && cmd.length >= 3) {
+        userPoints.push({ x: cmd[1], y: cmd[2], timestamp: index * 10, cmd: 'L' });
       } else if (cmd[0] === 'Q' && cmd.length >= 5) {
         userPoints.push({
           x: cmd[3],
           y: cmd[4],
-          timestamp: index * 10
+          timestamp: index * 10,
+          cmd: 'Q',
+          cx: cmd[1],
+          cy: cmd[2]
         });
       }
     });
@@ -318,10 +212,11 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     targetPoints: StrokePoint[]
   ): number => {
     if (userPoints.length < 2 || targetPoints.length < 2) return 0;
+    type EvalPoint = { x: number; y: number; timestamp: number };
 
     // 1) Normalize and resample both sequences to fixed length
     const SAMPLE_SIZE = 64;
-    const normalize = (pts: StrokePoint[]) => {
+    const normalize = (pts: EvalPoint[]) => {
       const xs = pts.map((p) => p.x);
       const ys = pts.map((p) => p.y);
       const minX = Math.min(...xs);
@@ -334,7 +229,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
       return pts.map((p) => ({ x: (p.x - minX) * scale, y: (p.y - minY) * scale, timestamp: 0 }));
     };
 
-    const resample = (pts: StrokePoint[], n: number) => {
+    const resample = (pts: EvalPoint[], n: number) => {
       if (pts.length === n) return pts;
       const dists: number[] = [0];
       for (let i = 1; i < pts.length; i++) {
@@ -344,7 +239,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
       }
       const total = dists[dists.length - 1] || 1;
       const step = total / (n - 1);
-      const res: StrokePoint[] = [];
+      const res: EvalPoint[] = [];
       let target = 0;
       let j = 0;
       for (let i = 0; i < n; i++) {
@@ -359,13 +254,21 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
       return res;
     };
 
-    const uNorm = normalize(userPoints);
-    const tNorm = normalize(targetPoints);
+    // Flatten potential curves to polylines for fair comparison
+    const flatten = (pts: StrokePoint[]): EvalPoint[] =>
+      sampleStrokeToPolyline({ order: 0, points: pts } as any, 20).map((p, i) => ({
+        x: p.x,
+        y: p.y,
+        timestamp: i
+      }));
+
+    const uNorm = normalize(flatten(userPoints));
+    const tNorm = normalize(flatten(targetPoints));
     const u = resample(uNorm, SAMPLE_SIZE);
     const t = resample(tNorm, SAMPLE_SIZE);
 
     // 2) Compute direction similarity (cosine between overall vectors)
-    const vec = (pts: StrokePoint[]) => ({
+    const vec = (pts: EvalPoint[]) => ({
       x: pts[pts.length - 1].x - pts[0].x,
       y: pts[pts.length - 1].y - pts[0].y
     });
@@ -384,7 +287,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     const endpointScore = Math.max(0, 1 - (startDist + endDist) / 2);
 
     // 4) DTW path similarity for shape matching
-    const dtw = (a: StrokePoint[], b: StrokePoint[]) => {
+    const dtw = (a: EvalPoint[], b: EvalPoint[]) => {
       const n = a.length;
       const m = b.length;
       const dp = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(Infinity));
@@ -403,7 +306,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     const dtwScore = Math.max(0, 1 - dtwDist); // since coords are normalized to ~[0,1], distance ~[0,2]
 
     // 5) Path length ratio (to discourage overly short/long)
-    const lengthOf = (pts: StrokePoint[]) =>
+    const lengthOf = (pts: EvalPoint[]) =>
       pts.reduce((acc, p, i) => {
         if (i === 0) return 0;
         return acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y);
@@ -438,12 +341,13 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
   const createPerfectStrokeVisualization = (stroke: any, zIndex: number) => {
     if (!fabricCanvasRef.current || stroke.points.length < 2) return;
 
+    const sampledPoints = sampleStrokeToPolyline(stroke);
     let pathString = '';
-    stroke.points.forEach((point: StrokePoint, index: number) => {
+    sampledPoints.forEach((pt: { x: number; y: number }, index: number) => {
       if (index === 0) {
-        pathString += `M ${point.x} ${point.y}`;
+        pathString += `M ${pt.x} ${pt.y}`;
       } else {
-        pathString += ` L ${point.x} ${point.y}`;
+        pathString += ` L ${pt.x} ${pt.y}`;
       }
     });
 

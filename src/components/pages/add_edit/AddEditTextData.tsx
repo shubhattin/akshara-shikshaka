@@ -52,30 +52,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
-
-// Gesture Types
-type StrokePoint = {
-  x: number;
-  y: number;
-  timestamp: number;
-};
-
-type Stroke = {
-  order: number;
-  points: StrokePoint[];
-};
-
-type Gesture = {
-  order: number;
-  strokes: Stroke[];
-  brush_width: number;
-  brush_color: string;
-  animation_duration: number;
-};
-
-type GestureData = {
-  gestures: Gesture[];
-};
+import type { StrokePoint, Stroke, Gesture, GestureData } from '~/tools/stroke_data/types';
+import { GESTURE_FLAGS, CANVAS_DIMS } from '~/tools/stroke_data/types';
+import { playGestureWithoutClear, sampleStrokeToPolyline } from '~/tools/stroke_data/utils';
 
 type text_data_type = {
   text: string;
@@ -97,20 +76,10 @@ type Props =
       };
     };
 
-const CANVAS_DIMS = {
-  width: 400,
-  height: 400
-} as const;
-
 const DEFAULT_GESTURE_BRUSH_WIDTH = 8;
 const DEFAULT_GESTURE_BRUSH_COLOR = '#ff0000'; // red
 const DEFAULT_GESTURE_ANIMATION_DURATION = 600;
 const DEFAULT_SCALE_DOWN_FACTOR = 4.5;
-
-const GESTURE_FLAGS = {
-  isGestureVisualization: 'isGestureVisualization',
-  isMainCharacterPath: 'isMainCharacterPath'
-} as const;
 
 const text_atom = atom('');
 const text_edit_mode_atom = atom(false);
@@ -342,84 +311,13 @@ function AddEditTextData({
     fabricCanvasRef.current.renderAll();
   };
 
-  const playGestureWithoutClear = async (gesture: Gesture) => {
-    if (!fabricCanvasRef.current) return;
-
-    for (const stroke of gesture.strokes) {
-      if (stroke.points.length < 2) continue;
-
-      // Create a path for smooth animation
-      let pathString = '';
-      stroke.points.forEach((point, index) => {
-        if (index === 0) {
-          pathString += `M ${point.x} ${point.y}`;
-        } else {
-          pathString += ` L ${point.x} ${point.y}`;
-        }
-      });
-
-      // Create the full path but make it invisible initially
-      const fullPath = new fabric.Path(pathString, {
-        stroke: gesture.brush_color,
-        strokeWidth: gesture.brush_width,
-        fill: '',
-        selectable: false,
-        evented: false,
-        isGestureVisualization: true,
-        opacity: 0
-      } as any);
-
-      fabricCanvasRef.current.add(fullPath);
-
-      // Animate the path drawing
-      const totalPoints = stroke.points.length;
-      const animationSteps = Math.min(totalPoints * 2, 50); // More steps for smoother animation
-
-      for (let step = 1; step <= animationSteps; step++) {
-        const progress = step / animationSteps;
-        const pointIndex = Math.floor(progress * (totalPoints - 1));
-
-        // Create partial path up to current point
-        let partialPath = '';
-        for (let i = 0; i <= pointIndex; i++) {
-          if (i === 0) {
-            partialPath += `M ${stroke.points[i].x} ${stroke.points[i].y}`;
-          } else {
-            partialPath += ` L ${stroke.points[i].x} ${stroke.points[i].y}`;
-          }
-        }
-
-        // Add interpolated point for smooth animation
-        if (pointIndex < totalPoints - 1) {
-          const currentPoint = stroke.points[pointIndex];
-          const nextPoint = stroke.points[pointIndex + 1];
-          const subProgress = (progress * (totalPoints - 1)) % 1;
-
-          const interpolatedX = currentPoint.x + (nextPoint.x - currentPoint.x) * subProgress;
-          const interpolatedY = currentPoint.y + (nextPoint.y - currentPoint.y) * subProgress;
-
-          partialPath += ` L ${interpolatedX} ${interpolatedY}`;
-        }
-
-        // Update the path
-        fullPath.set('path', fabric.util.parsePath(partialPath));
-        fullPath.set('opacity', 1);
-        fabricCanvasRef.current.renderAll();
-
-        // Wait based on animation duration
-        const delay = gesture.animation_duration / animationSteps;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-  };
-
   const playAllGestures = async () => {
     setIsPlaying(true);
     clearGestureVisualization();
 
     for (const gesture of gestureData.gestures) {
       if (gesture.strokes.length === 0) continue;
-      await playGestureWithoutClear(gesture);
+      await playGestureWithoutClear(gesture, fabricCanvasRef);
       await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay between gestures
     }
 
@@ -690,22 +588,38 @@ const SelectedGestureControls = ({
 
       // Convert SVG path commands to points
       pathData.forEach((cmd: any, index: number) => {
-        if (cmd[0] === 'M' || cmd[0] === 'L') {
-          // M -> Move to, L -> Line to
+        if (cmd[0] === 'M' && cmd.length >= 3) {
           points.push({
             x: cmd[1],
             y: cmd[2],
-            timestamp: index * 10 // Relative timestamps starting from 0
+            timestamp: index * 10,
+            cmd: 'M'
+          });
+        } else if (cmd[0] === 'L' && cmd.length >= 3) {
+          points.push({
+            x: cmd[1],
+            y: cmd[2],
+            timestamp: index * 10,
+            cmd: 'L'
           });
         } else if (cmd[0] === 'Q' && cmd.length >= 5) {
-          // Quadratic bezier curve - add end point
+          // Quadratic bezier. curve - store control and end point
           points.push({
             x: cmd[3],
             y: cmd[4],
-            timestamp: index * 10 // Relative timestamps starting from 0
+            timestamp: index * 10,
+            cmd: 'Q',
+            cx: cmd[1],
+            cy: cmd[2]
           });
         }
       });
+
+      // Syntax
+      // M x y : Move to x,y
+      // L x y : Line to x,y
+      // Q x1 y1 x2 y2 : Quadratic bezier curve to x2,y2 from x1,y1
+      // C x1 y1 x2 y2 x3 y3 : Cubic bezier curve to x3,y3 from x1,y1 via x2,y2
 
       if (points.length > 1) {
         // Apply path approximation if character path exists
@@ -808,7 +722,7 @@ const SelectedGestureControls = ({
     // Remove only gesture visualization objects (lines), keep the character path
     fabricCanvasRef.current.getObjects().forEach((obj) => {
       if (obj.get(GESTURE_FLAGS.isGestureVisualization)) {
-        fabricCanvasRef.current?.remove(obj);
+        fabricCanvasRef.current!.remove(obj);
       }
     });
     fabricCanvasRef.current.renderAll();
@@ -821,72 +735,7 @@ const SelectedGestureControls = ({
     setIsPlaying(true);
     clearGestureVisualization();
 
-    for (const stroke of gesture.strokes) {
-      if (stroke.points.length < 2) continue;
-
-      // Create a path for smooth animation
-      let pathString = '';
-      stroke.points.forEach((point, index) => {
-        if (index === 0) {
-          pathString += `M ${point.x} ${point.y}`;
-        } else {
-          pathString += ` L ${point.x} ${point.y}`;
-        }
-      });
-
-      // Create the full path but make it invisible initially
-      const fullPath = new fabric.Path(pathString, {
-        stroke: gesture.brush_color,
-        strokeWidth: gesture.brush_width,
-        fill: '',
-        selectable: false,
-        evented: false,
-        isGestureVisualization: true,
-        opacity: 0
-      } as any);
-
-      fabricCanvasRef.current.add(fullPath);
-
-      // Animate the path drawing
-      const totalPoints = stroke.points.length;
-      const animationSteps = Math.min(totalPoints * 2, 50); // More steps for smoother animation
-
-      for (let step = 1; step <= animationSteps; step++) {
-        const progress = step / animationSteps;
-        const pointIndex = Math.floor(progress * (totalPoints - 1));
-
-        // Create partial path up to current point
-        let partialPath = '';
-        for (let i = 0; i <= pointIndex; i++) {
-          if (i === 0) {
-            partialPath += `M ${stroke.points[i].x} ${stroke.points[i].y}`;
-          } else {
-            partialPath += ` L ${stroke.points[i].x} ${stroke.points[i].y}`;
-          }
-        }
-
-        // Add interpolated point for smooth animation
-        if (pointIndex < totalPoints - 1) {
-          const currentPoint = stroke.points[pointIndex];
-          const nextPoint = stroke.points[pointIndex + 1];
-          const subProgress = (progress * (totalPoints - 1)) % 1;
-
-          const interpolatedX = currentPoint.x + (nextPoint.x - currentPoint.x) * subProgress;
-          const interpolatedY = currentPoint.y + (nextPoint.y - currentPoint.y) * subProgress;
-
-          partialPath += ` L ${interpolatedX} ${interpolatedY}`;
-        }
-
-        // Update the path
-        fullPath.set('path', fabric.util.parsePath(partialPath));
-        fullPath.set('opacity', 1);
-        fabricCanvasRef.current.renderAll();
-
-        // Wait based on animation duration
-        const delay = gesture.animation_duration / animationSteps;
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
+    await playGestureWithoutClear(gesture, fabricCanvasRef);
 
     setIsPlaying(false);
   };

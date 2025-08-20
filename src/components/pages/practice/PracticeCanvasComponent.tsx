@@ -37,7 +37,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const [practiceMode, setPracticeMode] = useState<'none' | 'playing' | 'practicing'>('none');
   const [currentGestureIndex, setCurrentGestureIndex] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [completedGestures, setCompletedGestures] = useState<number[]>([]);
+  const [completedGesturesCount, setCompletedGesturesCount] = useState<number>(9);
   const [showAllGesturesDone, setShowAllGesturesDone] = useState(false);
   const [isAnimatingCurrentGesture, setIsAnimatingCurrentGesture] = useState(false);
   const [showTryAgain, setShowTryAgain] = useState(false);
@@ -173,7 +173,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     if (accuracy > 0.7) {
       // completeCurrentGesture
       setShowTryAgain(false);
-      setCompletedGestures((prev) => [...prev, currentGestureIndex]);
+      setCompletedGesturesCount(completedGesturesCount + 1);
       playGestureWithoutClear(currentGesture, fabricCanvasRef);
 
       console.log({ currentStrokeIndex: currentGestureIndex, totalGestures });
@@ -181,7 +181,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         setTimeout(() => {
           playGestureIndex(currentGestureIndex + 1);
         }, 500);
-        setCurrentGestureIndex((prev) => prev + 1);
+        setCurrentGestureIndex(currentGestureIndex + 1);
         disableDrawingMode();
       } else {
         finishPracticeMode();
@@ -258,7 +258,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       setTimeout(() => {
         playGestureIndex(currentGestureIndex + 1);
       }, 300);
-      setCurrentGestureIndex((prev) => prev + 1);
+      setCurrentGestureIndex(currentGestureIndex + 1);
       disableDrawingMode();
     } else {
       finishPracticeMode();
@@ -268,7 +268,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const resetPractice = () => {
     setPracticeMode('none');
     setCurrentGestureIndex(0);
-    setCompletedGestures([]);
+    setCompletedGesturesCount(0);
     setShowAllGesturesDone(false);
     setShowTryAgain(false);
     disableDrawingMode();
@@ -334,7 +334,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
                   setPracticeMode('practicing');
                   setCurrentGestureIndex(0);
-                  setCompletedGestures([]);
+                  setCompletedGesturesCount(0);
                   setShowTryAgain(false);
                   clearPracticeStrokes();
                   playGestureIndex(currentGestureIndex);
@@ -394,9 +394,9 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         </div>
         {practiceMode === 'practicing' && (
           <ProgressDisplay
-            currentStroke={currentGestureIndex + 1}
-            totalStrokes={totalGestures}
-            completedCount={completedGestures.length}
+            currentGestures={currentGestureIndex + 1}
+            totalGestures={totalGestures}
+            completedCount={completedGesturesCount}
           />
         )}
 
@@ -578,12 +578,12 @@ const AnimatedNumber = ({ value, className = '' }: { value: number; className?: 
 
 // Progress Display Component
 const ProgressDisplay = ({
-  currentStroke,
-  totalStrokes,
+  currentGestures,
+  totalGestures,
   completedCount
 }: {
-  currentStroke: number;
-  totalStrokes: number;
+  currentGestures: number;
+  totalGestures: number;
   completedCount: number;
 }) => {
   return (
@@ -607,12 +607,12 @@ const ProgressDisplay = ({
           <span className="text-gray-600 dark:text-gray-300">Stroke</span>
           <motion.div className="flex items-center space-x-1" whileHover={{ scale: 1.05 }}>
             <AnimatedNumber
-              value={currentStroke}
+              value={currentGestures}
               className="text-2xl font-bold text-blue-600 dark:text-blue-400"
             />
             <span className="text-gray-500 dark:text-gray-400">/</span>
             <span className="text-xl font-semibold text-gray-700 dark:text-gray-300">
-              {totalStrokes}
+              {totalGestures}
             </span>
           </motion.div>
         </div>

@@ -1,6 +1,7 @@
 import type { Gesture, Stroke, StrokePoint } from './types';
 import { Canvas } from 'fabric';
 import * as fabric from 'fabric';
+import { GESTURE_FLAGS } from './types';
 
 // Utility: sample a stroke (with optional quadratic segments) into a polyline for playback
 export function sampleStrokeToPolyline(
@@ -57,7 +58,8 @@ export function buildSvgPathFromStroke(stroke: Stroke): string {
 
 export const playGestureWithoutClear = async (
   gesture: Gesture,
-  fabricCanvasRef: React.RefObject<Canvas | null>
+  fabricCanvasRef: React.RefObject<Canvas | null>,
+  extraFlags: Record<string, unknown> = {}
 ) => {
   if (!fabricCanvasRef.current) return;
 
@@ -77,7 +79,7 @@ export const playGestureWithoutClear = async (
       fill: '',
       selectable: false,
       evented: false,
-      isGestureVisualization: true,
+      [GESTURE_FLAGS.isGestureVisualization]: true,
       opacity: 0
     } as any);
 

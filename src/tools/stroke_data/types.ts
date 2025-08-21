@@ -36,7 +36,11 @@ export type GestureData = z.infer<typeof StrokeDataSchema>;
 
 export const GESTURE_FLAGS = {
   isGestureVisualization: 'isGestureVisualization',
-  isMainCharacterPath: 'isMainCharacterPath'
+  isMainCharacterPath: 'isMainCharacterPath',
+  /** The strokes which are manually drawn by the user */
+  isUserStroke: 'isUserStroke',
+  /** Stroke for the current Gesture */
+  isCurrentAnimatedStroke: 'isCurrentAnimatedStroke'
 } as const;
 
 export const CANVAS_DIMS = {

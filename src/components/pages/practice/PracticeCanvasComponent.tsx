@@ -13,7 +13,13 @@ import {
   evaluateStrokeAccuracy,
   playGestureWithoutClear
 } from '~/tools/stroke_data/utils';
-import { StrokePoint, GestureData, CANVAS_DIMS, Stroke } from '~/tools/stroke_data/types';
+import {
+  StrokePoint,
+  GestureData,
+  CANVAS_DIMS,
+  Stroke,
+  GESTURE_FLAGS
+} from '~/tools/stroke_data/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AiOutlineSignature } from 'react-icons/ai';
 
@@ -37,11 +43,22 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const [practiceMode, setPracticeMode] = useState<'none' | 'playing' | 'practicing'>('none');
   const [currentGestureIndex, setCurrentGestureIndex] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [completedGesturesCount, setCompletedGesturesCount] = useState<number>(9);
+  const [completedGesturesCount, setCompletedGesturesCount] = useState<number>(0);
   const [showAllGesturesDone, setShowAllGesturesDone] = useState(false);
   const [isAnimatingCurrentGesture, setIsAnimatingCurrentGesture] = useState(false);
   const [showTryAgain, setShowTryAgain] = useState(false);
   const [lastAccuracy, setLastAccuracy] = useState(0);
+
+  // Add refs to capture latest state in callbacks
+  const currentGestureIndexRef = useRef(currentGestureIndex);
+  useEffect(() => {
+    currentGestureIndexRef.current = currentGestureIndex;
+  }, [currentGestureIndex]);
+
+  const completedGesturesCountRef = useRef(completedGesturesCount);
+  useEffect(() => {
+    completedGesturesCountRef.current = completedGesturesCount;
+  }, [completedGesturesCount]);
 
   const strokeData = text_data.strokes_json || { gestures: [] };
 
@@ -90,7 +107,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     if (!fabricCanvasRef.current) return;
 
     setPracticeMode('playing');
-    clearPracticeStrokes();
+    clearAllPracticeStrokes();
 
     for (const gesture of allGestures) {
       await playGestureWithoutClear(gesture, fabricCanvasRef);
@@ -105,13 +122,16 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     disableDrawingMode();
     setIsAnimatingCurrentGesture(true);
     clearCurrentAnimatedStroke();
-    await playGestureWithoutClear(allGestures[gestureIndex], fabricCanvasRef);
+    await playGestureWithoutClear(allGestures[gestureIndex], fabricCanvasRef, {
+      [GESTURE_FLAGS.isCurrentAnimatedStroke]: true
+    });
     setIsAnimatingCurrentGesture(false);
     enableDrawingMode();
   };
 
   const enableDrawingMode = () => {
     if (!fabricCanvasRef.current) return;
+    // clearGestureVisualization();
 
     setIsDrawing(true);
     const canvas = fabricCanvasRef.current;
@@ -133,14 +153,19 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     fabricCanvasRef.current.off('path:created', handleUserStroke);
   };
 
+  // Modify handleUserStroke to use refs for latest state
   const handleUserStroke = (e: any) => {
+    // Add fresh state references
+    const gestureIdx = currentGestureIndexRef.current;
+    const gesture = allGestures[gestureIdx];
+
     if (!e.path) return;
 
     // Mark user drawn path
     e.path.set({
       selectable: false,
       evented: false,
-      isUserStroke: true
+      [GESTURE_FLAGS.isUserStroke]: true
     });
 
     // Extract points from user path
@@ -164,34 +189,49 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       }
     });
 
-    // Evaluate stroke accuracy
+    // Evaluate stroke accuracy using latest gesture
     const accuracy =
-      currentGesture.strokes.reduce((acc, stroke) => {
+      gesture.strokes.reduce((acc, stroke) => {
         return acc + evaluateStrokeAccuracy(userPoints, stroke.points);
-      }, 0) / currentGesture.strokes.length;
+      }, 0) / gesture.strokes.length;
 
     if (accuracy > 0.7) {
       // completeCurrentGesture
       setShowTryAgain(false);
-      setCompletedGesturesCount(completedGesturesCount + 1);
-      playGestureWithoutClear(currentGesture, fabricCanvasRef);
+      playGestureWithoutClear(gesture, fabricCanvasRef);
 
-      console.log({ currentStrokeIndex: currentGestureIndex, totalGestures });
-      if (currentGestureIndex < totalGestures - 1) {
-        setTimeout(() => {
-          playGestureIndex(currentGestureIndex + 1);
-        }, 500);
-        setCurrentGestureIndex(currentGestureIndex + 1);
-        disableDrawingMode();
-      } else {
-        finishPracticeMode();
-      }
+      playNextGesture(gestureIdx, completedGesturesCountRef.current);
     } else {
       setLastAccuracy(accuracy);
       setShowTryAgain(true);
       fabricCanvasRef.current?.remove(e.path);
       // Auto-hide after 5 seconds
       setTimeout(() => setShowTryAgain(false), 5000);
+    }
+  };
+
+  const playNextGesture = (currentGestureIndex: number, completedGesturesCount: number) => {
+    clearUserStrokes();
+    clearCurrentAnimatedStroke();
+
+    // Move to next stroke
+    if (currentGestureIndex > 0) {
+      // reset previous isCurrentAnimatedStroke
+      fabricCanvasRef.current?.getObjects().forEach((obj) => {
+        if (obj.get(GESTURE_FLAGS.isCurrentAnimatedStroke)) {
+          obj.set({ [GESTURE_FLAGS.isCurrentAnimatedStroke]: false });
+        }
+      });
+    }
+    if (currentGestureIndex < totalGestures - 1) {
+      setTimeout(() => {
+        playGestureIndex(currentGestureIndex + 1);
+      }, 300);
+      setCurrentGestureIndex(currentGestureIndex + 1);
+      disableDrawingMode();
+      setCompletedGesturesCount(completedGesturesCount + 1);
+    } else {
+      finishPracticeMode();
     }
   };
 
@@ -207,11 +247,11 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     }, 3000);
   };
 
-  const clearPracticeStrokes = () => {
+  const clearAllPracticeStrokes = () => {
     if (!fabricCanvasRef.current) return;
 
     fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get('isAnimatedStroke') || obj.get('isUserStroke') || obj.get('isPerfectStroke')) {
+      if (obj.get(GESTURE_FLAGS.isUserStroke) || obj.get(GESTURE_FLAGS.isGestureVisualization)) {
         fabricCanvasRef.current?.remove(obj);
       }
     });
@@ -222,7 +262,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     if (!fabricCanvasRef.current) return;
 
     fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get('isAnimatedStroke')) {
+      if (obj.get(GESTURE_FLAGS.isCurrentAnimatedStroke)) {
         fabricCanvasRef.current?.remove(obj);
       }
     });
@@ -233,7 +273,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     if (!fabricCanvasRef.current) return;
 
     fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get('isUserStroke')) {
+      if (obj.get(GESTURE_FLAGS.isUserStroke)) {
         fabricCanvasRef.current?.remove(obj);
       }
     });
@@ -250,19 +290,9 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     if (practiceMode !== 'practicing' || isAnimatingCurrentGesture) return;
 
     setShowTryAgain(false);
-    clearUserStrokes();
-    clearCurrentAnimatedStroke();
 
     // Move to next stroke
-    if (currentGestureIndex < totalGestures - 1) {
-      setTimeout(() => {
-        playGestureIndex(currentGestureIndex + 1);
-      }, 300);
-      setCurrentGestureIndex(currentGestureIndex + 1);
-      disableDrawingMode();
-    } else {
-      finishPracticeMode();
-    }
+    playNextGesture(currentGestureIndex, completedGesturesCount);
   };
 
   const resetPractice = () => {
@@ -272,7 +302,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     setShowAllGesturesDone(false);
     setShowTryAgain(false);
     disableDrawingMode();
-    clearPracticeStrokes();
+    clearAllPracticeStrokes();
     // Keep canvas empty on reset
   };
 
@@ -336,7 +366,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
                   setCurrentGestureIndex(0);
                   setCompletedGesturesCount(0);
                   setShowTryAgain(false);
-                  clearPracticeStrokes();
+                  clearAllPracticeStrokes();
                   playGestureIndex(currentGestureIndex);
                 }}
                 disabled={practiceMode === 'playing'}
@@ -431,7 +461,10 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
               isDrawing ? 'border-blue-500' : 'border-border'
             )}
           >
-            <canvas ref={canvasRef} />
+            <canvas
+              ref={canvasRef}
+              style={{ width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }}
+            />
           </div>
         </div>
       </div>

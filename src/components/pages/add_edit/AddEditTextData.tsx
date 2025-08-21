@@ -318,7 +318,7 @@ function AddEditTextData({
     for (const gesture of gestureData.gestures) {
       if (gesture.strokes.length === 0) continue;
       await playGestureWithoutClear(gesture, fabricCanvasRef);
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Small delay between gestures
+      await new Promise((resolve) => setTimeout(resolve, 50)); // Small delay between gestures
     }
 
     setIsPlaying(false);

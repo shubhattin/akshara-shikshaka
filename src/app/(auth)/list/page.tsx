@@ -19,7 +19,7 @@ const List = async () => {
       createdAt: true,
       updatedAt: true
     },
-    orderBy: ({ createdAt }, { desc }) => desc(createdAt)
+    orderBy: (text_data, { asc }) => [asc(text_data.text)]
   });
 
   return (

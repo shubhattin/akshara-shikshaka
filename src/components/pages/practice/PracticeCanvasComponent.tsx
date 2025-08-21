@@ -170,7 +170,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
     for (const gesture of allGestures) {
       await playGestureWithoutClear(gesture, fabricCanvasRef);
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
     setPracticeMode('none');

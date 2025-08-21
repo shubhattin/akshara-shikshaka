@@ -8,7 +8,8 @@ export default async function Home() {
     columns: {
       id: true,
       text: true
-    }
+    },
+    orderBy: (text_data, { asc }) => [asc(text_data.text)]
   });
 
   return (

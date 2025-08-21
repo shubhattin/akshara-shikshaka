@@ -223,13 +223,13 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         }
       });
     }
+    setCurrentGestureIndex(currentGestureIndex + 1);
+    setCompletedGesturesCount(completedGesturesCount + 1);
     if (currentGestureIndex < totalGestures - 1) {
       setTimeout(() => {
         playGestureIndex(currentGestureIndex + 1);
       }, 300);
-      setCurrentGestureIndex(currentGestureIndex + 1);
       disableDrawingMode();
-      setCompletedGesturesCount(completedGesturesCount + 1);
     } else {
       finishPracticeMode();
     }
@@ -239,12 +239,6 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     disableDrawingMode();
     clearUserStrokes();
     setShowAllGesturesDone(true);
-
-    setTimeout(async () => {
-      setShowAllGesturesDone(false);
-      await playAllGestures();
-      setPracticeMode('none');
-    }, 3000);
   };
 
   const clearAllPracticeStrokes = () => {
@@ -422,7 +416,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
             </>
           )}
         </div>
-        {practiceMode === 'practicing' && (
+        {practiceMode === 'practicing' && !showAllGesturesDone && (
           <ProgressDisplay
             currentGestures={currentGestureIndex + 1}
             totalGestures={totalGestures}
@@ -432,15 +426,44 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
         {showAllGesturesDone && (
           <motion.div
-            className="rounded-lg border border-green-200 bg-green-50 p-4 text-center"
-            initial={{ x: 200, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 200, opacity: 0 }}
+            className={cn(
+              'space-y-4 rounded-xl border border-gray-200 bg-gradient-to-br from-white via-gray-50 to-gray-100 p-6 text-center shadow-lg',
+              'dark:border-gray-700 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-700'
+            )}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
           >
-            <div className="text-2xl">🎉</div>
-            <div className="text-lg font-semibold text-green-800">Congratulations!</div>
-            <div className="text-green-600">You successfully completed all strokes!</div>
+            <div className="mb-2 text-3xl">🎉</div>
+            <div className="mb-1 text-xl font-bold text-yellow-800 dark:text-yellow-200">
+              Congratulations!
+            </div>
+            <div className="mb-3 text-yellow-700 dark:text-yellow-300">
+              You successfully completed all strokes!
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.07 }}
+              onClick={() => {
+                setShowAllGesturesDone(false);
+                resetPractice();
+                playAllGestures();
+              }}
+              className={cn(
+                'relative inline-flex items-center rounded-lg px-4 py-2 font-semibold transition-all duration-200',
+                'bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 text-yellow-900 shadow-md',
+                'hover:scale-105 hover:from-yellow-500 hover:via-orange-500 hover:to-yellow-600 hover:shadow-lg',
+                'focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:outline-none',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+                'dark:from-yellow-600 dark:via-orange-500 dark:to-yellow-700 dark:text-yellow-100',
+                'dark:hover:from-yellow-700 dark:hover:via-orange-600 dark:hover:to-yellow-800'
+              )}
+              style={{ fontSize: '0.95rem' }}
+            >
+              <MdArrowForward className="mr-2 text-lg drop-shadow" />
+              Play Again
+            </motion.button>
           </motion.div>
         )}
 

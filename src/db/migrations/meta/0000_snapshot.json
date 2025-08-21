@@ -1,5 +1,5 @@
 {
-  "id": "137b5259-ae52-46aa-839a-a86ecaa5ade4",
+  "id": "92f3fb5d-94d3-47ac-ad13-130dfbdaa061",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -33,6 +33,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "strokes_json": {
+          "name": "strokes_json",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -47,7 +53,23 @@
           "notNull": true
         }
       },
-      "indexes": {},
+      "indexes": {
+        "text_data_text_idx": {
+          "name": "text_data_text_idx",
+          "columns": [
+            {
+              "expression": "text",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

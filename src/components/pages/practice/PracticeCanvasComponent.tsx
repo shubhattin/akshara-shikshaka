@@ -2,76 +2,120 @@
 
 import { type Canvas } from 'fabric';
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '~/components/ui/button';
 import { Card } from '~/components/ui/card';
 import * as fabric from 'fabric';
 import { cn } from '~/lib/utils';
-import { MdPlayArrow, MdClear, MdFiberManualRecord } from 'react-icons/md';
-import { toast } from 'sonner';
-
-// Types from AddEditTextData
-type StrokePoint = {
-  x: number;
-  y: number;
-  timestamp: number;
-};
-
-type Stroke = {
-  order: number;
-  points: StrokePoint[];
-};
-
-type Gesture = {
-  order: number;
-  strokes: Stroke[];
-  brush_width: number;
-  brush_color: string;
-  animation_duration: number;
-};
-
-type StrokeData = {
-  gestures: Gesture[];
-};
+import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward } from 'react-icons/md';
+import { FiTrendingUp } from 'react-icons/fi';
+import { evaluateStrokeAccuracy, playGestureWithoutClear } from '~/tools/stroke_data/utils';
+import {
+  StrokePoint,
+  GestureData,
+  CANVAS_DIMS,
+  Stroke,
+  GESTURE_FLAGS
+} from '~/tools/stroke_data/types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AiOutlineSignature } from 'react-icons/ai';
 
 type text_data_type = {
   id: number;
   uuid: string;
   text: string;
-  strokes_json?: StrokeData;
+  strokes_json?: GestureData;
 };
 
 type Props = {
   text_data: text_data_type;
 };
 
-const PracticeCanvasComponent = ({ text_data }: Props) => {
+export default function PracticeCanvasComponent({ text_data }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<Canvas>(null);
   const canceledRef = useRef(false);
 
   // Practice state
   const [practiceMode, setPracticeMode] = useState<'none' | 'playing' | 'practicing'>('none');
-  const [currentStrokeIndex, setCurrentStrokeIndex] = useState(0);
+  const [currentGestureIndex, setCurrentGestureIndex] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [completedStrokes, setCompletedStrokes] = useState<number[]>([]);
-  const [showCongratulations, setShowCongratulations] = useState(false);
-  const [isAnimatingCurrentStroke, setIsAnimatingCurrentStroke] = useState(false);
+  const [completedGesturesCount, setCompletedGesturesCount] = useState<number>(0);
+  const [showAllGesturesDone, setShowAllGesturesDone] = useState(false);
+  const [isAnimatingCurrentGesture, setIsAnimatingCurrentGesture] = useState(false);
+  const [showTryAgain, setShowTryAgain] = useState(false);
+  const [lastAccuracy, setLastAccuracy] = useState(0);
+  const [scalingFactor, setScalingFactor] = useState(1);
+  const [mounted, setMounted] = useState(false);
+
+  function updateScalingFactor() {
+    if (typeof window === 'undefined') return;
+    // calculate scale based on available width, cap to 1
+    const availableWidth = window.innerWidth * 0.8;
+    const scaleX = availableWidth / CANVAS_DIMS.width;
+    const scale = Math.min(1, scaleX);
+    setScalingFactor(scale);
+  }
+  const updateCanvasDimensions = () => {
+    if (!fabricCanvasRef.current) return;
+    // Keep logical canvas size constant; scale visually with zoom
+    fabricCanvasRef.current.setWidth(CANVAS_DIMS.width * scalingFactor);
+    fabricCanvasRef.current.setHeight(CANVAS_DIMS.height * scalingFactor);
+    fabricCanvasRef.current.setZoom(scalingFactor);
+    // Center viewport so character remains centered
+    const viewportTransform = fabricCanvasRef.current.viewportTransform;
+    if (viewportTransform) {
+      viewportTransform[4] = 0; // translateX
+      viewportTransform[5] = 0; // translateY
+    }
+    fabricCanvasRef.current.requestRenderAll();
+  };
+  useEffect(() => {
+    if (mounted) {
+      updateCanvasDimensions();
+    }
+  }, [scalingFactor, mounted]);
+
+  // Add refs to capture latest state in callbacks
+  const currentGestureIndexRef = useRef(currentGestureIndex);
+  useEffect(() => {
+    currentGestureIndexRef.current = currentGestureIndex;
+  }, [currentGestureIndex]);
+
+  const completedGesturesCountRef = useRef(completedGesturesCount);
+  useEffect(() => {
+    completedGesturesCountRef.current = completedGesturesCount;
+  }, [completedGesturesCount]);
+
+  useEffect(() => {
+    updateScalingFactor();
+    canceledRef.current = false;
+    initCanvas().then(() => {
+      setMounted(true);
+    });
+
+    window.addEventListener('resize', updateScalingFactor);
+    const unsub_func = () => {
+      window.removeEventListener('resize', updateScalingFactor);
+    };
+
+    return () => {
+      unsub_func();
+      canceledRef.current = true;
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.dispose();
+        fabricCanvasRef.current = null;
+      }
+      if (canvasRef.current && (canvasRef.current as any).__fabric) {
+        delete (canvasRef.current as any).__fabric;
+      }
+    };
+  }, []);
 
   const strokeData = text_data.strokes_json || { gestures: [] };
 
-  // Flatten all strokes from all gestures for practice
-  const allStrokes = strokeData.gestures.flatMap((gesture, gestureIndex) =>
-    gesture.strokes.map((stroke, strokeIndex) => ({
-      ...stroke,
-      gestureIndex,
-      strokeIndex,
-      gesture,
-      globalIndex: gestureIndex * 1000 + strokeIndex
-    }))
-  );
+  const allGestures = strokeData.gestures;
+  const currentGesture = allGestures[currentGestureIndex];
 
-  const totalStrokes = allStrokes.length;
-  const currentStroke = allStrokes[currentStrokeIndex];
+  const totalGestures = allGestures.length;
 
   const initCanvas = async () => {
     if (!canvasRef.current) return;
@@ -83,8 +127,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     }
 
     // Dynamic import to avoid SSR issues
-    const fabricModule = await import('fabric');
-    const fab = (fabricModule as any).fabric || (fabricModule as any).default || fabricModule;
+
     if (canceledRef.current) return;
 
     // Check if the canvas element already has a Fabric instance
@@ -95,161 +138,59 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     }
 
     // Initialize Fabric.js canvas
-    const canvas = new fab.Canvas(canvasRef.current, {
-      width: 400,
-      height: 400,
+    const canvas = new fabric.Canvas(canvasRef.current, {
+      width: CANVAS_DIMS.width * scalingFactor,
+      height: CANVAS_DIMS.height * scalingFactor,
       backgroundColor: '#ffffff',
-      isDrawingMode: false
+      isDrawingMode: false,
+      selection: false
     });
 
     // Store reference on the canvas element itself for cleanup
     (canvasRef.current as any).__fabric = canvas;
     fabricCanvasRef.current = canvas;
 
+    // Apply initial zoom and center
+    canvas.setZoom(scalingFactor);
+    const viewportTransform = canvas.viewportTransform;
+    if (viewportTransform) {
+      viewportTransform[4] = 0;
+      viewportTransform[5] = 0;
+    }
+    canvas.requestRenderAll();
+
     // Start with a clean, empty canvas (no character path or pre-rendered strokes)
   };
 
-  const renderCharacterPath = async () => {
-    if (!text_data.text || !fabricCanvasRef.current) return;
-
-    const hbjs = await import('~/tools/harfbuzz/index');
-    const FONT_URL = '/fonts/regular/Nirmala.ttf';
-    await Promise.all([hbjs.preload_harfbuzzjs_wasm(), hbjs.preload_font_from_url(FONT_URL)]);
-
-    const svg_path = await hbjs.get_text_svg_path(text_data.text, FONT_URL);
-    if (svg_path) {
-      const SCALE_FACTOR = 1 / 4.5;
-      const pathObject = new fabric.Path(svg_path, {
-        fill: 'rgba(0,0,0,0.1)',
-        stroke: '#cccccc',
-        strokeWidth: 1,
-        selectable: false,
-        evented: false,
-        scaleX: SCALE_FACTOR,
-        scaleY: SCALE_FACTOR,
-        isCharacterPath: true
-      });
-
-      fabricCanvasRef.current?.centerObject(pathObject);
-      fabricCanvasRef.current?.add(pathObject);
-      fabricCanvasRef.current?.renderAll();
-    }
-  };
-
-  const prerenderAllStrokes = () => {
-    // Intentionally no-op to keep canvas empty at start
-    return;
-  };
-
-  const playAllStrokes = async () => {
+  const playAllGestures = async () => {
     if (!fabricCanvasRef.current) return;
 
     setPracticeMode('playing');
-    clearPracticeStrokes();
+    clearAllPracticeStrokes();
 
-    for (const stroke of allStrokes) {
-      if (stroke.points.length < 2) continue;
-      await animateStroke(
-        stroke,
-        stroke.gesture.brush_color,
-        stroke.gesture.brush_width,
-        stroke.gesture.animation_duration
-      );
-      await new Promise((resolve) => setTimeout(resolve, 100));
+    for (const gesture of allGestures) {
+      await playGestureWithoutClear(gesture, fabricCanvasRef);
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
     setPracticeMode('none');
   };
 
-  const animateStroke = async (stroke: any, color: string, width: number, duration: number) => {
-    if (!fabricCanvasRef.current || stroke.points.length < 2) return;
-
-    let pathString = '';
-    stroke.points.forEach((point: StrokePoint, index: number) => {
-      if (index === 0) {
-        pathString += `M ${point.x} ${point.y}`;
-      } else {
-        pathString += ` L ${point.x} ${point.y}`;
-      }
-    });
-
-    const fullPath = new fabric.Path(pathString, {
-      stroke: color,
-      strokeWidth: width,
-      fill: '',
-      selectable: false,
-      evented: false,
-      isAnimatedStroke: true,
-      opacity: 0
-    } as any);
-
-    fabricCanvasRef.current.add(fullPath);
-
-    const totalPoints = stroke.points.length;
-    const animationSteps = Math.min(totalPoints * 2, 50);
-
-    for (let step = 1; step <= animationSteps; step++) {
-      const progress = step / animationSteps;
-      const pointIndex = Math.floor(progress * (totalPoints - 1));
-
-      let partialPath = '';
-      for (let i = 0; i <= pointIndex; i++) {
-        if (i === 0) {
-          partialPath += `M ${stroke.points[i].x} ${stroke.points[i].y}`;
-        } else {
-          partialPath += ` L ${stroke.points[i].x} ${stroke.points[i].y}`;
-        }
-      }
-
-      if (pointIndex < totalPoints - 1) {
-        const currentPoint = stroke.points[pointIndex];
-        const nextPoint = stroke.points[pointIndex + 1];
-        const subProgress = (progress * (totalPoints - 1)) % 1;
-
-        const interpolatedX = currentPoint.x + (nextPoint.x - currentPoint.x) * subProgress;
-        const interpolatedY = currentPoint.y + (nextPoint.y - currentPoint.y) * subProgress;
-
-        partialPath += ` L ${interpolatedX} ${interpolatedY}`;
-      }
-
-      fullPath.set('path', fabric.util.parsePath(partialPath));
-      fullPath.set('opacity', 1);
-      fabricCanvasRef.current.renderAll();
-
-      const delay = duration / animationSteps;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  };
-
-  const startPracticeMode = () => {
-    if (totalStrokes === 0) return;
-
-    setPracticeMode('practicing');
-    setCurrentStrokeIndex(0);
-    setCompletedStrokes([]);
-    clearPracticeStrokes();
-    showCurrentStroke();
-  };
-
-  const showCurrentStroke = async () => {
-    if (!currentStroke) return;
-
+  const playGestureIndex = async (gestureIndex: number) => {
     // Disable drawing while playing the guided animation for the current stroke
     disableDrawingMode();
-    setIsAnimatingCurrentStroke(true);
+    setIsAnimatingCurrentGesture(true);
     clearCurrentAnimatedStroke();
-    await animateStroke(
-      currentStroke,
-      currentStroke.gesture.brush_color,
-      currentStroke.gesture.brush_width,
-      currentStroke.gesture.animation_duration
-    );
-    setIsAnimatingCurrentStroke(false);
+    await playGestureWithoutClear(allGestures[gestureIndex], fabricCanvasRef, {
+      [GESTURE_FLAGS.isCurrentAnimatedStroke]: true
+    });
+    setIsAnimatingCurrentGesture(false);
     enableDrawingMode();
   };
 
   const enableDrawingMode = () => {
     if (!fabricCanvasRef.current) return;
+    // clearGestureVisualization();
 
     setIsDrawing(true);
     const canvas = fabricCanvasRef.current;
@@ -257,9 +198,9 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     canvas.isDrawingMode = true;
     canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
     canvas.freeDrawingBrush.color = '#0066cc';
-    canvas.freeDrawingBrush.width = currentStroke?.gesture.brush_width || 6;
+    canvas.freeDrawingBrush.width = currentGesture.brush_width || 6;
 
-    canvas.off('path:created');
+    canvas.off('path:created', handleUserStroke);
     canvas.on('path:created', handleUserStroke);
   };
 
@@ -268,17 +209,22 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
 
     setIsDrawing(false);
     fabricCanvasRef.current.isDrawingMode = false;
-    fabricCanvasRef.current.off('path:created');
+    fabricCanvasRef.current.off('path:created', handleUserStroke);
   };
 
+  // Modify handleUserStroke to use refs for latest state
   const handleUserStroke = (e: any) => {
-    if (!e.path || !currentStroke) return;
+    // Add fresh state references
+    const gestureIdx = currentGestureIndexRef.current;
+    const gesture = allGestures[gestureIdx];
+
+    if (!e.path) return;
 
     // Mark user drawn path
     e.path.set({
       selectable: false,
       evented: false,
-      isUserStroke: true
+      [GESTURE_FLAGS.isUserStroke]: true
     });
 
     // Extract points from user path
@@ -286,201 +232,79 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     const userPoints: StrokePoint[] = [];
 
     pathData.forEach((cmd: any, index: number) => {
-      if (cmd[0] === 'M' || cmd[0] === 'L') {
-        userPoints.push({
-          x: cmd[1],
-          y: cmd[2],
-          timestamp: index * 10
-        });
+      if (cmd[0] === 'M' && cmd.length >= 3) {
+        userPoints.push({ x: cmd[1], y: cmd[2], timestamp: index * 10, cmd: 'M' });
+      } else if (cmd[0] === 'L' && cmd.length >= 3) {
+        userPoints.push({ x: cmd[1], y: cmd[2], timestamp: index * 10, cmd: 'L' });
       } else if (cmd[0] === 'Q' && cmd.length >= 5) {
         userPoints.push({
           x: cmd[3],
           y: cmd[4],
-          timestamp: index * 10
+          timestamp: index * 10,
+          cmd: 'Q',
+          cx: cmd[1],
+          cy: cmd[2]
         });
       }
     });
 
-    // Evaluate stroke accuracy
-    const accuracy = evaluateStrokeAccuracy(userPoints, currentStroke.points);
+    // Evaluate stroke accuracy using latest gesture
+    const accuracy =
+      gesture.strokes.reduce((acc, stroke) => {
+        return acc + evaluateStrokeAccuracy(userPoints, stroke.points);
+      }, 0) / gesture.strokes.length;
 
     if (accuracy > 0.7) {
-      toast.success(`Good stroke! Accuracy: ${Math.round(accuracy * 100)}%`);
-      completeCurrentStroke();
+      // completeCurrentGesture
+      setShowTryAgain(false);
+      playGestureWithoutClear(gesture, fabricCanvasRef);
+
+      playNextGesture(gestureIdx, completedGesturesCountRef.current);
     } else {
-      toast.error(`Try again! Accuracy: ${Math.round(accuracy * 100)}% (need 70%+)`);
+      setLastAccuracy(accuracy);
+      setShowTryAgain(true);
       fabricCanvasRef.current?.remove(e.path);
+      // Auto-hide after 5 seconds
+      setTimeout(() => setShowTryAgain(false), 5000);
     }
   };
 
-  const evaluateStrokeAccuracy = (
-    userPoints: StrokePoint[],
-    targetPoints: StrokePoint[]
-  ): number => {
-    if (userPoints.length < 2 || targetPoints.length < 2) return 0;
-
-    // 1) Normalize and resample both sequences to fixed length
-    const SAMPLE_SIZE = 64;
-    const normalize = (pts: StrokePoint[]) => {
-      const xs = pts.map((p) => p.x);
-      const ys = pts.map((p) => p.y);
-      const minX = Math.min(...xs);
-      const minY = Math.min(...ys);
-      const maxX = Math.max(...xs);
-      const maxY = Math.max(...ys);
-      const w = Math.max(1, maxX - minX);
-      const h = Math.max(1, maxY - minY);
-      const scale = 1 / Math.max(w, h);
-      return pts.map((p) => ({ x: (p.x - minX) * scale, y: (p.y - minY) * scale, timestamp: 0 }));
-    };
-
-    const resample = (pts: StrokePoint[], n: number) => {
-      if (pts.length === n) return pts;
-      const dists: number[] = [0];
-      for (let i = 1; i < pts.length; i++) {
-        const dx = pts[i].x - pts[i - 1].x;
-        const dy = pts[i].y - pts[i - 1].y;
-        dists[i] = dists[i - 1] + Math.hypot(dx, dy);
-      }
-      const total = dists[dists.length - 1] || 1;
-      const step = total / (n - 1);
-      const res: StrokePoint[] = [];
-      let target = 0;
-      let j = 0;
-      for (let i = 0; i < n; i++) {
-        while (j < dists.length - 1 && dists[j] < target) j++;
-        const prev = Math.max(0, j - 1);
-        const t = dists[j] === dists[prev] ? 0 : (target - dists[prev]) / (dists[j] - dists[prev]);
-        const x = pts[prev].x + (pts[j].x - pts[prev].x) * t;
-        const y = pts[prev].y + (pts[j].y - pts[prev].y) * t;
-        res.push({ x, y, timestamp: i });
-        target = i * step;
-      }
-      return res;
-    };
-
-    const uNorm = normalize(userPoints);
-    const tNorm = normalize(targetPoints);
-    const u = resample(uNorm, SAMPLE_SIZE);
-    const t = resample(tNorm, SAMPLE_SIZE);
-
-    // 2) Compute direction similarity (cosine between overall vectors)
-    const vec = (pts: StrokePoint[]) => ({
-      x: pts[pts.length - 1].x - pts[0].x,
-      y: pts[pts.length - 1].y - pts[0].y
-    });
-    const dot = (a: { x: number; y: number }, b: { x: number; y: number }) => a.x * b.x + a.y * b.y;
-    const mag = (a: { x: number; y: number }) => Math.hypot(a.x, a.y) || 1e-6;
-    const vU = vec(u);
-    const vT = vec(t);
-    const directionCos = Math.max(0, Math.min(1, dot(vU, vT) / (mag(vU) * mag(vT))));
-
-    // 3) Endpoint proximity
-    const endDist = Math.hypot(
-      u[u.length - 1].x - t[t.length - 1].x,
-      u[u.length - 1].y - t[t.length - 1].y
-    );
-    const startDist = Math.hypot(u[0].x - t[0].x, u[0].y - t[0].y);
-    const endpointScore = Math.max(0, 1 - (startDist + endDist) / 2);
-
-    // 4) DTW path similarity for shape matching
-    const dtw = (a: StrokePoint[], b: StrokePoint[]) => {
-      const n = a.length;
-      const m = b.length;
-      const dp = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(Infinity));
-      dp[0][0] = 0;
-      const cost = (i: number, j: number) => Math.hypot(a[i].x - b[j].x, a[i].y - b[j].y);
-      for (let i = 1; i <= n; i++) {
-        for (let j = 1; j <= m; j++) {
-          const c = cost(i - 1, j - 1);
-          dp[i][j] = c + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-        }
-      }
-      return dp[n][m] / (n + m);
-    };
-
-    const dtwDist = dtw(u, t);
-    const dtwScore = Math.max(0, 1 - dtwDist); // since coords are normalized to ~[0,1], distance ~[0,2]
-
-    // 5) Path length ratio (to discourage overly short/long)
-    const lengthOf = (pts: StrokePoint[]) =>
-      pts.reduce((acc, p, i) => {
-        if (i === 0) return 0;
-        return acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y);
-      }, 0);
-    const lenU = lengthOf(u);
-    const lenT = lengthOf(t);
-    const lenRatio = lenT > 0 ? Math.min(lenU, lenT) / Math.max(lenU, lenT) : 0;
-
-    // Weighted aggregate score
-    const score = 0.45 * dtwScore + 0.2 * directionCos + 0.2 * endpointScore + 0.15 * lenRatio;
-
-    return Math.max(0, Math.min(1, score));
-  };
-
-  const completeCurrentStroke = () => {
-    if (!currentStroke) return;
-
-    setCompletedStrokes((prev) => [...prev, currentStrokeIndex]);
-    createPerfectStrokeVisualization(currentStroke, currentStrokeIndex);
-
-    if (currentStrokeIndex < totalStrokes - 1) {
-      setCurrentStrokeIndex((prev) => prev + 1);
-      disableDrawingMode();
-      setTimeout(() => {
-        showCurrentStroke();
-      }, 500);
-    } else {
-      finishPractice();
-    }
-  };
-
-  const createPerfectStrokeVisualization = (stroke: any, zIndex: number) => {
-    if (!fabricCanvasRef.current || stroke.points.length < 2) return;
-
-    let pathString = '';
-    stroke.points.forEach((point: StrokePoint, index: number) => {
-      if (index === 0) {
-        pathString += `M ${point.x} ${point.y}`;
-      } else {
-        pathString += ` L ${point.x} ${point.y}`;
-      }
-    });
-
-    const perfectPath = new fabric.Path(pathString, {
-      stroke: stroke.gesture.brush_color,
-      strokeWidth: stroke.gesture.brush_width,
-      fill: '',
-      selectable: false,
-      evented: false,
-      isPerfectStroke: true,
-      strokeOrder: zIndex
-    } as any);
-
+  const playNextGesture = (currentGestureIndex: number, completedGesturesCount: number) => {
+    clearUserStrokes();
     clearCurrentAnimatedStroke();
-    fabricCanvasRef.current.add(perfectPath);
-    fabricCanvasRef.current.renderAll();
+
+    // Move to next stroke
+    if (currentGestureIndex > 0) {
+      // reset previous isCurrentAnimatedStroke
+      fabricCanvasRef.current?.getObjects().forEach((obj) => {
+        if (obj.get(GESTURE_FLAGS.isCurrentAnimatedStroke)) {
+          obj.set({ [GESTURE_FLAGS.isCurrentAnimatedStroke]: false });
+        }
+      });
+    }
+    setCurrentGestureIndex(currentGestureIndex + 1);
+    setCompletedGesturesCount(completedGesturesCount + 1);
+    if (currentGestureIndex < totalGestures - 1) {
+      setTimeout(() => {
+        playGestureIndex(currentGestureIndex + 1);
+      }, 300);
+      disableDrawingMode();
+    } else {
+      finishPracticeMode();
+    }
   };
 
-  const finishPractice = async () => {
+  const finishPracticeMode = async () => {
     disableDrawingMode();
     clearUserStrokes();
-    setShowCongratulations(true);
-
-    toast.success('🎉 Congratulations! You completed all strokes!');
-
-    setTimeout(async () => {
-      setShowCongratulations(false);
-      await playAllStrokes();
-      setPracticeMode('none');
-    }, 3000);
+    setShowAllGesturesDone(true);
   };
 
-  const clearPracticeStrokes = () => {
+  const clearAllPracticeStrokes = () => {
     if (!fabricCanvasRef.current) return;
 
     fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get('isAnimatedStroke') || obj.get('isUserStroke') || obj.get('isPerfectStroke')) {
+      if (obj.get(GESTURE_FLAGS.isUserStroke) || obj.get(GESTURE_FLAGS.isGestureVisualization)) {
         fabricCanvasRef.current?.remove(obj);
       }
     });
@@ -491,7 +315,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     if (!fabricCanvasRef.current) return;
 
     fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get('isAnimatedStroke')) {
+      if (obj.get(GESTURE_FLAGS.isCurrentAnimatedStroke)) {
         fabricCanvasRef.current?.remove(obj);
       }
     });
@@ -502,7 +326,7 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
     if (!fabricCanvasRef.current) return;
 
     fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get('isUserStroke')) {
+      if (obj.get(GESTURE_FLAGS.isUserStroke)) {
         fabricCanvasRef.current?.remove(obj);
       }
     });
@@ -510,36 +334,30 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
   };
 
   const replayCurrentStroke = () => {
-    if (!currentStroke || practiceMode !== 'practicing' || isAnimatingCurrentStroke) return;
+    if (practiceMode !== 'practicing' || isAnimatingCurrentGesture) return;
     clearCurrentAnimatedStroke();
-    showCurrentStroke();
+    playGestureIndex(currentGestureIndex);
+  };
+
+  const skipCurrentStroke = () => {
+    if (practiceMode !== 'practicing' || isAnimatingCurrentGesture) return;
+
+    setShowTryAgain(false);
+
+    // Move to next stroke
+    playNextGesture(currentGestureIndex, completedGesturesCount);
   };
 
   const resetPractice = () => {
     setPracticeMode('none');
-    setCurrentStrokeIndex(0);
-    setCompletedStrokes([]);
-    setShowCongratulations(false);
+    setCurrentGestureIndex(0);
+    setCompletedGesturesCount(0);
+    setShowAllGesturesDone(false);
+    setShowTryAgain(false);
     disableDrawingMode();
-    clearPracticeStrokes();
+    clearAllPracticeStrokes();
     // Keep canvas empty on reset
   };
-
-  useEffect(() => {
-    canceledRef.current = false;
-    initCanvas();
-
-    return () => {
-      canceledRef.current = true;
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-        fabricCanvasRef.current = null;
-      }
-      if (canvasRef.current && (canvasRef.current as any).__fabric) {
-        delete (canvasRef.current as any).__fabric;
-      }
-    };
-  }, []);
 
   if (!strokeData.gestures.length) {
     return (
@@ -556,62 +374,151 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
       <div className="space-y-4">
         <div className="text-center">
           <h2 className="mb-2 text-2xl font-bold">Practice: {text_data.text}</h2>
-          {practiceMode === 'practicing' && (
-            <div className="text-lg font-semibold text-primary">
-              Stroke {currentStrokeIndex + 1} of {totalStrokes}
-              {isDrawing && (
-                <div className="mt-1 text-sm text-muted-foreground">
-                  Draw the highlighted stroke. Need 70%+ accuracy to continue.
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="flex justify-center gap-4">
-          {practiceMode === 'none' && (
+          {(practiceMode === 'none' || practiceMode === 'playing') && (
             <>
-              <Button onClick={playAllStrokes} variant="outline">
-                <MdPlayArrow className="mr-2" />
-                Play All Strokes
-              </Button>
-              <Button onClick={startPracticeMode} variant="default">
-                <MdFiberManualRecord className="mr-2 text-red-500" />
-                Practice Each Stroke
-              </Button>
+              <button
+                onClick={playAllGestures}
+                disabled={practiceMode === 'playing'}
+                className={cn(
+                  'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
+                  'bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-lg',
+                  'hover:scale-105 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
+                  'focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none',
+                  'disabled:cursor-not-allowed disabled:opacity-60',
+                  'dark:from-blue-700 dark:to-blue-900 dark:text-white',
+                  'dark:hover:from-blue-800 dark:hover:to-blue-950'
+                )}
+              >
+                <MdPlayArrow className="mr-2 size-6 text-xl drop-shadow" />
+                How to Write
+              </button>
+              <button
+                onClick={() => {
+                  if (totalGestures === 0) return;
+
+                  setPracticeMode('practicing');
+                  setCurrentGestureIndex(0);
+                  setCompletedGesturesCount(0);
+                  setShowTryAgain(false);
+                  clearAllPracticeStrokes();
+                  playGestureIndex(currentGestureIndex);
+                }}
+                disabled={practiceMode === 'playing'}
+                className={cn(
+                  'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
+                  'bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white shadow-lg',
+                  'hover:scale-105 hover:from-pink-600 hover:via-red-600 hover:to-yellow-600 hover:shadow-xl',
+                  'focus:ring-2 focus:ring-pink-400 focus:ring-offset-2 focus:outline-none',
+                  'disabled:cursor-not-allowed disabled:opacity-60',
+                  'dark:from-pink-700 dark:via-red-700 dark:to-yellow-700 dark:text-white',
+                  'dark:hover:from-pink-800 dark:hover:via-red-800 dark:hover:to-yellow-800'
+                )}
+              >
+                <AiOutlineSignature className="mr-2 size-6 text-xl text-white drop-shadow" />
+                Practice
+              </button>
             </>
           )}
 
           {practiceMode === 'practicing' && (
             <>
-              <Button
+              <button
                 onClick={replayCurrentStroke}
-                variant="outline"
-                size="sm"
-                disabled={isAnimatingCurrentStroke}
+                disabled={isAnimatingCurrentGesture}
+                className={cn(
+                  'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
+                  'bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-lg',
+                  'hover:scale-105 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
+                  'focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none',
+                  'disabled:cursor-not-allowed disabled:opacity-60',
+                  'dark:from-blue-700 dark:to-blue-900 dark:text-white',
+                  'dark:hover:from-blue-800 dark:hover:to-blue-950'
+                )}
               >
-                <MdPlayArrow className="mr-1" />
-                Play Stroke
-              </Button>
-              <Button onClick={resetPractice} variant="outline" size="sm">
-                <MdClear className="mr-1" />
+                <MdPlayArrow className="mr-2 text-xl drop-shadow" />
+                Play Current Stroke
+              </button>
+              <button
+                onClick={resetPractice}
+                className={cn(
+                  'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
+                  'bg-gradient-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-lg',
+                  'hover:scale-105 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-xl',
+                  'focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none',
+                  'disabled:cursor-not-allowed disabled:opacity-60',
+                  'dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 dark:text-white',
+                  'dark:hover:from-gray-800 dark:hover:via-gray-900 dark:hover:to-black'
+                )}
+              >
+                <MdClear className="mr-2 text-xl drop-shadow" />
                 Reset
-              </Button>
+              </button>
             </>
           )}
-
-          {practiceMode === 'playing' && (
-            <div className="text-muted-foreground">Playing all strokes...</div>
-          )}
         </div>
-
-        {showCongratulations && (
-          <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center">
-            <div className="text-2xl">🎉</div>
-            <div className="text-lg font-semibold text-green-800">Congratulations!</div>
-            <div className="text-green-600">You successfully completed all strokes!</div>
-          </div>
+        {practiceMode === 'practicing' && !showAllGesturesDone && (
+          <ProgressDisplay
+            currentGestures={currentGestureIndex + 1}
+            totalGestures={totalGestures}
+            completedCount={completedGesturesCount}
+          />
         )}
+
+        {showAllGesturesDone && (
+          <motion.div
+            className={cn(
+              'space-y-4 rounded-xl border border-gray-200 bg-gradient-to-br from-white via-gray-50 to-gray-100 p-6 text-center shadow-lg',
+              'dark:border-gray-700 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-700'
+            )}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          >
+            <div className="mb-2 text-3xl">🎉</div>
+            <div className="mb-1 text-xl font-bold text-yellow-800 dark:text-yellow-200">
+              Congratulations!
+            </div>
+            <div className="mb-3 text-yellow-700 dark:text-yellow-300">
+              You successfully completed all strokes!
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.07 }}
+              onClick={() => {
+                setShowAllGesturesDone(false);
+                resetPractice();
+                playAllGestures();
+              }}
+              className={cn(
+                'relative inline-flex items-center rounded-lg px-4 py-2 font-semibold transition-all duration-200',
+                'bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 text-yellow-900 shadow-md',
+                'hover:scale-105 hover:from-yellow-500 hover:via-orange-500 hover:to-yellow-600 hover:shadow-lg',
+                'focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:outline-none',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+                'dark:from-yellow-600 dark:via-orange-500 dark:to-yellow-700 dark:text-yellow-100',
+                'dark:hover:from-yellow-700 dark:hover:via-orange-600 dark:hover:to-yellow-800'
+              )}
+              style={{ fontSize: '0.95rem' }}
+            >
+              <MdArrowForward className="mr-2 text-lg drop-shadow" />
+              Play Again
+            </motion.button>
+          </motion.div>
+        )}
+
+        <AnimatePresence>
+          {showTryAgain && practiceMode === 'practicing' && (
+            <TryAgainSection
+              accuracy={lastAccuracy}
+              onSkipStroke={skipCurrentStroke}
+              onClose={() => setShowTryAgain(false)}
+            />
+          )}
+        </AnimatePresence>
 
         <div className="flex justify-center">
           <div
@@ -620,18 +527,247 @@ const PracticeCanvasComponent = ({ text_data }: Props) => {
               isDrawing ? 'border-blue-500' : 'border-border'
             )}
           >
-            <canvas ref={canvasRef} />
+            <canvas
+              ref={canvasRef}
+              style={{
+                ...(!canvasRef.current
+                  ? {
+                      width: CANVAS_DIMS.width * scalingFactor,
+                      height: CANVAS_DIMS.height * scalingFactor
+                    }
+                  : {})
+              }}
+            />
           </div>
         </div>
-
-        {practiceMode === 'practicing' && (
-          <div className="text-center text-sm text-muted-foreground">
-            Stroke {currentStrokeIndex + 1}/{totalStrokes} • Completed: {completedStrokes.length}
-          </div>
-        )}
       </div>
     </Card>
   );
+}
+
+// Try Again Section Component
+const TryAgainSection = ({
+  accuracy,
+  onSkipStroke,
+  onClose
+}: {
+  accuracy: number;
+  onSkipStroke: () => void;
+  onClose: () => void;
+}) => {
+  return (
+    <motion.div
+      className="fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2"
+      initial={{ scale: 0, opacity: 0 }}
+      animate={{
+        scale: 1,
+        opacity: 1
+      }}
+      transition={{
+        type: 'spring',
+        stiffness: 300,
+        damping: 15,
+        duration: 0.6
+      }}
+      exit={{
+        scale: 0,
+        opacity: 0,
+        transition: { duration: 0.2 }
+      }}
+    >
+      <motion.div
+        initial={{ scale: 1 }}
+        animate={{ scale: [1, 1.05, 1] }}
+        transition={{
+          delay: 0.3,
+          duration: 0.4,
+          ease: 'easeInOut'
+        }}
+      >
+        <div className="rounded-xl border border-red-200 bg-white p-6 shadow-2xl dark:border-red-800 dark:bg-gray-900">
+          <div className="flex items-center justify-between space-x-6">
+            <div className="flex items-center space-x-3">
+              <motion.div
+                className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  rotate: [0, 5, -5, 0]
+                }}
+                transition={{
+                  duration: 0.6,
+                  repeat: Infinity,
+                  repeatDelay: 2
+                }}
+              >
+                <span className="text-2xl">😅</span>
+              </motion.div>
+              <div>
+                <motion.h3
+                  className="text-xl font-bold text-red-700 dark:text-red-400"
+                  animate={{
+                    scale: [1, 1.05, 1]
+                  }}
+                  transition={{
+                    duration: 0.8,
+                    repeat: Infinity,
+                    repeatDelay: 1.5
+                  }}
+                >
+                  Try Again!
+                </motion.h3>
+                <p className="text-sm text-red-600 dark:text-red-300">
+                  Accuracy: {Math.round(accuracy * 100)}% (need 70%+)
+                </p>
+              </div>
+            </div>
+
+            <div className="flex space-x-2">
+              <motion.button
+                onClick={onSkipStroke}
+                className="flex items-center space-x-2 rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <MdArrowForward className="h-4 w-4" />
+                <span>Next Stroke</span>
+              </motion.button>
+
+              <motion.button
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-600 transition-colors hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-800/40"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                ×
+              </motion.button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Backdrop to close on click */}
+      <motion.div
+        className="fixed inset-0 -z-10 bg-black/20 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      />
+    </motion.div>
+  );
 };
 
-export default PracticeCanvasComponent;
+// Animated Number Component with carousel effect
+const AnimatedNumber = ({ value, className = '' }: { value: number; className?: string }) => {
+  return (
+    <div className={cn('relative inline-flex overflow-hidden', className)}>
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={value}
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -20, opacity: 0 }}
+          transition={{
+            type: 'spring',
+            stiffness: 400,
+            damping: 25,
+            duration: 0.4
+          }}
+          className="block"
+        >
+          {value}
+        </motion.span>
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// Progress Display Component
+const ProgressDisplay = ({
+  currentGestures,
+  totalGestures,
+  completedCount
+}: {
+  currentGestures: number;
+  totalGestures: number;
+  completedCount: number;
+}) => {
+  return (
+    <motion.div
+      className="flex items-center justify-center space-x-6 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 shadow-lg dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30"
+      initial={{ y: -40, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: -40, opacity: 0 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+    >
+      {/* Current Stroke Progress */}
+      <div className="flex items-center space-x-2">
+        <motion.div
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="flex-shrink-0"
+        >
+          <FiTrendingUp className="text-2xl text-blue-500 dark:text-blue-400" />
+        </motion.div>
+        <div className="flex items-center space-x-1 text-lg font-bold">
+          <span className="text-gray-600 dark:text-gray-300">Stroke</span>
+          <motion.div className="flex items-center space-x-1" whileHover={{ scale: 1.05 }}>
+            <AnimatedNumber
+              value={currentGestures}
+              className="text-2xl font-bold text-blue-600 dark:text-blue-400"
+            />
+            <span className="text-gray-500 dark:text-gray-400">/</span>
+            <span className="text-xl font-semibold text-gray-700 dark:text-gray-300">
+              {totalGestures}
+            </span>
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Separator */}
+      <div className="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-600"></div>
+
+      {/* Completed Strokes */}
+      <div className="flex items-center space-x-2">
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+            rotate: [0, 10, -10, 0]
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: 'easeInOut'
+          }}
+          className="flex-shrink-0"
+        >
+          <MdCheckCircle className="text-2xl text-green-500 dark:text-green-400" />
+        </motion.div>
+        <div className="flex items-center space-x-1 text-lg font-bold">
+          <span className="text-gray-600 dark:text-gray-300">Completed</span>
+          <motion.div className="relative" whileHover={{ scale: 1.05 }}>
+            <AnimatedNumber
+              value={completedCount}
+              className="text-2xl font-bold text-green-600 dark:text-green-400"
+            />
+            {/* Celebration effect when completed count increases */}
+            <AnimatePresence>
+              {completedCount > 0 && (
+                <motion.div
+                  key={`celebration-${completedCount}`}
+                  initial={{ scale: 0, opacity: 1 }}
+                  animate={{ scale: 1.5, opacity: 0 }}
+                  exit={{ scale: 2, opacity: 0 }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                  className="absolute inset-0 flex items-center justify-center text-2xl"
+                >
+                  ✨
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};

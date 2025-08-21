@@ -3,30 +3,7 @@ import { t, protectedAdminProcedure } from '~/api/trpc_init';
 import { db } from '~/db/db';
 import { text_data } from '~/db/schema';
 import { and, eq } from 'drizzle-orm';
-
-// Define proper types for strokes data
-const StrokePointSchema = z.object({
-  x: z.number(),
-  y: z.number(),
-  timestamp: z.number()
-});
-
-const StrokeSchema = z.object({
-  order: z.number(),
-  points: z.array(StrokePointSchema)
-});
-
-const GestureSchema = z.object({
-  order: z.number(),
-  strokes: z.array(StrokeSchema),
-  brush_width: z.number(),
-  brush_color: z.string(),
-  animation_duration: z.number()
-});
-
-const StrokeDataSchema = z.object({
-  gestures: z.array(GestureSchema)
-});
+import { StrokeDataSchema } from '~/tools/stroke_data/types';
 
 const add_text_data_route = protectedAdminProcedure
   .input(

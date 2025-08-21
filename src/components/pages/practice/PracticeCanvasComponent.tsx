@@ -486,7 +486,11 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
           >
             <canvas
               ref={canvasRef}
-              style={{ width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }}
+              style={{
+                ...(!canvasRef.current
+                  ? { width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }
+                  : {})
+              }}
             />
           </div>
         </div>

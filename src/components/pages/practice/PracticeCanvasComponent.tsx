@@ -7,12 +7,7 @@ import * as fabric from 'fabric';
 import { cn } from '~/lib/utils';
 import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward } from 'react-icons/md';
 import { FiTrendingUp } from 'react-icons/fi';
-import {
-  sampleStrokeToPolyline,
-  playStrokeWithoutClear,
-  evaluateStrokeAccuracy,
-  playGestureWithoutClear
-} from '~/tools/stroke_data/utils';
+import { evaluateStrokeAccuracy, playGestureWithoutClear } from '~/tools/stroke_data/utils';
 import {
   StrokePoint,
   GestureData,
@@ -48,6 +43,36 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const [isAnimatingCurrentGesture, setIsAnimatingCurrentGesture] = useState(false);
   const [showTryAgain, setShowTryAgain] = useState(false);
   const [lastAccuracy, setLastAccuracy] = useState(0);
+  const [scalingFactor, setScalingFactor] = useState(1);
+  const [mounted, setMounted] = useState(false);
+
+  function updateScalingFactor() {
+    if (typeof window === 'undefined') return;
+    // calculate scale based on available width, cap to 1
+    const availableWidth = window.innerWidth * 0.8;
+    const scaleX = availableWidth / CANVAS_DIMS.width;
+    const scale = Math.min(1, scaleX);
+    setScalingFactor(scale);
+  }
+  const updateCanvasDimensions = () => {
+    if (!fabricCanvasRef.current) return;
+    // Keep logical canvas size constant; scale visually with zoom
+    fabricCanvasRef.current.setWidth(CANVAS_DIMS.width * scalingFactor);
+    fabricCanvasRef.current.setHeight(CANVAS_DIMS.height * scalingFactor);
+    fabricCanvasRef.current.setZoom(scalingFactor);
+    // Center viewport so character remains centered
+    const viewportTransform = fabricCanvasRef.current.viewportTransform;
+    if (viewportTransform) {
+      viewportTransform[4] = 0; // translateX
+      viewportTransform[5] = 0; // translateY
+    }
+    fabricCanvasRef.current.requestRenderAll();
+  };
+  useEffect(() => {
+    if (mounted) {
+      updateCanvasDimensions();
+    }
+  }, [scalingFactor, mounted]);
 
   // Add refs to capture latest state in callbacks
   const currentGestureIndexRef = useRef(currentGestureIndex);
@@ -59,6 +84,31 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   useEffect(() => {
     completedGesturesCountRef.current = completedGesturesCount;
   }, [completedGesturesCount]);
+
+  useEffect(() => {
+    updateScalingFactor();
+    canceledRef.current = false;
+    initCanvas().then(() => {
+      setMounted(true);
+    });
+
+    window.addEventListener('resize', updateScalingFactor);
+    const unsub_func = () => {
+      window.removeEventListener('resize', updateScalingFactor);
+    };
+
+    return () => {
+      unsub_func();
+      canceledRef.current = true;
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.dispose();
+        fabricCanvasRef.current = null;
+      }
+      if (canvasRef.current && (canvasRef.current as any).__fabric) {
+        delete (canvasRef.current as any).__fabric;
+      }
+    };
+  }, []);
 
   const strokeData = text_data.strokes_json || { gestures: [] };
 
@@ -89,8 +139,8 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
     // Initialize Fabric.js canvas
     const canvas = new fabric.Canvas(canvasRef.current, {
-      width: CANVAS_DIMS.width,
-      height: CANVAS_DIMS.height,
+      width: CANVAS_DIMS.width * scalingFactor,
+      height: CANVAS_DIMS.height * scalingFactor,
       backgroundColor: '#ffffff',
       isDrawingMode: false,
       selection: false
@@ -99,6 +149,15 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     // Store reference on the canvas element itself for cleanup
     (canvasRef.current as any).__fabric = canvas;
     fabricCanvasRef.current = canvas;
+
+    // Apply initial zoom and center
+    canvas.setZoom(scalingFactor);
+    const viewportTransform = canvas.viewportTransform;
+    if (viewportTransform) {
+      viewportTransform[4] = 0;
+      viewportTransform[5] = 0;
+    }
+    canvas.requestRenderAll();
 
     // Start with a clean, empty canvas (no character path or pre-rendered strokes)
   };
@@ -300,22 +359,6 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     // Keep canvas empty on reset
   };
 
-  useEffect(() => {
-    canceledRef.current = false;
-    initCanvas();
-
-    return () => {
-      canceledRef.current = true;
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-        fabricCanvasRef.current = null;
-      }
-      if (canvasRef.current && (canvasRef.current as any).__fabric) {
-        delete (canvasRef.current as any).__fabric;
-      }
-    };
-  }, []);
-
   if (!strokeData.gestures.length) {
     return (
       <Card className="p-6">
@@ -488,7 +531,10 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
               ref={canvasRef}
               style={{
                 ...(!canvasRef.current
-                  ? { width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }
+                  ? {
+                      width: CANVAS_DIMS.width * scalingFactor,
+                      height: CANVAS_DIMS.height * scalingFactor
+                    }
                   : {})
               }}
             />

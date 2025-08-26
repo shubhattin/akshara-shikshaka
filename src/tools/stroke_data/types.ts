@@ -27,7 +27,7 @@ export const GESTURE_FLAGS = {
   /** The strokes which are manually drawn by the user */
   isUserStroke: 'isUserStroke',
   /** Stroke for the current Gesture */
-  isCurrentAnimatedStroke: 'isCurrentAnimatedStroke'
+  isCurrentAnimatedGesture: 'isCurrentAnimatedStroke'
 } as const;
 
 export const CANVAS_DIMS = {

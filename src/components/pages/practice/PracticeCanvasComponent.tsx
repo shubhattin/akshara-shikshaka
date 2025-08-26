@@ -112,10 +112,9 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
   const gestureData = text_data.gestures ?? [];
 
-  const allGestures = gestureData;
-  const currentGesture = allGestures[currentGestureIndex];
+  const currentGesture = gestureData[currentGestureIndex];
 
-  const totalGestures = allGestures.length;
+  const totalGestures = gestureData.length;
 
   const initCanvas = async () => {
     if (!canvasRef.current) return;
@@ -168,7 +167,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     setPracticeMode('playing');
     clearAllPracticeGestures();
 
-    for (const gesture of allGestures) {
+    for (const gesture of gestureData) {
       await playGestureWithoutClear(gesture, fabricCanvasRef);
       await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION));
     }
@@ -181,8 +180,8 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     disableDrawingMode();
     setIsAnimatingCurrentGesture(true);
     clearCurrentAnimatedGesture();
-    await playGestureWithoutClear(allGestures[gestureIndex], fabricCanvasRef, {
-      [GESTURE_FLAGS.isCurrentAnimatedStroke]: true
+    await playGestureWithoutClear(gestureData[gestureIndex], fabricCanvasRef, {
+      [GESTURE_FLAGS.isCurrentAnimatedGesture]: true
     });
     setIsAnimatingCurrentGesture(false);
     enableDrawingMode();
@@ -213,10 +212,10 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   // Handle user gesture drawing to use refs for latest state
-  const handleUserGesture = (e: any) => {
+  const handleUserGesture = async (e: any) => {
     // Add fresh state references
-    const gestureIdx = currentGestureIndexRef.current;
-    const gesture = allGestures[gestureIdx];
+    const currentGestureIdx = currentGestureIndexRef.current;
+    const currentGesture = gestureData[currentGestureIdx];
 
     if (!e.path) return;
 
@@ -249,14 +248,13 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     });
 
     // Evaluate gesture accuracy using latest gesture
-    const accuracy = evaluateStrokeAccuracy(userPoints, gesture.points);
+    const accuracy = evaluateStrokeAccuracy(userPoints, currentGesture.points);
 
     if (accuracy > 0.7) {
       // completeCurrentGesture
       setShowTryAgain(false);
-      playGestureWithoutClear(gesture, fabricCanvasRef);
 
-      playNextGesture(gestureIdx, completedGesturesCountRef.current);
+      playNextGesture(currentGestureIdx, completedGesturesCountRef.current);
     } else {
       setLastAccuracy(accuracy);
       setShowTryAgain(true);
@@ -267,18 +265,19 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   const playNextGesture = (currentGestureIndex: number, completedGesturesCount: number) => {
+    if (currentGestureIndex >= 0) {
+      // reset previous isCurrentAnimatedStroke
+      fabricCanvasRef.current?.getObjects().forEach((obj) => {
+        console.log('obj', obj.type, obj.get(GESTURE_FLAGS.isCurrentAnimatedGesture));
+        if (obj.get(GESTURE_FLAGS.isCurrentAnimatedGesture)) {
+          obj.set({ [GESTURE_FLAGS.isCurrentAnimatedGesture]: false });
+        }
+      });
+    }
     clearUserGestures();
     clearCurrentAnimatedGesture();
 
     // Move to next gesture
-    if (currentGestureIndex > 0) {
-      // reset previous isCurrentAnimatedStroke
-      fabricCanvasRef.current?.getObjects().forEach((obj) => {
-        if (obj.get(GESTURE_FLAGS.isCurrentAnimatedStroke)) {
-          obj.set({ [GESTURE_FLAGS.isCurrentAnimatedStroke]: false });
-        }
-      });
-    }
     setCurrentGestureIndex(currentGestureIndex + 1);
     setCompletedGesturesCount(completedGesturesCount + 1);
     if (currentGestureIndex < totalGestures - 1) {
@@ -312,7 +311,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     if (!fabricCanvasRef.current) return;
 
     fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get(GESTURE_FLAGS.isCurrentAnimatedStroke)) {
+      if (obj.get(GESTURE_FLAGS.isCurrentAnimatedGesture)) {
         fabricCanvasRef.current?.remove(obj);
       }
     });

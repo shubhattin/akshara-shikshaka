@@ -52,9 +52,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
-import type { StrokePoint, Stroke, Gesture, GestureData } from '~/tools/stroke_data/types';
+import type { GesturePoint, Stroke, Gesture, GestureData } from '~/tools/stroke_data/types';
 import { GESTURE_FLAGS, CANVAS_DIMS } from '~/tools/stroke_data/types';
-import { playGestureWithoutClear, sampleStrokeToPolyline } from '~/tools/stroke_data/utils';
+import { playGestureWithoutClear, sampleGestureToPolyline } from '~/tools/stroke_data/utils';
 
 type text_data_type = {
   text: string;
@@ -90,7 +90,7 @@ const gesture_data_atom = atom<GestureData>({
 const selected_gesture_order_atom = atom<string | null>(null);
 const is_recording_atom = atom(false);
 const is_playing_atom = atom(false);
-const current_stroke_atom = atom<StrokePoint[]>([]);
+const current_stroke_atom = atom<GesturePoint[]>([]);
 const recording_start_time_atom = atom<number>(0);
 const temp_strokes_atom = atom<Stroke[]>([]);
 const character_path_atom = atom<fabric.Path | null>(null);
@@ -510,9 +510,9 @@ const SelectedGestureControls = ({
 
   // Function to approximate gesture points to the character path
   const approximateToCharacterPath = (
-    gesturePoints: StrokePoint[],
+    gesturePoints: GesturePoint[],
     charPath: fabric.Path
-  ): StrokePoint[] => {
+  ): GesturePoint[] => {
     // Get the path's bounding box
     const pathBounds = charPath.getBoundingRect();
     const pathCenter = {
@@ -586,7 +586,7 @@ const SelectedGestureControls = ({
 
     // Extract points from the path
     const pathData = e.path.path;
-    const points: StrokePoint[] = [];
+    const points: GesturePoint[] = [];
     const baseTime = recordingStartTime;
 
     // Convert SVG path commands to points

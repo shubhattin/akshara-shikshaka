@@ -8,6 +8,13 @@
       "when": 1755776112447,
       "tag": "0000_third_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1756228419845,
+      "tag": "0001_abandoned_rage",
+      "breakpoints": true
     }
   ]
 }

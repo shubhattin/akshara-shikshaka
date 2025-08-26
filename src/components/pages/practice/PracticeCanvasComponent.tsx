@@ -9,7 +9,7 @@ import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward } from 'react-icons
 import { FiTrendingUp } from 'react-icons/fi';
 import { evaluateStrokeAccuracy, playGestureWithoutClear } from '~/tools/stroke_data/utils';
 import {
-  StrokePoint,
+  GesturePoint,
   GestureData,
   CANVAS_DIMS,
   Stroke,
@@ -229,7 +229,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
     // Extract points from user path
     const pathData = e.path.path;
-    const userPoints: StrokePoint[] = [];
+    const userPoints: GesturePoint[] = [];
 
     pathData.forEach((cmd: any, index: number) => {
       if (cmd[0] === 'M' && cmd.length >= 3) {

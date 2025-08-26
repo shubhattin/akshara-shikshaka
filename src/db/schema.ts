@@ -7,7 +7,7 @@ export const text_data = pgTable(
     id: serial('id').primaryKey(),
     uuid: uuid('uuid').notNull().defaultRandom(),
     text: text('text').notNull(),
-    gestures: jsonb('gestures').$type<Gesture[]>(),
+    gestures: jsonb('gestures').$type<Gesture[]>().notNull().default([]),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at')
       .notNull()

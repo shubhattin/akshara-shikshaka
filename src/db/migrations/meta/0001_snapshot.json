@@ -1,5 +1,5 @@
 {
-  "id": "affaf4be-b71e-4839-bad7-5e3d36094064",
+  "id": "52c2224a-3900-4125-bac3-7d40696155a5",
   "prevId": "92f3fb5d-94d3-47ac-ad13-130dfbdaa061",
   "version": "7",
   "dialect": "postgresql",
@@ -31,7 +31,8 @@
           "name": "gestures",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'[]'::jsonb"
         },
         "created_at": {
           "name": "created_at",

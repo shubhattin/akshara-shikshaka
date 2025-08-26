@@ -58,7 +58,8 @@ export function buildSvgPathFromGesturePoints(points: Gesture['points']): string
 
 export const playGestureWithoutClear = async (
   gesture: Gesture,
-  fabricCanvasRef: React.RefObject<Canvas | null>
+  fabricCanvasRef: React.RefObject<Canvas | null>,
+  extraFlags: Record<string, any> = {}
 ) => {
   if (!fabricCanvasRef.current) return;
 
@@ -76,7 +77,8 @@ export const playGestureWithoutClear = async (
     selectable: false,
     evented: false,
     [GESTURE_FLAGS.isGestureVisualization]: true,
-    opacity: 0
+    opacity: 0,
+    ...extraFlags
   } as any);
 
   fabricCanvasRef.current.add(fullPath);

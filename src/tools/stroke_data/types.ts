@@ -34,3 +34,5 @@ export const CANVAS_DIMS = {
   width: 400,
   height: 400
 } as const;
+
+export const GESTURE_GAP_DURATION = 100 as const;

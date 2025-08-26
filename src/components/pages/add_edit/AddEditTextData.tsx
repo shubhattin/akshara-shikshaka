@@ -54,8 +54,8 @@ import { atom, useAtom, useAtomValue } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
 import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
-import { GESTURE_FLAGS, CANVAS_DIMS } from '~/tools/stroke_data/types';
-import { playGestureWithoutClear, sampleGestureToPolyline } from '~/tools/stroke_data/utils';
+import { GESTURE_FLAGS, CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
+import { playGestureWithoutClear } from '~/tools/stroke_data/utils';
 
 type text_data_type = {
   text: string;
@@ -297,7 +297,7 @@ function AddEditTextData({
     for (const gesture of gestureData) {
       if (gesture.points.length === 0) continue;
       await playGestureWithoutClear(gesture, fabricCanvasRef);
-      await new Promise((resolve) => setTimeout(resolve, 50)); // Small delay between gestures
+      await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION)); // Small delay between gestures
     }
 
     setIsPlaying(false);

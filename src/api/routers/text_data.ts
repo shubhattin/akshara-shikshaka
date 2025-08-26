@@ -3,14 +3,13 @@ import { t, protectedAdminProcedure } from '~/api/trpc_init';
 import { db } from '~/db/db';
 import { text_data } from '~/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { StrokeDataSchema } from '~/tools/stroke_data/types';
+import { GestureSchema } from '~/tools/stroke_data/types';
 
 const add_text_data_route = protectedAdminProcedure
   .input(
     z.object({
       text: z.string().min(1),
-      svg_json: z.any(),
-      strokes_json: StrokeDataSchema.optional()
+      gestures: GestureSchema.array()
     })
   )
   .mutation(async ({ input }) => {
@@ -18,8 +17,7 @@ const add_text_data_route = protectedAdminProcedure
       .insert(text_data)
       .values({
         text: input.text,
-        svg_json: input.svg_json!,
-        strokes_json: input.strokes_json || null
+        gestures: input.gestures
       })
       .returning();
     return {
@@ -34,8 +32,7 @@ const edit_text_data_route = protectedAdminProcedure
       id: z.number(),
       uuid: z.string().uuid(),
       text: z.string().min(1),
-      svg_json: z.any(),
-      strokes_json: StrokeDataSchema.optional()
+      gestures: GestureSchema.array()
     })
   )
   .mutation(async ({ input }) => {
@@ -43,8 +40,7 @@ const edit_text_data_route = protectedAdminProcedure
       .update(text_data)
       .set({
         text: input.text,
-        svg_json: input.svg_json,
-        strokes_json: input.strokes_json || null
+        gestures: input.gestures
       })
       .where(and(eq(text_data.uuid, input.uuid), eq(text_data.id, input.id)));
     return {

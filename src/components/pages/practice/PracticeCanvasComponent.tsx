@@ -9,11 +9,11 @@ import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward } from 'react-icons
 import { FiTrendingUp } from 'react-icons/fi';
 import { evaluateStrokeAccuracy, playGestureWithoutClear } from '~/tools/stroke_data/utils';
 import {
-  StrokePoint,
-  GestureData,
+  GesturePoint,
   CANVAS_DIMS,
-  Stroke,
-  GESTURE_FLAGS
+  GESTURE_FLAGS,
+  Gesture,
+  GESTURE_GAP_DURATION
 } from '~/tools/stroke_data/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AiOutlineSignature } from 'react-icons/ai';
@@ -22,7 +22,7 @@ type text_data_type = {
   id: number;
   uuid: string;
   text: string;
-  strokes_json?: GestureData;
+  gestures?: Gesture[] | null;
 };
 
 type Props = {
@@ -110,12 +110,11 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     };
   }, []);
 
-  const strokeData = text_data.strokes_json || { gestures: [] };
+  const gestureData = text_data.gestures ?? [];
 
-  const allGestures = strokeData.gestures;
-  const currentGesture = allGestures[currentGestureIndex];
+  const currentGesture = gestureData[currentGestureIndex];
 
-  const totalGestures = allGestures.length;
+  const totalGestures = gestureData.length;
 
   const initCanvas = async () => {
     if (!canvasRef.current) return;
@@ -166,23 +165,23 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     if (!fabricCanvasRef.current) return;
 
     setPracticeMode('playing');
-    clearAllPracticeStrokes();
+    clearAllPracticeGestures();
 
-    for (const gesture of allGestures) {
+    for (const gesture of gestureData) {
       await playGestureWithoutClear(gesture, fabricCanvasRef);
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION));
     }
 
     setPracticeMode('none');
   };
 
   const playGestureIndex = async (gestureIndex: number) => {
-    // Disable drawing while playing the guided animation for the current stroke
+    // Disable drawing while playing the guided animation for the current gesture
     disableDrawingMode();
     setIsAnimatingCurrentGesture(true);
-    clearCurrentAnimatedStroke();
-    await playGestureWithoutClear(allGestures[gestureIndex], fabricCanvasRef, {
-      [GESTURE_FLAGS.isCurrentAnimatedStroke]: true
+    clearCurrentAnimatedGesture();
+    await playGestureWithoutClear(gestureData[gestureIndex], fabricCanvasRef, {
+      [GESTURE_FLAGS.isCurrentAnimatedGesture]: true
     });
     setIsAnimatingCurrentGesture(false);
     enableDrawingMode();
@@ -200,8 +199,8 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     canvas.freeDrawingBrush.color = '#0066cc';
     canvas.freeDrawingBrush.width = currentGesture.brush_width || 6;
 
-    canvas.off('path:created', handleUserStroke);
-    canvas.on('path:created', handleUserStroke);
+    canvas.off('path:created', handleUserGesture);
+    canvas.on('path:created', handleUserGesture);
   };
 
   const disableDrawingMode = () => {
@@ -209,14 +208,14 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
     setIsDrawing(false);
     fabricCanvasRef.current.isDrawingMode = false;
-    fabricCanvasRef.current.off('path:created', handleUserStroke);
+    fabricCanvasRef.current.off('path:created', handleUserGesture);
   };
 
-  // Modify handleUserStroke to use refs for latest state
-  const handleUserStroke = (e: any) => {
+  // Handle user gesture drawing to use refs for latest state
+  const handleUserGesture = async (e: any) => {
     // Add fresh state references
-    const gestureIdx = currentGestureIndexRef.current;
-    const gesture = allGestures[gestureIdx];
+    const currentGestureIdx = currentGestureIndexRef.current;
+    const currentGesture = gestureData[currentGestureIdx];
 
     if (!e.path) return;
 
@@ -229,7 +228,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
     // Extract points from user path
     const pathData = e.path.path;
-    const userPoints: StrokePoint[] = [];
+    const userPoints: GesturePoint[] = [];
 
     pathData.forEach((cmd: any, index: number) => {
       if (cmd[0] === 'M' && cmd.length >= 3) {
@@ -248,18 +247,14 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       }
     });
 
-    // Evaluate stroke accuracy using latest gesture
-    const accuracy =
-      gesture.strokes.reduce((acc, stroke) => {
-        return acc + evaluateStrokeAccuracy(userPoints, stroke.points);
-      }, 0) / gesture.strokes.length;
+    // Evaluate gesture accuracy using latest gesture
+    const accuracy = evaluateStrokeAccuracy(userPoints, currentGesture.points);
 
     if (accuracy > 0.7) {
       // completeCurrentGesture
       setShowTryAgain(false);
-      playGestureWithoutClear(gesture, fabricCanvasRef);
 
-      playNextGesture(gestureIdx, completedGesturesCountRef.current);
+      playNextGesture(currentGestureIdx, completedGesturesCountRef.current);
     } else {
       setLastAccuracy(accuracy);
       setShowTryAgain(true);
@@ -270,18 +265,19 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   const playNextGesture = (currentGestureIndex: number, completedGesturesCount: number) => {
-    clearUserStrokes();
-    clearCurrentAnimatedStroke();
-
-    // Move to next stroke
-    if (currentGestureIndex > 0) {
+    if (currentGestureIndex >= 0) {
       // reset previous isCurrentAnimatedStroke
       fabricCanvasRef.current?.getObjects().forEach((obj) => {
-        if (obj.get(GESTURE_FLAGS.isCurrentAnimatedStroke)) {
-          obj.set({ [GESTURE_FLAGS.isCurrentAnimatedStroke]: false });
+        console.log('obj', obj.type, obj.get(GESTURE_FLAGS.isCurrentAnimatedGesture));
+        if (obj.get(GESTURE_FLAGS.isCurrentAnimatedGesture)) {
+          obj.set({ [GESTURE_FLAGS.isCurrentAnimatedGesture]: false });
         }
       });
     }
+    clearUserGestures();
+    clearCurrentAnimatedGesture();
+
+    // Move to next gesture
     setCurrentGestureIndex(currentGestureIndex + 1);
     setCompletedGesturesCount(completedGesturesCount + 1);
     if (currentGestureIndex < totalGestures - 1) {
@@ -296,11 +292,11 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
   const finishPracticeMode = async () => {
     disableDrawingMode();
-    clearUserStrokes();
+    clearUserGestures();
     setShowAllGesturesDone(true);
   };
 
-  const clearAllPracticeStrokes = () => {
+  const clearAllPracticeGestures = () => {
     if (!fabricCanvasRef.current) return;
 
     fabricCanvasRef.current.getObjects().forEach((obj) => {
@@ -311,18 +307,18 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     fabricCanvasRef.current.renderAll();
   };
 
-  const clearCurrentAnimatedStroke = () => {
+  const clearCurrentAnimatedGesture = () => {
     if (!fabricCanvasRef.current) return;
 
     fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get(GESTURE_FLAGS.isCurrentAnimatedStroke)) {
+      if (obj.get(GESTURE_FLAGS.isCurrentAnimatedGesture)) {
         fabricCanvasRef.current?.remove(obj);
       }
     });
     fabricCanvasRef.current.renderAll();
   };
 
-  const clearUserStrokes = () => {
+  const clearUserGestures = () => {
     if (!fabricCanvasRef.current) return;
 
     fabricCanvasRef.current.getObjects().forEach((obj) => {
@@ -333,18 +329,18 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     fabricCanvasRef.current.renderAll();
   };
 
-  const replayCurrentStroke = () => {
+  const replayCurrentGesture = () => {
     if (practiceMode !== 'practicing' || isAnimatingCurrentGesture) return;
-    clearCurrentAnimatedStroke();
+    clearCurrentAnimatedGesture();
     playGestureIndex(currentGestureIndex);
   };
 
-  const skipCurrentStroke = () => {
+  const skipCurrentGesture = () => {
     if (practiceMode !== 'practicing' || isAnimatingCurrentGesture) return;
 
     setShowTryAgain(false);
 
-    // Move to next stroke
+    // Move to next gesture
     playNextGesture(currentGestureIndex, completedGesturesCount);
   };
 
@@ -355,15 +351,15 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     setShowAllGesturesDone(false);
     setShowTryAgain(false);
     disableDrawingMode();
-    clearAllPracticeStrokes();
+    clearAllPracticeGestures();
     // Keep canvas empty on reset
   };
 
-  if (!strokeData.gestures.length) {
+  if (!gestureData.length) {
     return (
       <Card className="p-6">
         <div className="text-center text-muted-foreground">
-          No stroke data available for practice.
+          No gesture data available for practice.
         </div>
       </Card>
     );
@@ -403,7 +399,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
                   setCurrentGestureIndex(0);
                   setCompletedGesturesCount(0);
                   setShowTryAgain(false);
-                  clearAllPracticeStrokes();
+                  clearAllPracticeGestures();
                   playGestureIndex(currentGestureIndex);
                 }}
                 disabled={practiceMode === 'playing'}
@@ -426,7 +422,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
           {practiceMode === 'practicing' && (
             <>
               <button
-                onClick={replayCurrentStroke}
+                onClick={replayCurrentGesture}
                 disabled={isAnimatingCurrentGesture}
                 className={cn(
                   'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
@@ -439,7 +435,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
                 )}
               >
                 <MdPlayArrow className="mr-2 text-xl drop-shadow" />
-                Play Current Stroke
+                Play Current Gesture
               </button>
               <button
                 onClick={resetPractice}
@@ -461,7 +457,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         </div>
         {practiceMode === 'practicing' && !showAllGesturesDone && (
           <ProgressDisplay
-            currentGestures={currentGestureIndex + 1}
+            currentGesture={currentGestureIndex + 1}
             totalGestures={totalGestures}
             completedCount={completedGesturesCount}
           />
@@ -483,7 +479,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
               Congratulations!
             </div>
             <div className="mb-3 text-yellow-700 dark:text-yellow-300">
-              You successfully completed all strokes!
+              You successfully completed all gestures!
             </div>
             <motion.button
               whileTap={{ scale: 0.95 }}
@@ -514,7 +510,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
           {showTryAgain && practiceMode === 'practicing' && (
             <TryAgainSection
               accuracy={lastAccuracy}
-              onSkipStroke={skipCurrentStroke}
+              onSkipGesture={skipCurrentGesture}
               onClose={() => setShowTryAgain(false)}
             />
           )}
@@ -548,11 +544,11 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 // Try Again Section Component
 const TryAgainSection = ({
   accuracy,
-  onSkipStroke,
+  onSkipGesture,
   onClose
 }: {
   accuracy: number;
-  onSkipStroke: () => void;
+  onSkipGesture: () => void;
   onClose: () => void;
 }) => {
   return (
@@ -623,13 +619,13 @@ const TryAgainSection = ({
 
             <div className="flex space-x-2">
               <motion.button
-                onClick={onSkipStroke}
+                onClick={onSkipGesture}
                 className="flex items-center space-x-2 rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
                 <MdArrowForward className="h-4 w-4" />
-                <span>Next Stroke</span>
+                <span>Next Gesture</span>
               </motion.button>
 
               <motion.button
@@ -684,11 +680,11 @@ const AnimatedNumber = ({ value, className = '' }: { value: number; className?: 
 
 // Progress Display Component
 const ProgressDisplay = ({
-  currentGestures,
+  currentGesture,
   totalGestures,
   completedCount
 }: {
-  currentGestures: number;
+  currentGesture: number;
   totalGestures: number;
   completedCount: number;
 }) => {
@@ -700,7 +696,7 @@ const ProgressDisplay = ({
       exit={{ y: -40, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
     >
-      {/* Current Stroke Progress */}
+      {/* Current Gesture Progress */}
       <div className="flex items-center space-x-2">
         <motion.div
           animate={{ rotate: [0, 360] }}
@@ -710,10 +706,10 @@ const ProgressDisplay = ({
           <FiTrendingUp className="text-2xl text-blue-500 dark:text-blue-400" />
         </motion.div>
         <div className="flex items-center space-x-1 text-lg font-bold">
-          <span className="text-gray-600 dark:text-gray-300">Stroke</span>
+          <span className="text-gray-600 dark:text-gray-300">Gesture</span>
           <motion.div className="flex items-center space-x-1" whileHover={{ scale: 1.05 }}>
             <AnimatedNumber
-              value={currentGestures}
+              value={currentGesture}
               className="text-2xl font-bold text-blue-600 dark:text-blue-400"
             />
             <span className="text-gray-500 dark:text-gray-400">/</span>
@@ -727,7 +723,7 @@ const ProgressDisplay = ({
       {/* Separator */}
       <div className="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-600"></div>
 
-      {/* Completed Strokes */}
+      {/* Completed Gestures */}
       <div className="flex items-center space-x-2">
         <motion.div
           animate={{

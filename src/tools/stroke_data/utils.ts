@@ -1,11 +1,11 @@
-import type { Gesture, Stroke, StrokePoint } from './types';
+import type { Gesture, GesturePoint } from './types';
 import { Canvas } from 'fabric';
 import * as fabric from 'fabric';
 import { GESTURE_FLAGS } from './types';
 
 // Utility: sample a stroke (with optional quadratic segments) into a polyline for playback
-export function sampleStrokeToPolyline(
-  stroke: Stroke,
+export function sampleGestureToPolyline(
+  stroke: Gesture,
   samplesPerSegment = 12
 ): { x: number; y: number }[] {
   const sampled: { x: number; y: number }[] = [];
@@ -35,9 +35,9 @@ export function sampleStrokeToPolyline(
   return sampled;
 }
 
-export function buildSvgPathFromStroke(stroke: Stroke): string {
+export function buildSvgPathFromGesturePoints(points: Gesture['points']): string {
   let path = '';
-  stroke.points.forEach((pt, idx) => {
+  points.forEach((pt, idx) => {
     // First point must always start with a move command
     if (idx === 0 || pt.cmd === 'M') {
       path += `M ${pt.x} ${pt.y}`;
@@ -59,107 +59,39 @@ export function buildSvgPathFromStroke(stroke: Stroke): string {
 export const playGestureWithoutClear = async (
   gesture: Gesture,
   fabricCanvasRef: React.RefObject<Canvas | null>,
-  extraFlags: Record<string, unknown> = {}
+  extraFlags: Record<string, any> = {}
 ) => {
   if (!fabricCanvasRef.current) return;
 
-  for (const stroke of gesture.strokes) {
-    if (stroke.points.length < 2) continue;
+  // Create a path for smooth animation (sample curves to polyline)
+  const sampledPoints = sampleGestureToPolyline(gesture);
 
-    // Create a path for smooth animation (sample curves to polyline)
-    const sampledPoints = sampleStrokeToPolyline(stroke);
+  // Build the full SVG path respecting the original stroke commands (M, L, Q)
+  const pathString = buildSvgPathFromGesturePoints(gesture.points);
 
-    // Build the full SVG path respecting the original stroke commands (M, L, Q)
-    const pathString = buildSvgPathFromStroke(stroke);
-
-    // Create the full path but make it invisible initially
-    const fullPath = new fabric.Path(pathString, {
-      stroke: gesture.brush_color,
-      strokeWidth: gesture.brush_width,
-      fill: '',
-      selectable: false,
-      evented: false,
-      [GESTURE_FLAGS.isGestureVisualization]: true,
-      opacity: 0
-    } as any);
-
-    fabricCanvasRef.current.add(fullPath);
-
-    // Animate the path drawing
-    const totalPoints = sampledPoints.length;
-    const animationSteps = Math.min(totalPoints * 2, 50); // More steps for smoother animation
-
-    for (let step = 1; step <= animationSteps; step++) {
-      const progress = step / animationSteps;
-      const pointIndex = Math.floor(progress * (totalPoints - 1));
-
-      // Create partial path up to current point
-      let partialPath = '';
-      for (let i = 0; i <= pointIndex; i++) {
-        if (i === 0) {
-          partialPath += `M ${sampledPoints[i].x} ${sampledPoints[i].y}`;
-        } else {
-          partialPath += ` L ${sampledPoints[i].x} ${sampledPoints[i].y}`;
-        }
-      }
-
-      // Add interpolated point for smooth animation
-      if (pointIndex < totalPoints - 1) {
-        const currentPoint = sampledPoints[pointIndex];
-        const nextPoint = sampledPoints[pointIndex + 1];
-        const subProgress = (progress * (totalPoints - 1)) % 1;
-
-        const interpolatedX = currentPoint.x + (nextPoint.x - currentPoint.x) * subProgress;
-        const interpolatedY = currentPoint.y + (nextPoint.y - currentPoint.y) * subProgress;
-
-        partialPath += ` L ${interpolatedX} ${interpolatedY}`;
-      }
-
-      // Update the path
-      fullPath.set('path', fabric.util.parsePath(partialPath));
-      fullPath.set('opacity', 1);
-      fabricCanvasRef.current.renderAll();
-
-      // Wait based on animation duration
-      const delay = gesture.animation_duration / animationSteps;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-};
-
-export async function playStrokeWithoutClear(
-  stroke: Stroke,
-  brushColor: string,
-  brushWidth: number,
-  animationDuration: number,
-  fabricCanvasRef: React.RefObject<Canvas | null>,
-  extraPathProps?: Record<string, unknown>
-): Promise<void> {
-  if (!fabricCanvasRef.current || stroke.points.length < 2) return;
-
-  const sampledPoints = sampleStrokeToPolyline(stroke);
-  const pathString = buildSvgPathFromStroke(stroke);
-
+  // Create the full path but make it invisible initially
   const fullPath = new fabric.Path(pathString, {
-    stroke: brushColor,
-    strokeWidth: brushWidth,
+    stroke: gesture.brush_color,
+    strokeWidth: gesture.brush_width,
     fill: '',
     selectable: false,
     evented: false,
-    isGestureVisualization: true,
+    [GESTURE_FLAGS.isGestureVisualization]: true,
     opacity: 0,
-    ...(extraPathProps || {})
+    ...extraFlags
   } as any);
 
   fabricCanvasRef.current.add(fullPath);
 
+  // Animate the path drawing
   const totalPoints = sampledPoints.length;
-  const animationSteps = Math.min(totalPoints * 2, 50);
+  const animationSteps = Math.min(totalPoints * 2, 50); // More steps for smoother animation
 
   for (let step = 1; step <= animationSteps; step++) {
     const progress = step / animationSteps;
     const pointIndex = Math.floor(progress * (totalPoints - 1));
 
+    // Create partial path up to current point
     let partialPath = '';
     for (let i = 0; i <= pointIndex; i++) {
       if (i === 0) {
@@ -169,6 +101,7 @@ export async function playStrokeWithoutClear(
       }
     }
 
+    // Add interpolated point for smooth animation
     if (pointIndex < totalPoints - 1) {
       const currentPoint = sampledPoints[pointIndex];
       const nextPoint = sampledPoints[pointIndex + 1];
@@ -180,18 +113,20 @@ export async function playStrokeWithoutClear(
       partialPath += ` L ${interpolatedX} ${interpolatedY}`;
     }
 
+    // Update the path
     fullPath.set('path', fabric.util.parsePath(partialPath));
     fullPath.set('opacity', 1);
     fabricCanvasRef.current.renderAll();
 
-    const delay = animationDuration / animationSteps;
+    // Wait based on animation duration
+    const delay = gesture.animation_duration / animationSteps;
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
-}
+};
 
 export const evaluateStrokeAccuracy = (
-  userPoints: StrokePoint[],
-  targetPoints: StrokePoint[]
+  userPoints: GesturePoint[],
+  targetPoints: GesturePoint[]
 ): number => {
   if (userPoints.length < 2 || targetPoints.length < 2) return 0;
   type EvalPoint = { x: number; y: number; timestamp: number };
@@ -237,8 +172,8 @@ export const evaluateStrokeAccuracy = (
   };
 
   // Flatten potential curves to polylines for fair comparison
-  const flatten = (pts: StrokePoint[]): EvalPoint[] =>
-    sampleStrokeToPolyline({ order: 0, points: pts } as any, 20).map((p, i) => ({
+  const flatten = (pts: GesturePoint[]): EvalPoint[] =>
+    sampleGestureToPolyline({ order: 0, points: pts } as any, 20).map((p, i) => ({
       x: p.x,
       y: p.y,
       timestamp: i

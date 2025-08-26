@@ -28,7 +28,8 @@ import {
   MdStop,
   MdClear,
   MdFiberManualRecord,
-  MdDragHandle
+  MdDragHandle,
+  MdReplay
 } from 'react-icons/md';
 import { toast } from 'sonner';
 import { cn } from '~/lib/utils';
@@ -52,15 +53,15 @@ import { CSS } from '@dnd-kit/utilities';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
-import type { StrokePoint, Stroke, Gesture, GestureData } from '~/tools/stroke_data/types';
-import { GESTURE_FLAGS, CANVAS_DIMS } from '~/tools/stroke_data/types';
-import { playGestureWithoutClear, sampleStrokeToPolyline } from '~/tools/stroke_data/utils';
+import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
+import { GESTURE_FLAGS, CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
+import { playGestureWithoutClear } from '~/tools/stroke_data/utils';
 
 type text_data_type = {
   text: string;
   id?: number;
   uuid?: string;
-  strokes_json?: GestureData;
+  gestures?: Gesture[] | null;
 };
 
 type Props =
@@ -84,15 +85,13 @@ const DEFAULT_SCALE_DOWN_FACTOR = 4.5;
 const text_atom = atom('');
 const text_edit_mode_atom = atom(false);
 const scale_down_factor_atom = atom(DEFAULT_SCALE_DOWN_FACTOR);
-const gesture_data_atom = atom<GestureData>({
-  gestures: []
-});
+const gesture_data_atom = atom<Gesture[]>([]);
 const selected_gesture_order_atom = atom<string | null>(null);
 const is_recording_atom = atom(false);
 const is_playing_atom = atom(false);
-const current_stroke_atom = atom<StrokePoint[]>([]);
+const current_points_atom = atom<GesturePoint[]>([]);
 const recording_start_time_atom = atom<number>(0);
-const temp_strokes_atom = atom<Stroke[]>([]);
+const temp_points_atom = atom<GesturePoint[]>([]);
 const character_path_atom = atom<fabric.Path | null>(null);
 const main_text_path_visible_atom = atom(true);
 
@@ -101,7 +100,7 @@ export default function AddEditTextDataWrapper(props: Props) {
     [text_atom, props.text_data.text],
     [text_edit_mode_atom, props.location === 'add' && true],
     [scale_down_factor_atom, DEFAULT_SCALE_DOWN_FACTOR],
-    [gesture_data_atom, props.text_data.strokes_json || { gestures: [] }],
+    [gesture_data_atom, props.text_data.gestures ?? []],
     [selected_gesture_order_atom, null],
     [is_recording_atom, false],
     [is_playing_atom, false]
@@ -154,14 +153,14 @@ function AddEditTextData({
       const activeOrder = parseInt(active.id.toString(), 10);
       const isSelectedBeingMoved = selectedGestureOrder === active.id.toString();
 
-      setGestureData((prev) => {
-        const oldIndex = prev.gestures.findIndex((g) => g.order === activeOrder);
-        const newIndex = prev.gestures.findIndex((g) => g.order.toString() === over.id);
+      setGestureData((prev: Gesture[]) => {
+        const oldIndex = prev.findIndex((g) => g.order === activeOrder);
+        const newIndex = prev.findIndex((g) => g.order.toString() === over.id);
 
         if (oldIndex === -1 || newIndex === -1) return prev;
 
         // Reorder the gestures array
-        const newGestures = arrayMove(prev.gestures, oldIndex, newIndex);
+        const newGestures = arrayMove(prev, oldIndex, newIndex);
 
         // Update the order property for each gesture to reflect new positions
         const updatedGestures = newGestures.map((gesture, index) => ({
@@ -169,19 +168,16 @@ function AddEditTextData({
           order: index
         }));
 
-        return {
-          ...prev,
-          gestures: updatedGestures
-        };
+        return updatedGestures;
       });
 
       // Update selectedGestureId if the selected gesture was moved
       if (isSelectedBeingMoved) {
-        const oldIndex = gestureData.gestures.findIndex((g) => g.order === activeOrder);
-        const newIndex = gestureData.gestures.findIndex((g) => g.order.toString() === over.id);
+        const oldIndex = gestureData.findIndex((g) => g.order === activeOrder);
+        const newIndex = gestureData.findIndex((g) => g.order.toString() === over.id);
 
         if (oldIndex !== -1 && newIndex !== -1) {
-          const newGestures = arrayMove(gestureData.gestures, oldIndex, newIndex);
+          const newGestures = arrayMove(gestureData, oldIndex, newIndex);
           // The selected gesture will now be at position newIndex, so its new order is newIndex
           setSelectedGestureOrder(newIndex.toString());
         }
@@ -264,36 +260,19 @@ function AddEditTextData({
 
   const addNewGesture = () => {
     const newGesture: Gesture = {
-      order: gestureData.gestures.length,
-      strokes: [],
+      order: gestureData.length,
+      points: [],
       brush_width: DEFAULT_GESTURE_BRUSH_WIDTH,
       brush_color: DEFAULT_GESTURE_BRUSH_COLOR, // red
       animation_duration: DEFAULT_GESTURE_ANIMATION_DURATION
     };
-    setGestureData((prev) => ({
-      ...prev, // not needed here
-      gestures: [...prev.gestures, newGesture]
-    }));
+    setGestureData((prev: Gesture[]) => [...prev, newGesture]);
     clearGestureVisualization();
     setSelectedGestureOrder(newGesture.order.toString());
   };
 
-  const clearCurrentGesture = () => {
-    if (!selectedGestureOrder) return;
-    setGestureData((prev) => ({
-      ...prev,
-      gestures: prev.gestures.map((gesture) =>
-        gesture.order === parseInt(selectedGestureOrder, 10) ? { ...gesture, strokes: [] } : gesture
-      )
-    }));
-    clearGestureVisualization();
-  };
-
   const deleteGesture = (gestureOrder: number) => {
-    setGestureData((prev) => ({
-      ...prev,
-      gestures: prev.gestures.filter((g) => g.order !== gestureOrder)
-    }));
+    setGestureData((prev: Gesture[]) => prev.filter((g) => g.order !== gestureOrder));
     if (selectedGestureOrder === gestureOrder.toString()) {
       setSelectedGestureOrder(null);
     }
@@ -315,10 +294,10 @@ function AddEditTextData({
     setIsPlaying(true);
     clearGestureVisualization();
 
-    for (const gesture of gestureData.gestures) {
-      if (gesture.strokes.length === 0) continue;
+    for (const gesture of gestureData) {
+      if (gesture.points.length === 0) continue;
       await playGestureWithoutClear(gesture, fabricCanvasRef);
-      await new Promise((resolve) => setTimeout(resolve, 50)); // Small delay between gestures
+      await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION)); // Small delay between gestures
     }
 
     setIsPlaying(false);
@@ -358,9 +337,7 @@ function AddEditTextData({
     render_text_path(text);
   }, [text, scaleDownFactor]);
 
-  const selectedGesture = gestureData.gestures.find(
-    (g) => g.order.toString() === selectedGestureOrder
-  );
+  const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);
 
   return (
     <div className="space-y-4">
@@ -416,17 +393,13 @@ function AddEditTextData({
           Add Gesture
         </Button>
         {/* Play All and Clear Controls */}
-        {gestureData.gestures.length > 0 && (
+        {gestureData.length > 0 && (
           <div className="flex items-center gap-2">
             <Button
               size="sm"
               variant="outline"
               onClick={playAllGestures}
-              disabled={
-                isRecording ||
-                isPlaying ||
-                gestureData.gestures.every((g) => g.strokes.length === 0)
-              }
+              disabled={isRecording || isPlaying || gestureData.every((g) => g.points.length === 0)}
             >
               <MdPlayArrow className="mr-1" />
               Play All
@@ -446,11 +419,11 @@ function AddEditTextData({
         {/* Gesture List */}
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext
-            items={gestureData.gestures.map((g) => g.order.toString())}
+            items={gestureData.map((g) => g.order.toString())}
             strategy={verticalListSortingStrategy}
           >
             <div className="flex flex-col gap-2">
-              {gestureData.gestures.map((gesture) => (
+              {gestureData.map((gesture) => (
                 <SortableGestureItem
                   key={gesture.order}
                   gesture={gesture}
@@ -471,7 +444,6 @@ function AddEditTextData({
         {selectedGesture && (
           <SelectedGestureControls
             selectedGesture={selectedGesture}
-            clearCurrentGesture={clearCurrentGesture}
             fabricCanvasRef={fabricCanvasRef}
           />
         )}
@@ -492,27 +464,25 @@ function AddEditTextData({
 
 const SelectedGestureControls = ({
   selectedGesture,
-  fabricCanvasRef,
-  clearCurrentGesture
+  fabricCanvasRef
 }: {
   selectedGesture: Gesture;
   fabricCanvasRef: React.RefObject<Canvas | null>;
-  clearCurrentGesture: () => void;
 }) => {
   const [isRecording, setIsRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
-  const [tempStrokes, setTempStrokes] = useAtom(temp_strokes_atom);
+  const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
   const [selectedGestureOrder] = useAtom(selected_gesture_order_atom);
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
   const [recordingStartTime, setRecordingStartTime] = useAtom(recording_start_time_atom);
-  const [, setCurrentStroke] = useAtom(current_stroke_atom);
+  const [, setCurrentPoints] = useAtom(current_points_atom);
   const [characterPath] = useAtom(character_path_atom);
 
   // Function to approximate gesture points to the character path
   const approximateToCharacterPath = (
-    gesturePoints: StrokePoint[],
+    gesturePoints: GesturePoint[],
     charPath: fabric.Path
-  ): StrokePoint[] => {
+  ): GesturePoint[] => {
     // Get the path's bounding box
     const pathBounds = charPath.getBoundingRect();
     const pathCenter = {
@@ -586,7 +556,7 @@ const SelectedGestureControls = ({
 
     // Extract points from the path
     const pathData = e.path.path;
-    const points: StrokePoint[] = [];
+    const points: GesturePoint[] = [];
     const baseTime = recordingStartTime;
 
     // Convert SVG path commands to points
@@ -630,23 +600,26 @@ const SelectedGestureControls = ({
         ? approximateToCharacterPath(points, characterPath)
         : points;
 
-      console.log('Adding stroke with', approximatedPoints.length, 'points');
-      setTempStrokes((prev) => {
-        const newStrokes = [...prev, { order: prev.length, points: approximatedPoints }];
-        console.log('Total temp strokes:', newStrokes.length);
-        return newStrokes;
-      });
+      console.log('Adding points:', approximatedPoints.length, 'points');
+      setTempPoints(approximatedPoints);
+    }
+
+    // Disable drawing and keep recording UI active (user can Cancel or Done)
+    if (fabricCanvasRef.current) {
+      fabricCanvasRef.current.isDrawingMode = false;
+      // stop listening further until user taps Record Again
+      fabricCanvasRef.current.off('path:created', handlePathCreated);
+      fabricCanvasRef.current.renderAll();
     }
   };
   const startRecording = () => {
     if (!selectedGestureOrder || !fabricCanvasRef.current) return;
     setIsRecording(true);
     setRecordingStartTime(Date.now());
-    setTempStrokes([]); // Clear temporary strokes
+    setTempPoints([]); // Clear temporary points
     clearGestureVisualization();
 
     // Enable drawing mode by disabling object selection
-    fabricCanvasRef.current.selection = false;
     fabricCanvasRef.current.forEachObject((obj) => {
       obj.selectable = false;
       obj.evented = false;
@@ -659,14 +632,13 @@ const SelectedGestureControls = ({
 
   const stopRecording = () => {
     setIsRecording(false);
-    setCurrentStroke([]);
-    setTempStrokes([]); // Clear temp strokes without saving
-    clearGestureVisualization(); // Clear all drawn strokes
+    setCurrentPoints([]);
+    setTempPoints([]); // Clear temp points without saving
+    clearGestureVisualization(); // Clear all drawn paths
 
     // Restore normal canvas behavior
     if (fabricCanvasRef.current) {
       fabricCanvasRef.current.isDrawingMode = false; // Disable drawing mode
-      fabricCanvasRef.current.selection = true;
 
       // Remove path created listener
       fabricCanvasRef.current.off('path:created', handlePathCreated);
@@ -682,25 +654,24 @@ const SelectedGestureControls = ({
   };
 
   const saveRecording = () => {
-    if (!selectedGestureOrder || tempStrokes.length === 0) return;
+    if (!selectedGestureOrder || tempPoints.length === 0) return;
 
-    const strokeCount = tempStrokes.length;
+    const pointCount = tempPoints.length;
 
-    // Add all temporary strokes to the selected gesture
-    setGestureData((prev) => ({
-      ...prev,
-      gestures: prev.gestures.map((gesture) =>
+    // Set the points for the selected gesture (overwrite previous points)
+    setGestureData((prev: Gesture[]) =>
+      prev.map((gesture) =>
         gesture.order === parseInt(selectedGestureOrder, 10)
           ? {
               ...gesture,
-              strokes: [...gesture.strokes, ...tempStrokes]
+              points: tempPoints
             }
           : gesture
       )
-    }));
+    );
 
-    // Clear temporary strokes
-    setTempStrokes([]);
+    // Clear temporary points
+    setTempPoints([]);
 
     // Stop recording but keep the visualization
     setIsRecording(false);
@@ -708,11 +679,10 @@ const SelectedGestureControls = ({
     // Disable drawing mode
     if (fabricCanvasRef.current) {
       fabricCanvasRef.current.isDrawingMode = false;
-      fabricCanvasRef.current.selection = true;
       fabricCanvasRef.current.renderAll();
     }
 
-    toast.success(`Added ${strokeCount} stroke(s) to gesture`);
+    toast.success(`Recorded ${pointCount} points for gesture`);
   };
 
   const clearGestureVisualization = () => {
@@ -728,7 +698,7 @@ const SelectedGestureControls = ({
   };
 
   const playGesture = async (gestureOrder: number) => {
-    const gesture = gestureData.gestures.find((g) => g.order === gestureOrder);
+    const gesture = gestureData.find((g) => g.order === gestureOrder);
     if (!gesture || !fabricCanvasRef.current) return;
 
     setIsPlaying(true);
@@ -737,6 +707,16 @@ const SelectedGestureControls = ({
     await playGestureWithoutClear(gesture, fabricCanvasRef);
 
     setIsPlaying(false);
+  };
+
+  const clearCurrentGesturePoints = () => {
+    if (!selectedGestureOrder) return;
+    setGestureData((prev: Gesture[]) =>
+      prev.map((gesture) =>
+        gesture.order === parseInt(selectedGestureOrder, 10) ? { ...gesture, points: [] } : gesture
+      )
+    );
+    clearGestureVisualization();
   };
 
   // Update brush settings when selected gesture changes during recording
@@ -755,16 +735,18 @@ const SelectedGestureControls = ({
       <div className="flex items-center justify-between">
         <span className="font-medium">Selected: Gesture {selectedGesture.order + 1}</span>
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={clearCurrentGesture}
-            disabled={isRecording || isPlaying}
-          >
-            <MdClear className="mr-1" />
-            Clear
-          </Button>
-
+          {!isRecording && (
+            <Button
+              size="sm"
+              variant="outline"
+              onDoubleClick={clearCurrentGesturePoints}
+              disabled={isRecording || isPlaying || selectedGesture.points.length === 0}
+              className="text-sm"
+            >
+              <MdClear className="mr-1" />
+              Clear Gesture
+            </Button>
+          )}
           {!isRecording ? (
             <Button size="sm" variant="default" onClick={startRecording} disabled={isPlaying}>
               <MdFiberManualRecord className="mr-1 text-red-500" />
@@ -772,6 +754,26 @@ const SelectedGestureControls = ({
             </Button>
           ) : (
             <>
+              {/* Record Again (re-enable drawing). Shown only during recording */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (!fabricCanvasRef.current) return;
+                  // clear previous temp points but keep visualization clearing to start fresh
+                  setTempPoints([]);
+                  clearGestureVisualization(); // Clear canvas for fresh start
+                  // Re-enable drawing and reattach listener
+                  fabricCanvasRef.current.isDrawingMode = true;
+                  fabricCanvasRef.current.off('path:created', handlePathCreated);
+                  fabricCanvasRef.current.on('path:created', handlePathCreated);
+                  fabricCanvasRef.current.renderAll();
+                }}
+                disabled={tempPoints.length === 0}
+              >
+                <MdReplay className="mr-1" />
+                Record Again
+              </Button>
               <Button size="sm" variant="secondary" onClick={stopRecording}>
                 <MdStop className="mr-1" />
                 Cancel
@@ -780,22 +782,24 @@ const SelectedGestureControls = ({
                 size="sm"
                 variant="default"
                 onClick={saveRecording}
-                disabled={tempStrokes.length === 0}
+                disabled={tempPoints.length === 0}
               >
-                Done ({tempStrokes.length})
+                Done
               </Button>
             </>
           )}
 
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => playGesture(selectedGesture.order)}
-            disabled={isRecording || isPlaying || selectedGesture.strokes.length === 0}
-          >
-            <MdPlayArrow className="mr-1" />
-            Play
-          </Button>
+          {!isRecording && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => playGesture(selectedGesture.order)}
+              disabled={isRecording || isPlaying || selectedGesture.points.length === 0}
+            >
+              <MdPlayArrow className="mr-1" />
+              Play
+            </Button>
+          )}
         </div>
       </div>
 
@@ -809,14 +813,13 @@ const SelectedGestureControls = ({
               type="color"
               value={selectedGesture.brush_color}
               onChange={(e) =>
-                setGestureData((prev) => ({
-                  ...prev,
-                  gestures: prev.gestures.map((gesture) =>
+                setGestureData((prev: Gesture[]) =>
+                  prev.map((gesture) =>
                     gesture.order === parseInt(selectedGestureOrder || '0', 10)
                       ? { ...gesture, brush_color: e.target.value }
                       : gesture
                   )
-                }))
+                )
               }
               className="h-8 w-12 rounded border border-input"
               disabled={isRecording || isPlaying}
@@ -833,14 +836,13 @@ const SelectedGestureControls = ({
           <Slider
             value={[selectedGesture.brush_width]}
             onValueChange={(value) =>
-              setGestureData((prev) => ({
-                ...prev,
-                gestures: prev.gestures.map((gesture) =>
+              setGestureData((prev: Gesture[]) =>
+                prev.map((gesture) =>
                   gesture.order === parseInt(selectedGestureOrder || '0', 10)
                     ? { ...gesture, brush_width: value[0] }
                     : gesture
                 )
-              }))
+              )
             }
             min={4}
             max={14}
@@ -858,14 +860,13 @@ const SelectedGestureControls = ({
           <Slider
             value={[selectedGesture.animation_duration]}
             onValueChange={(value) =>
-              setGestureData((prev) => ({
-                ...prev,
-                gestures: prev.gestures.map((gesture) =>
+              setGestureData((prev: Gesture[]) =>
+                prev.map((gesture) =>
                   gesture.order === parseInt(selectedGestureOrder || '0', 10)
                     ? { ...gesture, animation_duration: value[0] }
                     : gesture
                 )
-              }))
+              )
             }
             min={50}
             max={1000}
@@ -878,7 +879,7 @@ const SelectedGestureControls = ({
 
       {isRecording && (
         <div className="text-sm font-medium text-destructive">
-          🔴 Recording... Draw on the canvas to record strokes
+          🔴 Recording... Draw on the canvas to record gesture
         </div>
       )}
     </div>
@@ -942,7 +943,6 @@ function SortableGestureItem({
         <MdDragHandle className="h-4 w-4 text-muted-foreground" />
       </div>
       <span className="text-sm">Gesture {gesture.order + 1}</span>
-      <span className="text-xs text-muted-foreground">({gesture.strokes.length} strokes)</span>
       <Button
         size="sm"
         variant="ghost"
@@ -967,7 +967,7 @@ const SaveEditMode = ({
   text_data: text_data_type;
 }) => {
   const text = useAtomValue(text_atom);
-  const strokeData = useAtomValue(gesture_data_atom);
+  const gestureData = useAtomValue(gesture_data_atom);
 
   const is_addition = text_data.id === undefined && text_data.uuid === undefined;
 
@@ -1023,16 +1023,14 @@ const SaveEditMode = ({
     if (is_addition) {
       add_text_data_mut.mutate({
         text,
-        svg_json: fabricjs_svg_dump,
-        strokes_json: strokeData
+        gestures: gestureData
       });
     } else {
       update_text_data_mut.mutate({
         id: text_data.id!,
         uuid: text_data.uuid!,
         text,
-        svg_json: fabricjs_svg_dump,
-        strokes_json: strokeData
+        gestures: gestureData
       });
     }
   };

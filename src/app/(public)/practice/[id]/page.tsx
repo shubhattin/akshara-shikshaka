@@ -14,7 +14,7 @@ const get_cached_text_data = cache(async (id: number) => {
       id: true,
       uuid: true,
       text: true,
-      strokes_json: true
+      gestures: true
     }
   });
   return text_data;
@@ -53,7 +53,7 @@ const MainEdit = async ({ params }: Props) => {
       <PracticeCanvasComponent
         text_data={{
           ...text_data,
-          strokes_json: text_data.strokes_json || undefined
+          gestures: text_data.gestures
         }}
       />
     </div>

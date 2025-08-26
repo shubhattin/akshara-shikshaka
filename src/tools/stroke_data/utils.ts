@@ -124,6 +124,7 @@ export const playGestureWithoutClear = async (
   }
 };
 
+// better
 export const evaluateStrokeAccuracy = (
   userPoints: GesturePoint[],
   targetPoints: GesturePoint[]

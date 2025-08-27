@@ -1,22 +1,49 @@
 'use client';
 
-import { type Canvas } from 'fabric';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Card } from '~/components/ui/card';
-import * as fabric from 'fabric';
+import dynamic from 'next/dynamic';
+import type Konva from 'konva';
 import { cn } from '~/lib/utils';
 import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward } from 'react-icons/md';
 import { FiTrendingUp } from 'react-icons/fi';
-import { evaluateStrokeAccuracy, playGestureWithoutClear } from '~/tools/stroke_data/utils';
+import { evaluateStrokeAccuracy, animateGesture } from '~/tools/stroke_data/utils';
 import {
   GesturePoint,
   CANVAS_DIMS,
-  GESTURE_FLAGS,
   Gesture,
   GESTURE_GAP_DURATION
 } from '~/tools/stroke_data/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AiOutlineSignature } from 'react-icons/ai';
+import { useAtom, useAtomValue } from 'jotai';
+import { useHydrateAtoms } from 'jotai/utils';
+import {
+  practice_mode_atom,
+  current_gesture_index_atom,
+  is_drawing_atom,
+  completed_gestures_count_atom,
+  show_all_gestures_done_atom,
+  is_animating_current_gesture_atom,
+  show_try_again_atom,
+  last_accuracy_atom,
+  scaling_factor_atom,
+  mounted_atom,
+  animated_gesture_lines_atom
+} from './shared-state';
+
+// Dynamic import for PracticeKonvaCanvas to avoid SSR issues
+const PracticeKonvaCanvas = dynamic(() => import('./PracticeKonvaCanvas'), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="flex items-center justify-center rounded-lg border-2 bg-gray-50"
+      style={{ width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }}
+    >
+      <div className="text-gray-500">Loading canvas...</div>
+    </div>
+  )
+});
 
 type text_data_type = {
   id: number;
@@ -30,21 +57,40 @@ type Props = {
 };
 
 export default function PracticeCanvasComponent({ text_data }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fabricCanvasRef = useRef<Canvas>(null);
+  const stageRef = useRef<Konva.Stage>(null);
   const canceledRef = useRef(false);
 
-  // Practice state
-  const [practiceMode, setPracticeMode] = useState<'none' | 'playing' | 'practicing'>('none');
-  const [currentGestureIndex, setCurrentGestureIndex] = useState(0);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [completedGesturesCount, setCompletedGesturesCount] = useState<number>(0);
-  const [showAllGesturesDone, setShowAllGesturesDone] = useState(false);
-  const [isAnimatingCurrentGesture, setIsAnimatingCurrentGesture] = useState(false);
-  const [showTryAgain, setShowTryAgain] = useState(false);
-  const [lastAccuracy, setLastAccuracy] = useState(0);
-  const [scalingFactor, setScalingFactor] = useState(1);
-  const [mounted, setMounted] = useState(false);
+  // Initialize atoms with default values
+  useHydrateAtoms([
+    [practice_mode_atom, 'none' as const],
+    [current_gesture_index_atom, 0],
+    [is_drawing_atom, false],
+    [completed_gestures_count_atom, 0],
+    [show_all_gestures_done_atom, false],
+    [is_animating_current_gesture_atom, false],
+    [show_try_again_atom, false],
+    [last_accuracy_atom, 0],
+    [scaling_factor_atom, 1],
+    [mounted_atom, false],
+    [animated_gesture_lines_atom, []]
+  ]);
+
+  // Practice state from atoms
+  const [practiceMode, setPracticeMode] = useAtom(practice_mode_atom);
+  const [currentGestureIndex, setCurrentGestureIndex] = useAtom(current_gesture_index_atom);
+  const [isDrawing, setIsDrawing] = useAtom(is_drawing_atom);
+  const [completedGesturesCount, setCompletedGesturesCount] = useAtom(
+    completed_gestures_count_atom
+  );
+  const [showAllGesturesDone, setShowAllGesturesDone] = useAtom(show_all_gestures_done_atom);
+  const [isAnimatingCurrentGesture, setIsAnimatingCurrentGesture] = useAtom(
+    is_animating_current_gesture_atom
+  );
+  const [showTryAgain, setShowTryAgain] = useAtom(show_try_again_atom);
+  const [lastAccuracy, setLastAccuracy] = useAtom(last_accuracy_atom);
+  const [scalingFactor, setScalingFactor] = useAtom(scaling_factor_atom);
+  const [mounted, setMounted] = useAtom(mounted_atom);
+  const [animatedGestureLines, setAnimatedGestureLines] = useAtom(animated_gesture_lines_atom);
 
   function updateScalingFactor() {
     if (typeof window === 'undefined') return;
@@ -54,43 +100,15 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     const scale = Math.min(1, scaleX);
     setScalingFactor(scale);
   }
-  const updateCanvasDimensions = () => {
-    if (!fabricCanvasRef.current) return;
-    // Keep logical canvas size constant; scale visually with zoom
-    fabricCanvasRef.current.setWidth(CANVAS_DIMS.width * scalingFactor);
-    fabricCanvasRef.current.setHeight(CANVAS_DIMS.height * scalingFactor);
-    fabricCanvasRef.current.setZoom(scalingFactor);
-    // Center viewport so character remains centered
-    const viewportTransform = fabricCanvasRef.current.viewportTransform;
-    if (viewportTransform) {
-      viewportTransform[4] = 0; // translateX
-      viewportTransform[5] = 0; // translateY
-    }
-    fabricCanvasRef.current.requestRenderAll();
-  };
-  useEffect(() => {
-    if (mounted) {
-      updateCanvasDimensions();
-    }
-  }, [scalingFactor, mounted]);
 
-  // Add refs to capture latest state in callbacks
-  const currentGestureIndexRef = useRef(currentGestureIndex);
-  useEffect(() => {
-    currentGestureIndexRef.current = currentGestureIndex;
-  }, [currentGestureIndex]);
+  // Konva doesn't need manual dimension updates - scaling is handled via props
 
-  const completedGesturesCountRef = useRef(completedGesturesCount);
-  useEffect(() => {
-    completedGesturesCountRef.current = completedGesturesCount;
-  }, [completedGesturesCount]);
+  // Refs are no longer needed with direct state access
 
   useEffect(() => {
     updateScalingFactor();
     canceledRef.current = false;
-    initCanvas().then(() => {
-      setMounted(true);
-    });
+    setMounted(true);
 
     window.addEventListener('resize', updateScalingFactor);
     const unsub_func = () => {
@@ -100,13 +118,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     return () => {
       unsub_func();
       canceledRef.current = true;
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-        fabricCanvasRef.current = null;
-      }
-      if (canvasRef.current && (canvasRef.current as any).__fabric) {
-        delete (canvasRef.current as any).__fabric;
-      }
+      // Konva cleanup is handled automatically by the Stage component
     };
   }, []);
 
@@ -116,63 +128,48 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
   const totalGestures = gestureData.length;
 
-  const initCanvas = async () => {
-    if (!canvasRef.current) return;
-
-    // Clean up existing canvas first
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.dispose();
-      fabricCanvasRef.current = null;
-    }
-
-    // Dynamic import to avoid SSR issues
-
-    if (canceledRef.current) return;
-
-    // Check if the canvas element already has a Fabric instance
-    const existingCanvas = (canvasRef.current as any).__fabric;
-    if (existingCanvas) {
-      existingCanvas.dispose();
-      delete (canvasRef.current as any).__fabric;
-    }
-
-    // Initialize Fabric.js canvas
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width: CANVAS_DIMS.width * scalingFactor,
-      height: CANVAS_DIMS.height * scalingFactor,
-      backgroundColor: '#ffffff',
-      isDrawingMode: false,
-      selection: false
-    });
-
-    // Store reference on the canvas element itself for cleanup
-    (canvasRef.current as any).__fabric = canvas;
-    fabricCanvasRef.current = canvas;
-
-    // Apply initial zoom and center
-    canvas.setZoom(scalingFactor);
-    const viewportTransform = canvas.viewportTransform;
-    if (viewportTransform) {
-      viewportTransform[4] = 0;
-      viewportTransform[5] = 0;
-    }
-    canvas.requestRenderAll();
-
-    // Start with a clean, empty canvas (no character path or pre-rendered strokes)
-  };
+  // Konva initialization is handled by the Stage component automatically
 
   const playAllGestures = async () => {
-    if (!fabricCanvasRef.current) return;
-
     setPracticeMode('playing');
     clearAllPracticeGestures();
 
     for (const gesture of gestureData) {
-      await playGestureWithoutClear(gesture, fabricCanvasRef);
+      await playGestureWithKonva(gesture, false); // Not a guidance gesture
       await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION));
     }
 
     setPracticeMode('none');
+  };
+
+  // Konva-based gesture animation
+  const playGestureWithKonva = async (
+    gesture: Gesture,
+    isCurrentAnimatedGesture: boolean = false
+  ): Promise<void> => {
+    const gestureLineId = gesture.order;
+
+    // Initialize the gesture line in state
+    setAnimatedGestureLines((prev) => [
+      ...prev.filter((line) => line.order !== gestureLineId),
+      {
+        order: gestureLineId,
+        points: [],
+        color: gesture.brush_color,
+        width: gesture.brush_width,
+        isCurrentAnimatedGesture
+      }
+    ]);
+
+    // Use the framework-agnostic animation helper
+    await animateGesture(gesture, (frame) => {
+      // Convert points to flat array for Konva Line component
+      const flatPoints = frame.partialPoints.flatMap((p) => [p.x, p.y]);
+
+      setAnimatedGestureLines((prev) =>
+        prev.map((line) => (line.order === gestureLineId ? { ...line, points: flatPoints } : line))
+      );
+    });
   };
 
   const playGestureIndex = async (gestureIndex: number) => {
@@ -180,109 +177,73 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     disableDrawingMode();
     setIsAnimatingCurrentGesture(true);
     clearCurrentAnimatedGesture();
-    await playGestureWithoutClear(gestureData[gestureIndex], fabricCanvasRef, {
-      [GESTURE_FLAGS.isCurrentAnimatedGesture]: true
-    });
+    await playGestureWithKonva(gestureData[gestureIndex], true); // This is a guidance gesture
     setIsAnimatingCurrentGesture(false);
     enableDrawingMode();
   };
 
   const enableDrawingMode = () => {
-    if (!fabricCanvasRef.current) return;
-    // clearGestureVisualization();
-
     setIsDrawing(true);
-    const canvas = fabricCanvasRef.current;
-
-    canvas.isDrawingMode = true;
-    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-    canvas.freeDrawingBrush.color = '#0066cc';
-    canvas.freeDrawingBrush.width = currentGesture.brush_width || 6;
-
-    canvas.off('path:created', handleUserGesture);
-    canvas.on('path:created', handleUserGesture);
   };
 
   const disableDrawingMode = () => {
-    if (!fabricCanvasRef.current) return;
-
     setIsDrawing(false);
-    fabricCanvasRef.current.isDrawingMode = false;
-    fabricCanvasRef.current.off('path:created', handleUserGesture);
   };
 
-  // Handle user gesture drawing to use refs for latest state
-  const handleUserGesture = async (e: any) => {
-    // Add fresh state references
-    const currentGestureIdx = currentGestureIndexRef.current;
-    const currentGesture = gestureData[currentGestureIdx];
+  // Handle user gesture drawing from Konva canvas
+  const handleUserStroke = async (userPoints: GesturePoint[]) => {
+    const currentGesture = gestureData[currentGestureIndex];
+    if (!currentGesture) return;
 
-    if (!e.path) return;
+    // Add user stroke to visualization
+    const gestureLineId = Date.now(); // Unique ID for user stroke
+    const flatPoints = userPoints.flatMap((p) => [p.x, p.y]);
 
-    // Mark user drawn path
-    e.path.set({
-      selectable: false,
-      evented: false,
-      [GESTURE_FLAGS.isUserStroke]: true
-    });
-
-    // Extract points from user path
-    const pathData = e.path.path;
-    const userPoints: GesturePoint[] = [];
-
-    pathData.forEach((cmd: any, index: number) => {
-      if (cmd[0] === 'M' && cmd.length >= 3) {
-        userPoints.push({ x: cmd[1], y: cmd[2], timestamp: index * 10, cmd: 'M' });
-      } else if (cmd[0] === 'L' && cmd.length >= 3) {
-        userPoints.push({ x: cmd[1], y: cmd[2], timestamp: index * 10, cmd: 'L' });
-      } else if (cmd[0] === 'Q' && cmd.length >= 5) {
-        userPoints.push({
-          x: cmd[3],
-          y: cmd[4],
-          timestamp: index * 10,
-          cmd: 'Q',
-          cx: cmd[1],
-          cy: cmd[2]
-        });
+    setAnimatedGestureLines((prev) => [
+      ...prev,
+      {
+        order: gestureLineId,
+        points: flatPoints,
+        color: '#0066cc',
+        width: currentGesture.brush_width || 6,
+        isUserStroke: true
       }
-    });
+    ]);
 
-    // Evaluate gesture accuracy using latest gesture
+    // Evaluate gesture accuracy
     const accuracy = evaluateStrokeAccuracy(userPoints, currentGesture.points);
 
     if (accuracy > 0.7) {
       // completeCurrentGesture
       setShowTryAgain(false);
-
-      playNextGesture(currentGestureIdx, completedGesturesCountRef.current);
+      playNextGesture(currentGestureIndex, completedGesturesCount);
     } else {
       setLastAccuracy(accuracy);
       setShowTryAgain(true);
-      fabricCanvasRef.current?.remove(e.path);
-      // Auto-hide after 5 seconds
-      setTimeout(() => setShowTryAgain(false), 5000);
+
+      // Remove the user stroke after a delay
+      setTimeout(() => {
+        setAnimatedGestureLines((prev) => prev.filter((line) => line.order !== gestureLineId));
+        setShowTryAgain(false);
+      }, 5000);
     }
   };
 
-  const playNextGesture = (currentGestureIndex: number, completedGesturesCount: number) => {
-    if (currentGestureIndex >= 0) {
-      // reset previous isCurrentAnimatedStroke
-      fabricCanvasRef.current?.getObjects().forEach((obj) => {
-        console.log('obj', obj.type, obj.get(GESTURE_FLAGS.isCurrentAnimatedGesture));
-        if (obj.get(GESTURE_FLAGS.isCurrentAnimatedGesture)) {
-          obj.set({ [GESTURE_FLAGS.isCurrentAnimatedGesture]: false });
-        }
-      });
-    }
+  const playNextGesture = (currentGestureIdx: number, completedCount: number) => {
+    // Clear current animated gesture flag
+    setAnimatedGestureLines((prev) =>
+      prev.map((line) => ({ ...line, isCurrentAnimatedGesture: false }))
+    );
+
     clearUserGestures();
     clearCurrentAnimatedGesture();
 
     // Move to next gesture
-    setCurrentGestureIndex(currentGestureIndex + 1);
-    setCompletedGesturesCount(completedGesturesCount + 1);
-    if (currentGestureIndex < totalGestures - 1) {
+    setCurrentGestureIndex(currentGestureIdx + 1);
+    setCompletedGesturesCount(completedCount + 1);
+    if (currentGestureIdx < totalGestures - 1) {
       setTimeout(() => {
-        playGestureIndex(currentGestureIndex + 1);
+        playGestureIndex(currentGestureIdx + 1);
       }, 300);
       disableDrawingMode();
     } else {
@@ -297,36 +258,15 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   const clearAllPracticeGestures = () => {
-    if (!fabricCanvasRef.current) return;
-
-    fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get(GESTURE_FLAGS.isUserStroke) || obj.get(GESTURE_FLAGS.isGestureVisualization)) {
-        fabricCanvasRef.current?.remove(obj);
-      }
-    });
-    fabricCanvasRef.current.renderAll();
+    setAnimatedGestureLines([]);
   };
 
   const clearCurrentAnimatedGesture = () => {
-    if (!fabricCanvasRef.current) return;
-
-    fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get(GESTURE_FLAGS.isCurrentAnimatedGesture)) {
-        fabricCanvasRef.current?.remove(obj);
-      }
-    });
-    fabricCanvasRef.current.renderAll();
+    setAnimatedGestureLines((prev) => prev.filter((line) => !line.isCurrentAnimatedGesture));
   };
 
   const clearUserGestures = () => {
-    if (!fabricCanvasRef.current) return;
-
-    fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get(GESTURE_FLAGS.isUserStroke)) {
-        fabricCanvasRef.current?.remove(obj);
-      }
-    });
-    fabricCanvasRef.current.renderAll();
+    setAnimatedGestureLines((prev) => prev.filter((line) => !line.isUserStroke));
   };
 
   const replayCurrentGesture = () => {
@@ -352,7 +292,6 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     setShowTryAgain(false);
     disableDrawingMode();
     clearAllPracticeGestures();
-    // Keep canvas empty on reset
   };
 
   if (!gestureData.length) {
@@ -523,16 +462,12 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
               isDrawing ? 'border-blue-500' : 'border-border'
             )}
           >
-            <canvas
-              ref={canvasRef}
-              style={{
-                ...(!canvasRef.current
-                  ? {
-                      width: CANVAS_DIMS.width * scalingFactor,
-                      height: CANVAS_DIMS.height * scalingFactor
-                    }
-                  : {})
-              }}
+            <PracticeKonvaCanvas
+              ref={stageRef}
+              gestureData={gestureData}
+              currentGestureIndex={currentGestureIndex}
+              onUserStroke={handleUserStroke}
+              isDrawingEnabled={isDrawing}
             />
           </div>
         </div>

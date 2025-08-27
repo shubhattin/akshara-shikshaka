@@ -1,12 +1,12 @@
 'use client';
 
-import { type Canvas } from 'fabric';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Slider } from '~/components/ui/slider';
-import * as fabric from 'fabric';
+import dynamic from 'next/dynamic';
+import type Konva from 'konva';
 import { client_q } from '~/api/client';
 import { useRouter } from 'next/navigation';
 import {
@@ -50,12 +50,40 @@ import {
 } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { atom, useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
 import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
-import { GESTURE_FLAGS, CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
-import { playGestureWithoutClear } from '~/tools/stroke_data/utils';
+import { CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
+import { animateGesture } from '~/tools/stroke_data/utils';
+import {
+  text_atom,
+  text_edit_mode_atom,
+  scale_down_factor_atom,
+  gesture_data_atom,
+  selected_gesture_order_atom,
+  is_recording_atom,
+  is_playing_atom,
+  recording_start_time_atom,
+  temp_points_atom,
+  character_svg_path_atom,
+  main_text_path_visible_atom,
+  animated_gesture_lines_atom,
+  DEFAULTS
+} from './shared-state';
+
+// Dynamic import for KonvaCanvas to avoid SSR issues
+const KonvaCanvas = dynamic(() => import('./KonvaCanvas'), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="flex items-center justify-center rounded-lg border-2 bg-gray-50"
+      style={{ width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }}
+    >
+      <div className="text-gray-500">Loading canvas...</div>
+    </div>
+  )
+});
 
 type text_data_type = {
   text: string;
@@ -77,52 +105,33 @@ type Props =
       };
     };
 
-const DEFAULT_GESTURE_BRUSH_WIDTH = 8;
-const DEFAULT_GESTURE_BRUSH_COLOR = '#ff0000'; // red
-const DEFAULT_GESTURE_ANIMATION_DURATION = 600;
-const DEFAULT_SCALE_DOWN_FACTOR = 4.5;
-
-const text_atom = atom('');
-const text_edit_mode_atom = atom(false);
-const scale_down_factor_atom = atom(DEFAULT_SCALE_DOWN_FACTOR);
-const gesture_data_atom = atom<Gesture[]>([]);
-const selected_gesture_order_atom = atom<string | null>(null);
-const is_recording_atom = atom(false);
-const is_playing_atom = atom(false);
-const current_points_atom = atom<GesturePoint[]>([]);
-const recording_start_time_atom = atom<number>(0);
-const temp_points_atom = atom<GesturePoint[]>([]);
-const character_path_atom = atom<fabric.Path | null>(null);
-const main_text_path_visible_atom = atom(true);
+// All atoms and constants are now imported from shared-state.ts
 
 export default function AddEditTextDataWrapper(props: Props) {
   useHydrateAtoms([
     [text_atom, props.text_data.text],
     [text_edit_mode_atom, props.location === 'add' && true],
-    [scale_down_factor_atom, DEFAULT_SCALE_DOWN_FACTOR],
+    [scale_down_factor_atom, DEFAULTS.SCALE_DOWN_FACTOR],
     [gesture_data_atom, props.text_data.gestures ?? []],
     [selected_gesture_order_atom, null],
     [is_recording_atom, false],
     [is_playing_atom, false]
   ]);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fabricCanvasRef = useRef<Canvas>(null);
+  const stageRef = useRef<Konva.Stage>(null);
 
   return (
     <>
-      <AddEditTextData {...props} canvasRef={canvasRef} fabricCanvasRef={fabricCanvasRef} />
-      <SaveEditMode fabricCanvasRef={fabricCanvasRef} text_data={props.text_data} />
+      <AddEditTextData {...props} stageRef={stageRef} />
+      <SaveEditMode stageRef={stageRef} text_data={props.text_data} />
     </>
   );
 }
 
 function AddEditTextData({
   text_data,
-  canvasRef,
-  fabricCanvasRef
+  stageRef
 }: Props & {
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  fabricCanvasRef: React.RefObject<Canvas | null>;
+  stageRef: React.RefObject<Konva.Stage | null>;
 }) {
   const [textIntermediate, setIntermediateText] = useState(text_data.text);
   const [text, setText] = useAtom(text_atom);
@@ -133,9 +142,16 @@ function AddEditTextData({
   // Gesture Recording State
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
   const [selectedGestureOrder, setSelectedGestureOrder] = useAtom(selected_gesture_order_atom);
-  const [isRecording] = useAtom(is_recording_atom);
+  const [isRecording, setIsRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
-  const [, setCharacterPath] = useAtom(character_path_atom);
+  const [, setCharacterSvgPath] = useAtom(character_svg_path_atom);
+  const [, setAnimatedGestureLines] = useAtom(animated_gesture_lines_atom);
+  const [, setTempPoints] = useAtom(temp_points_atom);
+  const [recordingStartTime, setRecordingStartTime] = useAtom(recording_start_time_atom);
+
+  // Recording state for current drawing
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentDrawingPoints, setCurrentDrawingPoints] = useState<number[]>([]);
 
   // Drag and Drop Sensors
   const sensors = useSensors(
@@ -185,36 +201,8 @@ function AddEditTextData({
     }
   };
 
-  const initCanvas = async () => {
-    if (!canvasRef.current) return;
-
-    // Clean up existing canvas first
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.dispose();
-      fabricCanvasRef.current = null;
-    }
-
-    // Check if the canvas element already has a Fabric instance
-    // This can happen in React StrictMode
-    const existingCanvas = (canvasRef.current as any).__fabric;
-    if (existingCanvas) {
-      existingCanvas.dispose();
-      delete (canvasRef.current as any).__fabric;
-    }
-
-    // Initialize Fabric.js canvas
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width: CANVAS_DIMS.width,
-      height: CANVAS_DIMS.height,
-      backgroundColor: '#ffffff',
-      isDrawingMode: false // Explicitly disable drawing mode initially
-    });
-
-    // Store reference on the canvas element itself for cleanup
-    (canvasRef.current as any).__fabric = canvas;
-
-    fabricCanvasRef.current = canvas;
-  };
+  // Konva doesn't need manual initialization like Fabric
+  // The Stage component handles everything declaratively
 
   const render_text_path = async (text: string) => {
     const hbjs = await import('~/tools/harfbuzz/index');
@@ -223,38 +211,9 @@ function AddEditTextData({
     await Promise.all([hbjs.preload_harfbuzzjs_wasm(), hbjs.preload_font_from_url(FONT_URL)]);
 
     const svg_path = await hbjs.get_text_svg_path(text, FONT_URL);
-    if (svg_path && fabricCanvasRef.current) {
-      const SCALE_FACTOR = !scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1;
-      const pathObject = new fabric.Path(svg_path, {
-        fill: 'black',
-        stroke: '#000000', // black
-        strokeWidth: 2,
-        selectable: true,
-        scaleX: SCALE_FACTOR,
-        scaleY: SCALE_FACTOR,
-        evented: false,
-        lockScalingX: false,
-        lockScalingY: false,
-        lockRotation: true,
-        lockMovementX: false,
-        lockMovementY: false
-      });
-      pathObject.set(GESTURE_FLAGS.isMainCharacterPath, true);
-
-      // clear prev path objects
-      fabricCanvasRef.current?.getObjects().forEach((obj) => {
-        if (obj instanceof fabric.Path && !obj.get(GESTURE_FLAGS.isGestureVisualization)) {
-          fabricCanvasRef.current?.remove(obj);
-        }
-      });
-
-      // Center the character on canvas
-      fabricCanvasRef.current?.centerObject(pathObject);
-      fabricCanvasRef.current?.add(pathObject);
-      fabricCanvasRef.current?.renderAll();
-
-      // Store the character path for approximation
-      setCharacterPath(pathObject);
+    if (svg_path) {
+      // Store the SVG path data in state - Konva Path component will use it
+      setCharacterSvgPath(svg_path);
     }
   };
 
@@ -262,9 +221,9 @@ function AddEditTextData({
     const newGesture: Gesture = {
       order: gestureData.length,
       points: [],
-      brush_width: DEFAULT_GESTURE_BRUSH_WIDTH,
-      brush_color: DEFAULT_GESTURE_BRUSH_COLOR, // red
-      animation_duration: DEFAULT_GESTURE_ANIMATION_DURATION
+      brush_width: DEFAULTS.GESTURE_BRUSH_WIDTH,
+      brush_color: DEFAULTS.GESTURE_BRUSH_COLOR, // red
+      animation_duration: DEFAULTS.GESTURE_ANIMATION_DURATION
     };
     setGestureData((prev: Gesture[]) => [...prev, newGesture]);
     clearGestureVisualization();
@@ -279,15 +238,8 @@ function AddEditTextData({
   };
 
   const clearGestureVisualization = () => {
-    if (!fabricCanvasRef.current) return;
-
-    // Remove only gesture visualization objects (lines), keep the character path
-    fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get(GESTURE_FLAGS.isGestureVisualization)) {
-        fabricCanvasRef.current?.remove(obj);
-      }
-    });
-    fabricCanvasRef.current.renderAll();
+    // Clear animated gesture lines from state
+    setAnimatedGestureLines([]);
   };
 
   const playAllGestures = async () => {
@@ -296,41 +248,44 @@ function AddEditTextData({
 
     for (const gesture of gestureData) {
       if (gesture.points.length === 0) continue;
-      await playGestureWithoutClear(gesture, fabricCanvasRef);
+      await playGestureWithKonva(gesture);
       await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION)); // Small delay between gestures
     }
 
     setIsPlaying(false);
   };
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    initCanvas();
-    return () => {
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-        fabricCanvasRef.current = null;
-      }
-      // Also clean up the reference on the canvas element
-      if (canvasRef.current && (canvasRef.current as any).__fabric) {
-        delete (canvasRef.current as any).__fabric;
-      }
-    };
-  }, []);
+  // Konva-based gesture animation using framework-agnostic helper
+  const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {
+    const gestureLineId = gesture.order;
 
-  useEffect(() => {
-    if (!fabricCanvasRef.current) return;
-    // get object by its isMainCharacterPath flag
-    const mainCharacterPath = fabricCanvasRef.current
-      .getObjects()
-      .find((obj) => obj.get(GESTURE_FLAGS.isMainCharacterPath));
-    if (mainCharacterPath) {
-      mainCharacterPath.visible = mainTextPathVisible;
-      fabricCanvasRef.current.renderAll();
-    }
-  }, [mainTextPathVisible]);
+    // Initialize the gesture line in state
+    setAnimatedGestureLines((prev) => [
+      ...prev.filter((line) => line.order !== gestureLineId),
+      {
+        order: gestureLineId,
+        points: [],
+        color: gesture.brush_color,
+        width: gesture.brush_width
+      }
+    ]);
 
-  // Removed useEffect for setupGestureRecording as it will be called directly in startRecording
+    // Use the framework-agnostic animation helper
+    await animateGesture(gesture, (frame) => {
+      // Convert points to flat array for Konva Line component
+      const flatPoints = frame.partialPoints.flatMap((p) => [p.x, p.y]);
+
+      setAnimatedGestureLines((prev) =>
+        prev.map((line) => (line.order === gestureLineId ? { ...line, points: flatPoints } : line))
+      );
+    });
+  };
+
+  // No manual canvas initialization needed with Konva
+
+  // Text path visibility is now handled declaratively via mainTextPathVisible state
+
+  // Gesture recording is now handled via Stage mouse events
 
   useEffect(() => {
     if (text.trim().length === 0) return;
@@ -338,6 +293,49 @@ function AddEditTextData({
   }, [text, scaleDownFactor]);
 
   const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);
+
+  // Mouse event handlers for gesture recording
+  const handleStageMouseDown = (e: any) => {
+    if (!isRecording || !selectedGesture) return;
+
+    setIsDrawing(true);
+    setRecordingStartTime(Date.now());
+
+    const pos = e.target.getStage().getPointerPosition();
+    const point: GesturePoint = {
+      x: pos.x,
+      y: pos.y,
+      timestamp: 0,
+      cmd: 'M'
+    };
+
+    setTempPoints([point]);
+    setCurrentDrawingPoints([pos.x, pos.y]);
+  };
+
+  const handleStageMouseMove = (e: any) => {
+    if (!isRecording || !isDrawing || !selectedGesture) return;
+
+    const pos = e.target.getStage().getPointerPosition();
+    const currentTime = Date.now();
+
+    const point: GesturePoint = {
+      x: pos.x,
+      y: pos.y,
+      timestamp: currentTime - recordingStartTime,
+      cmd: 'L'
+    };
+
+    setTempPoints((prev) => [...prev, point]);
+    setCurrentDrawingPoints((prev) => [...prev, pos.x, pos.y]);
+  };
+
+  const handleStageMouseUp = () => {
+    if (!isRecording || !isDrawing) return;
+
+    setIsDrawing(false);
+    // Keep the temp points for user to save or discard
+  };
 
   return (
     <div className="space-y-4">
@@ -442,10 +440,7 @@ function AddEditTextData({
 
         {/* Gesture Controls */}
         {selectedGesture && (
-          <SelectedGestureControls
-            selectedGesture={selectedGesture}
-            fabricCanvasRef={fabricCanvasRef}
-          />
+          <SelectedGestureControls selectedGesture={selectedGesture} stageRef={stageRef} />
         )}
       </div>
       <div className="flex justify-center">
@@ -455,7 +450,15 @@ function AddEditTextData({
             isRecording ? 'border-destructive' : 'border-border'
           )}
         >
-          <canvas ref={canvasRef} />
+          <KonvaCanvas
+            ref={stageRef}
+            isRecording={isRecording}
+            isDrawing={isDrawing}
+            currentDrawingPoints={currentDrawingPoints}
+            onMouseDown={handleStageMouseDown}
+            onMouseMove={handleStageMouseMove}
+            onMouseUp={handleStageMouseUp}
+          />
         </div>
       </div>
     </div>
@@ -464,193 +467,35 @@ function AddEditTextData({
 
 const SelectedGestureControls = ({
   selectedGesture,
-  fabricCanvasRef
+  stageRef
 }: {
   selectedGesture: Gesture;
-  fabricCanvasRef: React.RefObject<Canvas | null>;
+  stageRef: React.RefObject<Konva.Stage | null>;
 }) => {
   const [isRecording, setIsRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
   const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
   const [selectedGestureOrder] = useAtom(selected_gesture_order_atom);
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
-  const [recordingStartTime, setRecordingStartTime] = useAtom(recording_start_time_atom);
-  const [, setCurrentPoints] = useAtom(current_points_atom);
-  const [characterPath] = useAtom(character_path_atom);
+  const [animatedGestureLines, setAnimatedGestureLines] = useAtom(animated_gesture_lines_atom);
 
-  // Function to approximate gesture points to the character path
-  const approximateToCharacterPath = (
-    gesturePoints: GesturePoint[],
-    charPath: fabric.Path
-  ): GesturePoint[] => {
-    // Get the path's bounding box
-    const pathBounds = charPath.getBoundingRect();
-    const pathCenter = {
-      x: pathBounds.left + pathBounds.width / 2,
-      y: pathBounds.top + pathBounds.height / 2
-    };
+  // Path approximation can be added later if needed
+  // For now, we'll use the raw gesture points
 
-    // Simple approximation: snap points that are close to the character path
-    const snapThreshold = 20; // pixels
+  // Recording is now handled by Stage mouse events in the parent component
 
-    return gesturePoints.map((point) => {
-      // Get the path outline points (simplified approach)
-      // In a production app, you'd use a more sophisticated algorithm
-      // to find the closest point on the actual path curve
-
-      // For now, we'll do a simple distance-based snapping
-      const distToCenter = Math.sqrt(
-        Math.pow(point.x - pathCenter.x, 2) + Math.pow(point.y - pathCenter.y, 2)
-      );
-
-      // If the point is within the character bounds, keep it closer to the path
-      if (
-        point.x >= pathBounds.left - snapThreshold &&
-        point.x <= pathBounds.left + pathBounds.width + snapThreshold &&
-        point.y >= pathBounds.top - snapThreshold &&
-        point.y <= pathBounds.top + pathBounds.height + snapThreshold
-      ) {
-        // This is a simplified approximation
-        // In reality, you'd want to find the nearest point on the actual path
-        return {
-          ...point,
-          // Add a slight magnetic effect towards the path
-          x: point.x,
-          y: point.y
-        };
-      }
-
-      return point;
-    });
-  };
-
-  const setupGestureRecording = () => {
-    if (!fabricCanvasRef.current || !selectedGesture) return;
-
-    const canvas = fabricCanvasRef.current;
-
-    // Enable free drawing mode
-    canvas.isDrawingMode = true;
-    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-    canvas.freeDrawingBrush.color = selectedGesture.brush_color;
-    canvas.freeDrawingBrush.width = selectedGesture.brush_width;
-
-    // Clear all previous listeners first
-    canvas.off('path:created', handlePathCreated);
-
-    canvas.on('path:created', handlePathCreated);
-  };
-
-  // Listen for path creation with proper closure
-  const handlePathCreated = (e: any) => {
-    if (!e.path) return;
-
-    console.log('Path created during recording');
-
-    // Mark the path as gesture visualization
-    e.path.set({
-      selectable: false,
-      evented: false,
-      [GESTURE_FLAGS.isGestureVisualization]: true
-    });
-
-    // Extract points from the path
-    const pathData = e.path.path;
-    const points: GesturePoint[] = [];
-    const baseTime = recordingStartTime;
-
-    // Convert SVG path commands to points
-    pathData.forEach((cmd: any, index: number) => {
-      if (cmd[0] === 'M' && cmd.length >= 3) {
-        points.push({
-          x: cmd[1],
-          y: cmd[2],
-          timestamp: index * 10,
-          cmd: 'M'
-        });
-      } else if (cmd[0] === 'L' && cmd.length >= 3) {
-        points.push({
-          x: cmd[1],
-          y: cmd[2],
-          timestamp: index * 10,
-          cmd: 'L'
-        });
-      } else if (cmd[0] === 'Q' && cmd.length >= 5) {
-        // Quadratic bezier. curve - store control and end point
-        points.push({
-          x: cmd[3],
-          y: cmd[4],
-          timestamp: index * 10,
-          cmd: 'Q',
-          cx: cmd[1],
-          cy: cmd[2]
-        });
-      }
-    });
-
-    // Syntax
-    // M x y : Move to x,y
-    // L x y : Line to x,y
-    // Q x1 y1 x2 y2 : Quadratic bezier curve to x2,y2 from x1,y1
-    // C x1 y1 x2 y2 x3 y3 : Cubic bezier curve to x3,y3 from x1,y1 via x2,y2
-
-    if (points.length > 1) {
-      // Apply path approximation if character path exists
-      const approximatedPoints = characterPath
-        ? approximateToCharacterPath(points, characterPath)
-        : points;
-
-      console.log('Adding points:', approximatedPoints.length, 'points');
-      setTempPoints(approximatedPoints);
-    }
-
-    // Disable drawing and keep recording UI active (user can Cancel or Done)
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.isDrawingMode = false;
-      // stop listening further until user taps Record Again
-      fabricCanvasRef.current.off('path:created', handlePathCreated);
-      fabricCanvasRef.current.renderAll();
-    }
-  };
+  // Path handling is now done directly via mouse events in the parent component
   const startRecording = () => {
-    if (!selectedGestureOrder || !fabricCanvasRef.current) return;
+    if (!selectedGestureOrder) return;
     setIsRecording(true);
-    setRecordingStartTime(Date.now());
     setTempPoints([]); // Clear temporary points
     clearGestureVisualization();
-
-    // Enable drawing mode by disabling object selection
-    fabricCanvasRef.current.forEachObject((obj) => {
-      obj.selectable = false;
-      obj.evented = false;
-    });
-
-    // Set up event handling
-    setupGestureRecording();
-    fabricCanvasRef.current.renderAll();
   };
 
   const stopRecording = () => {
     setIsRecording(false);
-    setCurrentPoints([]);
     setTempPoints([]); // Clear temp points without saving
     clearGestureVisualization(); // Clear all drawn paths
-
-    // Restore normal canvas behavior
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.isDrawingMode = false; // Disable drawing mode
-
-      // Remove path created listener
-      fabricCanvasRef.current.off('path:created', handlePathCreated);
-
-      fabricCanvasRef.current.forEachObject((obj) => {
-        if (!obj.get(GESTURE_FLAGS.isGestureVisualization)) {
-          obj.selectable = true;
-          obj.evented = false; // Keep character paths non-interactive
-        }
-      });
-      fabricCanvasRef.current.renderAll();
-    }
   };
 
   const saveRecording = () => {
@@ -676,37 +521,51 @@ const SelectedGestureControls = ({
     // Stop recording but keep the visualization
     setIsRecording(false);
 
-    // Disable drawing mode
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.isDrawingMode = false;
-      fabricCanvasRef.current.renderAll();
-    }
-
     toast.success(`Recorded ${pointCount} points for gesture`);
   };
 
   const clearGestureVisualization = () => {
-    if (!fabricCanvasRef.current) return;
-
-    // Remove only gesture visualization objects (lines), keep the character path
-    fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get(GESTURE_FLAGS.isGestureVisualization)) {
-        fabricCanvasRef.current!.remove(obj);
-      }
-    });
-    fabricCanvasRef.current.renderAll();
+    // Clear animated gesture lines from state
+    setAnimatedGestureLines([]);
   };
 
   const playGesture = async (gestureOrder: number) => {
     const gesture = gestureData.find((g) => g.order === gestureOrder);
-    if (!gesture || !fabricCanvasRef.current) return;
+    if (!gesture) return;
 
     setIsPlaying(true);
     clearGestureVisualization();
 
-    await playGestureWithoutClear(gesture, fabricCanvasRef);
+    // Use the Konva animation function from parent scope
+    await playGestureWithKonva(gesture);
 
     setIsPlaying(false);
+  };
+
+  // Local Konva gesture animation using framework-agnostic helper
+  const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {
+    const gestureLineId = gesture.order;
+
+    // Initialize the gesture line in state
+    setAnimatedGestureLines((prev) => [
+      ...prev.filter((line) => line.order !== gestureLineId),
+      {
+        order: gestureLineId,
+        points: [],
+        color: gesture.brush_color,
+        width: gesture.brush_width
+      }
+    ]);
+
+    // Use the framework-agnostic animation helper
+    await animateGesture(gesture, (frame) => {
+      // Convert points to flat array for Konva Line component
+      const flatPoints = frame.partialPoints.flatMap((p) => [p.x, p.y]);
+
+      setAnimatedGestureLines((prev) =>
+        prev.map((line) => (line.order === gestureLineId ? { ...line, points: flatPoints } : line))
+      );
+    });
   };
 
   const clearCurrentGesturePoints = () => {
@@ -719,16 +578,7 @@ const SelectedGestureControls = ({
     clearGestureVisualization();
   };
 
-  // Update brush settings when selected gesture changes during recording
-  useEffect(() => {
-    if (isRecording && selectedGesture && fabricCanvasRef.current) {
-      const canvas = fabricCanvasRef.current;
-      if (canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush.color = selectedGesture.brush_color;
-        canvas.freeDrawingBrush.width = selectedGesture.brush_width;
-      }
-    }
-  }, [selectedGesture?.brush_color, selectedGesture?.brush_width, isRecording]);
+  // Brush settings are now handled declaratively via state
 
   return (
     <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
@@ -754,20 +604,14 @@ const SelectedGestureControls = ({
             </Button>
           ) : (
             <>
-              {/* Record Again (re-enable drawing). Shown only during recording */}
+              {/* Record Again (clear temp points to start fresh). Shown only during recording */}
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  if (!fabricCanvasRef.current) return;
-                  // clear previous temp points but keep visualization clearing to start fresh
+                  // Clear previous temp points to start fresh
                   setTempPoints([]);
                   clearGestureVisualization(); // Clear canvas for fresh start
-                  // Re-enable drawing and reattach listener
-                  fabricCanvasRef.current.isDrawingMode = true;
-                  fabricCanvasRef.current.off('path:created', handlePathCreated);
-                  fabricCanvasRef.current.on('path:created', handlePathCreated);
-                  fabricCanvasRef.current.renderAll();
                 }}
                 disabled={tempPoints.length === 0}
               >
@@ -960,10 +804,10 @@ function SortableGestureItem({
 }
 
 const SaveEditMode = ({
-  fabricCanvasRef,
+  stageRef,
   text_data
 }: {
-  fabricCanvasRef: React.RefObject<Canvas | null>;
+  stageRef: React.RefObject<Konva.Stage | null>;
   text_data: text_data_type;
 }) => {
   const text = useAtomValue(text_atom);
@@ -993,32 +837,10 @@ const SaveEditMode = ({
   });
 
   const handle_save = () => {
-    if (text.trim().length === 0 || !fabricCanvasRef.current) return;
+    if (text.trim().length === 0) return;
 
-    // Temporarily hide gesture visualization objects
-    const gestureObjects = fabricCanvasRef.current
-      .getObjects()
-      .filter((obj) => obj.get('isGestureVisualization'));
-    gestureObjects.forEach((obj) => {
-      fabricCanvasRef.current?.remove(obj);
-    });
-
-    // make character path visible if hidden
-    const mainCharacterPath = fabricCanvasRef.current
-      .getObjects()
-      .find((obj) => obj.get(GESTURE_FLAGS.isMainCharacterPath));
-    if (mainCharacterPath) {
-      mainCharacterPath.visible = true;
-    }
-
-    // Get JSON with only text path objects
-    const fabricjs_svg_dump = fabricCanvasRef.current.toJSON();
-
-    // Restore gesture visualization objects
-    gestureObjects.forEach((obj) => {
-      fabricCanvasRef.current?.add(obj);
-    });
-    fabricCanvasRef.current.renderAll();
+    // With Konva, we don't need to manipulate canvas objects for saving
+    // The gesture data is already stored in state and ready to save
 
     if (is_addition) {
       add_text_data_mut.mutate({

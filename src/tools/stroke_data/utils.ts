@@ -1,7 +1,4 @@
 import type { Gesture, GesturePoint } from './types';
-import { Canvas } from 'fabric';
-import * as fabric from 'fabric';
-import { GESTURE_FLAGS } from './types';
 
 // Utility: sample a stroke (with optional quadratic segments) into a polyline for playback
 export function sampleGestureToPolyline(
@@ -35,71 +32,33 @@ export function sampleGestureToPolyline(
   return sampled;
 }
 
-export function buildSvgPathFromGesturePoints(points: Gesture['points']): string {
-  let path = '';
-  points.forEach((pt, idx) => {
-    // First point must always start with a move command
-    if (idx === 0 || pt.cmd === 'M') {
-      path += `M ${pt.x} ${pt.y}`;
-      return;
-    }
-
-    if (pt.cmd === 'L') {
-      path += ` L ${pt.x} ${pt.y}`;
-    } else if (pt.cmd === 'Q' && typeof pt.cx === 'number' && typeof pt.cy === 'number') {
-      path += ` Q ${pt.cx} ${pt.cy} ${pt.x} ${pt.y}`;
-    } else {
-      // Fallback to a simple line if command is unknown
-      path += ` L ${pt.x} ${pt.y}`;
-    }
-  });
-  return path;
+// Framework-agnostic gesture animation data generator
+export interface GestureAnimationFrame {
+  step: number;
+  totalSteps: number;
+  progress: number;
+  pointIndex: number;
+  partialPoints: { x: number; y: number }[];
+  partialSvgPath: string;
+  isComplete: boolean;
 }
 
-export const playGestureWithoutClear = async (
+export function* generateGestureAnimationFrames(
   gesture: Gesture,
-  fabricCanvasRef: React.RefObject<Canvas | null>,
-  extraFlags: Record<string, any> = {}
-) => {
-  if (!fabricCanvasRef.current) return;
+  maxSteps: number = 50
+): Generator<GestureAnimationFrame> {
+  if (!gesture.points.length) return;
 
-  // Create a path for smooth animation (sample curves to polyline)
   const sampledPoints = sampleGestureToPolyline(gesture);
-
-  // Build the full SVG path respecting the original stroke commands (M, L, Q)
-  const pathString = buildSvgPathFromGesturePoints(gesture.points);
-
-  // Create the full path but make it invisible initially
-  const fullPath = new fabric.Path(pathString, {
-    stroke: gesture.brush_color,
-    strokeWidth: gesture.brush_width,
-    fill: '',
-    selectable: false,
-    evented: false,
-    [GESTURE_FLAGS.isGestureVisualization]: true,
-    opacity: 0,
-    ...extraFlags
-  } as any);
-
-  fabricCanvasRef.current.add(fullPath);
-
-  // Animate the path drawing
   const totalPoints = sampledPoints.length;
-  const animationSteps = Math.min(totalPoints * 2, 50); // More steps for smoother animation
+  const animationSteps = Math.min(totalPoints * 2, maxSteps);
 
   for (let step = 1; step <= animationSteps; step++) {
     const progress = step / animationSteps;
     const pointIndex = Math.floor(progress * (totalPoints - 1));
 
-    // Create partial path up to current point
-    let partialPath = '';
-    for (let i = 0; i <= pointIndex; i++) {
-      if (i === 0) {
-        partialPath += `M ${sampledPoints[i].x} ${sampledPoints[i].y}`;
-      } else {
-        partialPath += ` L ${sampledPoints[i].x} ${sampledPoints[i].y}`;
-      }
-    }
+    // Get partial points up to current position
+    const partialPoints = sampledPoints.slice(0, pointIndex + 1);
 
     // Add interpolated point for smooth animation
     if (pointIndex < totalPoints - 1) {
@@ -110,19 +69,48 @@ export const playGestureWithoutClear = async (
       const interpolatedX = currentPoint.x + (nextPoint.x - currentPoint.x) * subProgress;
       const interpolatedY = currentPoint.y + (nextPoint.y - currentPoint.y) * subProgress;
 
-      partialPath += ` L ${interpolatedX} ${interpolatedY}`;
+      partialPoints.push({ x: interpolatedX, y: interpolatedY });
     }
 
-    // Update the path
-    fullPath.set('path', fabric.util.parsePath(partialPath));
-    fullPath.set('opacity', 1);
-    fabricCanvasRef.current.renderAll();
+    // Build SVG path for current frame
+    let partialSvgPath = '';
+    partialPoints.forEach((point, i) => {
+      if (i === 0) {
+        partialSvgPath += `M ${point.x} ${point.y}`;
+      } else {
+        partialSvgPath += ` L ${point.x} ${point.y}`;
+      }
+    });
 
-    // Wait based on animation duration
-    const delay = gesture.animation_duration / animationSteps;
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    yield {
+      step,
+      totalSteps: animationSteps,
+      progress,
+      pointIndex,
+      partialPoints,
+      partialSvgPath,
+      isComplete: step === animationSteps
+    };
   }
-};
+}
+
+// Simple promise-based animation helper
+export async function animateGesture(
+  gesture: Gesture,
+  onFrame: (frame: GestureAnimationFrame) => void,
+  maxSteps: number = 50
+): Promise<void> {
+  const generator = generateGestureAnimationFrames(gesture, maxSteps);
+  const stepDuration = gesture.animation_duration / maxSteps;
+
+  for (const frame of generator) {
+    onFrame(frame);
+
+    if (!frame.isComplete) {
+      await new Promise((resolve) => setTimeout(resolve, stepDuration));
+    }
+  }
+}
 
 // better
 export const evaluateStrokeAccuracy = (

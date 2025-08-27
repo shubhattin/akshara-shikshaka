@@ -82,12 +82,10 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       for (let i = 0; i < drawingPoints.length; i += 2) {
         const x = drawingPoints[i];
         const y = drawingPoints[i + 1];
-        const timestamp = (i / 2) * 10; // Approximate timing
 
         gesturePoints.push({
           x,
           y,
-          timestamp,
           cmd: i === 0 ? 'M' : 'L'
         });
       }

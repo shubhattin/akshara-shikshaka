@@ -1,7 +1,7 @@
 import type { Gesture, GesturePoint } from './types';
 
 // Utility: sample a stroke (with optional quadratic segments) into a polyline for playback
-export function sampleGestureToPolyline(
+function sampleGestureToPolyline(
   stroke: Gesture,
   samplesPerSegment = 12
 ): { x: number; y: number }[] {

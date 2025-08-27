@@ -3,7 +3,6 @@ import { z } from 'zod';
 export const StrokePointSchema = z.object({
   x: z.number(),
   y: z.number(),
-  timestamp: z.number(),
   cmd: z.enum(['M', 'L', 'Q']),
   cx: z.number().optional(),
   cy: z.number().optional()

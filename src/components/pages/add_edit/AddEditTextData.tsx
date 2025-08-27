@@ -305,7 +305,6 @@ function AddEditTextData({
     const point: GesturePoint = {
       x: pos.x,
       y: pos.y,
-      timestamp: 0,
       cmd: 'M'
     };
 
@@ -317,12 +316,10 @@ function AddEditTextData({
     if (!isRecording || !isDrawing || !selectedGesture) return;
 
     const pos = e.target.getStage().getPointerPosition();
-    const currentTime = Date.now();
 
     const point: GesturePoint = {
       x: pos.x,
       y: pos.y,
-      timestamp: currentTime - recordingStartTime,
       cmd: 'L'
     };
 

@@ -12,7 +12,10 @@ import {
   animated_gesture_lines_atom,
   temp_points_atom,
   selected_gesture_order_atom,
-  gesture_data_atom
+  gesture_data_atom,
+  is_recording_atom,
+  is_drawing_atom,
+  current_drawing_points_atom
 } from './shared-state';
 
 // Utility function to calculate SVG path bounding box
@@ -42,16 +45,13 @@ function getSVGPathBounds(pathData: string) {
 }
 
 interface KonvaCanvasProps {
-  isRecording: boolean;
-  isDrawing: boolean;
-  currentDrawingPoints: number[];
   onMouseDown: (e: any) => void;
   onMouseMove: (e: any) => void;
   onMouseUp: (e: any) => void;
 }
 
 const KonvaCanvas = forwardRef<Konva.Stage, KonvaCanvasProps>(
-  ({ isRecording, isDrawing, currentDrawingPoints, onMouseDown, onMouseMove, onMouseUp }, ref) => {
+  ({ onMouseDown, onMouseMove, onMouseUp }, ref) => {
     // Canvas state from atoms
     const characterSvgPath = useAtomValue(character_svg_path_atom);
     const mainTextPathVisible = useAtomValue(main_text_path_visible_atom);
@@ -60,6 +60,9 @@ const KonvaCanvas = forwardRef<Konva.Stage, KonvaCanvasProps>(
     const tempPoints = useAtomValue(temp_points_atom);
     const selectedGestureOrder = useAtomValue(selected_gesture_order_atom);
     const gestureData = useAtomValue(gesture_data_atom);
+    const isRecording = useAtomValue(is_recording_atom);
+    const isDrawing = useAtomValue(is_drawing_atom);
+    const currentDrawingPoints = useAtomValue(current_drawing_points_atom);
 
     // Get selected gesture for drawing style
     const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);

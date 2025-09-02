@@ -50,7 +50,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
 import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
@@ -69,7 +69,9 @@ import {
   character_svg_path_atom,
   main_text_path_visible_atom,
   animated_gesture_lines_atom,
-  DEFAULTS
+  DEFAULTS,
+  is_drawing_atom,
+  current_drawing_points_atom
 } from './shared-state';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
@@ -115,7 +117,9 @@ export default function AddEditTextDataWrapper(props: Props) {
     [gesture_data_atom, props.text_data.gestures ?? []],
     [selected_gesture_order_atom, null],
     [is_recording_atom, false],
-    [is_playing_atom, false]
+    [is_playing_atom, false],
+    [is_drawing_atom, false],
+    [current_drawing_points_atom, []]
   ]);
   const stageRef = useRef<Konva.Stage>(null);
 
@@ -142,16 +146,16 @@ function AddEditTextData({
   // Gesture Recording State
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
   const [selectedGestureOrder, setSelectedGestureOrder] = useAtom(selected_gesture_order_atom);
-  const [isRecording, setIsRecording] = useAtom(is_recording_atom);
+  const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
-  const [, setCharacterSvgPath] = useAtom(character_svg_path_atom);
-  const [, setAnimatedGestureLines] = useAtom(animated_gesture_lines_atom);
-  const [, setTempPoints] = useAtom(temp_points_atom);
-  const [recordingStartTime, setRecordingStartTime] = useAtom(recording_start_time_atom);
+  const setCharacterSvgPath = useSetAtom(character_svg_path_atom);
+  const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
+  const setTempPoints = useSetAtom(temp_points_atom);
+  const setRecordingStartTime = useSetAtom(recording_start_time_atom);
 
   // Recording state for current drawing
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentDrawingPoints, setCurrentDrawingPoints] = useState<number[]>([]);
+  const [isDrawing, setIsDrawing] = useAtom(is_drawing_atom);
+  const setCurrentDrawingPoints = useSetAtom(current_drawing_points_atom);
 
   // Drag and Drop Sensors
   const sensors = useSensors(
@@ -447,9 +451,6 @@ function AddEditTextData({
         >
           <KonvaCanvas
             ref={stageRef}
-            isRecording={isRecording}
-            isDrawing={isDrawing}
-            currentDrawingPoints={currentDrawingPoints}
             onMouseDown={handleStageMouseDown}
             onMouseMove={handleStageMouseMove}
             onMouseUp={handleStageMouseUp}
@@ -472,7 +473,7 @@ const SelectedGestureControls = ({
   const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
   const [selectedGestureOrder] = useAtom(selected_gesture_order_atom);
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
-  const [animatedGestureLines, setAnimatedGestureLines] = useAtom(animated_gesture_lines_atom);
+  const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
 
   // Path approximation can be added later if needed
   // For now, we'll use the raw gesture points

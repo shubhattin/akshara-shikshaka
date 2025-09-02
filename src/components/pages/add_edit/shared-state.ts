@@ -15,12 +15,14 @@ export const scale_down_factor_atom = atom(DEFAULT_SCALE_DOWN_FACTOR);
 // Gesture data and selection
 export const gesture_data_atom = atom<Gesture[]>([]);
 export const selected_gesture_order_atom = atom<string | null>(null);
+export const current_drawing_points_atom = atom<number[]>([]);
 
 // Recording and playback state
 export const is_recording_atom = atom(false);
 export const is_playing_atom = atom(false);
 export const recording_start_time_atom = atom<number>(0);
 export const temp_points_atom = atom<GesturePoint[]>([]);
+export const is_drawing_atom = atom(false);
 
 // Character rendering state
 export const character_svg_path_atom = atom<string>('');

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
-export const StrokePointSchema = z.object({
-  x: z.number(),
-  y: z.number()
-});
+export const StrokePointSchema = z
+  .object({
+    x: z.number(),
+    y: z.number()
+  })
+  .strict();
 
 export const GestureSchema = z.object({
   order: z.number(),

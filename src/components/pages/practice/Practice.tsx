@@ -191,6 +191,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   // Handle user gesture drawing from Konva canvas
+  // Handle user gesture drawing from Konva canvas
   const handleUserStroke = async (userPoints: GesturePoint[]) => {
     const currentGesture = gestureData[currentGestureIndex];
     if (!currentGesture) return;
@@ -210,8 +211,15 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       }
     ]);
 
-    // Evaluate gesture accuracy
-    const accuracy = evaluateStrokeAccuracy(userPoints, currentGesture.points);
+    // Evaluate gesture accuracy with error handling
+    let accuracy = 0;
+    try {
+      accuracy = evaluateStrokeAccuracy(userPoints, currentGesture.points);
+    } catch (error) {
+      console.error('Error evaluating stroke accuracy:', error);
+      // Treat evaluation errors as failed attempts
+      accuracy = 0;
+    }
 
     if (accuracy > 0.7) {
       // completeCurrentGesture

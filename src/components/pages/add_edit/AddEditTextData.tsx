@@ -398,7 +398,7 @@ function AddEditTextData({
             >
               <div className="flex flex-col gap-2">
                 {gestureData.map((gesture) => (
-                  <SortableGestureItem key={gesture.order} gestureOrder={gesture.order} />
+                  <SortableGestureItem key={gesture.order} gesture={gesture} />
                 ))}
               </div>
             </SortableContext>
@@ -407,7 +407,10 @@ function AddEditTextData({
 
         {/* Gesture Controls */}
         {selectedGesture && (
-          <SelectedGestureControls selectedGesture={selectedGesture} stageRef={stageRef} />
+          <SelectedGestureControls
+            selectedGesture={selectedGesture}
+            playGestureWithKonva={playGestureWithKonva}
+          />
         )}
       </div>
       <div className="flex justify-center">
@@ -426,10 +429,10 @@ function AddEditTextData({
 
 const SelectedGestureControls = ({
   selectedGesture,
-  stageRef
+  playGestureWithKonva
 }: {
   selectedGesture: Gesture;
-  stageRef: React.RefObject<Konva.Stage | null>;
+  playGestureWithKonva: (gesture: Gesture) => Promise<void>;
 }) => {
   const [isRecording, setIsRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
@@ -496,32 +499,6 @@ const SelectedGestureControls = ({
     await playGestureWithKonva(gesture);
 
     setIsPlaying(false);
-  };
-
-  // Local Konva gesture animation using framework-agnostic helper
-  const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {
-    const gestureLineId = gesture.order;
-
-    // Initialize the gesture line in state
-    setAnimatedGestureLines((prev) => [
-      ...prev.filter((line) => line.order !== gestureLineId),
-      {
-        order: gestureLineId,
-        points: [],
-        color: gesture.brush_color,
-        width: gesture.brush_width
-      }
-    ]);
-
-    // Use the framework-agnostic animation helper
-    await animateGesture(gesture, (frame) => {
-      // Convert points to flat array for Konva Line component
-      const flatPoints = frame.partialPoints.flatMap((p) => [p.x, p.y]);
-
-      setAnimatedGestureLines((prev) =>
-        prev.map((line) => (line.order === gestureLineId ? { ...line, points: flatPoints } : line))
-      );
-    });
   };
 
   const clearCurrentGesturePoints = () => {
@@ -688,17 +665,14 @@ const SelectedGestureControls = ({
 
 // Sortable Gesture Item Component
 type SortableGestureItemProps = {
-  gestureOrder: number;
+  gesture: Gesture;
 };
 
-function SortableGestureItem({ gestureOrder }: SortableGestureItemProps) {
+function SortableGestureItem({ gesture }: SortableGestureItemProps) {
   const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying] = useAtom(is_playing_atom);
   const [selectedGestureOrder, setSelectedGestureOrder] = useAtom(selected_gesture_order_atom);
-  const setGestureData = useSetAtom(gesture_data_atom);
   const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
-  const gestureData = useAtomValue(gesture_data_atom);
-  const gesture = gestureData.find((g) => g.order === gestureOrder)!;
 
   const disabled = isRecording || isPlaying;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -721,7 +695,10 @@ function SortableGestureItem({ gestureOrder }: SortableGestureItemProps) {
   };
 
   const deleteGesture = (gestureOrder: number) => {
-    setGestureData((prev: Gesture[]) => prev.filter((g) => g.order !== gestureOrder));
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+      id: gesture.order.toString(),
+      disabled: disabled
+    });
     if (selectedGestureOrder === gestureOrder.toString()) {
       setSelectedGestureOrder(null);
     }

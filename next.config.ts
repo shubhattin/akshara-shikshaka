@@ -22,9 +22,21 @@ const nextConfig: NextConfig = {
       };
     }
 
-    // Mark canvas as external to prevent bundling
-    config.externals = config.externals || [];
-    config.externals.push('canvas');
+    // Mark canvas as external only on the server, and handle both array/function shapes
+    if (isServer) {
+      const ext = config.externals;
+      if (Array.isArray(ext)) {
+        ext.push('canvas');
+      } else if (typeof ext === 'function') {
+        const orig = ext;
+        config.externals = async (ctx: any, req: any, cb: any) => {
+          if (req === 'canvas') return cb(null, 'commonjs canvas');
+          return orig(ctx, req, cb);
+        };
+      } else {
+        config.externals = ['canvas'];
+      }
+    }
 
     return config;
   }

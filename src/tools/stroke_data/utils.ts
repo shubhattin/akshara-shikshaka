@@ -68,8 +68,12 @@ export async function animateGesture(
   onFrame: (frame: GestureAnimationFrame) => void,
   maxSteps: number = 50
 ): Promise<void> {
+  if (maxSteps <= 0) {
+    throw new Error('maxSteps must be greater than 0');
+  }
+
   const generator = generateGestureAnimationFrames(gesture, maxSteps);
-  const stepDuration = gesture.animation_duration / maxSteps;
+  const stepDuration = Math.max(0, (gesture.animation_duration || 0) / maxSteps);
 
   for (const frame of generator) {
     onFrame(frame);

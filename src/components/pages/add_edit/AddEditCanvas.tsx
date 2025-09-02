@@ -127,8 +127,8 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
       height={CANVAS_DIMS.height}
       ref={ref}
       onMouseDown={onMouseDown}
-      onMousemove={onMouseMove}
-      onMouseup={onMouseUp}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
       onTouchStart={onMouseDown}
       onTouchMove={onMouseMove}
       onTouchEnd={onMouseUp}

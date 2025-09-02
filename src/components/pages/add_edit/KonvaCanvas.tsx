@@ -17,7 +17,7 @@ import {
   is_drawing_atom,
   current_drawing_points_atom,
   recording_start_time_atom
-} from './shared-state';
+} from './add_edit_state';
 
 // Utility function to calculate SVG path bounding box
 function getSVGPathBounds(pathData: string) {

@@ -72,7 +72,7 @@ import {
   current_drawing_points_atom,
   not_to_clear_gestures_order_atom,
   temp_points_atom
-} from './shared-state';
+} from './add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues

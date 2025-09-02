@@ -30,7 +30,7 @@ import {
   scaling_factor_atom,
   mounted_atom,
   animated_gesture_lines_atom
-} from './shared-state';
+} from './practice_state';
 
 // Dynamic import for PracticeKonvaCanvas to avoid SSR issues
 const PracticeKonvaCanvas = dynamic(() => import('./PracticeKonvaCanvas'), {

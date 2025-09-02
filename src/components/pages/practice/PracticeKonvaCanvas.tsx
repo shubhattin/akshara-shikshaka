@@ -12,7 +12,7 @@ import {
   drawing_points_atom,
   is_recording_stroke_atom,
   is_drawing_atom
-} from './shared-state';
+} from './practice_state';
 
 interface PracticeKonvaCanvasProps {
   gestureData: Gesture[];

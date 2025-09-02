@@ -22,27 +22,25 @@ import { cn } from '~/lib/utils';
 
 // Utility function to calculate SVG path bounding box
 function getSVGPathBounds(pathData: string) {
+  let svg: SVGSVGElement | null = null;
   try {
-    // Create a temporary SVG element to get path bounds
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    // render offscreen; getBBox requires element to be in the DOM and visible
+    (svg.style as CSSStyleDeclaration).position = 'absolute';
+    (svg.style as CSSStyleDeclaration).left = '-9999px';
+    (svg.style as CSSStyleDeclaration).top = '-9999px';
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', pathData);
     svg.appendChild(path);
     document.body.appendChild(svg);
 
     const bbox = path.getBBox();
-    document.body.removeChild(svg);
-
-    return {
-      x: bbox.x,
-      y: bbox.y,
-      width: bbox.width,
-      height: bbox.height
-    };
+    return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height };
   } catch (error) {
     console.warn('Failed to calculate path bounds:', error);
-    // Fallback bounds
     return { x: 0, y: 0, width: 100, height: 100 };
+  } finally {
+    if (svg && svg.parentNode) svg.parentNode.removeChild(svg);
   }
 }
 

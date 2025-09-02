@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Slider } from '~/components/ui/slider';
-import dynamic from 'next/dynamic';
 import type Konva from 'konva';
 import { client_q } from '~/api/client';
 import { useRouter } from 'next/navigation';
@@ -64,15 +64,16 @@ import {
   selected_gesture_order_atom,
   is_recording_atom,
   is_playing_atom,
-  recording_start_time_atom,
-  temp_points_atom,
   character_svg_path_atom,
   main_text_path_visible_atom,
   animated_gesture_lines_atom,
   DEFAULTS,
   is_drawing_atom,
-  current_drawing_points_atom
+  current_drawing_points_atom,
+  not_to_clear_gestures_order_atom,
+  temp_points_atom
 } from './shared-state';
+import { Checkbox } from '~/components/ui/checkbox';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
 const KonvaCanvas = dynamic(() => import('./KonvaCanvas'), {
@@ -82,10 +83,31 @@ const KonvaCanvas = dynamic(() => import('./KonvaCanvas'), {
       className="flex items-center justify-center rounded-lg border-2 bg-gray-50"
       style={{ width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }}
     >
-      <div className="text-gray-500">Loading canvas...</div>
+      <div className="text-gray-500">Loading...</div>
     </div>
   )
 });
+
+// Client-side only wrapper to prevent hydration mismatches
+const ClientOnly = ({
+  children,
+  fallback = null
+}: {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+}) => {
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return <>{fallback}</>;
+  }
+
+  return <>{children}</>;
+};
 
 type text_data_type = {
   text: string;
@@ -145,17 +167,12 @@ function AddEditTextData({
 
   // Gesture Recording State
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
+
   const [selectedGestureOrder, setSelectedGestureOrder] = useAtom(selected_gesture_order_atom);
   const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
   const setCharacterSvgPath = useSetAtom(character_svg_path_atom);
   const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
-  const setTempPoints = useSetAtom(temp_points_atom);
-  const setRecordingStartTime = useSetAtom(recording_start_time_atom);
-
-  // Recording state for current drawing
-  const [isDrawing, setIsDrawing] = useAtom(is_drawing_atom);
-  const setCurrentDrawingPoints = useSetAtom(current_drawing_points_atom);
 
   // Drag and Drop Sensors
   const sensors = useSensors(
@@ -234,13 +251,6 @@ function AddEditTextData({
     setSelectedGestureOrder(newGesture.order.toString());
   };
 
-  const deleteGesture = (gestureOrder: number) => {
-    setGestureData((prev: Gesture[]) => prev.filter((g) => g.order !== gestureOrder));
-    if (selectedGestureOrder === gestureOrder.toString()) {
-      setSelectedGestureOrder(null);
-    }
-  };
-
   const clearGestureVisualization = () => {
     // Clear animated gesture lines from state
     setAnimatedGestureLines([]);
@@ -297,44 +307,6 @@ function AddEditTextData({
   }, [text, scaleDownFactor]);
 
   const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);
-
-  // Mouse event handlers for gesture recording
-  const handleStageMouseDown = (e: any) => {
-    if (!isRecording || !selectedGesture) return;
-
-    setIsDrawing(true);
-    setRecordingStartTime(Date.now());
-
-    const pos = e.target.getStage().getPointerPosition();
-    const point: GesturePoint = {
-      x: pos.x,
-      y: pos.y
-    };
-
-    setTempPoints([point]);
-    setCurrentDrawingPoints([pos.x, pos.y]);
-  };
-
-  const handleStageMouseMove = (e: any) => {
-    if (!isRecording || !isDrawing || !selectedGesture) return;
-
-    const pos = e.target.getStage().getPointerPosition();
-
-    const point: GesturePoint = {
-      x: pos.x,
-      y: pos.y
-    };
-
-    setTempPoints((prev) => [...prev, point]);
-    setCurrentDrawingPoints((prev) => [...prev, pos.x, pos.y]);
-  };
-
-  const handleStageMouseUp = () => {
-    if (!isRecording || !isDrawing) return;
-
-    setIsDrawing(false);
-    // Keep the temp points for user to save or discard
-  };
 
   return (
     <div className="space-y-4">
@@ -414,28 +386,24 @@ function AddEditTextData({
         )}
 
         {/* Gesture List */}
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext
-            items={gestureData.map((g) => g.order.toString())}
-            strategy={verticalListSortingStrategy}
+        <ClientOnly>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            <div className="flex flex-col gap-2">
-              {gestureData.map((gesture) => (
-                <SortableGestureItem
-                  key={gesture.order}
-                  gesture={gesture}
-                  selectedGestureId={selectedGestureOrder}
-                  onSelect={(gestureId) => {
-                    clearGestureVisualization();
-                    setSelectedGestureOrder(gestureId);
-                  }}
-                  onDelete={deleteGesture}
-                  disabled={isRecording || isPlaying}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+            <SortableContext
+              items={gestureData.map((g) => g.order.toString())}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="flex flex-col gap-2">
+                {gestureData.map((gesture) => (
+                  <SortableGestureItem key={gesture.order} gestureOrder={gesture.order} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </ClientOnly>
 
         {/* Gesture Controls */}
         {selectedGesture && (
@@ -449,12 +417,7 @@ function AddEditTextData({
             isRecording ? 'border-destructive' : 'border-border'
           )}
         >
-          <KonvaCanvas
-            ref={stageRef}
-            onMouseDown={handleStageMouseDown}
-            onMouseMove={handleStageMouseMove}
-            onMouseUp={handleStageMouseUp}
-          />
+          <KonvaCanvas ref={stageRef} />
         </div>
       </div>
     </div>
@@ -474,9 +437,6 @@ const SelectedGestureControls = ({
   const [selectedGestureOrder] = useAtom(selected_gesture_order_atom);
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
   const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
-
-  // Path approximation can be added later if needed
-  // For now, we'll use the raw gesture points
 
   // Recording is now handled by Stage mouse events in the parent component
 
@@ -728,22 +688,21 @@ const SelectedGestureControls = ({
 
 // Sortable Gesture Item Component
 type SortableGestureItemProps = {
-  gesture: Gesture;
-  selectedGestureId: string | null;
-  onSelect: (gestureId: string | null) => void;
-  onDelete: (gestureOrder: number) => void;
-  disabled?: boolean;
+  gestureOrder: number;
 };
 
-function SortableGestureItem({
-  gesture,
-  selectedGestureId,
-  onSelect,
-  onDelete,
-  disabled = false
-}: SortableGestureItemProps) {
+function SortableGestureItem({ gestureOrder }: SortableGestureItemProps) {
+  const [isRecording] = useAtom(is_recording_atom);
+  const [isPlaying] = useAtom(is_playing_atom);
+  const [selectedGestureOrder, setSelectedGestureOrder] = useAtom(selected_gesture_order_atom);
+  const setGestureData = useSetAtom(gesture_data_atom);
+  const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
+  const gestureData = useAtomValue(gesture_data_atom);
+  const gesture = gestureData.find((g) => g.order === gestureOrder)!;
+
+  const disabled = isRecording || isPlaying;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: gesture.order.toString(),
+    id: `gesture-${gesture.order}`,
     disabled: disabled
   });
 
@@ -752,6 +711,35 @@ function SortableGestureItem({
     transition,
     opacity: isDragging ? 0.5 : 1
   };
+  const [notToClearGesturesOrder, setNotToClearGesturesOrder] = useAtom(
+    not_to_clear_gestures_order_atom
+  );
+
+  const clearGestureVisualization = () => {
+    // Clear animated gesture lines from state
+    setAnimatedGestureLines([]);
+  };
+
+  const deleteGesture = (gestureOrder: number) => {
+    setGestureData((prev: Gesture[]) => prev.filter((g) => g.order !== gestureOrder));
+    if (selectedGestureOrder === gestureOrder.toString()) {
+      setSelectedGestureOrder(null);
+    }
+  };
+
+  const onSelect = (gestureOrder: string | null) => {
+    clearGestureVisualization();
+    setSelectedGestureOrder(gestureOrder);
+  };
+
+  const onSelectCurrent = () => {
+    clearGestureVisualization();
+    if (selectedGestureOrder === gesture.order.toString()) {
+      onSelect(null);
+    } else {
+      onSelect(gesture.order.toString());
+    }
+  };
 
   return (
     <div
@@ -759,18 +747,14 @@ function SortableGestureItem({
       style={style}
       className={cn(
         'flex cursor-pointer items-center gap-2 rounded border p-2 transition-colors',
-        selectedGestureId === gesture.order.toString()
+        selectedGestureOrder === gesture.order.toString()
           ? 'border-primary bg-primary/10'
           : 'border-border hover:border-primary/50 hover:bg-muted/50',
         isDragging && 'z-10 shadow-lg'
       )}
       onClick={() => {
         if (!disabled) {
-          if (selectedGestureId === gesture.order.toString()) {
-            onSelect(null);
-          } else {
-            onSelect(gesture.order.toString());
-          }
+          onSelectCurrent();
         }
       }}
     >
@@ -789,12 +773,28 @@ function SortableGestureItem({
         className="h-6 w-6 p-0"
         onClick={(e) => {
           e.stopPropagation();
-          onDelete(gesture.order);
+          deleteGesture(gesture.order);
         }}
         disabled={disabled}
       >
         <MdDeleteOutline className="h-3 w-3" />
       </Button>
+      <Checkbox
+        id="toggle-2"
+        checked={notToClearGesturesOrder.has(gesture.order)}
+        onCheckedChange={(checked) => {
+          if (checked) {
+            setNotToClearGesturesOrder((prev) => new Set(prev).add(gesture.order));
+          } else {
+            setNotToClearGesturesOrder((prev) => {
+              const st = new Set(prev);
+              st.delete(gesture.order);
+              return st;
+            });
+          }
+        }}
+        className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
+      />
     </div>
   );
 }

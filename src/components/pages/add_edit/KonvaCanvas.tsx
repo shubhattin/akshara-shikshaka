@@ -3,8 +3,8 @@
 import { forwardRef, useMemo } from 'react';
 import { Stage, Layer, Path, Line } from 'react-konva';
 import type Konva from 'konva';
-import { useAtomValue } from 'jotai';
-import { CANVAS_DIMS } from '~/tools/stroke_data/types';
+import { useAtomValue, useSetAtom } from 'jotai';
+import { CANVAS_DIMS, GesturePoint } from '~/tools/stroke_data/types';
 import {
   character_svg_path_atom,
   main_text_path_visible_atom,
@@ -15,7 +15,8 @@ import {
   gesture_data_atom,
   is_recording_atom,
   is_drawing_atom,
-  current_drawing_points_atom
+  current_drawing_points_atom,
+  recording_start_time_atom
 } from './shared-state';
 
 // Utility function to calculate SVG path bounding box
@@ -44,122 +45,156 @@ function getSVGPathBounds(pathData: string) {
   }
 }
 
-interface KonvaCanvasProps {
-  onMouseDown: (e: any) => void;
-  onMouseMove: (e: any) => void;
-  onMouseUp: (e: any) => void;
-}
+const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
+  // Canvas state from atoms
+  const characterSvgPath = useAtomValue(character_svg_path_atom);
+  const mainTextPathVisible = useAtomValue(main_text_path_visible_atom);
+  const scaleDownFactor = useAtomValue(scale_down_factor_atom);
+  const animatedGestureLines = useAtomValue(animated_gesture_lines_atom);
+  const tempPoints = useAtomValue(temp_points_atom);
+  const selectedGestureOrder = useAtomValue(selected_gesture_order_atom);
+  const gestureData = useAtomValue(gesture_data_atom);
+  const isRecording = useAtomValue(is_recording_atom);
+  const isDrawing = useAtomValue(is_drawing_atom);
+  const currentDrawingPoints = useAtomValue(current_drawing_points_atom);
+  const setIsDrawing = useSetAtom(is_drawing_atom);
+  const setTempPoints = useSetAtom(temp_points_atom);
+  const setCurrentDrawingPoints = useSetAtom(current_drawing_points_atom);
+  const setRecordingStartTime = useSetAtom(recording_start_time_atom);
 
-const KonvaCanvas = forwardRef<Konva.Stage, KonvaCanvasProps>(
-  ({ onMouseDown, onMouseMove, onMouseUp }, ref) => {
-    // Canvas state from atoms
-    const characterSvgPath = useAtomValue(character_svg_path_atom);
-    const mainTextPathVisible = useAtomValue(main_text_path_visible_atom);
-    const scaleDownFactor = useAtomValue(scale_down_factor_atom);
-    const animatedGestureLines = useAtomValue(animated_gesture_lines_atom);
-    const tempPoints = useAtomValue(temp_points_atom);
-    const selectedGestureOrder = useAtomValue(selected_gesture_order_atom);
-    const gestureData = useAtomValue(gesture_data_atom);
-    const isRecording = useAtomValue(is_recording_atom);
-    const isDrawing = useAtomValue(is_drawing_atom);
-    const currentDrawingPoints = useAtomValue(current_drawing_points_atom);
+  // Get selected gesture for drawing style
+  const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);
 
-    // Get selected gesture for drawing style
-    const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);
+  // Calculate proper centering for the character path
+  const pathCentering = useMemo(() => {
+    if (!characterSvgPath) return { offsetX: 0, offsetY: 0 };
 
-    // Calculate proper centering for the character path
-    const pathCentering = useMemo(() => {
-      if (!characterSvgPath) return { offsetX: 0, offsetY: 0 };
+    const bounds = getSVGPathBounds(characterSvgPath);
+    const scale = !scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1;
 
-      const bounds = getSVGPathBounds(characterSvgPath);
-      const scale = !scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1;
+    // Calculate the scaled dimensions
+    const scaledWidth = bounds.width * scale;
+    const scaledHeight = bounds.height * scale;
 
-      // Calculate the scaled dimensions
-      const scaledWidth = bounds.width * scale;
-      const scaledHeight = bounds.height * scale;
+    // Calculate offset to center the path (accounting for its natural position)
+    const offsetX = bounds.width / 2 + bounds.x;
+    const offsetY = bounds.height / 2 + bounds.y;
 
-      // Calculate offset to center the path (accounting for its natural position)
-      const offsetX = bounds.width / 2 + bounds.x;
-      const offsetY = bounds.height / 2 + bounds.y;
+    return { offsetX, offsetY };
+  }, [characterSvgPath, scaleDownFactor]);
 
-      return { offsetX, offsetY };
-    }, [characterSvgPath, scaleDownFactor]);
+  // Mouse event handlers for gesture recording
+  const onMouseDown = (e: any) => {
+    if (!isRecording || !selectedGesture) return;
 
-    return (
-      <Stage
-        width={CANVAS_DIMS.width}
-        height={CANVAS_DIMS.height}
-        ref={ref}
-        onMouseDown={onMouseDown}
-        onMousemove={onMouseMove}
-        onMouseup={onMouseUp}
-        onTouchStart={onMouseDown}
-        onTouchMove={onMouseMove}
-        onTouchEnd={onMouseUp}
-        style={{
-          backgroundColor: 'white'
-        }}
-      >
-        <Layer>
-          {/* Character Text Path */}
-          {characterSvgPath && (
-            <Path
-              data={characterSvgPath}
-              fill="black"
-              stroke="#000000"
-              strokeWidth={2}
-              scaleX={!scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1}
-              scaleY={!scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1}
-              x={CANVAS_DIMS.width / 2}
-              y={CANVAS_DIMS.height / 2}
-              offsetX={pathCentering.offsetX}
-              offsetY={pathCentering.offsetY}
-              visible={mainTextPathVisible}
-              listening={false}
-            />
-          )}
+    setIsDrawing(true);
+    setRecordingStartTime(Date.now());
 
-          {/* Animated Gesture Lines */}
-          {animatedGestureLines.map((line) => (
-            <Line
-              key={`animated-${line.order}`}
-              points={line.points}
-              stroke={line.color}
-              strokeWidth={line.width}
-              lineCap="round"
-              lineJoin="round"
-              listening={false}
-            />
-          ))}
+    const pos = e.target.getStage().getPointerPosition();
+    const point: GesturePoint = {
+      x: pos.x,
+      y: pos.y
+    };
 
-          {/* Current Drawing Line (during recording) */}
-          {isRecording && isDrawing && currentDrawingPoints.length > 0 && selectedGesture && (
-            <Line
-              points={currentDrawingPoints}
-              stroke={selectedGesture.brush_color}
-              strokeWidth={selectedGesture.brush_width}
-              lineCap="round"
-              lineJoin="round"
-              listening={false}
-            />
-          )}
+    setTempPoints([point]);
+    setCurrentDrawingPoints([pos.x, pos.y]);
+  };
 
-          {/* Temporary recorded line (before save/cancel) */}
-          {isRecording && !isDrawing && tempPoints.length > 0 && selectedGesture && (
-            <Line
-              points={tempPoints.flatMap((p) => [p.x, p.y])}
-              stroke={selectedGesture.brush_color}
-              strokeWidth={selectedGesture.brush_width}
-              lineCap="round"
-              lineJoin="round"
-              listening={false}
-            />
-          )}
-        </Layer>
-      </Stage>
-    );
-  }
-);
+  const onMouseMove = (e: any) => {
+    if (!isRecording || !isDrawing || !selectedGesture) return;
+
+    const pos = e.target.getStage().getPointerPosition();
+
+    const point: GesturePoint = {
+      x: pos.x,
+      y: pos.y
+    };
+
+    setTempPoints((prev) => [...prev, point]);
+    setCurrentDrawingPoints((prev) => [...prev, pos.x, pos.y]);
+  };
+
+  const onMouseUp = () => {
+    if (!isRecording || !isDrawing) return;
+
+    setIsDrawing(false);
+    // Keep the temp points for user to save or discard
+  };
+
+  return (
+    <Stage
+      width={CANVAS_DIMS.width}
+      height={CANVAS_DIMS.height}
+      ref={ref}
+      onMouseDown={onMouseDown}
+      onMousemove={onMouseMove}
+      onMouseup={onMouseUp}
+      onTouchStart={onMouseDown}
+      onTouchMove={onMouseMove}
+      onTouchEnd={onMouseUp}
+      style={{
+        backgroundColor: 'white'
+      }}
+    >
+      <Layer>
+        {/* Character Text Path */}
+        {characterSvgPath && (
+          <Path
+            data={characterSvgPath}
+            fill="black"
+            stroke="#000000"
+            strokeWidth={2}
+            scaleX={!scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1}
+            scaleY={!scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1}
+            x={CANVAS_DIMS.width / 2}
+            y={CANVAS_DIMS.height / 2}
+            offsetX={pathCentering.offsetX}
+            offsetY={pathCentering.offsetY}
+            visible={mainTextPathVisible}
+            listening={false}
+          />
+        )}
+
+        {/* Animated Gesture Lines */}
+        {animatedGestureLines.map((line) => (
+          <Line
+            key={`animated-${line.order}`}
+            points={line.points}
+            stroke={line.color}
+            strokeWidth={line.width}
+            lineCap="round"
+            lineJoin="round"
+            listening={false}
+          />
+        ))}
+
+        {/* Current Drawing Line (during recording) */}
+        {isRecording && isDrawing && currentDrawingPoints.length > 0 && selectedGesture && (
+          <Line
+            points={currentDrawingPoints}
+            stroke={selectedGesture.brush_color}
+            strokeWidth={selectedGesture.brush_width}
+            lineCap="round"
+            lineJoin="round"
+            listening={false}
+          />
+        )}
+
+        {/* Temporary recorded line (before save/cancel) */}
+        {isRecording && !isDrawing && tempPoints.length > 0 && selectedGesture && (
+          <Line
+            points={tempPoints.flatMap((p) => [p.x, p.y])}
+            stroke={selectedGesture.brush_color}
+            strokeWidth={selectedGesture.brush_width}
+            lineCap="round"
+            lineJoin="round"
+            listening={false}
+          />
+        )}
+      </Layer>
+    </Stage>
+  );
+});
 
 KonvaCanvas.displayName = 'KonvaCanvas';
 

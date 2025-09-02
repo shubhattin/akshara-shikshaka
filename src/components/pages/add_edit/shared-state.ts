@@ -16,6 +16,7 @@ export const scale_down_factor_atom = atom(DEFAULT_SCALE_DOWN_FACTOR);
 export const gesture_data_atom = atom<Gesture[]>([]);
 export const selected_gesture_order_atom = atom<string | null>(null);
 export const current_drawing_points_atom = atom<number[]>([]);
+export const not_to_clear_gestures_order_atom = atom<Set<number>>(new Set<number>());
 
 // Recording and playback state
 export const is_recording_atom = atom(false);

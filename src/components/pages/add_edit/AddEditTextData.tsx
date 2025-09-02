@@ -143,7 +143,7 @@ export default function AddEditTextDataWrapper(props: Props) {
     [is_drawing_atom, false],
     [current_drawing_points_atom, []]
   ]);
-  const stageRef = useRef<Konva.Stage>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
 
   return (
     <>

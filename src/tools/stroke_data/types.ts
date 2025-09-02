@@ -1,11 +1,6 @@
 import { z } from 'zod';
 
-export const StrokePointSchema = z
-  .object({
-    x: z.number(),
-    y: z.number()
-  })
-  .strict();
+export const StrokePointSchema = z.tuple([z.number(), z.number()]);
 
 export const GestureSchema = z
   .object({

@@ -164,7 +164,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     // Use the framework-agnostic animation helper
     await animateGesture(gesture, (frame) => {
       // Convert points to flat array for Konva Line component
-      const flatPoints = frame.partialPoints.flatMap((p) => [p.x, p.y]);
+      const flatPoints = frame.partialPoints.flatMap((p) => [p[0], p[1]]);
 
       setAnimatedGestureLines((prev) =>
         prev.map((line) => (line.order === gestureLineId ? { ...line, points: flatPoints } : line))
@@ -198,7 +198,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
     // Add user stroke to visualization
     const gestureLineId = Date.now(); // Unique ID for user stroke
-    const flatPoints = userPoints.flatMap((p) => [p.x, p.y]);
+    const flatPoints = userPoints.flatMap((p) => [p[0], p[1]]);
 
     setAnimatedGestureLines((prev) => [
       ...prev,

@@ -84,10 +84,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         const x = drawingPoints[i];
         const y = drawingPoints[i + 1];
 
-        gesturePoints.push({
-          x,
-          y
-        });
+        gesturePoints.push([x, y]);
       }
 
       // Clear drawing points and notify parent

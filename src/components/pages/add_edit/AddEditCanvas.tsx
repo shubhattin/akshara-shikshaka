@@ -86,10 +86,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     setIsDrawing(true);
 
     const pos = e.target.getStage().getPointerPosition();
-    const point: GesturePoint = {
-      x: pos.x,
-      y: pos.y
-    };
+    const point: GesturePoint = [pos.x, pos.y];
 
     setTempPoints([point]);
     setCurrentDrawingPoints([pos.x, pos.y]);
@@ -100,10 +97,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     const pos = e.target.getStage().getPointerPosition();
 
-    const point: GesturePoint = {
-      x: pos.x,
-      y: pos.y
-    };
+    const point: GesturePoint = [pos.x, pos.y];
 
     setTempPoints((prev) => [...prev, point]);
     setCurrentDrawingPoints((prev) => [...prev, pos.x, pos.y]);
@@ -180,7 +174,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
         {/* Temporary recorded line (before save/cancel) */}
         {isRecording && !isDrawing && tempPoints.length > 0 && selectedGesture && (
           <Line
-            points={tempPoints.flatMap((p) => [p.x, p.y])}
+            points={tempPoints.flatMap((p) => [p[0], p[1]])}
             stroke={selectedGesture.color}
             strokeWidth={selectedGesture.width}
             lineCap="round"

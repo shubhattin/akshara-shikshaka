@@ -6,7 +6,7 @@ export interface GestureAnimationFrame {
   totalSteps: number;
   progress: number;
   pointIndex: number;
-  partialPoints: { x: number; y: number }[];
+  partialPoints: GesturePoint[];
   partialSvgPath: string;
   isComplete: boolean;
 }
@@ -17,7 +17,7 @@ export function* generateGestureAnimationFrames(
 ): Generator<GestureAnimationFrame> {
   if (!gesture.points.length) return;
 
-  const sampledPoints = gesture.points.map((point) => ({ x: point.x, y: point.y }));
+  const sampledPoints = gesture.points;
   const totalPoints = sampledPoints.length;
   const animationSteps = Math.min(totalPoints * 2, maxSteps);
 
@@ -34,19 +34,19 @@ export function* generateGestureAnimationFrames(
       const nextPoint = sampledPoints[pointIndex + 1];
       const subProgress = (progress * (totalPoints - 1)) % 1;
 
-      const interpolatedX = currentPoint.x + (nextPoint.x - currentPoint.x) * subProgress;
-      const interpolatedY = currentPoint.y + (nextPoint.y - currentPoint.y) * subProgress;
+      const interpolatedX = currentPoint[0] + (nextPoint[0] - currentPoint[0]) * subProgress;
+      const interpolatedY = currentPoint[1] + (nextPoint[1] - currentPoint[1]) * subProgress;
 
-      partialPoints.push({ x: interpolatedX, y: interpolatedY });
+      partialPoints.push([interpolatedX, interpolatedY]);
     }
 
     // Build SVG path for current frame
     let partialSvgPath = '';
     partialPoints.forEach((point, i) => {
       if (i === 0) {
-        partialSvgPath += `M ${point.x} ${point.y}`;
+        partialSvgPath += `M ${point[0]} ${point[1]}`;
       } else {
-        partialSvgPath += ` L ${point.x} ${point.y}`;
+        partialSvgPath += ` L ${point[0]} ${point[1]}`;
       }
     });
 
@@ -135,8 +135,8 @@ export const evaluateStrokeAccuracy = (
   // Convert gesture points to evaluation points
   const flatten = (pts: GesturePoint[]): EvalPoint[] =>
     pts.map((p, i) => ({
-      x: p.x,
-      y: p.y,
+      x: p[0],
+      y: p[1],
       timestamp: i
     }));
 

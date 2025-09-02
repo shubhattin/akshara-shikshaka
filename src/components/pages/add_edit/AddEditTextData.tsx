@@ -280,7 +280,7 @@ function AddEditTextData({
     setAnimatedGestureLines(
       allowed_gestures.map((g) => ({
         index: g.index,
-        points: g.points.flatMap((p) => [p.x, p.y]),
+        points: g.points.flatMap((p) => [p[0], p[1]]),
         color: g.color,
         width: g.width
       }))
@@ -318,7 +318,7 @@ function AddEditTextData({
     // Use the framework-agnostic animation helper
     await animateGesture(gesture, (frame) => {
       // Convert points to flat array for Konva Line component
-      const flatPoints = frame.partialPoints.flatMap((p) => [p.x, p.y]);
+      const flatPoints = frame.partialPoints.flatMap((p) => [p[0], p[1]]);
 
       setAnimatedGestureLines((prev) =>
         prev.map((line) => (line.index === gestureLineId ? { ...line, points: flatPoints } : line))

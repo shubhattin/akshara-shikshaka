@@ -76,7 +76,7 @@ import {
 import { Checkbox } from '~/components/ui/checkbox';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
-const KonvaCanvas = dynamic(() => import('./KonvaCanvas'), {
+const KonvaCanvas = dynamic(() => import('./AddEditCanvas'), {
   ssr: false,
   loading: () => (
     <div

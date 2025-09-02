@@ -3,7 +3,7 @@ import { type Metadata } from 'next';
 import { cache } from 'react';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 import { db } from '~/db/db';
-import PracticeCanvasComponent from '~/components/pages/practice/PracticeCanvasComponent';
+import Practice from '~/components/pages/practice/Practice';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -50,7 +50,7 @@ const MainEdit = async ({ params }: Props) => {
 
   return (
     <div className="flex h-screen flex-col items-center justify-center">
-      <PracticeCanvasComponent
+      <Practice
         text_data={{
           ...text_data,
           gestures: text_data.gestures

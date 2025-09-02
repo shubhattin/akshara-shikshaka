@@ -33,7 +33,7 @@ import {
 } from './practice_state';
 
 // Dynamic import for PracticeKonvaCanvas to avoid SSR issues
-const PracticeKonvaCanvas = dynamic(() => import('./PracticeKonvaCanvas'), {
+const PracticeKonvaCanvas = dynamic(() => import('./PracticeCanvas'), {
   ssr: false,
   loading: () => (
     <div

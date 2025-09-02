@@ -7,13 +7,15 @@ export const StrokePointSchema = z
   })
   .strict();
 
-export const GestureSchema = z.object({
-  order: z.number(),
-  brush_width: z.number(),
-  brush_color: z.string(),
-  animation_duration: z.number(),
-  points: z.array(StrokePointSchema)
-});
+export const GestureSchema = z
+  .object({
+    index: z.number().int(),
+    width: z.number(),
+    color: z.string(),
+    duration: z.number(),
+    points: z.array(StrokePointSchema)
+  })
+  .strict();
 
 export type GesturePoint = z.infer<typeof StrokePointSchema>;
 

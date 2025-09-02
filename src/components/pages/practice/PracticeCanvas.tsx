@@ -137,7 +137,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
               <Line
                 points={drawingPoints} // No scaling needed - Stage handles it
                 stroke="#0066cc"
-                strokeWidth={currentGesture.brush_width || 6}
+                strokeWidth={currentGesture.width || 6}
                 lineCap="round"
                 lineJoin="round"
                 listening={false}

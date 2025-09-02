@@ -61,7 +61,7 @@ import {
   text_edit_mode_atom,
   scale_down_factor_atom,
   gesture_data_atom,
-  selected_gesture_order_atom,
+  selected_gesture_index_atom,
   is_recording_atom,
   is_playing_atom,
   character_svg_path_atom,
@@ -70,7 +70,7 @@ import {
   DEFAULTS,
   is_drawing_atom,
   current_drawing_points_atom,
-  not_to_clear_gestures_order_atom,
+  not_to_clear_gestures_index_atom,
   temp_points_atom
 } from './add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
@@ -137,7 +137,7 @@ export default function AddEditTextDataWrapper(props: Props) {
     [text_edit_mode_atom, props.location === 'add' && true],
     [scale_down_factor_atom, DEFAULTS.SCALE_DOWN_FACTOR],
     [gesture_data_atom, props.text_data.gestures ?? []],
-    [selected_gesture_order_atom, null],
+    [selected_gesture_index_atom, null],
     [is_recording_atom, false],
     [is_playing_atom, false],
     [is_drawing_atom, false],
@@ -168,13 +168,13 @@ function AddEditTextData({
   // Gesture Recording State
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
 
-  const [selectedGestureOrder, setSelectedGestureOrder] = useAtom(selected_gesture_order_atom);
+  const [selectedGestureIndex, setSelectedGestureIndex] = useAtom(selected_gesture_index_atom);
   const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
   const setCharacterSvgPath = useSetAtom(character_svg_path_atom);
   const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
-  const [notToClearGesturesOrder, setNotToClearGesturesOrder] = useAtom(
-    not_to_clear_gestures_order_atom
+  const [notToClearGesturesIndex, setNotToClearGesturesIndex] = useAtom(
+    not_to_clear_gestures_index_atom
   );
 
   // Drag and Drop Sensors
@@ -191,12 +191,12 @@ function AddEditTextData({
 
     if (over && active.id !== over.id) {
       const activeOrder = parseInt(active.id.toString(), 10);
-      const isSelectedBeingMoved = selectedGestureOrder === active.id.toString();
+      const isSelectedBeingMoved = selectedGestureIndex === active.id.toString();
 
       // We need to capture the current state to calculate the new notToClearGesturesOrder
       const oldGestureData = gestureData;
-      const oldIndex = oldGestureData.findIndex((g) => g.order === activeOrder);
-      const newIndex = oldGestureData.findIndex((g) => g.order.toString() === over.id);
+      const oldIndex = oldGestureData.findIndex((g) => g.index === activeOrder);
+      const newIndex = oldGestureData.findIndex((g) => g.index.toString() === over.id);
 
       if (oldIndex === -1 || newIndex === -1) return;
 
@@ -214,14 +214,14 @@ function AddEditTextData({
       });
 
       // Update notToClearGesturesOrder to reflect the new order values after reordering
-      setNotToClearGesturesOrder((prev) => {
+      setNotToClearGesturesIndex((prev) => {
         const newSet = new Set<number>();
         // Create a mapping from old order to new order
         const reorderedGestures = arrayMove(oldGestureData, oldIndex, newIndex);
 
         for (const oldOrder of prev) {
           // Find where this old order ended up in the new array
-          const gestureWithOldOrder = oldGestureData.find((g) => g.order === oldOrder);
+          const gestureWithOldOrder = oldGestureData.find((g) => g.index === oldOrder);
           if (gestureWithOldOrder) {
             const newPosition = reorderedGestures.findIndex((g) => g === gestureWithOldOrder);
             if (newPosition !== -1) {
@@ -236,7 +236,7 @@ function AddEditTextData({
       // Update selectedGestureId if the selected gesture was moved
       if (isSelectedBeingMoved) {
         // The selected gesture will now be at position newIndex, so its new order is newIndex
-        setSelectedGestureOrder(newIndex.toString());
+        setSelectedGestureIndex(newIndex.toString());
       }
     }
   };
@@ -259,15 +259,15 @@ function AddEditTextData({
 
   const addNewGesture = () => {
     const newGesture: Gesture = {
-      order: gestureData.length,
+      index: gestureData.length,
       points: [],
-      brush_width: DEFAULTS.GESTURE_BRUSH_WIDTH,
-      brush_color: DEFAULTS.GESTURE_BRUSH_COLOR, // red
-      animation_duration: DEFAULTS.GESTURE_ANIMATION_DURATION
+      width: DEFAULTS.GESTURE_BRUSH_WIDTH,
+      color: DEFAULTS.GESTURE_BRUSH_COLOR, // red
+      duration: DEFAULTS.GESTURE_ANIMATION_DURATION
     };
     setGestureData((prev: Gesture[]) => [...prev, newGesture]);
     clearGestureVisualization();
-    setSelectedGestureOrder(newGesture.order.toString());
+    setSelectedGestureIndex(newGesture.index.toString());
   };
 
   const clearGestureVisualization = (all = false) => {
@@ -276,13 +276,13 @@ function AddEditTextData({
       return;
     }
     // Clear animated gesture lines from state
-    const allowed_gestures = gestureData.filter((g) => notToClearGesturesOrder.has(g.order));
+    const allowed_gestures = gestureData.filter((g) => notToClearGesturesIndex.has(g.index));
     setAnimatedGestureLines(
       allowed_gestures.map((g) => ({
-        order: g.order,
+        index: g.index,
         points: g.points.flatMap((p) => [p.x, p.y]),
-        color: g.brush_color,
-        width: g.brush_width
+        color: g.color,
+        width: g.width
       }))
     );
   };
@@ -302,16 +302,16 @@ function AddEditTextData({
 
   // Konva-based gesture animation using framework-agnostic helper
   const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {
-    const gestureLineId = gesture.order;
+    const gestureLineId = gesture.index;
 
     // Initialize the gesture line in state
     setAnimatedGestureLines((prev) => [
-      ...prev.filter((line) => line.order !== gestureLineId),
+      ...prev.filter((line) => line.index !== gestureLineId),
       {
-        order: gestureLineId,
+        index: gestureLineId,
         points: [],
-        color: gesture.brush_color,
-        width: gesture.brush_width
+        color: gesture.color,
+        width: gesture.width
       }
     ]);
 
@@ -321,7 +321,7 @@ function AddEditTextData({
       const flatPoints = frame.partialPoints.flatMap((p) => [p.x, p.y]);
 
       setAnimatedGestureLines((prev) =>
-        prev.map((line) => (line.order === gestureLineId ? { ...line, points: flatPoints } : line))
+        prev.map((line) => (line.index === gestureLineId ? { ...line, points: flatPoints } : line))
       );
     });
   };
@@ -337,12 +337,12 @@ function AddEditTextData({
     render_text_path(text);
   }, [text, scaleDownFactor]);
 
-  const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);
+  const selectedGesture = gestureData.find((g) => g.index.toString() === selectedGestureIndex);
 
   // replaint canvas on change of notToClearGesturesOrder
   useEffect(() => {
     clearGestureVisualization();
-  }, [notToClearGesturesOrder]);
+  }, [notToClearGesturesIndex]);
 
   return (
     <div className="space-y-4">
@@ -429,13 +429,13 @@ function AddEditTextData({
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={gestureData.map((g) => g.order.toString())}
+              items={gestureData.map((g) => g.index.toString())}
               strategy={verticalListSortingStrategy}
             >
               <div className="flex flex-col gap-2">
                 {gestureData.map((gesture) => (
                   <SortableGestureItem
-                    key={gesture.order}
+                    key={gesture.index.toString()}
                     gesture={gesture}
                     {...{ clearGestureVisualization }}
                   />
@@ -479,15 +479,15 @@ const SelectedGestureControls = ({
   const [isRecording, setIsRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
   const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
-  const [selectedGestureOrder] = useAtom(selected_gesture_order_atom);
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
-  const setNotToClearGesturesOrder = useSetAtom(not_to_clear_gestures_order_atom);
+  const selectedGestureIndex = useAtomValue(selected_gesture_index_atom);
+  const setNotToClearGesturesIndex = useSetAtom(not_to_clear_gestures_index_atom);
 
   // Recording is now handled by Stage mouse events in the parent component
 
   // Path handling is now done directly via mouse events in the parent component
   const startRecording = () => {
-    if (!selectedGestureOrder) return;
+    if (!selectedGestureIndex) return;
     setIsRecording(true);
     setTempPoints([]); // Clear temporary points
     clearGestureVisualization();
@@ -500,14 +500,14 @@ const SelectedGestureControls = ({
   };
 
   const saveRecording = () => {
-    if (!selectedGestureOrder || tempPoints.length === 0) return;
+    if (!selectedGestureIndex || tempPoints.length === 0) return;
 
     const pointCount = tempPoints.length;
 
     // Set the points for the selected gesture (overwrite previous points)
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
-        gesture.order === parseInt(selectedGestureOrder, 10)
+        gesture.index === parseInt(selectedGestureIndex, 10)
           ? {
               ...gesture,
               points: tempPoints
@@ -526,7 +526,7 @@ const SelectedGestureControls = ({
   };
 
   const playGesture = async (gestureOrder: number) => {
-    const gesture = gestureData.find((g) => g.order === gestureOrder);
+    const gesture = gestureData.find((g) => g.index === gestureOrder);
     if (!gesture) return;
 
     setIsPlaying(true);
@@ -539,16 +539,16 @@ const SelectedGestureControls = ({
   };
 
   const clearCurrentGesturePoints = () => {
-    if (!selectedGestureOrder) return;
+    if (!selectedGestureIndex) return;
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
-        gesture.order === parseInt(selectedGestureOrder, 10) ? { ...gesture, points: [] } : gesture
+        gesture.index === parseInt(selectedGestureIndex, 10) ? { ...gesture, points: [] } : gesture
       )
     );
     setTempPoints([]);
-    setNotToClearGesturesOrder((prev) => {
+    setNotToClearGesturesIndex((prev) => {
       const st = new Set(prev);
-      st.delete(parseInt(selectedGestureOrder, 10));
+      st.delete(parseInt(selectedGestureIndex, 10));
       return st;
     });
     clearGestureVisualization();
@@ -559,7 +559,7 @@ const SelectedGestureControls = ({
   return (
     <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
       <div className="flex items-center justify-between">
-        <span className="font-medium">Selected: Gesture {selectedGesture.order + 1}</span>
+        <span className="font-medium">Selected: Gesture {selectedGesture.index + 1}</span>
         <div className="flex gap-2">
           {!isRecording && (
             <Button
@@ -613,7 +613,7 @@ const SelectedGestureControls = ({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => playGesture(selectedGesture.order)}
+              onClick={() => playGesture(selectedGesture.index)}
               disabled={isRecording || isPlaying || selectedGesture.points.length === 0}
             >
               <MdPlayArrow className="mr-1" />
@@ -631,12 +631,12 @@ const SelectedGestureControls = ({
           <div className="flex items-center gap-2">
             <input
               type="color"
-              value={selectedGesture.brush_color}
+              value={selectedGesture.color}
               onChange={(e) =>
                 setGestureData((prev: Gesture[]) =>
                   prev.map((gesture) =>
-                    gesture.order === parseInt(selectedGestureOrder || '0', 10)
-                      ? { ...gesture, brush_color: e.target.value }
+                    gesture.index === parseInt(selectedGestureIndex || '0', 10)
+                      ? { ...gesture, color: e.target.value }
                       : gesture
                   )
                 )
@@ -644,22 +644,20 @@ const SelectedGestureControls = ({
               className="h-8 w-12 rounded border border-input"
               disabled={isRecording || isPlaying}
             />
-            <span className="text-xs text-muted-foreground">{selectedGesture.brush_color}</span>
+            <span className="text-xs text-muted-foreground">{selectedGesture.color}</span>
           </div>
         </div>
 
         {/* Brush Width */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">
-            Brush Width: {selectedGesture.brush_width}px
-          </Label>
+          <Label className="text-sm font-medium">Brush Width: {selectedGesture.width}px</Label>
           <Slider
-            value={[selectedGesture.brush_width]}
+            value={[selectedGesture.width]}
             onValueChange={(value) =>
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
-                  gesture.order === parseInt(selectedGestureOrder || '0', 10)
-                    ? { ...gesture, brush_width: value[0] }
+                  gesture.index === parseInt(selectedGestureIndex || '0', 10)
+                    ? { ...gesture, width: value[0] }
                     : gesture
                 )
               )
@@ -674,16 +672,14 @@ const SelectedGestureControls = ({
 
         {/* Animation Duration */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">
-            Animation: {selectedGesture.animation_duration}ms
-          </Label>
+          <Label className="text-sm font-medium">Animation: {selectedGesture.duration}ms</Label>
           <Slider
-            value={[selectedGesture.animation_duration]}
+            value={[selectedGesture.duration]}
             onValueChange={(value) =>
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
-                  gesture.order === parseInt(selectedGestureOrder || '0', 10)
-                    ? { ...gesture, animation_duration: value[0] }
+                  gesture.index === parseInt(selectedGestureIndex || '0', 10)
+                    ? { ...gesture, duration: value[0] }
                     : gesture
                 )
               )
@@ -715,12 +711,12 @@ type SortableGestureItemProps = {
 function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGestureItemProps) {
   const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying] = useAtom(is_playing_atom);
-  const [selectedGestureOrder, setSelectedGestureOrder] = useAtom(selected_gesture_order_atom);
+  const [selectedGestureIndex, setSelectedGestureIndex] = useAtom(selected_gesture_index_atom);
   const setGestureData = useSetAtom(gesture_data_atom);
 
   const disabled = isRecording || isPlaying;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: `gesture-${gesture.order}`,
+    id: gesture.index.toString(),
     disabled: disabled
   });
 
@@ -730,13 +726,13 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
     opacity: isDragging ? 0.5 : 1
   };
   const [notToClearGesturesOrder, setNotToClearGesturesOrder] = useAtom(
-    not_to_clear_gestures_order_atom
+    not_to_clear_gestures_index_atom
   );
 
   const deleteGesture = (gestureOrder: number) => {
     setGestureData((prev: Gesture[]) => {
       // Filter out the deleted gesture
-      const filteredGestures = prev.filter((g) => g.order !== gestureOrder);
+      const filteredGestures = prev.filter((g) => g.index !== gestureOrder);
 
       // Reorder the remaining gestures to have sequential order values (0, 1, 2, etc.)
       const reorderedGestures = filteredGestures.map((gesture, index) => ({
@@ -765,28 +761,28 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
     });
 
     // Update selected gesture order logic
-    if (selectedGestureOrder === gestureOrder.toString()) {
-      setSelectedGestureOrder(null);
-    } else if (selectedGestureOrder !== null) {
-      const selectedOrder = parseInt(selectedGestureOrder, 10);
+    if (selectedGestureIndex === gestureOrder.toString()) {
+      setSelectedGestureIndex(null);
+    } else if (selectedGestureIndex !== null) {
+      const selectedOrder = parseInt(selectedGestureIndex, 10);
       // If selected gesture's order was after the deleted one, decrement it
       if (selectedOrder > gestureOrder) {
-        setSelectedGestureOrder((selectedOrder - 1).toString());
+        setSelectedGestureIndex((selectedOrder - 1).toString());
       }
     }
   };
 
   const onSelect = (gestureOrder: string | null) => {
     clearGestureVisualization();
-    setSelectedGestureOrder(gestureOrder);
+    setSelectedGestureIndex(gestureOrder);
   };
 
   const onSelectCurrent = () => {
     clearGestureVisualization();
-    if (selectedGestureOrder === gesture.order.toString()) {
+    if (selectedGestureIndex === gesture.index.toString()) {
       onSelect(null);
     } else {
-      onSelect(gesture.order.toString());
+      onSelect(gesture.index.toString());
     }
   };
 
@@ -796,7 +792,7 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
       style={style}
       className={cn(
         'flex cursor-pointer items-center gap-2 rounded border p-2 transition-colors',
-        selectedGestureOrder === gesture.order.toString()
+        selectedGestureIndex === gesture.index.toString()
           ? 'border-primary bg-primary/10'
           : 'border-border hover:border-primary/50 hover:bg-muted/50',
         isDragging && 'z-10 shadow-lg'
@@ -815,14 +811,14 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
       >
         <MdDragHandle className="h-4 w-4 text-muted-foreground" />
       </div>
-      <span className="text-sm">Gesture {gesture.order + 1}</span>
+      <span className="text-sm">Gesture {gesture.index + 1}</span>
       <Button
         size="sm"
         variant="ghost"
         className="h-6 w-6 p-0"
         onClick={(e) => {
           e.stopPropagation();
-          deleteGesture(gesture.order);
+          deleteGesture(gesture.index);
         }}
         disabled={disabled}
       >
@@ -830,14 +826,14 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
       </Button>
       <Checkbox
         id="toggle-2"
-        checked={notToClearGesturesOrder.has(gesture.order)}
+        checked={notToClearGesturesOrder.has(gesture.index)}
         onCheckedChange={(checked) => {
           if (checked) {
-            setNotToClearGesturesOrder((prev) => new Set(prev).add(gesture.order));
+            setNotToClearGesturesOrder((prev) => new Set(prev).add(gesture.index));
           } else {
             setNotToClearGesturesOrder((prev) => {
               const st = new Set(prev);
-              st.delete(gesture.order);
+              st.delete(gesture.index);
               return st;
             });
           }

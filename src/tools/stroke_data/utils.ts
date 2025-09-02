@@ -73,7 +73,7 @@ export async function animateGesture(
   }
 
   const generator = generateGestureAnimationFrames(gesture, maxSteps);
-  const stepDuration = Math.max(0, (gesture.animation_duration || 0) / maxSteps);
+  const stepDuration = Math.max(0, (gesture.duration || 0) / maxSteps);
 
   for (const frame of generator) {
     onFrame(frame);

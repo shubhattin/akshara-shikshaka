@@ -14,9 +14,9 @@ export const scale_down_factor_atom = atom(DEFAULT_SCALE_DOWN_FACTOR);
 
 // Gesture data and selection
 export const gesture_data_atom = atom<Gesture[]>([]);
-export const selected_gesture_order_atom = atom<string | null>(null);
+export const selected_gesture_index_atom = atom<string | null>(null);
 export const current_drawing_points_atom = atom<number[]>([]);
-export const not_to_clear_gestures_order_atom = atom<ReadonlySet<number>>(new Set<number>());
+export const not_to_clear_gestures_index_atom = atom<ReadonlySet<number>>(new Set<number>());
 
 // Recording and playback state
 export const is_recording_atom = atom(false);
@@ -31,7 +31,7 @@ export const main_text_path_visible_atom = atom(true);
 // Animation state for Konva
 export const animated_gesture_lines_atom = atom<
   Array<{
-    order: number;
+    index: number;
     points: number[];
     color: string;
     width: number;

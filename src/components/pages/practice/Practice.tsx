@@ -147,7 +147,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     gesture: Gesture,
     isCurrentAnimatedGesture: boolean = false
   ): Promise<void> => {
-    const gestureLineId = gesture.order;
+    const gestureLineId = gesture.index;
 
     // Initialize the gesture line in state
     setAnimatedGestureLines((prev) => [
@@ -155,8 +155,8 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       {
         order: gestureLineId,
         points: [],
-        color: gesture.brush_color,
-        width: gesture.brush_width,
+        color: gesture.color,
+        width: gesture.width,
         isCurrentAnimatedGesture
       }
     ]);
@@ -206,7 +206,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         order: gestureLineId,
         points: flatPoints,
         color: '#0066cc',
-        width: currentGesture.brush_width || 6,
+        width: currentGesture.width || 6,
         isUserStroke: true
       }
     ]);

@@ -11,12 +11,12 @@ import {
   scale_down_factor_atom,
   animated_gesture_lines_atom,
   temp_points_atom,
-  selected_gesture_order_atom,
+  selected_gesture_index_atom,
   gesture_data_atom,
   is_recording_atom,
   is_drawing_atom,
   current_drawing_points_atom,
-  not_to_clear_gestures_order_atom
+  not_to_clear_gestures_index_atom
 } from './add_edit_state';
 import { cn } from '~/lib/utils';
 
@@ -53,17 +53,15 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   const scaleDownFactor = useAtomValue(scale_down_factor_atom);
   const animatedGestureLines = useAtomValue(animated_gesture_lines_atom);
   const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
-  const selectedGestureOrder = useAtomValue(selected_gesture_order_atom);
+  const selectedGestureIndex = useAtomValue(selected_gesture_index_atom);
   const gestureData = useAtomValue(gesture_data_atom);
   const isRecording = useAtomValue(is_recording_atom);
   const [isDrawing, setIsDrawing] = useAtom(is_drawing_atom);
   const [currentDrawingPoints, setCurrentDrawingPoints] = useAtom(current_drawing_points_atom);
-  const [notToClearGesturesOrder, setNotToClearGesturesOrder] = useAtom(
-    not_to_clear_gestures_order_atom
-  );
+  const setNotToClearGesturesIndex = useSetAtom(not_to_clear_gestures_index_atom);
 
   // Get selected gesture for drawing style
-  const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);
+  const selectedGesture = gestureData.find((g) => g.index.toString() === selectedGestureIndex);
 
   // Calculate proper centering for the character path
   const pathCentering = useMemo(() => {
@@ -120,7 +118,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     // Keep the temp points for user to save or discard
 
     if (selectedGesture) {
-      setNotToClearGesturesOrder((prev) => new Set(prev).add(selectedGesture.order));
+      setNotToClearGesturesIndex((prev) => new Set(prev).add(selectedGesture.index));
     }
   };
 
@@ -159,7 +157,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
         {/* Animated Gesture Lines */}
         {animatedGestureLines.map((line) => (
           <Line
-            key={`animated-${line.order}`}
+            key={`animated-${line.index}`}
             points={line.points}
             stroke={line.color}
             strokeWidth={line.width}
@@ -173,8 +171,8 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
         {isRecording && isDrawing && currentDrawingPoints.length > 0 && selectedGesture && (
           <Line
             points={currentDrawingPoints}
-            stroke={selectedGesture.brush_color}
-            strokeWidth={selectedGesture.brush_width}
+            stroke={selectedGesture.color}
+            strokeWidth={selectedGesture.width}
             lineCap="round"
             lineJoin="round"
             listening={false}
@@ -185,8 +183,8 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
         {isRecording && !isDrawing && tempPoints.length > 0 && selectedGesture && (
           <Line
             points={tempPoints.flatMap((p) => [p.x, p.y])}
-            stroke={selectedGesture.brush_color}
-            strokeWidth={selectedGesture.brush_width}
+            stroke={selectedGesture.color}
+            strokeWidth={selectedGesture.width}
             lineCap="round"
             lineJoin="round"
             listening={false}

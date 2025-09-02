@@ -85,8 +85,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
         gesturePoints.push({
           x,
-          y,
-          cmd: i === 0 ? 'M' : 'L'
+          y
         });
       }
 

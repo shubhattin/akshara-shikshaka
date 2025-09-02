@@ -304,8 +304,7 @@ function AddEditTextData({
     const pos = e.target.getStage().getPointerPosition();
     const point: GesturePoint = {
       x: pos.x,
-      y: pos.y,
-      cmd: 'M'
+      y: pos.y
     };
 
     setTempPoints([point]);
@@ -319,8 +318,7 @@ function AddEditTextData({
 
     const point: GesturePoint = {
       x: pos.x,
-      y: pos.y,
-      cmd: 'L'
+      y: pos.y
     };
 
     setTempPoints((prev) => [...prev, point]);

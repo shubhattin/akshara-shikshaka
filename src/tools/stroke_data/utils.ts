@@ -1,37 +1,5 @@
 import type { Gesture, GesturePoint } from './types';
 
-// Utility: sample a stroke (with optional quadratic segments) into a polyline for playback
-function sampleGestureToPolyline(
-  stroke: Gesture,
-  samplesPerSegment = 12
-): { x: number; y: number }[] {
-  const sampled: { x: number; y: number }[] = [];
-  if (!stroke.points.length) return sampled;
-  for (let i = 0; i < stroke.points.length; i++) {
-    const point = stroke.points[i];
-    if (i === 0) {
-      sampled.push({ x: point.x, y: point.y });
-      continue;
-    }
-    const prev = stroke.points[i - 1];
-    if (point.cmd === 'Q' && typeof point.cx === 'number' && typeof point.cy === 'number') {
-      const p0 = { x: prev.x, y: prev.y };
-      const p1 = { x: point.cx, y: point.cy };
-      const p2 = { x: point.x, y: point.y };
-      for (let s = 1; s <= samplesPerSegment; s++) {
-        const t = s / samplesPerSegment;
-        const mt = 1 - t;
-        const x = mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x;
-        const y = mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y;
-        sampled.push({ x, y });
-      }
-    } else {
-      sampled.push({ x: point.x, y: point.y });
-    }
-  }
-  return sampled;
-}
-
 // Framework-agnostic gesture animation data generator
 export interface GestureAnimationFrame {
   step: number;
@@ -49,7 +17,7 @@ export function* generateGestureAnimationFrames(
 ): Generator<GestureAnimationFrame> {
   if (!gesture.points.length) return;
 
-  const sampledPoints = sampleGestureToPolyline(gesture);
+  const sampledPoints = gesture.points.map((point) => ({ x: point.x, y: point.y }));
   const totalPoints = sampledPoints.length;
   const animationSteps = Math.min(totalPoints * 2, maxSteps);
 
@@ -160,9 +128,9 @@ export const evaluateStrokeAccuracy = (
     return res;
   };
 
-  // Flatten potential curves to polylines for fair comparison
+  // Convert gesture points to evaluation points
   const flatten = (pts: GesturePoint[]): EvalPoint[] =>
-    sampleGestureToPolyline({ order: 0, points: pts } as any, 20).map((p, i) => ({
+    pts.map((p, i) => ({
       x: p.x,
       y: p.y,
       timestamp: i

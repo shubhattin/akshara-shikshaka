@@ -3,7 +3,7 @@
 import { forwardRef, useMemo } from 'react';
 import { Stage, Layer, Path, Line } from 'react-konva';
 import type Konva from 'konva';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { CANVAS_DIMS, GesturePoint } from '~/tools/stroke_data/types';
 import {
   character_svg_path_atom,
@@ -16,8 +16,9 @@ import {
   is_recording_atom,
   is_drawing_atom,
   current_drawing_points_atom,
-  recording_start_time_atom
+  not_to_clear_gestures_order_atom
 } from './add_edit_state';
+import { cn } from '~/lib/utils';
 
 // Utility function to calculate SVG path bounding box
 function getSVGPathBounds(pathData: string) {
@@ -51,16 +52,15 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   const mainTextPathVisible = useAtomValue(main_text_path_visible_atom);
   const scaleDownFactor = useAtomValue(scale_down_factor_atom);
   const animatedGestureLines = useAtomValue(animated_gesture_lines_atom);
-  const tempPoints = useAtomValue(temp_points_atom);
+  const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
   const selectedGestureOrder = useAtomValue(selected_gesture_order_atom);
   const gestureData = useAtomValue(gesture_data_atom);
   const isRecording = useAtomValue(is_recording_atom);
-  const isDrawing = useAtomValue(is_drawing_atom);
-  const currentDrawingPoints = useAtomValue(current_drawing_points_atom);
-  const setIsDrawing = useSetAtom(is_drawing_atom);
-  const setTempPoints = useSetAtom(temp_points_atom);
-  const setCurrentDrawingPoints = useSetAtom(current_drawing_points_atom);
-  const setRecordingStartTime = useSetAtom(recording_start_time_atom);
+  const [isDrawing, setIsDrawing] = useAtom(is_drawing_atom);
+  const [currentDrawingPoints, setCurrentDrawingPoints] = useAtom(current_drawing_points_atom);
+  const [notToClearGesturesOrder, setNotToClearGesturesOrder] = useAtom(
+    not_to_clear_gestures_order_atom
+  );
 
   // Get selected gesture for drawing style
   const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);
@@ -88,7 +88,6 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     if (!isRecording || !selectedGesture) return;
 
     setIsDrawing(true);
-    setRecordingStartTime(Date.now());
 
     const pos = e.target.getStage().getPointerPosition();
     const point: GesturePoint = {
@@ -119,6 +118,10 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     setIsDrawing(false);
     // Keep the temp points for user to save or discard
+
+    if (selectedGesture) {
+      setNotToClearGesturesOrder((prev) => new Set(prev).add(selectedGesture.order));
+    }
   };
 
   return (
@@ -132,9 +135,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
       onTouchStart={onMouseDown}
       onTouchMove={onMouseMove}
       onTouchEnd={onMouseUp}
-      style={{
-        backgroundColor: 'white'
-      }}
+      className={cn('bg-white', isDrawing && 'cursor-crosshair')}
     >
       <Layer>
         {/* Character Text Path */}

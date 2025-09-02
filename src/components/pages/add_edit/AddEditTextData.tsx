@@ -53,7 +53,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
-import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
+import type { Gesture } from '~/tools/stroke_data/types';
 import { CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
 import { animateGesture } from '~/tools/stroke_data/utils';
 import {
@@ -148,7 +148,7 @@ export default function AddEditTextDataWrapper(props: Props) {
   return (
     <>
       <AddEditTextData {...props} stageRef={stageRef} />
-      <SaveEditMode stageRef={stageRef} text_data={props.text_data} />
+      <SaveEditMode text_data={props.text_data} />
     </>
   );
 }
@@ -173,6 +173,9 @@ function AddEditTextData({
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
   const setCharacterSvgPath = useSetAtom(character_svg_path_atom);
   const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
+  const [notToClearGesturesOrder, setNotToClearGesturesOrder] = useAtom(
+    not_to_clear_gestures_order_atom
+  );
 
   // Drag and Drop Sensors
   const sensors = useSensors(
@@ -190,12 +193,14 @@ function AddEditTextData({
       const activeOrder = parseInt(active.id.toString(), 10);
       const isSelectedBeingMoved = selectedGestureOrder === active.id.toString();
 
+      // We need to capture the current state to calculate the new notToClearGesturesOrder
+      const oldGestureData = gestureData;
+      const oldIndex = oldGestureData.findIndex((g) => g.order === activeOrder);
+      const newIndex = oldGestureData.findIndex((g) => g.order.toString() === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) return;
+
       setGestureData((prev: Gesture[]) => {
-        const oldIndex = prev.findIndex((g) => g.order === activeOrder);
-        const newIndex = prev.findIndex((g) => g.order.toString() === over.id);
-
-        if (oldIndex === -1 || newIndex === -1) return prev;
-
         // Reorder the gestures array
         const newGestures = arrayMove(prev, oldIndex, newIndex);
 
@@ -208,16 +213,30 @@ function AddEditTextData({
         return updatedGestures;
       });
 
+      // Update notToClearGesturesOrder to reflect the new order values after reordering
+      setNotToClearGesturesOrder((prev) => {
+        const newSet = new Set<number>();
+        // Create a mapping from old order to new order
+        const reorderedGestures = arrayMove(oldGestureData, oldIndex, newIndex);
+
+        for (const oldOrder of prev) {
+          // Find where this old order ended up in the new array
+          const gestureWithOldOrder = oldGestureData.find((g) => g.order === oldOrder);
+          if (gestureWithOldOrder) {
+            const newPosition = reorderedGestures.findIndex((g) => g === gestureWithOldOrder);
+            if (newPosition !== -1) {
+              newSet.add(newPosition);
+            }
+          }
+        }
+
+        return newSet;
+      });
+
       // Update selectedGestureId if the selected gesture was moved
       if (isSelectedBeingMoved) {
-        const oldIndex = gestureData.findIndex((g) => g.order === activeOrder);
-        const newIndex = gestureData.findIndex((g) => g.order.toString() === over.id);
-
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newGestures = arrayMove(gestureData, oldIndex, newIndex);
-          // The selected gesture will now be at position newIndex, so its new order is newIndex
-          setSelectedGestureOrder(newIndex.toString());
-        }
+        // The selected gesture will now be at position newIndex, so its new order is newIndex
+        setSelectedGestureOrder(newIndex.toString());
       }
     }
   };
@@ -251,14 +270,26 @@ function AddEditTextData({
     setSelectedGestureOrder(newGesture.order.toString());
   };
 
-  const clearGestureVisualization = () => {
+  const clearGestureVisualization = (all = false) => {
+    if (all) {
+      setAnimatedGestureLines([]);
+      return;
+    }
     // Clear animated gesture lines from state
-    setAnimatedGestureLines([]);
+    const allowed_gestures = gestureData.filter((g) => notToClearGesturesOrder.has(g.order));
+    setAnimatedGestureLines(
+      allowed_gestures.map((g) => ({
+        order: g.order,
+        points: g.points.flatMap((p) => [p.x, p.y]),
+        color: g.brush_color,
+        width: g.brush_width
+      }))
+    );
   };
 
   const playAllGestures = async () => {
     setIsPlaying(true);
-    clearGestureVisualization();
+    clearGestureVisualization(true);
 
     for (const gesture of gestureData) {
       if (gesture.points.length === 0) continue;
@@ -307,6 +338,11 @@ function AddEditTextData({
   }, [text, scaleDownFactor]);
 
   const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);
+
+  // replaint canvas on change of notToClearGesturesOrder
+  useEffect(() => {
+    clearGestureVisualization();
+  }, [notToClearGesturesOrder]);
 
   return (
     <div className="space-y-4">
@@ -376,7 +412,7 @@ function AddEditTextData({
             <Button
               size="sm"
               variant="outline"
-              onClick={clearGestureVisualization}
+              onClick={() => clearGestureVisualization()}
               disabled={isRecording || isPlaying}
             >
               <MdClear className="mr-1" />
@@ -398,7 +434,11 @@ function AddEditTextData({
             >
               <div className="flex flex-col gap-2">
                 {gestureData.map((gesture) => (
-                  <SortableGestureItem key={gesture.order} gesture={gesture} />
+                  <SortableGestureItem
+                    key={gesture.order}
+                    gesture={gesture}
+                    {...{ clearGestureVisualization }}
+                  />
                 ))}
               </div>
             </SortableContext>
@@ -409,7 +449,7 @@ function AddEditTextData({
         {selectedGesture && (
           <SelectedGestureControls
             selectedGesture={selectedGesture}
-            playGestureWithKonva={playGestureWithKonva}
+            {...{ clearGestureVisualization, playGestureWithKonva }}
           />
         )}
       </div>
@@ -429,17 +469,19 @@ function AddEditTextData({
 
 const SelectedGestureControls = ({
   selectedGesture,
-  playGestureWithKonva
+  playGestureWithKonva,
+  clearGestureVisualization
 }: {
   selectedGesture: Gesture;
   playGestureWithKonva: (gesture: Gesture) => Promise<void>;
+  clearGestureVisualization: () => void;
 }) => {
   const [isRecording, setIsRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
   const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
   const [selectedGestureOrder] = useAtom(selected_gesture_order_atom);
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
-  const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
+  const setNotToClearGesturesOrder = useSetAtom(not_to_clear_gestures_order_atom);
 
   // Recording is now handled by Stage mouse events in the parent component
 
@@ -483,11 +525,6 @@ const SelectedGestureControls = ({
     toast.success(`Recorded ${pointCount} points for gesture`);
   };
 
-  const clearGestureVisualization = () => {
-    // Clear animated gesture lines from state
-    setAnimatedGestureLines([]);
-  };
-
   const playGesture = async (gestureOrder: number) => {
     const gesture = gestureData.find((g) => g.order === gestureOrder);
     if (!gesture) return;
@@ -508,6 +545,12 @@ const SelectedGestureControls = ({
         gesture.order === parseInt(selectedGestureOrder, 10) ? { ...gesture, points: [] } : gesture
       )
     );
+    setTempPoints([]);
+    setNotToClearGesturesOrder((prev) => {
+      const st = new Set(prev);
+      st.delete(parseInt(selectedGestureOrder, 10));
+      return st;
+    });
     clearGestureVisualization();
   };
 
@@ -666,13 +709,14 @@ const SelectedGestureControls = ({
 // Sortable Gesture Item Component
 type SortableGestureItemProps = {
   gesture: Gesture;
+  clearGestureVisualization: () => void;
 };
 
-function SortableGestureItem({ gesture }: SortableGestureItemProps) {
+function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGestureItemProps) {
   const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying] = useAtom(is_playing_atom);
   const [selectedGestureOrder, setSelectedGestureOrder] = useAtom(selected_gesture_order_atom);
-  const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
+  const setGestureData = useSetAtom(gesture_data_atom);
 
   const disabled = isRecording || isPlaying;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -689,18 +733,46 @@ function SortableGestureItem({ gesture }: SortableGestureItemProps) {
     not_to_clear_gestures_order_atom
   );
 
-  const clearGestureVisualization = () => {
-    // Clear animated gesture lines from state
-    setAnimatedGestureLines([]);
-  };
-
   const deleteGesture = (gestureOrder: number) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-      id: gesture.order.toString(),
-      disabled: disabled
+    setGestureData((prev: Gesture[]) => {
+      // Filter out the deleted gesture
+      const filteredGestures = prev.filter((g) => g.order !== gestureOrder);
+
+      // Reorder the remaining gestures to have sequential order values (0, 1, 2, etc.)
+      const reorderedGestures = filteredGestures.map((gesture, index) => ({
+        ...gesture,
+        order: index
+      }));
+
+      return reorderedGestures;
     });
+
+    // Update notToClearGesturesOrder set to reflect the new order values
+    setNotToClearGesturesOrder((prev) => {
+      const newSet = new Set<number>();
+      // Convert old orders to new orders for gestures that weren't deleted
+      for (const oldOrder of prev) {
+        if (oldOrder < gestureOrder) {
+          // Orders before the deleted gesture stay the same
+          newSet.add(oldOrder);
+        } else if (oldOrder > gestureOrder) {
+          // Orders after the deleted gesture are decremented by 1
+          newSet.add(oldOrder - 1);
+        }
+        // The deleted gesture's order is not added to the new set
+      }
+      return newSet;
+    });
+
+    // Update selected gesture order logic
     if (selectedGestureOrder === gestureOrder.toString()) {
       setSelectedGestureOrder(null);
+    } else if (selectedGestureOrder !== null) {
+      const selectedOrder = parseInt(selectedGestureOrder, 10);
+      // If selected gesture's order was after the deleted one, decrement it
+      if (selectedOrder > gestureOrder) {
+        setSelectedGestureOrder((selectedOrder - 1).toString());
+      }
     }
   };
 
@@ -776,13 +848,7 @@ function SortableGestureItem({ gesture }: SortableGestureItemProps) {
   );
 }
 
-const SaveEditMode = ({
-  stageRef,
-  text_data
-}: {
-  stageRef: React.RefObject<Konva.Stage | null>;
-  text_data: text_data_type;
-}) => {
+const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const text = useAtomValue(text_atom);
   const gestureData = useAtomValue(gesture_data_atom);
 

@@ -13,6 +13,7 @@ import {
   is_recording_stroke_atom,
   is_drawing_atom
 } from './practice_state';
+import { cn } from '~/lib/utils';
 
 interface PracticeKonvaCanvasProps {
   gestureData: Gesture[];
@@ -109,9 +110,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         onTouchStart={handleStageMouseDown}
         onTouchMove={handleStageMouseMove}
         onTouchEnd={handleStageMouseUp}
-        style={{
-          backgroundColor: 'white'
-        }}
+        className={cn('bg-white', isDrawing && 'cursor-crosshair')}
       >
         <Layer>
           {/* Animated Gesture Lines (guidance and completed strokes) */}

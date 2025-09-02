@@ -19,15 +19,6 @@ export type GesturePoint = z.infer<typeof StrokePointSchema>;
 
 export type Gesture = z.infer<typeof GestureSchema>;
 
-export const GESTURE_FLAGS = {
-  isGestureVisualization: 'isGestureVisualization',
-  isMainCharacterPath: 'isMainCharacterPath',
-  /** The strokes which are manually drawn by the user */
-  isUserStroke: 'isUserStroke',
-  /** Stroke for the current Gesture */
-  isCurrentAnimatedGesture: 'isCurrentAnimatedStroke'
-} as const;
-
 export const CANVAS_DIMS = {
   width: 400,
   height: 400

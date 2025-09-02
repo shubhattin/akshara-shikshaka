@@ -21,7 +21,6 @@ export const not_to_clear_gestures_order_atom = atom<ReadonlySet<number>>(new Se
 // Recording and playback state
 export const is_recording_atom = atom(false);
 export const is_playing_atom = atom(false);
-export const recording_start_time_atom = atom<number>(0);
 export const temp_points_atom = atom<GesturePoint[]>([]);
 export const is_drawing_atom = atom(false);
 

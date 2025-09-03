@@ -1,5 +1,7 @@
 import { atom } from 'jotai';
 import type { GesturePoint, Gesture, AnimationGesture } from '~/tools/stroke_data/types';
+import type { script_list_type } from '~/state/lang_list';
+import type { FontFamily } from '~/state/font_list';
 
 // Default constants
 const DEFAULT_GESTURE_BRUSH_WIDTH = 8;
@@ -10,6 +12,9 @@ const DEFAULT_FONT_SIZE = 15;
 // Core text and UI state
 export const text_atom = atom('');
 export const text_edit_mode_atom = atom(false);
+export const script_atom = atom<script_list_type>('Devanagari');
+export const font_family_atom = atom<FontFamily>('Nirmala_UI');
+export const font_loaded_atom = atom<Map<FontFamily, boolean>>(new Map<FontFamily, boolean>());
 
 // Gesture data and selection
 export const gesture_data_atom = atom<Gesture[]>([]);

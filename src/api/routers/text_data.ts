@@ -9,7 +9,8 @@ const add_text_data_route = protectedAdminProcedure
   .input(
     z.object({
       text: z.string().min(1),
-      gestures: GestureSchema.array()
+      gestures: GestureSchema.array(),
+      scriptID: z.number().int()
     })
   )
   .mutation(async ({ input }) => {
@@ -17,7 +18,8 @@ const add_text_data_route = protectedAdminProcedure
       .insert(text_data)
       .values({
         text: input.text,
-        gestures: input.gestures
+        gestures: input.gestures,
+        scriptID: input.scriptID
       })
       .returning();
     return {
@@ -31,7 +33,6 @@ const edit_text_data_route = protectedAdminProcedure
     z.object({
       id: z.number(),
       uuid: z.string().uuid(),
-      text: z.string().min(1),
       gestures: GestureSchema.array()
     })
   )
@@ -39,7 +40,6 @@ const edit_text_data_route = protectedAdminProcedure
     await db
       .update(text_data)
       .set({
-        text: input.text,
         gestures: input.gestures
       })
       .where(and(eq(text_data.uuid, input.uuid), eq(text_data.id, input.id)));

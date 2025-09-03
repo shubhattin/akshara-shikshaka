@@ -16,7 +16,9 @@ import {
   is_drawing_atom,
   current_drawing_points_atom,
   not_to_clear_gestures_index_atom,
-  text_atom
+  text_atom,
+  font_family_atom,
+  font_loaded_atom
 } from './add_edit_state';
 import { cn } from '~/lib/utils';
 
@@ -36,6 +38,10 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
   // Get selected gesture for drawing style
   const selectedGesture = gestureData.find((g) => g.index.toString() === selectedGestureIndex);
+  const [fontFamily, setFontFamily] = useAtom(font_family_atom);
+  const [fontLoaded, setFontLoaded] = useAtom(font_loaded_atom);
+
+  const currentFontLoaded = fontLoaded.get(fontFamily) ?? false;
 
   // Accurately center the character using measured text box
   const textRef = useRef<Konva.Text | null>(null);
@@ -111,7 +117,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
           y={CANVAS_DIMS.height / 2}
           text={text}
           fontSize={fontSize * 15}
-          fontFamily="Nirmala UI"
+          fontFamily={currentFontLoaded ? fontFamily : 'Arial'}
           fill="black"
           visible={mainTextPathVisible}
           offsetX={textBox.width / 2}

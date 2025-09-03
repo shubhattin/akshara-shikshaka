@@ -70,9 +70,15 @@ import {
   is_drawing_atom,
   current_drawing_points_atom,
   not_to_clear_gestures_index_atom,
-  temp_points_atom
+  temp_points_atom,
+  font_family_atom,
+  script_atom,
+  font_loaded_atom
 } from './add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
+import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
+import { FONT_LIST, FONT_SCRIPTS, FontFamily } from '~/state/font_list';
+import { script_list_obj, script_list_type } from '~/state/lang_list';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
 const KonvaCanvas = dynamic(() => import('./AddEditCanvas'), {
@@ -154,14 +160,16 @@ export default function AddEditTextDataWrapper(props: Props) {
 
 function AddEditTextData({
   text_data,
+  location,
   stageRef
 }: Props & {
   stageRef: React.RefObject<Konva.Stage | null>;
 }) {
   const [textIntermediate, setIntermediateText] = useState(text_data.text);
-  const [, setText] = useAtom(text_atom);
+  const [text, setText] = useAtom(text_atom);
   const [textEditMode, setTextEditMode] = useAtom(text_edit_mode_atom);
   const [fontSize, setFontSize] = useAtom(font_size_atom);
+  const [fontLoaded, setFontLoaded] = useAtom(font_loaded_atom);
   const [mainTextPathVisible, setMainTextPathVisible] = useAtom(main_text_path_visible_atom);
 
   // Gesture Recording State
@@ -312,6 +320,38 @@ function AddEditTextData({
 
   const selectedGesture = gestureData.find((g) => g.index.toString() === selectedGestureIndex);
 
+  const [script, setScript] = useAtom(script_atom);
+  const [fontFamily, setFontFamily] = useAtom(font_family_atom);
+
+  const currentScriptFontList = FONT_LIST[script]!;
+
+  useEffect(() => {
+    if (location !== 'add') return;
+    load_parivartak_lang_data(script);
+    setFontFamily(currentScriptFontList[0].font_family);
+  }, [script]);
+
+  useEffect(() => {
+    if (fontLoaded.get(fontFamily)) return;
+    const font_info = FONT_LIST[script]!.find((f) => f.font_family === fontFamily);
+    if (!font_info) return;
+    const font = new FontFace(fontFamily, `url(${font_info.url})`);
+
+    font
+      .load()
+      .then((loadedFont) => {
+        document.fonts.add(loadedFont);
+        setFontLoaded((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(fontFamily, true);
+          return newMap;
+        });
+      })
+      .catch((err) => {
+        console.error('Font loading failed:', err);
+      });
+  }, [fontFamily]);
+
   // repaint canvas on change of notToClearGesturesIndex
   useEffect(() => {
     clearGestureVisualization();
@@ -319,26 +359,127 @@ function AddEditTextData({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Label className="font-bold">Text</Label>
+      <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <Input
-            value={textIntermediate}
-            className="w-32"
-            disabled={!textEditMode}
-            onChange={(e) => setIntermediateText(e.target.value)}
-          />
-          {!textEditMode && <Button onClick={() => setTextEditMode(true)}>Edit</Button>}
-          {textEditMode && (
-            <Button
-              onClick={() => {
-                setTextEditMode(false);
-                setText(textIntermediate);
+          <Label className="font-bold">Script</Label>
+          {location === 'add' && (
+            <select
+              value={script}
+              onChange={(e) => {
+                setScript(e.target.value as script_list_type);
               }}
+              className={cn(
+                'w-32 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm transition-colors',
+                'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                'disabled:cursor-not-allowed disabled:opacity-50',
+                'text-foreground',
+                'dark:border-border dark:bg-background dark:text-foreground'
+              )}
             >
-              Save
-            </Button>
+              {FONT_SCRIPTS.map((script) => (
+                <option
+                  key={script}
+                  value={script}
+                  className={cn(
+                    'bg-background text-foreground',
+                    'dark:bg-background dark:text-foreground'
+                  )}
+                >
+                  {script}
+                </option>
+              ))}
+            </select>
           )}
+          {location !== 'add' && <span className="text-sm">{script}</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="font-bold">Font Family</Label>
+          <select
+            value={fontFamily}
+            onChange={(e) => {
+              setFontFamily(e.target.value as FontFamily);
+            }}
+            className={cn(
+              'w-40 rounded-md border border-input bg-background px-2 py-1 shadow-sm transition-colors',
+              'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              'text-foreground',
+              'tdark:border-border dark:bg-background dark:text-foreground',
+              'text-xs'
+            )}
+          >
+            {currentScriptFontList.map((font) => (
+              <option
+                key={font.font_family}
+                value={font.font_family}
+                className={cn(
+                  'bg-background text-foreground',
+                  'dark:bg-background dark:text-foreground'
+                )}
+              >
+                {font.font_family.split('_').join(' ')}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex items-center gap-5">
+        <Label className="font-bold">Text</Label>
+        {location === 'add' && (
+          <div className="flex items-center gap-2">
+            <Input
+              value={textIntermediate}
+              className="w-32"
+              disabled={!textEditMode}
+              // onInput={(e) => setIntermediateText(e.target.value)}
+              onInput={(e) => {
+                setIntermediateText(e.currentTarget.value);
+                lekhika_typing_tool(
+                  e.nativeEvent.target,
+                  // @ts-ignore
+                  e.nativeEvent.data,
+                  script,
+                  true,
+                  // @ts-ignore
+                  (val) => {
+                    setIntermediateText(val);
+                  }
+                );
+              }}
+            />
+            {!textEditMode && <Button onClick={() => setTextEditMode(true)}>Edit</Button>}
+            {textEditMode && (
+              <Button
+                onClick={() => {
+                  setTextEditMode(false);
+                  setText(textIntermediate);
+                }}
+              >
+                Save
+              </Button>
+            )}
+          </div>
+        )}
+        {location !== 'add' && (
+          <span className="text-base" style={{ fontFamily }}>
+            {text}
+          </span>
+        )}
+        <div className="flex items-center gap-2">
+          <Label className="font-bold">Font Size</Label>
+          <Input
+            value={fontSize}
+            className="w-16"
+            type="number"
+            step={1}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              if (value > 0) {
+                setFontSize(value);
+              }
+            }}
+            style={{ fontFamily }}
+          />
         </div>
         <Label className="flex items-center gap-2">
           <Switch
@@ -348,24 +489,15 @@ function AddEditTextData({
           />
         </Label>
       </div>
-      <div className="flex items-center gap-2">
-        <Label className="font-bold">Font Size</Label>
-        <Input
-          value={fontSize}
-          className="w-16"
-          type="number"
-          step={1}
-          onChange={(e) => {
-            const value = Number(e.target.value);
-            if (value > 0) {
-              setFontSize(value);
-            }
-          }}
-        />
-      </div>
+
       {/* Gesture Management Section */}
       <div className="space-y-3">
-        <Button onClick={addNewGesture} size="sm" variant="outline">
+        <Button
+          onClick={addNewGesture}
+          size="sm"
+          variant="outline"
+          disabled={text.trim().length === 0}
+        >
           <IoMdAdd className="mr-1" />
           Add Gesture
         </Button>
@@ -819,6 +951,8 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
 const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const text = useAtomValue(text_atom);
   const gestureData = useAtomValue(gesture_data_atom);
+  const script = useAtomValue(script_atom);
+  const scriptID = script_list_obj[script]!;
 
   const is_addition = text_data.id === undefined && text_data.uuid === undefined;
 
@@ -852,14 +986,15 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     if (is_addition) {
       add_text_data_mut.mutate({
         text,
-        gestures: gestureData
+        gestures: gestureData,
+        scriptID
       });
     } else {
       update_text_data_mut.mutate({
         id: text_data.id!,
         uuid: text_data.uuid!,
-        text,
         gestures: gestureData
+        // script and text can be only set once
       });
     }
   };

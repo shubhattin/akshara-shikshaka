@@ -209,7 +209,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         points_flat: flatPoints,
         color: '#0066cc',
         width: currentGesture.width || 6,
-        isUserStroke: true
+        isUserGesture: true
       }
     ]);
 
@@ -276,7 +276,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   const clearUserGestures = () => {
-    setAnimatedGestureLines((prev) => prev.filter((line) => !line.isUserStroke));
+    setAnimatedGestureLines((prev) => prev.filter((line) => !line.isUserGesture));
   };
 
   const replayCurrentGesture = () => {

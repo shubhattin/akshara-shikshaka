@@ -120,8 +120,8 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
               lineCap="round"
               lineJoin="round"
               listening={false}
-              opacity={line.isUserStroke ? 0.8 : line.isCurrentAnimatedGesture ? 1 : 0.6}
-              dash={line.isCurrentAnimatedGesture ? [] : line.isUserStroke ? [] : [5, 5]}
+              opacity={line.isUserGesture ? 0.8 : line.isCurrentAnimatedGesture ? 1 : 0.6}
+              dash={line.isCurrentAnimatedGesture ? [] : line.isUserGesture ? [] : [5, 5]}
             />
           ))}
 

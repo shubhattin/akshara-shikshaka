@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
+import type { GesturePoint, AnimationGesture } from '~/tools/stroke_data/types';
 
 // Practice workflow state
 export const practice_mode_atom = atom<'none' | 'playing' | 'practicing'>('none');
@@ -20,14 +20,10 @@ export const mounted_atom = atom(false);
 // Gesture data atoms
 export const current_user_points_atom = atom<GesturePoint[]>([]);
 export const animated_gesture_lines_atom = atom<
-  Array<{
-    index: number;
-    points_flat: number[];
-    color: string;
-    width: number;
-    isUserStroke?: boolean;
+  (AnimationGesture & {
+    isUserGesture?: boolean;
     isCurrentAnimatedGesture?: boolean;
-  }>
+  })[]
 >([]);
 
 // Drawing state

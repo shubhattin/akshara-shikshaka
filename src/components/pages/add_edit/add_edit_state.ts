@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
+import type { GesturePoint, Gesture, AnimationGesture } from '~/tools/stroke_data/types';
 
 // Default constants
 const DEFAULT_GESTURE_BRUSH_WIDTH = 8;
@@ -29,14 +29,7 @@ export const character_svg_path_atom = atom<string>('');
 export const main_text_path_visible_atom = atom(true);
 
 // Animation state for Konva
-export const animated_gesture_lines_atom = atom<
-  Array<{
-    index: number;
-    points_flat: number[];
-    color: string;
-    width: number;
-  }>
->([]);
+export const animated_gesture_lines_atom = atom<AnimationGesture[]>([]);
 
 // Export constants for use in components
 export const DEFAULTS = {

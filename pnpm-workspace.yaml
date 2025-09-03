@@ -1,4 +1,7 @@
-ignoredBuiltDependencies:
+onlyBuiltDependencies:
+  - '@parcel/watcher'
   - '@tailwindcss/oxide'
+  - canvas
   - core-js
   - esbuild
+  - sharp

@@ -88,7 +88,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     // Keep the temp points for user to save or discard
 
     if (selectedGesture && gestureData.length === selectedGesture.index + 1) {
-      // ^ only if last
+      // ^ only if last gesture in the list
       setNotToClearGesturesIndex((prev) => new Set(prev).add(selectedGesture.index));
     }
   };
@@ -123,18 +123,21 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
         />
 
         {/* Animated Gesture Lines */}
-        {animatedGestures.map((gesture) => (
-          <Line
-            key={`animated-${gesture.index}`}
-            points={gesture.points_flat}
-            stroke={gesture.color}
-            strokeWidth={gesture.width}
-            lineCap="round"
-            lineJoin="round"
-            listening={false}
-            tension={1}
-          />
-        ))}
+        {animatedGestures
+          .filter((g) => !(isRecording && g.index === parseInt(selectedGestureIndex ?? '-1', 10)))
+          // ^ not displaying the current gesture even if marked while recording
+          .map((gesture) => (
+            <Line
+              key={`animated-${gesture.index}`}
+              points={gesture.points_flat}
+              stroke={gesture.color}
+              strokeWidth={gesture.width}
+              lineCap="round"
+              lineJoin="round"
+              listening={false}
+              tension={1}
+            />
+          ))}
 
         {/* Current Drawing Line (during recording) */}
         {currentGestureRecordingPoints.length > 0 && selectedGesture && (

@@ -1,14 +1,13 @@
 'use client';
 
-import { forwardRef, useMemo } from 'react';
-import { Stage, Layer, Path, Line } from 'react-konva';
+import { forwardRef, useLayoutEffect, useRef, useState } from 'react';
+import { Stage, Layer, Line, Text } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { CANVAS_DIMS, GesturePoint } from '~/tools/stroke_data/types';
 import {
-  character_svg_path_atom,
   main_text_path_visible_atom,
-  scale_down_factor_atom,
+  font_size_atom,
   animated_gesture_lines_atom,
   temp_points_atom,
   selected_gesture_index_atom,
@@ -16,39 +15,16 @@ import {
   is_recording_atom,
   is_drawing_atom,
   current_drawing_points_atom,
-  not_to_clear_gestures_index_atom
+  not_to_clear_gestures_index_atom,
+  text_atom
 } from './add_edit_state';
 import { cn } from '~/lib/utils';
 
-// Utility function to calculate SVG path bounding box
-function getSVGPathBounds(pathData: string) {
-  let svg: SVGSVGElement | null = null;
-  try {
-    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    // render offscreen; getBBox requires element to be in the DOM and visible
-    (svg.style as CSSStyleDeclaration).position = 'absolute';
-    (svg.style as CSSStyleDeclaration).left = '-9999px';
-    (svg.style as CSSStyleDeclaration).top = '-9999px';
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', pathData);
-    svg.appendChild(path);
-    document.body.appendChild(svg);
-
-    const bbox = path.getBBox();
-    return { x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height };
-  } catch (error) {
-    console.warn('Failed to calculate path bounds:', error);
-    return { x: 0, y: 0, width: 100, height: 100 };
-  } finally {
-    if (svg && svg.parentNode) svg.parentNode.removeChild(svg);
-  }
-}
-
 const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   // Canvas state from atoms
-  const characterSvgPath = useAtomValue(character_svg_path_atom);
   const mainTextPathVisible = useAtomValue(main_text_path_visible_atom);
-  const scaleDownFactor = useAtomValue(scale_down_factor_atom);
+  const text = useAtomValue(text_atom);
+  const fontSize = useAtomValue(font_size_atom);
   const animatedGestureLines = useAtomValue(animated_gesture_lines_atom);
   const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
   const selectedGestureIndex = useAtomValue(selected_gesture_index_atom);
@@ -61,23 +37,23 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   // Get selected gesture for drawing style
   const selectedGesture = gestureData.find((g) => g.index.toString() === selectedGestureIndex);
 
-  // Calculate proper centering for the character path
-  const pathCentering = useMemo(() => {
-    if (!characterSvgPath) return { offsetX: 0, offsetY: 0 };
+  // Accurately center the character using measured text box
+  const textRef = useRef<Konva.Text | null>(null);
+  const [textBox, setTextBox] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0
+  });
 
-    const bounds = getSVGPathBounds(characterSvgPath);
-    const scale = !scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1;
-
-    // Calculate the scaled dimensions
-    const scaledWidth = bounds.width * scale;
-    const scaledHeight = bounds.height * scale;
-
-    // Calculate offset to center the path (accounting for its natural position)
-    const offsetX = bounds.width / 2 + bounds.x;
-    const offsetY = bounds.height / 2 + bounds.y;
-
-    return { offsetX, offsetY };
-  }, [characterSvgPath, scaleDownFactor]);
+  useLayoutEffect(() => {
+    const node = textRef.current;
+    if (!node) return;
+    // Ensure layout is up to date before measuring
+    node.getLayer()?.batchDraw();
+    const measured = node.getClientRect({ skipShadow: true, skipStroke: true });
+    if (measured.width !== textBox.width || measured.height !== textBox.height) {
+      setTextBox({ width: measured.width, height: measured.height });
+    }
+  }, [text, fontSize]);
 
   // Mouse event handlers for gesture recording
   const onMouseDown = (e: any) => {
@@ -128,23 +104,20 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
       className={cn('bg-white', isRecording && 'cursor-crosshair')}
     >
       <Layer>
-        {/* Character Text Path */}
-        {characterSvgPath && (
-          <Path
-            data={characterSvgPath}
-            fill="black"
-            stroke="#000000"
-            strokeWidth={2}
-            scaleX={!scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1}
-            scaleY={!scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1}
-            x={CANVAS_DIMS.width / 2}
-            y={CANVAS_DIMS.height / 2}
-            offsetX={pathCentering.offsetX}
-            offsetY={pathCentering.offsetY}
-            visible={mainTextPathVisible}
-            listening={false}
-          />
-        )}
+        {/* Character Text */}
+        <Text
+          ref={textRef}
+          x={CANVAS_DIMS.width / 2}
+          y={CANVAS_DIMS.height / 2}
+          text={text}
+          fontSize={fontSize * 15}
+          fontFamily="Nirmala UI"
+          fill="black"
+          visible={mainTextPathVisible}
+          offsetX={textBox.width / 2}
+          offsetY={textBox.height / 2 - textBox.height * 0.06}
+          draggable={!isRecording && !isDrawing}
+        />
 
         {/* Animated Gesture Lines */}
         {animatedGestureLines.map((line) => (

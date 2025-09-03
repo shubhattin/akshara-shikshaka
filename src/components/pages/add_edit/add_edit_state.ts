@@ -5,12 +5,11 @@ import type { GesturePoint, Gesture, AnimationGesture } from '~/tools/stroke_dat
 const DEFAULT_GESTURE_BRUSH_WIDTH = 8;
 const DEFAULT_GESTURE_BRUSH_COLOR = '#ff0000'; // red
 const DEFAULT_GESTURE_ANIMATION_DURATION = 600;
-const DEFAULT_SCALE_DOWN_FACTOR = 4.5;
+const DEFAULT_FONT_SIZE = 15;
 
 // Core text and UI state
 export const text_atom = atom('');
 export const text_edit_mode_atom = atom(false);
-export const scale_down_factor_atom = atom(DEFAULT_SCALE_DOWN_FACTOR);
 
 // Gesture data and selection
 export const gesture_data_atom = atom<Gesture[]>([]);
@@ -25,8 +24,8 @@ export const temp_points_atom = atom<GesturePoint[]>([]);
 export const is_drawing_atom = atom(false);
 
 // Character rendering state
-export const character_svg_path_atom = atom<string>('');
 export const main_text_path_visible_atom = atom(true);
+export const font_size_atom = atom(DEFAULT_FONT_SIZE);
 
 // Animation state for Konva
 export const animated_gesture_lines_atom = atom<AnimationGesture[]>([]);
@@ -36,5 +35,5 @@ export const DEFAULTS = {
   GESTURE_BRUSH_WIDTH: DEFAULT_GESTURE_BRUSH_WIDTH,
   GESTURE_BRUSH_COLOR: DEFAULT_GESTURE_BRUSH_COLOR,
   GESTURE_ANIMATION_DURATION: DEFAULT_GESTURE_ANIMATION_DURATION,
-  SCALE_DOWN_FACTOR: DEFAULT_SCALE_DOWN_FACTOR
+  FONT_SIZE: DEFAULT_FONT_SIZE
 } as const;

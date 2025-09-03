@@ -59,12 +59,11 @@ import { animateGesture } from '~/tools/stroke_data/utils';
 import {
   text_atom,
   text_edit_mode_atom,
-  scale_down_factor_atom,
+  font_size_atom,
   gesture_data_atom,
   selected_gesture_index_atom,
   is_recording_atom,
   is_playing_atom,
-  character_svg_path_atom,
   main_text_path_visible_atom,
   animated_gesture_lines_atom,
   DEFAULTS,
@@ -135,7 +134,7 @@ export default function AddEditTextDataWrapper(props: Props) {
   useHydrateAtoms([
     [text_atom, props.text_data.text],
     [text_edit_mode_atom, props.location === 'add' && true],
-    [scale_down_factor_atom, DEFAULTS.SCALE_DOWN_FACTOR],
+    [font_size_atom, DEFAULTS.FONT_SIZE],
     [gesture_data_atom, props.text_data.gestures ?? []],
     [selected_gesture_index_atom, null],
     [is_recording_atom, false],
@@ -160,9 +159,9 @@ function AddEditTextData({
   stageRef: React.RefObject<Konva.Stage | null>;
 }) {
   const [textIntermediate, setIntermediateText] = useState(text_data.text);
-  const [text, setText] = useAtom(text_atom);
+  const [, setText] = useAtom(text_atom);
   const [textEditMode, setTextEditMode] = useAtom(text_edit_mode_atom);
-  const [scaleDownFactor, setScaleDownFactor] = useAtom(scale_down_factor_atom);
+  const [fontSize, setFontSize] = useAtom(font_size_atom);
   const [mainTextPathVisible, setMainTextPathVisible] = useAtom(main_text_path_visible_atom);
 
   // Gesture Recording State
@@ -171,7 +170,6 @@ function AddEditTextData({
   const [selectedGestureIndex, setSelectedGestureIndex] = useAtom(selected_gesture_index_atom);
   const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
-  const setCharacterSvgPath = useSetAtom(character_svg_path_atom);
   const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
   const [notToClearGesturesIndex, setNotToClearGesturesIndex] = useAtom(
     not_to_clear_gestures_index_atom
@@ -238,22 +236,6 @@ function AddEditTextData({
         // The selected gesture will now be at position newIndex, so its new index is newIndex
         setSelectedGestureIndex(newIndex.toString());
       }
-    }
-  };
-
-  // Konva doesn't need manual initialization like Fabric
-  // The Stage component handles everything declaratively
-
-  const render_text_path = async (text: string) => {
-    const hbjs = await import('~/tools/harfbuzz/index');
-
-    const FONT_URL = '/fonts/regular/Nirmala.ttf';
-    await Promise.all([hbjs.preload_harfbuzzjs_wasm(), hbjs.preload_font_from_url(FONT_URL)]);
-
-    const svg_path = await hbjs.get_text_svg_path(text, FONT_URL);
-    if (svg_path) {
-      // Store the SVG path data in state - Konva Path component will use it
-      setCharacterSvgPath(svg_path);
     }
   };
 
@@ -328,20 +310,9 @@ function AddEditTextData({
     });
   };
 
-  // No manual canvas initialization needed with Konva
-
-  // Text path visibility is now handled declaratively via mainTextPathVisible state
-
-  // Gesture recording is now handled via Stage mouse events
-
-  useEffect(() => {
-    if (text.trim().length === 0) return;
-    render_text_path(text);
-  }, [text, scaleDownFactor]);
-
   const selectedGesture = gestureData.find((g) => g.index.toString() === selectedGestureIndex);
 
-  // replaint canvas on change of notToClearGesturesIndex
+  // repaint canvas on change of notToClearGesturesIndex
   useEffect(() => {
     clearGestureVisualization();
   }, [notToClearGesturesIndex]);
@@ -370,7 +341,6 @@ function AddEditTextData({
           )}
         </div>
         <Label className="flex items-center gap-2">
-          Main Character Path
           <Switch
             checked={mainTextPathVisible}
             onCheckedChange={setMainTextPathVisible}
@@ -379,16 +349,16 @@ function AddEditTextData({
         </Label>
       </div>
       <div className="flex items-center gap-2">
-        <Label className="font-bold">Scale Down Factor</Label>
+        <Label className="font-bold">Font Size</Label>
         <Input
-          value={scaleDownFactor}
+          value={fontSize}
           className="w-16"
           type="number"
-          step={0.5}
+          step={1}
           onChange={(e) => {
             const value = Number(e.target.value);
             if (value > 0) {
-              setScaleDownFactor(value);
+              setFontSize(value);
             }
           }}
         />

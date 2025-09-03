@@ -8,7 +8,9 @@ export const text_atom = atom('');
 export const text_edit_mode_atom = atom(false);
 export const script_atom = atom<script_list_type>('Devanagari');
 export const font_family_atom = atom<FontFamily>('Nirmala_UI');
-export const font_loaded_atom = atom<Map<FontFamily, boolean>>(new Map<FontFamily, boolean>());
+export const font_loaded_atom = atom<ReadonlyMap<FontFamily, boolean>>(
+  new Map<FontFamily, boolean>()
+);
 export const main_text_path_visible_atom = atom(true);
 export const font_size_atom = atom(DEFAULT_FONT_SIZE as number);
 
@@ -19,7 +21,7 @@ export const is_drawing_atom = atom(false);
 
 // Gesture data and selection
 export const gesture_data_atom = atom<Gesture[]>([]);
-export const selected_gesture_index_atom = atom<string | null>(null);
+export const selected_gesture_index_atom = atom<number | null>(null);
 /** Set of gestures that are not to be cleared */
 export const not_to_clear_gestures_index_atom = atom<ReadonlySet<number>>(new Set<number>());
 

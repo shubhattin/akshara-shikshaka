@@ -37,7 +37,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   const setNotToClearGesturesIndex = useSetAtom(not_to_clear_gestures_index_atom);
 
   // Get selected gesture for drawing style
-  const selectedGesture = gestureData.find((g) => g.index.toString() === selectedGestureIndex);
+  const selectedGesture = gestureData.find((g) => g.index === selectedGestureIndex);
   const [fontFamily] = useAtom(font_family_atom);
   const [fontLoaded] = useAtom(font_loaded_atom);
 
@@ -124,7 +124,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
         {/* Animated Gesture Lines */}
         {animatedGestures
-          .filter((g) => !(isRecording && g.index === parseInt(selectedGestureIndex ?? '-1', 10)))
+          .filter((g) => !(isRecording && g.index === selectedGestureIndex))
           // ^ not displaying the current gesture even if marked while recording
           .map((gesture) => (
             <Line

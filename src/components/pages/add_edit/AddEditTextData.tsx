@@ -201,12 +201,13 @@ function AddEditTextData({
 
     if (over && active.id !== over.id) {
       const activeIndex = parseInt(active.id.toString(), 10);
-      const isSelectedBeingMoved = selectedGestureIndex === active.id.toString();
+      const overIndex = parseInt(over.id.toString(), 10);
+      const isSelectedBeingMoved = selectedGestureIndex === activeIndex;
 
       // We need to capture the current state to calculate the new notToClearGesturesIndex
       const oldGestureData = gestureData;
       const oldIndex = oldGestureData.findIndex((g) => g.index === activeIndex);
-      const newIndex = oldGestureData.findIndex((g) => g.index.toString() === over.id);
+      const newIndex = oldGestureData.findIndex((g) => g.index === overIndex);
 
       if (oldIndex === -1 || newIndex === -1) return;
 
@@ -246,7 +247,7 @@ function AddEditTextData({
       // Update selectedGestureId if the selected gesture was moved
       if (isSelectedBeingMoved) {
         // The selected gesture will now be at position newIndex, so its new index is newIndex
-        setSelectedGestureIndex(newIndex.toString());
+        setSelectedGestureIndex(newIndex);
       }
     }
   };
@@ -261,7 +262,7 @@ function AddEditTextData({
     };
     setGestureData((prev: Gesture[]) => [...prev, newGesture]);
     clearGestureVisualization();
-    setSelectedGestureIndex(newGesture.index.toString());
+    setSelectedGestureIndex(newGesture.index);
   };
 
   const clearGestureVisualization = (all = false) => {
@@ -320,7 +321,7 @@ function AddEditTextData({
     });
   };
 
-  const selectedGesture = gestureData.find((g) => g.index.toString() === selectedGestureIndex);
+  const selectedGesture = gestureData.find((g) => g.index === selectedGestureIndex);
 
   const [script, setScript] = useAtom(script_atom);
   const [fontFamily, setFontFamily] = useAtom(font_family_atom);
@@ -361,19 +362,17 @@ function AddEditTextData({
 
   useEffect(() => {
     if (!selectedGestureIndex) return;
-    const currentGestureIndex = gestureData.find(
-      (g) => g.index === parseInt(selectedGestureIndex, 10)
-    )!;
+    const currentGesture = gestureData.find((g) => g.index === selectedGestureIndex)!;
     // on gesture data change if there is a instance of it inside of animated gesture then update it
     setAnimatedGestures((prev) =>
       prev.map((g) =>
-        g.index === currentGestureIndex.index
+        g.index === currentGesture.index
           ? {
-              color: currentGestureIndex.color,
-              points: currentGestureIndex.points,
-              width: currentGestureIndex.width,
-              index: currentGestureIndex.index,
-              points_flat: currentGestureIndex.points.flatMap((p) => [p[0], p[1]])
+              color: currentGesture.color,
+              points: currentGesture.points,
+              width: currentGesture.width,
+              index: currentGesture.index,
+              points_flat: currentGesture.points.flatMap((p) => [p[0], p[1]])
             }
           : g
       )
@@ -632,7 +631,7 @@ const SelectedGestureControls = ({
     // Set the points for the selected gesture (overwrite previous points)
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
-        gesture.index === parseInt(selectedGestureIndex, 10)
+        gesture.index === selectedGestureIndex
           ? {
               ...gesture,
               points: currentGestureRecordingPoints
@@ -667,12 +666,12 @@ const SelectedGestureControls = ({
     if (!selectedGestureIndex) return;
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
-        gesture.index === parseInt(selectedGestureIndex, 10) ? { ...gesture, points: [] } : gesture
+        gesture.index === selectedGestureIndex ? { ...gesture, points: [] } : gesture
       )
     );
     setNotToClearGesturesIndex((prev) => {
       const st = new Set(prev);
-      st.delete(parseInt(selectedGestureIndex, 10));
+      st.delete(selectedGestureIndex);
       return st;
     });
     clearGestureVisualization();
@@ -759,7 +758,7 @@ const SelectedGestureControls = ({
               onChange={(e) =>
                 setGestureData((prev: Gesture[]) =>
                   prev.map((gesture) =>
-                    gesture.index === parseInt(selectedGestureIndex || '0', 10)
+                    gesture.index === selectedGestureIndex
                       ? { ...gesture, color: e.target.value }
                       : gesture
                   )
@@ -780,9 +779,7 @@ const SelectedGestureControls = ({
             onValueChange={(value) =>
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
-                  gesture.index === parseInt(selectedGestureIndex || '0', 10)
-                    ? { ...gesture, width: value[0] }
-                    : gesture
+                  gesture.index === selectedGestureIndex ? { ...gesture, width: value[0] } : gesture
                 )
               )
             }
@@ -802,7 +799,7 @@ const SelectedGestureControls = ({
             onValueChange={(value) =>
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
-                  gesture.index === parseInt(selectedGestureIndex || '0', 10)
+                  gesture.index === selectedGestureIndex
                     ? { ...gesture, duration: value[0] }
                     : gesture
                 )
@@ -885,28 +882,27 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
     });
 
     // Update selected gesture index logic
-    if (selectedGestureIndex === gestureIndex.toString()) {
+    if (selectedGestureIndex === gestureIndex) {
       setSelectedGestureIndex(null);
     } else if (selectedGestureIndex !== null) {
-      const selectedIndex = parseInt(selectedGestureIndex, 10);
       // If selected gesture's index was after the deleted one, decrement it
-      if (selectedIndex > gestureIndex) {
-        setSelectedGestureIndex((selectedIndex - 1).toString());
+      if (selectedGestureIndex > gestureIndex) {
+        setSelectedGestureIndex(selectedGestureIndex - 1);
       }
     }
   };
 
-  const onSelect = (gestureIndex: string | null) => {
+  const onSelect = (gestureIndex: number | null) => {
     clearGestureVisualization();
     setSelectedGestureIndex(gestureIndex);
   };
 
   const onSelectCurrent = () => {
     clearGestureVisualization();
-    if (selectedGestureIndex === gesture.index.toString()) {
+    if (selectedGestureIndex === gesture.index) {
       onSelect(null);
     } else {
-      onSelect(gesture.index.toString());
+      onSelect(gesture.index);
     }
   };
 
@@ -916,7 +912,7 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
       style={style}
       className={cn(
         'flex cursor-pointer items-center gap-2 rounded border p-2 transition-colors',
-        selectedGestureIndex === gesture.index.toString()
+        selectedGestureIndex === gesture.index
           ? 'border-primary bg-primary/10'
           : 'border-border hover:border-primary/50 hover:bg-muted/50',
         isDragging && 'z-10 shadow-lg'

@@ -482,7 +482,6 @@ function AddEditTextData({
                 setFontSize(value);
               }
             }}
-            style={{ fontFamily }}
           />
         </div>
         <Label className="flex items-center gap-2">

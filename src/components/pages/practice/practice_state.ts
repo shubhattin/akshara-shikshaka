@@ -21,8 +21,7 @@ export const mounted_atom = atom(false);
 export const current_user_points_atom = atom<GesturePoint[]>([]);
 export const animated_gesture_lines_atom = atom<
   (AnimationGesture & {
-    isUserGesture?: boolean;
-    isCurrentAnimatedGesture?: boolean;
+    gesture_type: 'user_gesture' | 'current_animated_gesture' | null;
   })[]
 >([]);
 

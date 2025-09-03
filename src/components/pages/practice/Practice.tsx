@@ -88,9 +88,9 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   );
   const [showTryAgain, setShowTryAgain] = useAtom(show_try_again_atom);
   const [lastAccuracy, setLastAccuracy] = useAtom(last_accuracy_atom);
-  const [scalingFactor, setScalingFactor] = useAtom(scaling_factor_atom);
-  const [mounted, setMounted] = useAtom(mounted_atom);
-  const [animatedGestureLines, setAnimatedGestureLines] = useAtom(animated_gesture_lines_atom);
+  const [, setScalingFactor] = useAtom(scaling_factor_atom);
+  const [, setMounted] = useAtom(mounted_atom);
+  const [, setAnimatedGestureLines] = useAtom(animated_gesture_lines_atom);
 
   function updateScalingFactor() {
     if (typeof window === 'undefined') return;
@@ -157,7 +157,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         points_flat: [],
         color: gesture.color,
         width: gesture.width,
-        isCurrentAnimatedGesture
+        gesture_type: 'current_animated_gesture'
       }
     ]);
 
@@ -209,7 +209,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         points_flat: flatPoints,
         color: '#0066cc',
         width: currentGesture.width || 6,
-        isUserGesture: true
+        gesture_type: 'user_gesture'
       }
     ]);
 
@@ -272,11 +272,13 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   const clearCurrentAnimatedGesture = () => {
-    setAnimatedGestureLines((prev) => prev.filter((line) => !line.isCurrentAnimatedGesture));
+    setAnimatedGestureLines((prev) =>
+      prev.filter((line) => line.gesture_type !== 'current_animated_gesture')
+    );
   };
 
   const clearUserGestures = () => {
-    setAnimatedGestureLines((prev) => prev.filter((line) => !line.isUserGesture));
+    setAnimatedGestureLines((prev) => prev.filter((line) => line.gesture_type !== 'user_gesture'));
   };
 
   const replayCurrentGesture = () => {

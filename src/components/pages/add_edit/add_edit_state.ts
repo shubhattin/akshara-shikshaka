@@ -32,7 +32,7 @@ export const main_text_path_visible_atom = atom(true);
 export const animated_gesture_lines_atom = atom<
   Array<{
     index: number;
-    points: number[];
+    points_flat: number[];
     color: string;
     width: number;
   }>

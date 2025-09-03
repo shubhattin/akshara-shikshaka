@@ -151,10 +151,10 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
     // Initialize the gesture line in state
     setAnimatedGestureLines((prev) => [
-      ...prev.filter((line) => line.order !== gestureLineId),
+      ...prev.filter((line) => line.index !== gestureLineId),
       {
-        order: gestureLineId,
-        points: [],
+        index: gestureLineId,
+        points_flat: [],
         color: gesture.color,
         width: gesture.width,
         isCurrentAnimatedGesture
@@ -167,7 +167,9 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       const flatPoints = frame.partialPoints.flatMap((p) => [p[0], p[1]]);
 
       setAnimatedGestureLines((prev) =>
-        prev.map((line) => (line.order === gestureLineId ? { ...line, points: flatPoints } : line))
+        prev.map((line) =>
+          line.index === gestureLineId ? { ...line, points_flat: flatPoints } : line
+        )
       );
     });
   };
@@ -203,8 +205,8 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     setAnimatedGestureLines((prev) => [
       ...prev,
       {
-        order: gestureLineId,
-        points: flatPoints,
+        index: gestureLineId,
+        points_flat: flatPoints,
         color: '#0066cc',
         width: currentGesture.width || 6,
         isUserStroke: true
@@ -231,7 +233,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
       // Remove the user stroke after a delay
       setTimeout(() => {
-        setAnimatedGestureLines((prev) => prev.filter((line) => line.order !== gestureLineId));
+        setAnimatedGestureLines((prev) => prev.filter((line) => line.index !== gestureLineId));
         setShowTryAgain(false);
       }, 5000);
     }

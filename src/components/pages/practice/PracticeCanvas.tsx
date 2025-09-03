@@ -107,14 +107,14 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         onTouchStart={handleStageMouseDown}
         onTouchMove={handleStageMouseMove}
         onTouchEnd={handleStageMouseUp}
-        className={cn('bg-white', isDrawing && 'cursor-crosshair')}
+        className={cn('bg-white', isRecordingStroke && 'cursor-crosshair')}
       >
         <Layer>
           {/* Animated Gesture Lines (guidance and completed strokes) */}
           {animatedGestureLines.map((line, index) => (
             <Line
-              key={`gesture-line-${line.order}-${index}`}
-              points={line.points} // No scaling needed - Stage handles it
+              key={`gesture-line-${line.index}-${index}`}
+              points={line.points_flat} // No scaling needed - Stage handles it
               stroke={line.color}
               strokeWidth={line.width} // No scaling needed - Stage handles it
               lineCap="round"

@@ -125,7 +125,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
       onTouchStart={onMouseDown}
       onTouchMove={onMouseMove}
       onTouchEnd={onMouseUp}
-      className={cn('bg-white', isDrawing && 'cursor-crosshair')}
+      className={cn('bg-white', isRecording && 'cursor-crosshair')}
     >
       <Layer>
         {/* Character Text Path */}
@@ -150,7 +150,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
         {animatedGestureLines.map((line) => (
           <Line
             key={`animated-${line.index}`}
-            points={line.points}
+            points={line.points_flat}
             stroke={line.color}
             strokeWidth={line.width}
             lineCap="round"

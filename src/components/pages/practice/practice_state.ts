@@ -21,8 +21,8 @@ export const mounted_atom = atom(false);
 export const current_user_points_atom = atom<GesturePoint[]>([]);
 export const animated_gesture_lines_atom = atom<
   Array<{
-    order: number;
-    points: number[];
+    index: number;
+    points_flat: number[];
     color: string;
     width: number;
     isUserStroke?: boolean;

@@ -4,13 +4,16 @@ import { db } from '~/db/db';
 import { text_data } from '~/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { GestureSchema } from '~/tools/stroke_data/types';
+import { type FontFamily } from '~/state/font_list';
 
 const add_text_data_route = protectedAdminProcedure
   .input(
     z.object({
       text: z.string().min(1),
       gestures: GestureSchema.array(),
-      scriptID: z.number().int()
+      scriptID: z.number().int(),
+      fontFamily: z.string().min(1),
+      fontSize: z.number().int()
     })
   )
   .mutation(async ({ input }) => {
@@ -19,7 +22,9 @@ const add_text_data_route = protectedAdminProcedure
       .values({
         text: input.text,
         gestures: input.gestures,
-        scriptID: input.scriptID
+        scriptID: input.scriptID,
+        fontFamily: input.fontFamily as FontFamily,
+        fontSize: input.fontSize
       })
       .returning();
     return {
@@ -33,14 +38,18 @@ const edit_text_data_route = protectedAdminProcedure
     z.object({
       id: z.number(),
       uuid: z.string().uuid(),
-      gestures: GestureSchema.array()
+      gestures: GestureSchema.array(),
+      fontFamily: z.string().min(1),
+      fontSize: z.number().int()
     })
   )
   .mutation(async ({ input }) => {
     await db
       .update(text_data)
       .set({
-        gestures: input.gestures
+        gestures: input.gestures,
+        fontFamily: input.fontFamily as FontFamily,
+        fontSize: input.fontSize
       })
       .where(and(eq(text_data.uuid, input.uuid), eq(text_data.id, input.id)));
     return {

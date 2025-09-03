@@ -1,5 +1,5 @@
 {
-  "id": "8e284b54-72cc-4279-b719-a36821fbce95",
+  "id": "69049f00-a36e-4b86-bde1-ec826c0de279",
   "prevId": "52c2224a-3900-4125-bac3-7d40696155a5",
   "version": "7",
   "dialect": "postgresql",
@@ -52,6 +52,20 @@
           "type": "smallint",
           "primaryKey": false,
           "notNull": true
+        },
+        "font_family": {
+          "name": "font_family",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Nirmala_UI'"
+        },
+        "font_size": {
+          "name": "font_size",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 15
         }
       },
       "indexes": {

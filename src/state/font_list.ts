@@ -10,50 +10,28 @@ export const FONT_FAMILIES = [
 export type FontFamily = (typeof FONT_FAMILIES)[number];
 
 export const FONT_SCRIPTS = ['Devanagari', 'Telugu', 'Kannada'] as const;
+type FontEntry<F extends FontFamily> = {
+  font_family: F;
+  url: `/fonts/regular/woff2/${F}.woff2` | `/fonts/variable/woff2/${F}.woff2`;
+};
+type FontList = Partial<Record<script_list_type, FontEntry<FontFamily>[]>>;
 
-type FontList = Partial<
-  Record<
-    script_list_type,
-    {
-      font_family: FontFamily;
-      url: `/fonts/regular/woff2/${FontFamily}.woff2` | `/fonts/variable/woff2/${FontFamily}.woff2`;
-    }[]
-  >
->;
+const get_font_entry = (font_family: FontFamily) => {
+  return {
+    font_family,
+    url: `/fonts/regular/woff2/${font_family}.woff2`
+  } satisfies FontEntry<FontFamily>;
+};
 
 export const FONT_LIST: FontList = {
-  Devanagari: [
-    {
-      font_family: 'Nirmala_UI',
-      url: '/fonts/regular/woff2/Nirmala_UI.woff2'
-    },
-    {
-      font_family: 'Adobe_Devanagari',
-      url: '/fonts/regular/woff2/Adobe_Devanagari.woff2'
-    }
-  ],
+  Devanagari: [get_font_entry('Nirmala_UI'), get_font_entry('Adobe_Devanagari')],
   Telugu: [
-    {
-      font_family: 'Nirmala_UI',
-      url: '/fonts/regular/woff2/Nirmala_UI.woff2'
-    },
-    {
-      font_family: 'Adobe_Telugu',
-      url: '/fonts/regular/woff2/Adobe_Telugu.woff2'
-    },
-    {
-      font_family: 'Noto_Serif_Telugu',
-      url: '/fonts/variable/woff2/Noto_Serif_Telugu.woff2'
-    }
+    get_font_entry('Nirmala_UI'),
+    get_font_entry('Adobe_Telugu'),
+    get_font_entry('Noto_Serif_Telugu')
   ],
-  Kannada: [
-    {
-      font_family: 'Nirmala_UI',
-      url: '/fonts/regular/woff2/Nirmala_UI.woff2'
-    },
-    {
-      font_family: 'Noto_Serif_Kannada',
-      url: '/fonts/variable/woff2/Noto_Serif_Kannada.woff2'
-    }
-  ]
+  Kannada: [get_font_entry('Nirmala_UI'), get_font_entry('Noto_Serif_Kannada')]
 };
+
+export const DEFAULT_FONT_FAMILY = 'Nirmala_UI' satisfies FontFamily;
+export const DEFAULT_FONT_SIZE = 15 as const;

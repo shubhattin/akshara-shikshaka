@@ -77,7 +77,7 @@ import {
 } from './add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
 import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
-import { FONT_LIST, FONT_SCRIPTS, FontFamily } from '~/state/font_list';
+import { FONT_LIST, FONT_SCRIPTS, type FontFamily } from '~/state/font_list';
 import { script_list_obj, script_list_type } from '~/state/lang_list';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
@@ -118,7 +118,9 @@ type text_data_type = {
   text: string;
   id?: number;
   uuid?: string;
-  gestures?: Gesture[] | null;
+  gestures: Gesture[];
+  fontFamily: FontFamily;
+  fontSize: number;
 };
 
 type Props =
@@ -140,13 +142,15 @@ export default function AddEditTextDataWrapper(props: Props) {
   useHydrateAtoms([
     [text_atom, props.text_data.text],
     [text_edit_mode_atom, props.location === 'add' && true],
-    [font_size_atom, DEFAULTS.FONT_SIZE],
     [gesture_data_atom, props.text_data.gestures ?? []],
     [selected_gesture_index_atom, null],
     [is_recording_atom, false],
     [is_playing_atom, false],
     [is_drawing_atom, false],
-    [current_drawing_points_atom, []]
+    [current_drawing_points_atom, []],
+    [font_family_atom, props.text_data.fontFamily],
+    [font_loaded_atom, new Map<FontFamily, boolean>()],
+    [font_size_atom, props.text_data.fontSize]
   ]);
   const stageRef = useRef<Konva.Stage | null>(null);
 
@@ -954,6 +958,9 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const script = useAtomValue(script_atom);
   const scriptID = script_list_obj[script]!;
 
+  const fontFamily = useAtomValue(font_family_atom);
+  const fontSize = useAtomValue(font_size_atom);
+
   const is_addition = text_data.id === undefined && text_data.uuid === undefined;
 
   const router = useRouter();
@@ -986,14 +993,18 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     if (is_addition) {
       add_text_data_mut.mutate({
         text,
+        scriptID,
         gestures: gestureData,
-        scriptID
+        fontFamily,
+        fontSize
       });
     } else {
       update_text_data_mut.mutate({
         id: text_data.id!,
         uuid: text_data.uuid!,
-        gestures: gestureData
+        gestures: gestureData,
+        fontFamily,
+        fontSize
         // script and text can be only set once
       });
     }

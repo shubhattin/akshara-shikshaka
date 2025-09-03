@@ -9,6 +9,7 @@ import { IoMdArrowRoundBack } from 'react-icons/io';
 import { getCachedSession } from '~/lib/cache_server_route_data';
 import { redirect } from 'next/navigation';
 import { Provider as JotaiProvider } from 'jotai';
+import { FontFamily } from '~/state/font_list';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -19,7 +20,9 @@ const get_cached_text_data = cache(async (id: number) => {
       id: true,
       uuid: true,
       text: true,
-      gestures: true
+      gestures: true,
+      fontFamily: true,
+      fontSize: true
     }
   });
   return text_data;
@@ -60,10 +63,7 @@ const MainEdit = async ({ params }: Props) => {
         <JotaiProvider key={`edit_akdhara_page-${id}`}>
           <AddEditTextDataWrapper
             location="edit"
-            text_data={{
-              ...text_data,
-              gestures: text_data.gestures
-            }}
+            text_data={{ ...text_data, fontFamily: text_data.fontFamily as FontFamily }}
           />
         </JotaiProvider>
       ) : (

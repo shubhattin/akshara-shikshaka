@@ -1,13 +1,12 @@
 import { atom } from 'jotai';
 import type { GesturePoint, Gesture, AnimationGesture } from '~/tools/stroke_data/types';
 import type { script_list_type } from '~/state/lang_list';
-import type { FontFamily } from '~/state/font_list';
+import { type FontFamily, DEFAULT_FONT_SIZE } from '~/state/font_list';
 
 // Default constants
 const DEFAULT_GESTURE_BRUSH_WIDTH = 8;
 const DEFAULT_GESTURE_BRUSH_COLOR = '#ff0000'; // red
 const DEFAULT_GESTURE_ANIMATION_DURATION = 600;
-const DEFAULT_FONT_SIZE = 15;
 
 // Core text and UI state
 export const text_atom = atom('');
@@ -30,7 +29,7 @@ export const is_drawing_atom = atom(false);
 
 // Character rendering state
 export const main_text_path_visible_atom = atom(true);
-export const font_size_atom = atom(DEFAULT_FONT_SIZE);
+export const font_size_atom = atom(DEFAULT_FONT_SIZE as number);
 
 // Animation state for Konva
 export const animated_gesture_lines_atom = atom<AnimationGesture[]>([]);

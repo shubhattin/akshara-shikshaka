@@ -38,8 +38,8 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
   // Get selected gesture for drawing style
   const selectedGesture = gestureData.find((g) => g.index.toString() === selectedGestureIndex);
-  const [fontFamily, setFontFamily] = useAtom(font_family_atom);
-  const [fontLoaded, setFontLoaded] = useAtom(font_loaded_atom);
+  const [fontFamily] = useAtom(font_family_atom);
+  const [fontLoaded] = useAtom(font_loaded_atom);
 
   const currentFontLoaded = fontLoaded.get(fontFamily) ?? false;
 

@@ -8,7 +8,7 @@ import { CANVAS_DIMS, GesturePoint } from '~/tools/stroke_data/types';
 import {
   main_text_path_visible_atom,
   font_size_atom,
-  animated_gesture_lines_atom,
+  animated_gestures_atom,
   selected_gesture_index_atom,
   gesture_data_atom,
   is_recording_atom,
@@ -26,7 +26,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   const mainTextPathVisible = useAtomValue(main_text_path_visible_atom);
   const text = useAtomValue(text_atom);
   const fontSize = useAtomValue(font_size_atom);
-  const animatedGestureLines = useAtomValue(animated_gesture_lines_atom);
+  const animatedGestures = useAtomValue(animated_gestures_atom);
   const selectedGestureIndex = useAtomValue(selected_gesture_index_atom);
   const gestureData = useAtomValue(gesture_data_atom);
   const isRecording = useAtomValue(is_recording_atom);
@@ -123,7 +123,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
         />
 
         {/* Animated Gesture Lines */}
-        {animatedGestureLines.map((gesture) => (
+        {animatedGestures.map((gesture) => (
           <Line
             key={`animated-${gesture.index}`}
             points={gesture.points_flat}
@@ -132,6 +132,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
             lineCap="round"
             lineJoin="round"
             listening={false}
+            tension={1}
           />
         ))}
 
@@ -144,6 +145,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
             lineCap="round"
             lineJoin="round"
             listening={false}
+            tension={1}
           />
         )}
       </Layer>

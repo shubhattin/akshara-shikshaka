@@ -20,15 +20,16 @@ export const is_drawing_atom = atom(false);
 // Gesture data and selection
 export const gesture_data_atom = atom<Gesture[]>([]);
 export const selected_gesture_index_atom = atom<string | null>(null);
-/** Stores point when the user is currently drawing (mouse down state), does not needs to store gesture attributes */
-export const current_gesture_recording_points_atom = atom<Gesture['points']>([]);
 /** Set of gestures that are not to be cleared */
 export const not_to_clear_gestures_index_atom = atom<ReadonlySet<number>>(new Set<number>());
+
+/** Stores point when the user is currently drawing (mouse down state), does not needs to store gesture attributes */
+export const current_gesture_recording_points_atom = atom<Gesture['points']>([]);
 /**
  * Used for displaying the animated gestures or the ones that are marked to stay on screen, use for `Play` buttons
  * Stores the attributes of all the different gestures to be used
  */
-export const animated_gesture_lines_atom = atom<AnimationGesture[]>([]);
+export const animated_gestures_atom = atom<AnimationGesture[]>([]);
 
 // Export constants for use in components
 export const DEFAULTS = {

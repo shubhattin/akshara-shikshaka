@@ -65,7 +65,7 @@ import {
   is_recording_atom,
   is_playing_atom,
   main_text_path_visible_atom,
-  animated_gesture_lines_atom,
+  animated_gestures_atom,
   DEFAULTS,
   is_drawing_atom,
   current_gesture_recording_points_atom,
@@ -182,7 +182,7 @@ function AddEditTextData({
   const [selectedGestureIndex, setSelectedGestureIndex] = useAtom(selected_gesture_index_atom);
   const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
-  const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
+  const setAnimatedGestures = useSetAtom(animated_gestures_atom);
   const [notToClearGesturesIndex, setNotToClearGesturesIndex] = useAtom(
     not_to_clear_gestures_index_atom
   );
@@ -266,17 +266,15 @@ function AddEditTextData({
 
   const clearGestureVisualization = (all = false) => {
     if (all) {
-      setAnimatedGestureLines([]);
+      setAnimatedGestures([]);
       return;
     }
     // Clear animated gesture lines from state
     const allowed_gestures = gestureData.filter((g) => notToClearGesturesIndex.has(g.index));
-    setAnimatedGestureLines(
+    setAnimatedGestures(
       allowed_gestures.map((g) => ({
-        index: g.index,
-        points_flat: g.points.flatMap((p) => [p[0], p[1]]),
-        color: g.color,
-        width: g.width
+        ...g,
+        points_flat: g.points.flatMap((p) => [p[0], p[1]])
       }))
     );
   };
@@ -299,7 +297,7 @@ function AddEditTextData({
     const gestureLineId = gesture.index;
 
     // Initialize the gesture line in state
-    setAnimatedGestureLines((prev) => [
+    setAnimatedGestures((prev) => [
       ...prev.filter((line) => line.index !== gestureLineId),
       {
         index: gestureLineId,
@@ -314,7 +312,7 @@ function AddEditTextData({
       // Convert points to flat array for Konva Line component
       const flatPoints = frame.partialPoints.flatMap((p) => [p[0], p[1]]);
 
-      setAnimatedGestureLines((prev) =>
+      setAnimatedGestures((prev) =>
         prev.map((line) =>
           line.index === gestureLineId ? { ...line, points_flat: flatPoints } : line
         )
@@ -360,6 +358,27 @@ function AddEditTextData({
   useEffect(() => {
     clearGestureVisualization();
   }, [notToClearGesturesIndex]);
+
+  useEffect(() => {
+    if (!selectedGestureIndex) return;
+    const currentGestureIndex = gestureData.find(
+      (g) => g.index === parseInt(selectedGestureIndex, 10)
+    )!;
+    // on gesture data change if there is a instance of it inside of animated gesture then update it
+    setAnimatedGestures((prev) =>
+      prev.map((g) =>
+        g.index === currentGestureIndex.index
+          ? {
+              color: currentGestureIndex.color,
+              points: currentGestureIndex.points,
+              width: currentGestureIndex.width,
+              index: currentGestureIndex.index,
+              points_flat: currentGestureIndex.points.flatMap((p) => [p[0], p[1]])
+            }
+          : g
+      )
+    );
+  }, [gestureData, selectedGestureIndex]);
 
   return (
     <div className="space-y-4">
@@ -591,8 +610,6 @@ const SelectedGestureControls = ({
   const [currentGestureRecordingPoints, setCurrentGestureRecordingPoints] = useAtom(
     current_gesture_recording_points_atom
   );
-
-  // Recording is now handled by Stage mouse events in the parent component
 
   // Path handling is now done directly via mouse events in the parent component
   const startRecording = () => {

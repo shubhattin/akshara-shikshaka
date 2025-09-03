@@ -9,12 +9,11 @@ import {
   main_text_path_visible_atom,
   font_size_atom,
   animated_gesture_lines_atom,
-  temp_points_atom,
   selected_gesture_index_atom,
   gesture_data_atom,
   is_recording_atom,
   is_drawing_atom,
-  current_drawing_points_atom,
+  current_gesture_recording_points_atom,
   not_to_clear_gestures_index_atom,
   text_atom,
   font_family_atom,
@@ -28,12 +27,13 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   const text = useAtomValue(text_atom);
   const fontSize = useAtomValue(font_size_atom);
   const animatedGestureLines = useAtomValue(animated_gesture_lines_atom);
-  const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
   const selectedGestureIndex = useAtomValue(selected_gesture_index_atom);
   const gestureData = useAtomValue(gesture_data_atom);
   const isRecording = useAtomValue(is_recording_atom);
   const [isDrawing, setIsDrawing] = useAtom(is_drawing_atom);
-  const [currentDrawingPoints, setCurrentDrawingPoints] = useAtom(current_drawing_points_atom);
+  const [currentGestureRecordingPoints, setCurrentGestureRecordingPoints] = useAtom(
+    current_gesture_recording_points_atom
+  );
   const setNotToClearGesturesIndex = useSetAtom(not_to_clear_gestures_index_atom);
 
   // Get selected gesture for drawing style
@@ -69,9 +69,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     const pos = e.target.getStage().getPointerPosition();
     const point: GesturePoint = [pos.x, pos.y];
-
-    setTempPoints([point]);
-    setCurrentDrawingPoints([pos.x, pos.y]);
+    setCurrentGestureRecordingPoints([point]);
   };
 
   const onMouseMove = (e: any) => {
@@ -80,9 +78,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     const pos = e.target.getStage().getPointerPosition();
 
     const point: GesturePoint = [pos.x, pos.y];
-
-    setTempPoints((prev) => [...prev, point]);
-    setCurrentDrawingPoints((prev) => [...prev, pos.x, pos.y]);
+    setCurrentGestureRecordingPoints((prev) => [...prev, point]);
   };
 
   const onMouseUp = () => {
@@ -91,7 +87,8 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     setIsDrawing(false);
     // Keep the temp points for user to save or discard
 
-    if (selectedGesture) {
+    if (selectedGesture && gestureData.length === selectedGesture.index + 1) {
+      // ^ only if last
       setNotToClearGesturesIndex((prev) => new Set(prev).add(selectedGesture.index));
     }
   };
@@ -126,12 +123,12 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
         />
 
         {/* Animated Gesture Lines */}
-        {animatedGestureLines.map((line) => (
+        {animatedGestureLines.map((gesture) => (
           <Line
-            key={`animated-${line.index}`}
-            points={line.points_flat}
-            stroke={line.color}
-            strokeWidth={line.width}
+            key={`animated-${gesture.index}`}
+            points={gesture.points_flat}
+            stroke={gesture.color}
+            strokeWidth={gesture.width}
             lineCap="round"
             lineJoin="round"
             listening={false}
@@ -139,21 +136,9 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
         ))}
 
         {/* Current Drawing Line (during recording) */}
-        {isRecording && isDrawing && currentDrawingPoints.length > 0 && selectedGesture && (
+        {currentGestureRecordingPoints.length > 0 && selectedGesture && (
           <Line
-            points={currentDrawingPoints}
-            stroke={selectedGesture.color}
-            strokeWidth={selectedGesture.width}
-            lineCap="round"
-            lineJoin="round"
-            listening={false}
-          />
-        )}
-
-        {/* Temporary recorded line (before save/cancel) */}
-        {isRecording && !isDrawing && tempPoints.length > 0 && selectedGesture && (
-          <Line
-            points={tempPoints.flatMap((p) => [p[0], p[1]])}
+            points={currentGestureRecordingPoints.flatMap((p) => [p[0], p[1]])}
             stroke={selectedGesture.color}
             strokeWidth={selectedGesture.width}
             lineCap="round"

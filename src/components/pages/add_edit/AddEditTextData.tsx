@@ -68,12 +68,12 @@ import {
   animated_gesture_lines_atom,
   DEFAULTS,
   is_drawing_atom,
-  current_drawing_points_atom,
+  current_gesture_recording_points_atom,
   not_to_clear_gestures_index_atom,
-  temp_points_atom,
   font_family_atom,
   script_atom,
-  font_loaded_atom
+  font_loaded_atom,
+  RANGES
 } from './add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
 import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
@@ -147,7 +147,7 @@ export default function AddEditTextDataWrapper(props: Props) {
     [is_recording_atom, false],
     [is_playing_atom, false],
     [is_drawing_atom, false],
-    [current_drawing_points_atom, []],
+    [current_gesture_recording_points_atom, []],
     [font_family_atom, props.text_data.fontFamily],
     [font_loaded_atom, new Map<FontFamily, boolean>()],
     [font_size_atom, props.text_data.fontSize]
@@ -585,10 +585,12 @@ const SelectedGestureControls = ({
 }) => {
   const [isRecording, setIsRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
-  const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
   const selectedGestureIndex = useAtomValue(selected_gesture_index_atom);
   const setNotToClearGesturesIndex = useSetAtom(not_to_clear_gestures_index_atom);
+  const [currentGestureRecordingPoints, setCurrentGestureRecordingPoints] = useAtom(
+    current_gesture_recording_points_atom
+  );
 
   // Recording is now handled by Stage mouse events in the parent component
 
@@ -596,20 +598,19 @@ const SelectedGestureControls = ({
   const startRecording = () => {
     if (!selectedGestureIndex) return;
     setIsRecording(true);
-    setTempPoints([]); // Clear temporary points
     clearGestureVisualization();
   };
 
   const stopRecording = () => {
     setIsRecording(false);
-    setTempPoints([]); // Clear temp points without saving
+    setCurrentGestureRecordingPoints([]);
     clearGestureVisualization(); // Clear all drawn paths
   };
 
   const saveRecording = () => {
-    if (!selectedGestureIndex || tempPoints.length === 0) return;
+    if (!selectedGestureIndex || currentGestureRecordingPoints.length === 0) return;
 
-    const pointCount = tempPoints.length;
+    const pointCount = currentGestureRecordingPoints.length;
 
     // Set the points for the selected gesture (overwrite previous points)
     setGestureData((prev: Gesture[]) =>
@@ -617,14 +618,14 @@ const SelectedGestureControls = ({
         gesture.index === parseInt(selectedGestureIndex, 10)
           ? {
               ...gesture,
-              points: tempPoints
+              points: currentGestureRecordingPoints
             }
           : gesture
       )
     );
 
     // Clear temporary points
-    setTempPoints([]);
+    setCurrentGestureRecordingPoints([]);
 
     // Stop recording but keep the visualization
     setIsRecording(false);
@@ -652,7 +653,6 @@ const SelectedGestureControls = ({
         gesture.index === parseInt(selectedGestureIndex, 10) ? { ...gesture, points: [] } : gesture
       )
     );
-    setTempPoints([]);
     setNotToClearGesturesIndex((prev) => {
       const st = new Set(prev);
       st.delete(parseInt(selectedGestureIndex, 10));
@@ -693,10 +693,10 @@ const SelectedGestureControls = ({
                 variant="outline"
                 onClick={() => {
                   // Clear previous temp points to start fresh
-                  setTempPoints([]);
+                  setCurrentGestureRecordingPoints([]);
                   clearGestureVisualization(); // Clear canvas for fresh start
                 }}
-                disabled={tempPoints.length === 0}
+                disabled={currentGestureRecordingPoints.length === 0}
               >
                 <MdReplay className="mr-1" />
                 Record Again
@@ -709,7 +709,7 @@ const SelectedGestureControls = ({
                 size="sm"
                 variant="default"
                 onClick={saveRecording}
-                disabled={tempPoints.length === 0}
+                disabled={currentGestureRecordingPoints.length === 0}
               >
                 Done
               </Button>
@@ -769,9 +769,9 @@ const SelectedGestureControls = ({
                 )
               )
             }
-            min={4}
-            max={14}
-            step={1}
+            min={RANGES.brush_width.min}
+            max={RANGES.brush_width.max}
+            step={RANGES.brush_width.step}
             className="w-full"
             disabled={isRecording || isPlaying}
           />
@@ -791,9 +791,9 @@ const SelectedGestureControls = ({
                 )
               )
             }
-            min={50}
-            max={1000}
-            step={10}
+            min={RANGES.animation_duration.min}
+            max={RANGES.animation_duration.max}
+            step={RANGES.animation_duration.step}
             className="w-full"
             disabled={isRecording || isPlaying}
           />

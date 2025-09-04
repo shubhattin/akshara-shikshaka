@@ -5,13 +5,18 @@ import AddEditTextDataWrapper from '~/components/pages/add_edit/AddEditTextData'
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import Link from 'next/link';
 import { Provider as JotaiProvider } from 'jotai';
+import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
 
 const List = async () => {
   const session = await getCachedSession();
   if (!session || session.user.role !== 'admin' || !session.user.is_approved) redirect('/');
 
   const text_data = {
-    text: ''
+    text: '',
+    gestures: [],
+    fontFamily: DEFAULT_FONT_FAMILY as FontFamily,
+    fontSize: DEFAULT_FONT_SIZE,
+    textCenterOffset: [0, 0] as [number, number]
   };
   return (
     <div>

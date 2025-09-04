@@ -4,12 +4,17 @@ import { db } from '~/db/db';
 import { text_data } from '~/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { GestureSchema } from '~/tools/stroke_data/types';
+import { type FontFamily } from '~/state/font_list';
 
 const add_text_data_route = protectedAdminProcedure
   .input(
     z.object({
       text: z.string().min(1),
-      gestures: GestureSchema.array()
+      gestures: GestureSchema.array(),
+      scriptID: z.number().int(),
+      fontFamily: z.string().min(1),
+      fontSize: z.number().int(),
+      textCenterOffset: z.tuple([z.number(), z.number()])
     })
   )
   .mutation(async ({ input }) => {
@@ -17,7 +22,11 @@ const add_text_data_route = protectedAdminProcedure
       .insert(text_data)
       .values({
         text: input.text,
-        gestures: input.gestures
+        gestures: input.gestures,
+        script_id: input.scriptID,
+        font_family: input.fontFamily as FontFamily,
+        font_size: input.fontSize,
+        text_center_offset: input.textCenterOffset
       })
       .returning();
     return {
@@ -31,16 +40,20 @@ const edit_text_data_route = protectedAdminProcedure
     z.object({
       id: z.number(),
       uuid: z.string().uuid(),
-      text: z.string().min(1),
-      gestures: GestureSchema.array()
+      gestures: GestureSchema.array(),
+      fontFamily: z.string().min(1),
+      fontSize: z.number().int(),
+      textCenterOffset: z.tuple([z.number(), z.number()])
     })
   )
   .mutation(async ({ input }) => {
     await db
       .update(text_data)
       .set({
-        text: input.text,
-        gestures: input.gestures
+        gestures: input.gestures,
+        font_family: input.fontFamily as FontFamily,
+        font_size: input.fontSize,
+        text_center_offset: input.textCenterOffset
       })
       .where(and(eq(text_data.uuid, input.uuid), eq(text_data.id, input.id)));
     return {

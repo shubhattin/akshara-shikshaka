@@ -3,9 +3,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { IoMdAdd, IoMdArrowRoundBack } from 'react-icons/io';
 import { Button } from '~/components/ui/button';
-import { Card, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
+import { Card, CardHeader, CardTitle } from '~/components/ui/card';
 import { db } from '~/db/db';
-import { CalendarIcon } from 'lucide-react';
 import { getCachedSession } from '~/lib/cache_server_route_data';
 
 const List = async () => {
@@ -16,8 +15,8 @@ const List = async () => {
     columns: {
       id: true,
       text: true,
-      createdAt: true,
-      updatedAt: true
+      created_at: true,
+      updated_at: true
     },
     orderBy: (text_data, { asc }) => [asc(text_data.text)]
   });

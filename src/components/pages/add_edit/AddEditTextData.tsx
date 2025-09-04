@@ -1,12 +1,12 @@
 'use client';
 
-import { type Canvas } from 'fabric';
 import { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Slider } from '~/components/ui/slider';
-import * as fabric from 'fabric';
+import type Konva from 'konva';
 import { client_q } from '~/api/client';
 import { useRouter } from 'next/navigation';
 import {
@@ -50,18 +50,79 @@ import {
 } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { atom, useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
-import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
-import { GESTURE_FLAGS, CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
-import { playGestureWithoutClear } from '~/tools/stroke_data/utils';
+import type { Gesture } from '~/tools/stroke_data/types';
+import { CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
+import { animateGesture } from '~/tools/stroke_data/utils';
+import {
+  text_atom,
+  text_edit_mode_atom,
+  font_size_atom,
+  gesture_data_atom,
+  selected_gesture_index_atom,
+  is_recording_atom,
+  is_playing_atom,
+  main_text_path_visible_atom,
+  canvas_gestures_flat_atom,
+  DEFAULTS,
+  is_drawing_atom,
+  current_gesture_recording_points_atom,
+  not_to_clear_gestures_index_atom,
+  font_family_atom,
+  script_atom,
+  font_loaded_atom,
+  RANGES,
+  canvas_text_center_offset_atoms
+} from './add_edit_state';
+import { Checkbox } from '~/components/ui/checkbox';
+import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
+import { FONT_LIST, FONT_SCRIPTS, type FontFamily } from '~/state/font_list';
+import { script_list_obj, script_list_type } from '~/state/lang_list';
+
+// Dynamic import for KonvaCanvas to avoid SSR issues
+const KonvaCanvas = dynamic(() => import('./AddEditCanvas'), {
+  ssr: false,
+  loading: () => (
+    <div
+      className="flex items-center justify-center rounded-lg border-2 bg-gray-50"
+      style={{ width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }}
+    >
+      <div className="text-gray-500">Loading...</div>
+    </div>
+  )
+});
+
+// Client-side only wrapper to prevent hydration mismatches
+const ClientOnly = ({
+  children,
+  fallback = null
+}: {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+}) => {
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return <>{fallback}</>;
+  }
+
+  return <>{children}</>;
+};
 
 type text_data_type = {
   text: string;
   id?: number;
   uuid?: string;
-  gestures?: Gesture[] | null;
+  gestures: Gesture[];
+  fontFamily: FontFamily;
+  fontSize: number;
+  textCenterOffset: [number, number];
 };
 
 type Props =
@@ -77,65 +138,58 @@ type Props =
       };
     };
 
-const DEFAULT_GESTURE_BRUSH_WIDTH = 8;
-const DEFAULT_GESTURE_BRUSH_COLOR = '#ff0000'; // red
-const DEFAULT_GESTURE_ANIMATION_DURATION = 600;
-const DEFAULT_SCALE_DOWN_FACTOR = 4.5;
-
-const text_atom = atom('');
-const text_edit_mode_atom = atom(false);
-const scale_down_factor_atom = atom(DEFAULT_SCALE_DOWN_FACTOR);
-const gesture_data_atom = atom<Gesture[]>([]);
-const selected_gesture_order_atom = atom<string | null>(null);
-const is_recording_atom = atom(false);
-const is_playing_atom = atom(false);
-const current_points_atom = atom<GesturePoint[]>([]);
-const recording_start_time_atom = atom<number>(0);
-const temp_points_atom = atom<GesturePoint[]>([]);
-const character_path_atom = atom<fabric.Path | null>(null);
-const main_text_path_visible_atom = atom(true);
+// All atoms and constants are now imported from shared-state.ts
 
 export default function AddEditTextDataWrapper(props: Props) {
   useHydrateAtoms([
     [text_atom, props.text_data.text],
     [text_edit_mode_atom, props.location === 'add' && true],
-    [scale_down_factor_atom, DEFAULT_SCALE_DOWN_FACTOR],
     [gesture_data_atom, props.text_data.gestures ?? []],
-    [selected_gesture_order_atom, null],
+    [selected_gesture_index_atom, null],
     [is_recording_atom, false],
-    [is_playing_atom, false]
+    [is_playing_atom, false],
+    [is_drawing_atom, false],
+    [current_gesture_recording_points_atom, []],
+    [font_family_atom, props.text_data.fontFamily],
+    [font_loaded_atom, new Map<FontFamily, boolean>()],
+    [font_size_atom, props.text_data.fontSize],
+    [canvas_text_center_offset_atoms, props.text_data.textCenterOffset]
   ]);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fabricCanvasRef = useRef<Canvas>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
 
   return (
     <>
-      <AddEditTextData {...props} canvasRef={canvasRef} fabricCanvasRef={fabricCanvasRef} />
-      <SaveEditMode fabricCanvasRef={fabricCanvasRef} text_data={props.text_data} />
+      <AddEditTextData {...props} stageRef={stageRef} />
+      <SaveEditMode text_data={props.text_data} />
     </>
   );
 }
 
 function AddEditTextData({
   text_data,
-  canvasRef,
-  fabricCanvasRef
+  location,
+  stageRef
 }: Props & {
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  fabricCanvasRef: React.RefObject<Canvas | null>;
+  stageRef: React.RefObject<Konva.Stage | null>;
 }) {
   const [textIntermediate, setIntermediateText] = useState(text_data.text);
   const [text, setText] = useAtom(text_atom);
   const [textEditMode, setTextEditMode] = useAtom(text_edit_mode_atom);
-  const [scaleDownFactor, setScaleDownFactor] = useAtom(scale_down_factor_atom);
+  const [fontSize, setFontSize] = useAtom(font_size_atom);
+  const [fontLoaded, setFontLoaded] = useAtom(font_loaded_atom);
   const [mainTextPathVisible, setMainTextPathVisible] = useAtom(main_text_path_visible_atom);
 
   // Gesture Recording State
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
-  const [selectedGestureOrder, setSelectedGestureOrder] = useAtom(selected_gesture_order_atom);
+
+  const [selectedGestureIndex, setSelectedGestureIndex] = useAtom(selected_gesture_index_atom);
   const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
-  const [, setCharacterPath] = useAtom(character_path_atom);
+  const setCanvasGesturesFlat = useSetAtom(canvas_gestures_flat_atom);
+  const [notToClearGesturesIndex, setNotToClearGesturesIndex] = useAtom(
+    not_to_clear_gestures_index_atom
+  );
+  const setCanvasTextCenterOffset = useSetAtom(canvas_text_center_offset_atoms);
 
   // Drag and Drop Sensors
   const sensors = useSensors(
@@ -150,245 +204,334 @@ function AddEditTextData({
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const activeOrder = parseInt(active.id.toString(), 10);
-      const isSelectedBeingMoved = selectedGestureOrder === active.id.toString();
+      const activeIndex = parseInt(active.id.toString(), 10);
+      const overIndex = parseInt(over.id.toString(), 10);
+      const isSelectedBeingMoved = selectedGestureIndex === activeIndex;
+
+      // We need to capture the current state to calculate the new notToClearGesturesIndex
+      const oldGestureData = gestureData;
+      const oldIndex = oldGestureData.findIndex((g) => g.index === activeIndex);
+      const newIndex = oldGestureData.findIndex((g) => g.index === overIndex);
+
+      if (oldIndex === -1 || newIndex === -1) return;
 
       setGestureData((prev: Gesture[]) => {
-        const oldIndex = prev.findIndex((g) => g.order === activeOrder);
-        const newIndex = prev.findIndex((g) => g.order.toString() === over.id);
-
-        if (oldIndex === -1 || newIndex === -1) return prev;
-
         // Reorder the gestures array
         const newGestures = arrayMove(prev, oldIndex, newIndex);
 
-        // Update the order property for each gesture to reflect new positions
+        // Update the index property for each gesture to reflect new positions
         const updatedGestures = newGestures.map((gesture, index) => ({
           ...gesture,
-          order: index
+          index: index
         }));
 
         return updatedGestures;
       });
 
+      // Update notToClearGesturesIndex to reflect the new index values after reordering
+      setNotToClearGesturesIndex((prev) => {
+        const newSet = new Set<number>();
+        // Create a mapping from old index to new index
+        const reorderedGestures = arrayMove(oldGestureData, oldIndex, newIndex);
+
+        for (const oldIndex of prev) {
+          // Find where this old index ended up in the new array
+          const gestureWithOldIndex = oldGestureData.find((g) => g.index === oldIndex);
+          if (gestureWithOldIndex) {
+            const newPosition = reorderedGestures.findIndex((g) => g === gestureWithOldIndex);
+            if (newPosition !== -1) {
+              newSet.add(newPosition);
+            }
+          }
+        }
+
+        return newSet;
+      });
+
       // Update selectedGestureId if the selected gesture was moved
       if (isSelectedBeingMoved) {
-        const oldIndex = gestureData.findIndex((g) => g.order === activeOrder);
-        const newIndex = gestureData.findIndex((g) => g.order.toString() === over.id);
-
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newGestures = arrayMove(gestureData, oldIndex, newIndex);
-          // The selected gesture will now be at position newIndex, so its new order is newIndex
-          setSelectedGestureOrder(newIndex.toString());
-        }
+        // The selected gesture will now be at position newIndex, so its new index is newIndex
+        setSelectedGestureIndex(newIndex);
       }
-    }
-  };
-
-  const initCanvas = async () => {
-    if (!canvasRef.current) return;
-
-    // Clean up existing canvas first
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.dispose();
-      fabricCanvasRef.current = null;
-    }
-
-    // Check if the canvas element already has a Fabric instance
-    // This can happen in React StrictMode
-    const existingCanvas = (canvasRef.current as any).__fabric;
-    if (existingCanvas) {
-      existingCanvas.dispose();
-      delete (canvasRef.current as any).__fabric;
-    }
-
-    // Initialize Fabric.js canvas
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width: CANVAS_DIMS.width,
-      height: CANVAS_DIMS.height,
-      backgroundColor: '#ffffff',
-      isDrawingMode: false // Explicitly disable drawing mode initially
-    });
-
-    // Store reference on the canvas element itself for cleanup
-    (canvasRef.current as any).__fabric = canvas;
-
-    fabricCanvasRef.current = canvas;
-  };
-
-  const render_text_path = async (text: string) => {
-    const hbjs = await import('~/tools/harfbuzz/index');
-
-    const FONT_URL = '/fonts/regular/Nirmala.ttf';
-    await Promise.all([hbjs.preload_harfbuzzjs_wasm(), hbjs.preload_font_from_url(FONT_URL)]);
-
-    const svg_path = await hbjs.get_text_svg_path(text, FONT_URL);
-    if (svg_path && fabricCanvasRef.current) {
-      const SCALE_FACTOR = !scaleDownFactor || scaleDownFactor !== 0 ? 1 / scaleDownFactor : 1;
-      const pathObject = new fabric.Path(svg_path, {
-        fill: 'black',
-        stroke: '#000000', // black
-        strokeWidth: 2,
-        selectable: true,
-        scaleX: SCALE_FACTOR,
-        scaleY: SCALE_FACTOR,
-        evented: false,
-        lockScalingX: false,
-        lockScalingY: false,
-        lockRotation: true,
-        lockMovementX: false,
-        lockMovementY: false
-      });
-      pathObject.set(GESTURE_FLAGS.isMainCharacterPath, true);
-
-      // clear prev path objects
-      fabricCanvasRef.current?.getObjects().forEach((obj) => {
-        if (obj instanceof fabric.Path && !obj.get(GESTURE_FLAGS.isGestureVisualization)) {
-          fabricCanvasRef.current?.remove(obj);
-        }
-      });
-
-      // Center the character on canvas
-      fabricCanvasRef.current?.centerObject(pathObject);
-      fabricCanvasRef.current?.add(pathObject);
-      fabricCanvasRef.current?.renderAll();
-
-      // Store the character path for approximation
-      setCharacterPath(pathObject);
     }
   };
 
   const addNewGesture = () => {
     const newGesture: Gesture = {
-      order: gestureData.length,
+      index: gestureData.length,
       points: [],
-      brush_width: DEFAULT_GESTURE_BRUSH_WIDTH,
-      brush_color: DEFAULT_GESTURE_BRUSH_COLOR, // red
-      animation_duration: DEFAULT_GESTURE_ANIMATION_DURATION
+      width: DEFAULTS.GESTURE_BRUSH_WIDTH,
+      color: DEFAULTS.GESTURE_BRUSH_COLOR, // red
+      duration: DEFAULTS.GESTURE_ANIMATION_DURATION
     };
     setGestureData((prev: Gesture[]) => [...prev, newGesture]);
     clearGestureVisualization();
-    setSelectedGestureOrder(newGesture.order.toString());
+    setSelectedGestureIndex(newGesture.index);
   };
 
-  const deleteGesture = (gestureOrder: number) => {
-    setGestureData((prev: Gesture[]) => prev.filter((g) => g.order !== gestureOrder));
-    if (selectedGestureOrder === gestureOrder.toString()) {
-      setSelectedGestureOrder(null);
+  const clearGestureVisualization = (all = false) => {
+    if (all) {
+      setCanvasGesturesFlat([]);
+      return;
     }
-  };
-
-  const clearGestureVisualization = () => {
-    if (!fabricCanvasRef.current) return;
-
-    // Remove only gesture visualization objects (lines), keep the character path
-    fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get(GESTURE_FLAGS.isGestureVisualization)) {
-        fabricCanvasRef.current?.remove(obj);
-      }
-    });
-    fabricCanvasRef.current.renderAll();
+    // Clear animated gesture lines from state
+    const allowed_gestures = gestureData.filter((g) => notToClearGesturesIndex.has(g.index));
+    setCanvasGesturesFlat(
+      allowed_gestures.map((g) => ({
+        ...g,
+        points_flat: g.points.flatMap((p) => [p[0], p[1]])
+      }))
+    );
   };
 
   const playAllGestures = async () => {
     setIsPlaying(true);
-    clearGestureVisualization();
+    clearGestureVisualization(true);
 
     for (const gesture of gestureData) {
       if (gesture.points.length === 0) continue;
-      await playGestureWithoutClear(gesture, fabricCanvasRef);
+      await playGestureWithKonva(gesture);
       await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION)); // Small delay between gestures
     }
 
     setIsPlaying(false);
   };
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    initCanvas();
-    return () => {
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-        fabricCanvasRef.current = null;
+  // Konva-based gesture animation using framework-agnostic helper
+  const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {
+    const gestureLineId = gesture.index;
+
+    // Initialize the gesture line in state
+    setCanvasGesturesFlat((prev) => [
+      ...prev.filter((line) => line.index !== gestureLineId),
+      {
+        index: gestureLineId,
+        points_flat: [],
+        color: gesture.color,
+        width: gesture.width
       }
-      // Also clean up the reference on the canvas element
-      if (canvasRef.current && (canvasRef.current as any).__fabric) {
-        delete (canvasRef.current as any).__fabric;
-      }
-    };
-  }, []);
+    ]);
+
+    // Use the framework-agnostic animation helper
+    await animateGesture(gesture, (frame) => {
+      // Convert points to flat array for Konva Line component
+      const flatPoints = frame.partialPoints.flatMap((p) => [p[0], p[1]]);
+
+      setCanvasGesturesFlat((prev) =>
+        prev.map((line) =>
+          line.index === gestureLineId ? { ...line, points_flat: flatPoints } : line
+        )
+      );
+    });
+  };
+
+  const selectedGesture = gestureData.find((g) => g.index === selectedGestureIndex);
+
+  const [script, setScript] = useAtom(script_atom);
+  const [fontFamily, setFontFamily] = useAtom(font_family_atom);
+
+  const currentScriptFontList = FONT_LIST[script]!;
 
   useEffect(() => {
-    if (!fabricCanvasRef.current) return;
-    // get object by its isMainCharacterPath flag
-    const mainCharacterPath = fabricCanvasRef.current
-      .getObjects()
-      .find((obj) => obj.get(GESTURE_FLAGS.isMainCharacterPath));
-    if (mainCharacterPath) {
-      mainCharacterPath.visible = mainTextPathVisible;
-      fabricCanvasRef.current.renderAll();
-    }
-  }, [mainTextPathVisible]);
-
-  // Removed useEffect for setupGestureRecording as it will be called directly in startRecording
+    if (location !== 'add') return;
+    load_parivartak_lang_data(script);
+    setFontFamily(currentScriptFontList[0].font_family);
+  }, [script]);
 
   useEffect(() => {
-    if (text.trim().length === 0) return;
-    render_text_path(text);
-  }, [text, scaleDownFactor]);
+    if (fontLoaded.get(fontFamily)) return;
+    const font_info = FONT_LIST[script]!.find((f) => f.font_family === fontFamily);
+    if (!font_info) return;
+    const font = new FontFace(fontFamily, `url(${font_info.url})`);
 
-  const selectedGesture = gestureData.find((g) => g.order.toString() === selectedGestureOrder);
+    font
+      .load()
+      .then((loadedFont) => {
+        document.fonts.add(loadedFont);
+        setFontLoaded((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(fontFamily, true);
+          return newMap;
+        });
+      })
+      .catch((err) => {
+        console.error('Font loading failed:', err);
+      });
+  }, [fontFamily]);
+
+  // repaint canvas on change of notToClearGesturesIndex
+  useEffect(() => {
+    clearGestureVisualization();
+  }, [notToClearGesturesIndex]);
+
+  useEffect(() => {
+    if (!selectedGestureIndex) return;
+    const currentGesture = gestureData.find((g) => g.index === selectedGestureIndex)!;
+    // on gesture data change if there is a instance of it inside of animated gesture then update it
+    setCanvasGesturesFlat((prev) =>
+      prev.map((g) =>
+        g.index === currentGesture.index
+          ? {
+              color: currentGesture.color,
+              points: currentGesture.points,
+              width: currentGesture.width,
+              index: currentGesture.index,
+              points_flat: currentGesture.points.flatMap((p) => [p[0], p[1]])
+            }
+          : g
+      )
+    );
+  }, [gestureData, selectedGestureIndex]);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Label className="font-bold">Text</Label>
+      <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
-          <Input
-            value={textIntermediate}
-            className="w-32"
-            disabled={!textEditMode}
-            onChange={(e) => setIntermediateText(e.target.value)}
-          />
-          {!textEditMode && <Button onClick={() => setTextEditMode(true)}>Edit</Button>}
-          {textEditMode && (
-            <Button
-              onClick={() => {
-                setTextEditMode(false);
-                setText(textIntermediate);
+          <Label className="font-bold">Script</Label>
+          {location === 'add' && (
+            <select
+              value={script}
+              onChange={(e) => {
+                setScript(e.target.value as script_list_type);
               }}
+              className={cn(
+                'w-32 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm transition-colors',
+                'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                'disabled:cursor-not-allowed disabled:opacity-50',
+                'text-foreground',
+                'dark:border-border dark:bg-background dark:text-foreground'
+              )}
             >
-              Save
-            </Button>
+              {FONT_SCRIPTS.map((script) => (
+                <option
+                  key={script}
+                  value={script}
+                  className={cn(
+                    'bg-background text-foreground',
+                    'dark:bg-background dark:text-foreground'
+                  )}
+                >
+                  {script}
+                </option>
+              ))}
+            </select>
           )}
+          {location !== 'add' && <span className="text-sm">{script}</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="font-bold">Font Family</Label>
+          <select
+            value={fontFamily}
+            onChange={(e) => {
+              setFontFamily(e.target.value as FontFamily);
+            }}
+            className={cn(
+              'w-40 rounded-md border border-input bg-background px-2 py-1 shadow-sm transition-colors',
+              'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+              'disabled:cursor-not-allowed disabled:opacity-50',
+              'text-foreground',
+              'tdark:border-border dark:bg-background dark:text-foreground',
+              'text-xs'
+            )}
+          >
+            {currentScriptFontList.map((font) => (
+              <option
+                key={font.font_family}
+                value={font.font_family}
+                className={cn(
+                  'bg-background text-foreground',
+                  'dark:bg-background dark:text-foreground'
+                )}
+              >
+                {font.font_family.split('_').join(' ')}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex items-center gap-5">
+        <Label className="font-bold">Text</Label>
+        {location === 'add' && (
+          <div className="flex items-center gap-2">
+            <Input
+              value={textIntermediate}
+              className="w-32"
+              disabled={!textEditMode}
+              // onInput={(e) => setIntermediateText(e.target.value)}
+              onInput={(e) => {
+                setIntermediateText(e.currentTarget.value);
+                lekhika_typing_tool(
+                  e.nativeEvent.target,
+                  // @ts-ignore
+                  e.nativeEvent.data,
+                  script,
+                  true,
+                  // @ts-ignore
+                  (val) => {
+                    setIntermediateText(val);
+                  }
+                );
+              }}
+            />
+            {!textEditMode && <Button onClick={() => setTextEditMode(true)}>Edit</Button>}
+            {textEditMode && (
+              <Button
+                onClick={() => {
+                  setTextEditMode(false);
+                  setText(textIntermediate);
+                }}
+              >
+                Save
+              </Button>
+            )}
+          </div>
+        )}
+        {location !== 'add' && (
+          <span className="text-base" style={{ fontFamily }}>
+            {text}
+          </span>
+        )}
+        <div className="flex items-center gap-2">
+          <Label className="font-bold">Font Size</Label>
+          <Input
+            value={fontSize}
+            className="w-16"
+            type="number"
+            step={1}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              if (value > 0) {
+                setFontSize(value);
+              }
+            }}
+          />
         </div>
         <Label className="flex items-center gap-2">
-          Main Character Path
           <Switch
             checked={mainTextPathVisible}
             onCheckedChange={setMainTextPathVisible}
             className=""
           />
         </Label>
+        {mainTextPathVisible && (
+          <button
+            className="rounded border border-gray-300 bg-gray-100 px-2 py-1 text-sm text-gray-700 transition-colors hover:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            type="button"
+            onClick={() => setCanvasTextCenterOffset([0, 0])}
+          >
+            Center Text
+          </button>
+        )}
       </div>
-      <div className="flex items-center gap-2">
-        <Label className="font-bold">Scale Down Factor</Label>
-        <Input
-          value={scaleDownFactor}
-          className="w-16"
-          type="number"
-          step={0.5}
-          onChange={(e) => {
-            const value = Number(e.target.value);
-            if (value > 0) {
-              setScaleDownFactor(value);
-            }
-          }}
-        />
-      </div>
+
       {/* Gesture Management Section */}
       <div className="space-y-3">
-        <Button onClick={addNewGesture} size="sm" variant="outline">
+        <Button
+          onClick={addNewGesture}
+          size="sm"
+          variant="outline"
+          disabled={text.trim().length === 0}
+        >
           <IoMdAdd className="mr-1" />
           Add Gesture
         </Button>
@@ -407,7 +550,7 @@ function AddEditTextData({
             <Button
               size="sm"
               variant="outline"
-              onClick={clearGestureVisualization}
+              onClick={() => clearGestureVisualization()}
               disabled={isRecording || isPlaying}
             >
               <MdClear className="mr-1" />
@@ -417,34 +560,34 @@ function AddEditTextData({
         )}
 
         {/* Gesture List */}
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext
-            items={gestureData.map((g) => g.order.toString())}
-            strategy={verticalListSortingStrategy}
+        <ClientOnly>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            <div className="flex flex-col gap-2">
-              {gestureData.map((gesture) => (
-                <SortableGestureItem
-                  key={gesture.order}
-                  gesture={gesture}
-                  selectedGestureId={selectedGestureOrder}
-                  onSelect={(gestureId) => {
-                    clearGestureVisualization();
-                    setSelectedGestureOrder(gestureId);
-                  }}
-                  onDelete={deleteGesture}
-                  disabled={isRecording || isPlaying}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+            <SortableContext
+              items={gestureData.map((g) => g.index.toString())}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="flex flex-col gap-2">
+                {gestureData.map((gesture) => (
+                  <SortableGestureItem
+                    key={gesture.index.toString()}
+                    gesture={gesture}
+                    {...{ clearGestureVisualization }}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </ClientOnly>
 
         {/* Gesture Controls */}
         {selectedGesture && (
           <SelectedGestureControls
             selectedGesture={selectedGesture}
-            fabricCanvasRef={fabricCanvasRef}
+            {...{ clearGestureVisualization, playGestureWithKonva }}
           />
         )}
       </div>
@@ -455,7 +598,7 @@ function AddEditTextData({
             isRecording ? 'border-destructive' : 'border-border'
           )}
         >
-          <canvas ref={canvasRef} />
+          <KonvaCanvas ref={stageRef} />
         </div>
       </div>
     </div>
@@ -464,276 +607,95 @@ function AddEditTextData({
 
 const SelectedGestureControls = ({
   selectedGesture,
-  fabricCanvasRef
+  playGestureWithKonva,
+  clearGestureVisualization
 }: {
   selectedGesture: Gesture;
-  fabricCanvasRef: React.RefObject<Canvas | null>;
+  playGestureWithKonva: (gesture: Gesture) => Promise<void>;
+  clearGestureVisualization: () => void;
 }) => {
   const [isRecording, setIsRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
-  const [tempPoints, setTempPoints] = useAtom(temp_points_atom);
-  const [selectedGestureOrder] = useAtom(selected_gesture_order_atom);
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
-  const [recordingStartTime, setRecordingStartTime] = useAtom(recording_start_time_atom);
-  const [, setCurrentPoints] = useAtom(current_points_atom);
-  const [characterPath] = useAtom(character_path_atom);
+  const selectedGestureIndex = useAtomValue(selected_gesture_index_atom);
+  const setNotToClearGesturesIndex = useSetAtom(not_to_clear_gestures_index_atom);
+  const [currentGestureRecordingPoints, setCurrentGestureRecordingPoints] = useAtom(
+    current_gesture_recording_points_atom
+  );
 
-  // Function to approximate gesture points to the character path
-  const approximateToCharacterPath = (
-    gesturePoints: GesturePoint[],
-    charPath: fabric.Path
-  ): GesturePoint[] => {
-    // Get the path's bounding box
-    const pathBounds = charPath.getBoundingRect();
-    const pathCenter = {
-      x: pathBounds.left + pathBounds.width / 2,
-      y: pathBounds.top + pathBounds.height / 2
-    };
-
-    // Simple approximation: snap points that are close to the character path
-    const snapThreshold = 20; // pixels
-
-    return gesturePoints.map((point) => {
-      // Get the path outline points (simplified approach)
-      // In a production app, you'd use a more sophisticated algorithm
-      // to find the closest point on the actual path curve
-
-      // For now, we'll do a simple distance-based snapping
-      const distToCenter = Math.sqrt(
-        Math.pow(point.x - pathCenter.x, 2) + Math.pow(point.y - pathCenter.y, 2)
-      );
-
-      // If the point is within the character bounds, keep it closer to the path
-      if (
-        point.x >= pathBounds.left - snapThreshold &&
-        point.x <= pathBounds.left + pathBounds.width + snapThreshold &&
-        point.y >= pathBounds.top - snapThreshold &&
-        point.y <= pathBounds.top + pathBounds.height + snapThreshold
-      ) {
-        // This is a simplified approximation
-        // In reality, you'd want to find the nearest point on the actual path
-        return {
-          ...point,
-          // Add a slight magnetic effect towards the path
-          x: point.x,
-          y: point.y
-        };
-      }
-
-      return point;
-    });
-  };
-
-  const setupGestureRecording = () => {
-    if (!fabricCanvasRef.current || !selectedGesture) return;
-
-    const canvas = fabricCanvasRef.current;
-
-    // Enable free drawing mode
-    canvas.isDrawingMode = true;
-    canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-    canvas.freeDrawingBrush.color = selectedGesture.brush_color;
-    canvas.freeDrawingBrush.width = selectedGesture.brush_width;
-
-    // Clear all previous listeners first
-    canvas.off('path:created', handlePathCreated);
-
-    canvas.on('path:created', handlePathCreated);
-  };
-
-  // Listen for path creation with proper closure
-  const handlePathCreated = (e: any) => {
-    if (!e.path) return;
-
-    console.log('Path created during recording');
-
-    // Mark the path as gesture visualization
-    e.path.set({
-      selectable: false,
-      evented: false,
-      [GESTURE_FLAGS.isGestureVisualization]: true
-    });
-
-    // Extract points from the path
-    const pathData = e.path.path;
-    const points: GesturePoint[] = [];
-    const baseTime = recordingStartTime;
-
-    // Convert SVG path commands to points
-    pathData.forEach((cmd: any, index: number) => {
-      if (cmd[0] === 'M' && cmd.length >= 3) {
-        points.push({
-          x: cmd[1],
-          y: cmd[2],
-          timestamp: index * 10,
-          cmd: 'M'
-        });
-      } else if (cmd[0] === 'L' && cmd.length >= 3) {
-        points.push({
-          x: cmd[1],
-          y: cmd[2],
-          timestamp: index * 10,
-          cmd: 'L'
-        });
-      } else if (cmd[0] === 'Q' && cmd.length >= 5) {
-        // Quadratic bezier. curve - store control and end point
-        points.push({
-          x: cmd[3],
-          y: cmd[4],
-          timestamp: index * 10,
-          cmd: 'Q',
-          cx: cmd[1],
-          cy: cmd[2]
-        });
-      }
-    });
-
-    // Syntax
-    // M x y : Move to x,y
-    // L x y : Line to x,y
-    // Q x1 y1 x2 y2 : Quadratic bezier curve to x2,y2 from x1,y1
-    // C x1 y1 x2 y2 x3 y3 : Cubic bezier curve to x3,y3 from x1,y1 via x2,y2
-
-    if (points.length > 1) {
-      // Apply path approximation if character path exists
-      const approximatedPoints = characterPath
-        ? approximateToCharacterPath(points, characterPath)
-        : points;
-
-      console.log('Adding points:', approximatedPoints.length, 'points');
-      setTempPoints(approximatedPoints);
-    }
-
-    // Disable drawing and keep recording UI active (user can Cancel or Done)
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.isDrawingMode = false;
-      // stop listening further until user taps Record Again
-      fabricCanvasRef.current.off('path:created', handlePathCreated);
-      fabricCanvasRef.current.renderAll();
-    }
-  };
+  // Path handling is now done directly via mouse events in the parent component
   const startRecording = () => {
-    if (!selectedGestureOrder || !fabricCanvasRef.current) return;
+    if (!selectedGestureIndex) return;
     setIsRecording(true);
-    setRecordingStartTime(Date.now());
-    setTempPoints([]); // Clear temporary points
     clearGestureVisualization();
-
-    // Enable drawing mode by disabling object selection
-    fabricCanvasRef.current.forEachObject((obj) => {
-      obj.selectable = false;
-      obj.evented = false;
-    });
-
-    // Set up event handling
-    setupGestureRecording();
-    fabricCanvasRef.current.renderAll();
   };
 
   const stopRecording = () => {
     setIsRecording(false);
-    setCurrentPoints([]);
-    setTempPoints([]); // Clear temp points without saving
+    setCurrentGestureRecordingPoints([]);
     clearGestureVisualization(); // Clear all drawn paths
-
-    // Restore normal canvas behavior
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.isDrawingMode = false; // Disable drawing mode
-
-      // Remove path created listener
-      fabricCanvasRef.current.off('path:created', handlePathCreated);
-
-      fabricCanvasRef.current.forEachObject((obj) => {
-        if (!obj.get(GESTURE_FLAGS.isGestureVisualization)) {
-          obj.selectable = true;
-          obj.evented = false; // Keep character paths non-interactive
-        }
-      });
-      fabricCanvasRef.current.renderAll();
-    }
   };
 
   const saveRecording = () => {
-    if (!selectedGestureOrder || tempPoints.length === 0) return;
+    if (!selectedGestureIndex || currentGestureRecordingPoints.length === 0) return;
 
-    const pointCount = tempPoints.length;
+    const pointCount = currentGestureRecordingPoints.length;
 
     // Set the points for the selected gesture (overwrite previous points)
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
-        gesture.order === parseInt(selectedGestureOrder, 10)
+        gesture.index === selectedGestureIndex
           ? {
               ...gesture,
-              points: tempPoints
+              points: currentGestureRecordingPoints
             }
           : gesture
       )
     );
 
     // Clear temporary points
-    setTempPoints([]);
+    setCurrentGestureRecordingPoints([]);
 
     // Stop recording but keep the visualization
     setIsRecording(false);
 
-    // Disable drawing mode
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.isDrawingMode = false;
-      fabricCanvasRef.current.renderAll();
-    }
-
     toast.success(`Recorded ${pointCount} points for gesture`);
   };
 
-  const clearGestureVisualization = () => {
-    if (!fabricCanvasRef.current) return;
-
-    // Remove only gesture visualization objects (lines), keep the character path
-    fabricCanvasRef.current.getObjects().forEach((obj) => {
-      if (obj.get(GESTURE_FLAGS.isGestureVisualization)) {
-        fabricCanvasRef.current!.remove(obj);
-      }
-    });
-    fabricCanvasRef.current.renderAll();
-  };
-
-  const playGesture = async (gestureOrder: number) => {
-    const gesture = gestureData.find((g) => g.order === gestureOrder);
-    if (!gesture || !fabricCanvasRef.current) return;
+  const playGesture = async (gestureIndex: number) => {
+    const gesture = gestureData.find((g) => g.index === gestureIndex);
+    if (!gesture) return;
 
     setIsPlaying(true);
     clearGestureVisualization();
 
-    await playGestureWithoutClear(gesture, fabricCanvasRef);
+    // Use the Konva animation function from parent scope
+    await playGestureWithKonva(gesture);
 
     setIsPlaying(false);
   };
 
   const clearCurrentGesturePoints = () => {
-    if (!selectedGestureOrder) return;
+    if (!selectedGestureIndex) return;
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
-        gesture.order === parseInt(selectedGestureOrder, 10) ? { ...gesture, points: [] } : gesture
+        gesture.index === selectedGestureIndex ? { ...gesture, points: [] } : gesture
       )
     );
+    setNotToClearGesturesIndex((prev) => {
+      const st = new Set(prev);
+      st.delete(selectedGestureIndex);
+      return st;
+    });
     clearGestureVisualization();
   };
 
-  // Update brush settings when selected gesture changes during recording
-  useEffect(() => {
-    if (isRecording && selectedGesture && fabricCanvasRef.current) {
-      const canvas = fabricCanvasRef.current;
-      if (canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush.color = selectedGesture.brush_color;
-        canvas.freeDrawingBrush.width = selectedGesture.brush_width;
-      }
-    }
-  }, [selectedGesture?.brush_color, selectedGesture?.brush_width, isRecording]);
+  // Brush settings are now handled declaratively via state
 
   return (
     <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
       <div className="flex items-center justify-between">
-        <span className="font-medium">Selected: Gesture {selectedGesture.order + 1}</span>
+        <span className="font-medium">Selected: Gesture {selectedGesture.index + 1}</span>
         <div className="flex gap-2">
           {!isRecording && (
             <Button
@@ -754,22 +716,16 @@ const SelectedGestureControls = ({
             </Button>
           ) : (
             <>
-              {/* Record Again (re-enable drawing). Shown only during recording */}
+              {/* Record Again (clear temp points to start fresh). Shown only during recording */}
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => {
-                  if (!fabricCanvasRef.current) return;
-                  // clear previous temp points but keep visualization clearing to start fresh
-                  setTempPoints([]);
+                  // Clear previous temp points to start fresh
+                  setCurrentGestureRecordingPoints([]);
                   clearGestureVisualization(); // Clear canvas for fresh start
-                  // Re-enable drawing and reattach listener
-                  fabricCanvasRef.current.isDrawingMode = true;
-                  fabricCanvasRef.current.off('path:created', handlePathCreated);
-                  fabricCanvasRef.current.on('path:created', handlePathCreated);
-                  fabricCanvasRef.current.renderAll();
                 }}
-                disabled={tempPoints.length === 0}
+                disabled={currentGestureRecordingPoints.length === 0}
               >
                 <MdReplay className="mr-1" />
                 Record Again
@@ -782,7 +738,7 @@ const SelectedGestureControls = ({
                 size="sm"
                 variant="default"
                 onClick={saveRecording}
-                disabled={tempPoints.length === 0}
+                disabled={currentGestureRecordingPoints.length === 0}
               >
                 Done
               </Button>
@@ -793,7 +749,7 @@ const SelectedGestureControls = ({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => playGesture(selectedGesture.order)}
+              onClick={() => playGesture(selectedGesture.index)}
               disabled={isRecording || isPlaying || selectedGesture.points.length === 0}
             >
               <MdPlayArrow className="mr-1" />
@@ -811,12 +767,12 @@ const SelectedGestureControls = ({
           <div className="flex items-center gap-2">
             <input
               type="color"
-              value={selectedGesture.brush_color}
+              value={selectedGesture.color}
               onChange={(e) =>
                 setGestureData((prev: Gesture[]) =>
                   prev.map((gesture) =>
-                    gesture.order === parseInt(selectedGestureOrder || '0', 10)
-                      ? { ...gesture, brush_color: e.target.value }
+                    gesture.index === selectedGestureIndex
+                      ? { ...gesture, color: e.target.value }
                       : gesture
                   )
                 )
@@ -824,29 +780,25 @@ const SelectedGestureControls = ({
               className="h-8 w-12 rounded border border-input"
               disabled={isRecording || isPlaying}
             />
-            <span className="text-xs text-muted-foreground">{selectedGesture.brush_color}</span>
+            <span className="text-xs text-muted-foreground">{selectedGesture.color}</span>
           </div>
         </div>
 
         {/* Brush Width */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">
-            Brush Width: {selectedGesture.brush_width}px
-          </Label>
+          <Label className="text-sm font-medium">Brush Width: {selectedGesture.width}px</Label>
           <Slider
-            value={[selectedGesture.brush_width]}
+            value={[selectedGesture.width]}
             onValueChange={(value) =>
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
-                  gesture.order === parseInt(selectedGestureOrder || '0', 10)
-                    ? { ...gesture, brush_width: value[0] }
-                    : gesture
+                  gesture.index === selectedGestureIndex ? { ...gesture, width: value[0] } : gesture
                 )
               )
             }
-            min={4}
-            max={14}
-            step={1}
+            min={RANGES.brush_width.min}
+            max={RANGES.brush_width.max}
+            step={RANGES.brush_width.step}
             className="w-full"
             disabled={isRecording || isPlaying}
           />
@@ -854,23 +806,21 @@ const SelectedGestureControls = ({
 
         {/* Animation Duration */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">
-            Animation: {selectedGesture.animation_duration}ms
-          </Label>
+          <Label className="text-sm font-medium">Animation: {selectedGesture.duration}ms</Label>
           <Slider
-            value={[selectedGesture.animation_duration]}
+            value={[selectedGesture.duration]}
             onValueChange={(value) =>
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
-                  gesture.order === parseInt(selectedGestureOrder || '0', 10)
-                    ? { ...gesture, animation_duration: value[0] }
+                  gesture.index === selectedGestureIndex
+                    ? { ...gesture, duration: value[0] }
                     : gesture
                 )
               )
             }
-            min={50}
-            max={1000}
-            step={10}
+            min={RANGES.animation_duration.min}
+            max={RANGES.animation_duration.max}
+            step={RANGES.animation_duration.step}
             className="w-full"
             disabled={isRecording || isPlaying}
           />
@@ -889,21 +839,18 @@ const SelectedGestureControls = ({
 // Sortable Gesture Item Component
 type SortableGestureItemProps = {
   gesture: Gesture;
-  selectedGestureId: string | null;
-  onSelect: (gestureId: string | null) => void;
-  onDelete: (gestureOrder: number) => void;
-  disabled?: boolean;
+  clearGestureVisualization: () => void;
 };
 
-function SortableGestureItem({
-  gesture,
-  selectedGestureId,
-  onSelect,
-  onDelete,
-  disabled = false
-}: SortableGestureItemProps) {
+function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGestureItemProps) {
+  const [isRecording] = useAtom(is_recording_atom);
+  const [isPlaying] = useAtom(is_playing_atom);
+  const [selectedGestureIndex, setSelectedGestureIndex] = useAtom(selected_gesture_index_atom);
+  const setGestureData = useSetAtom(gesture_data_atom);
+
+  const disabled = isRecording || isPlaying;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: gesture.order.toString(),
+    id: gesture.index.toString(),
     disabled: disabled
   });
 
@@ -912,6 +859,65 @@ function SortableGestureItem({
     transition,
     opacity: isDragging ? 0.5 : 1
   };
+  const [notToClearGesturesIndex, setNotToClearGesturesIndex] = useAtom(
+    not_to_clear_gestures_index_atom
+  );
+
+  const deleteGesture = (gestureIndex: number) => {
+    setGestureData((prev: Gesture[]) => {
+      // Filter out the deleted gesture
+      const filteredGestures = prev.filter((g) => g.index !== gestureIndex);
+
+      // Reorder the remaining gestures to have sequential index values (0, 1, 2, etc.)
+      const reorderedGestures = filteredGestures.map((gesture, index) => ({
+        ...gesture,
+        index: index
+      }));
+
+      return reorderedGestures;
+    });
+
+    // Update notToClearGesturesIndex set to reflect the new index values
+    setNotToClearGesturesIndex((prev) => {
+      const newSet = new Set<number>();
+      // Convert old indices to new indices for gestures that weren't deleted
+      for (const oldIndex of prev) {
+        if (oldIndex < gestureIndex) {
+          // Indices before the deleted gesture stay the same
+          newSet.add(oldIndex);
+        } else if (oldIndex > gestureIndex) {
+          // Indices after the deleted gesture are decremented by 1
+          newSet.add(oldIndex - 1);
+        }
+        // The deleted gesture's index is not added to the new set
+      }
+      return newSet;
+    });
+
+    // Update selected gesture index logic
+    if (selectedGestureIndex === gestureIndex) {
+      setSelectedGestureIndex(null);
+    } else if (selectedGestureIndex !== null) {
+      // If selected gesture's index was after the deleted one, decrement it
+      if (selectedGestureIndex > gestureIndex) {
+        setSelectedGestureIndex(selectedGestureIndex - 1);
+      }
+    }
+  };
+
+  const onSelect = (gestureIndex: number | null) => {
+    clearGestureVisualization();
+    setSelectedGestureIndex(gestureIndex);
+  };
+
+  const onSelectCurrent = () => {
+    clearGestureVisualization();
+    if (selectedGestureIndex === gesture.index) {
+      onSelect(null);
+    } else {
+      onSelect(gesture.index);
+    }
+  };
 
   return (
     <div
@@ -919,18 +925,14 @@ function SortableGestureItem({
       style={style}
       className={cn(
         'flex cursor-pointer items-center gap-2 rounded border p-2 transition-colors',
-        selectedGestureId === gesture.order.toString()
+        selectedGestureIndex === gesture.index
           ? 'border-primary bg-primary/10'
           : 'border-border hover:border-primary/50 hover:bg-muted/50',
         isDragging && 'z-10 shadow-lg'
       )}
       onClick={() => {
         if (!disabled) {
-          if (selectedGestureId === gesture.order.toString()) {
-            onSelect(null);
-          } else {
-            onSelect(gesture.order.toString());
-          }
+          onSelectCurrent();
         }
       }}
     >
@@ -942,32 +944,48 @@ function SortableGestureItem({
       >
         <MdDragHandle className="h-4 w-4 text-muted-foreground" />
       </div>
-      <span className="text-sm">Gesture {gesture.order + 1}</span>
+      <span className="text-sm">Gesture {gesture.index + 1}</span>
       <Button
         size="sm"
         variant="ghost"
         className="h-6 w-6 p-0"
         onClick={(e) => {
           e.stopPropagation();
-          onDelete(gesture.order);
+          deleteGesture(gesture.index);
         }}
         disabled={disabled}
       >
         <MdDeleteOutline className="h-3 w-3" />
       </Button>
+      <Checkbox
+        id="toggle-2"
+        checked={notToClearGesturesIndex.has(gesture.index)}
+        onCheckedChange={(checked) => {
+          if (checked) {
+            setNotToClearGesturesIndex((prev) => new Set(prev).add(gesture.index));
+          } else {
+            setNotToClearGesturesIndex((prev) => {
+              const st = new Set(prev);
+              st.delete(gesture.index);
+              return st;
+            });
+          }
+        }}
+        className="data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:text-white dark:data-[state=checked]:border-blue-700 dark:data-[state=checked]:bg-blue-700"
+      />
     </div>
   );
 }
 
-const SaveEditMode = ({
-  fabricCanvasRef,
-  text_data
-}: {
-  fabricCanvasRef: React.RefObject<Canvas | null>;
-  text_data: text_data_type;
-}) => {
+const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const text = useAtomValue(text_atom);
   const gestureData = useAtomValue(gesture_data_atom);
+  const script = useAtomValue(script_atom);
+  const scriptID = script_list_obj[script]!;
+
+  const fontFamily = useAtomValue(font_family_atom);
+  const fontSize = useAtomValue(font_size_atom);
+  const textCenterOffset = useAtomValue(canvas_text_center_offset_atoms);
 
   const is_addition = text_data.id === undefined && text_data.uuid === undefined;
 
@@ -993,44 +1011,29 @@ const SaveEditMode = ({
   });
 
   const handle_save = () => {
-    if (text.trim().length === 0 || !fabricCanvasRef.current) return;
+    if (text.trim().length === 0) return;
 
-    // Temporarily hide gesture visualization objects
-    const gestureObjects = fabricCanvasRef.current
-      .getObjects()
-      .filter((obj) => obj.get('isGestureVisualization'));
-    gestureObjects.forEach((obj) => {
-      fabricCanvasRef.current?.remove(obj);
-    });
-
-    // make character path visible if hidden
-    const mainCharacterPath = fabricCanvasRef.current
-      .getObjects()
-      .find((obj) => obj.get(GESTURE_FLAGS.isMainCharacterPath));
-    if (mainCharacterPath) {
-      mainCharacterPath.visible = true;
-    }
-
-    // Get JSON with only text path objects
-    const fabricjs_svg_dump = fabricCanvasRef.current.toJSON();
-
-    // Restore gesture visualization objects
-    gestureObjects.forEach((obj) => {
-      fabricCanvasRef.current?.add(obj);
-    });
-    fabricCanvasRef.current.renderAll();
+    // With Konva, we don't need to manipulate canvas objects for saving
+    // The gesture data is already stored in state and ready to save
 
     if (is_addition) {
       add_text_data_mut.mutate({
         text,
-        gestures: gestureData
+        scriptID,
+        gestures: gestureData,
+        fontFamily,
+        fontSize,
+        textCenterOffset
       });
     } else {
       update_text_data_mut.mutate({
         id: text_data.id!,
         uuid: text_data.uuid!,
-        text,
-        gestures: gestureData
+        gestures: gestureData,
+        fontFamily,
+        fontSize,
+        textCenterOffset
+        // script and text can be only set once
       });
     }
   };

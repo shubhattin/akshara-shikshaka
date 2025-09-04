@@ -15,6 +15,13 @@
       "when": 1756232958274,
       "tag": "0001_wooden_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1756983461401,
+      "tag": "0002_volatile_rictor",
+      "breakpoints": true
     }
   ]
 }

@@ -65,7 +65,7 @@ import {
   is_recording_atom,
   is_playing_atom,
   main_text_path_visible_atom,
-  animated_gestures_atom,
+  canvas_gestures_flat_atom,
   DEFAULTS,
   is_drawing_atom,
   current_gesture_recording_points_atom,
@@ -73,7 +73,8 @@ import {
   font_family_atom,
   script_atom,
   font_loaded_atom,
-  RANGES
+  RANGES,
+  canvas_text_center_offset_atoms
 } from './add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
 import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
@@ -121,6 +122,7 @@ type text_data_type = {
   gestures: Gesture[];
   fontFamily: FontFamily;
   fontSize: number;
+  textCenterOffset: [number, number];
 };
 
 type Props =
@@ -150,7 +152,8 @@ export default function AddEditTextDataWrapper(props: Props) {
     [current_gesture_recording_points_atom, []],
     [font_family_atom, props.text_data.fontFamily],
     [font_loaded_atom, new Map<FontFamily, boolean>()],
-    [font_size_atom, props.text_data.fontSize]
+    [font_size_atom, props.text_data.fontSize],
+    [canvas_text_center_offset_atoms, props.text_data.textCenterOffset]
   ]);
   const stageRef = useRef<Konva.Stage | null>(null);
 
@@ -182,10 +185,11 @@ function AddEditTextData({
   const [selectedGestureIndex, setSelectedGestureIndex] = useAtom(selected_gesture_index_atom);
   const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
-  const setAnimatedGestures = useSetAtom(animated_gestures_atom);
+  const setCanvasGesturesFlat = useSetAtom(canvas_gestures_flat_atom);
   const [notToClearGesturesIndex, setNotToClearGesturesIndex] = useAtom(
     not_to_clear_gestures_index_atom
   );
+  const setCanvasTextCenterOffset = useSetAtom(canvas_text_center_offset_atoms);
 
   // Drag and Drop Sensors
   const sensors = useSensors(
@@ -267,12 +271,12 @@ function AddEditTextData({
 
   const clearGestureVisualization = (all = false) => {
     if (all) {
-      setAnimatedGestures([]);
+      setCanvasGesturesFlat([]);
       return;
     }
     // Clear animated gesture lines from state
     const allowed_gestures = gestureData.filter((g) => notToClearGesturesIndex.has(g.index));
-    setAnimatedGestures(
+    setCanvasGesturesFlat(
       allowed_gestures.map((g) => ({
         ...g,
         points_flat: g.points.flatMap((p) => [p[0], p[1]])
@@ -298,7 +302,7 @@ function AddEditTextData({
     const gestureLineId = gesture.index;
 
     // Initialize the gesture line in state
-    setAnimatedGestures((prev) => [
+    setCanvasGesturesFlat((prev) => [
       ...prev.filter((line) => line.index !== gestureLineId),
       {
         index: gestureLineId,
@@ -313,7 +317,7 @@ function AddEditTextData({
       // Convert points to flat array for Konva Line component
       const flatPoints = frame.partialPoints.flatMap((p) => [p[0], p[1]]);
 
-      setAnimatedGestures((prev) =>
+      setCanvasGesturesFlat((prev) =>
         prev.map((line) =>
           line.index === gestureLineId ? { ...line, points_flat: flatPoints } : line
         )
@@ -364,7 +368,7 @@ function AddEditTextData({
     if (!selectedGestureIndex) return;
     const currentGesture = gestureData.find((g) => g.index === selectedGestureIndex)!;
     // on gesture data change if there is a instance of it inside of animated gesture then update it
-    setAnimatedGestures((prev) =>
+    setCanvasGesturesFlat((prev) =>
       prev.map((g) =>
         g.index === currentGesture.index
           ? {
@@ -509,6 +513,15 @@ function AddEditTextData({
             className=""
           />
         </Label>
+        {mainTextPathVisible && (
+          <button
+            className="rounded border border-gray-300 bg-gray-100 px-2 py-1 text-sm text-gray-700 transition-colors hover:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            type="button"
+            onClick={() => setCanvasTextCenterOffset([0, 0])}
+          >
+            Center Text
+          </button>
+        )}
       </div>
 
       {/* Gesture Management Section */}
@@ -972,6 +985,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
 
   const fontFamily = useAtomValue(font_family_atom);
   const fontSize = useAtomValue(font_size_atom);
+  const textCenterOffset = useAtomValue(canvas_text_center_offset_atoms);
 
   const is_addition = text_data.id === undefined && text_data.uuid === undefined;
 
@@ -1008,7 +1022,8 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
         scriptID,
         gestures: gestureData,
         fontFamily,
-        fontSize
+        fontSize,
+        textCenterOffset
       });
     } else {
       update_text_data_mut.mutate({
@@ -1016,7 +1031,8 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
         uuid: text_data.uuid!,
         gestures: gestureData,
         fontFamily,
-        fontSize
+        fontSize,
+        textCenterOffset
         // script and text can be only set once
       });
     }

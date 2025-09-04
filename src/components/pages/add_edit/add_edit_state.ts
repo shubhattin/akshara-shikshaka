@@ -28,10 +28,13 @@ export const not_to_clear_gestures_index_atom = atom<ReadonlySet<number>>(new Se
 /** Stores point when the user is currently drawing (mouse down state), does not needs to store gesture attributes */
 export const current_gesture_recording_points_atom = atom<Gesture['points']>([]);
 /**
- * Used for displaying the animated gestures or the ones that are marked to stay on screen, use for `Play` buttons
+ * Used for displaying the animated/ing gestures or the ones that are marked to stay on screen, use for `Play` buttons
  * Stores the attributes of all the different gestures to be used
  */
-export const animated_gestures_atom = atom<AnimationGesture[]>([]);
+export const canvas_gestures_flat_atom = atom<AnimationGesture[]>([]);
+
+/** offset from the base(Centre) text coordinates, this will be used to restore the position of the text */
+export const canvas_text_center_offset_atoms = atom<[number, number]>([0, 0]);
 
 // Export constants for use in components
 export const DEFAULTS = {

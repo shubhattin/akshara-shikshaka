@@ -13,7 +13,8 @@ const add_text_data_route = protectedAdminProcedure
       gestures: GestureSchema.array(),
       scriptID: z.number().int(),
       fontFamily: z.string().min(1),
-      fontSize: z.number().int()
+      fontSize: z.number().int(),
+      textCenterOffset: z.tuple([z.number(), z.number()])
     })
   )
   .mutation(async ({ input }) => {
@@ -24,7 +25,8 @@ const add_text_data_route = protectedAdminProcedure
         gestures: input.gestures,
         scriptID: input.scriptID,
         fontFamily: input.fontFamily as FontFamily,
-        fontSize: input.fontSize
+        fontSize: input.fontSize,
+        textCenterOffset: input.textCenterOffset
       })
       .returning();
     return {
@@ -40,7 +42,8 @@ const edit_text_data_route = protectedAdminProcedure
       uuid: z.string().uuid(),
       gestures: GestureSchema.array(),
       fontFamily: z.string().min(1),
-      fontSize: z.number().int()
+      fontSize: z.number().int(),
+      textCenterOffset: z.tuple([z.number(), z.number()])
     })
   )
   .mutation(async ({ input }) => {
@@ -49,7 +52,8 @@ const edit_text_data_route = protectedAdminProcedure
       .set({
         gestures: input.gestures,
         fontFamily: input.fontFamily as FontFamily,
-        fontSize: input.fontSize
+        fontSize: input.fontSize,
+        textCenterOffset: input.textCenterOffset
       })
       .where(and(eq(text_data.uuid, input.uuid), eq(text_data.id, input.id)));
     return {

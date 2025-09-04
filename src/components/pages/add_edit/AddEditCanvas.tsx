@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useLayoutEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Stage, Layer, Line, Text } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
@@ -8,7 +8,7 @@ import { CANVAS_DIMS, GesturePoint } from '~/tools/stroke_data/types';
 import {
   main_text_path_visible_atom,
   font_size_atom,
-  animated_gestures_atom,
+  canvas_gestures_flat_atom,
   selected_gesture_index_atom,
   gesture_data_atom,
   is_recording_atom,
@@ -17,7 +17,8 @@ import {
   not_to_clear_gestures_index_atom,
   text_atom,
   font_family_atom,
-  font_loaded_atom
+  font_loaded_atom,
+  canvas_text_center_offset_atoms
 } from './add_edit_state';
 import { cn } from '~/lib/utils';
 
@@ -26,7 +27,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   const mainTextPathVisible = useAtomValue(main_text_path_visible_atom);
   const text = useAtomValue(text_atom);
   const fontSize = useAtomValue(font_size_atom);
-  const animatedGestures = useAtomValue(animated_gestures_atom);
+  const canvasGesturesFlat = useAtomValue(canvas_gestures_flat_atom);
   const selectedGestureIndex = useAtomValue(selected_gesture_index_atom);
   const gestureData = useAtomValue(gesture_data_atom);
   const isRecording = useAtomValue(is_recording_atom);
@@ -49,7 +50,16 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     width: 0,
     height: 0
   });
+  const [canvasTextCenterOffset, setCanvasTextCenterOffset] = useAtom(
+    canvas_text_center_offset_atoms
+  );
 
+  const BASE_TEXT_CORRDINATES = [
+    CANVAS_DIMS.width / 2 - textBox.width / 2 + canvasTextCenterOffset[0],
+    CANVAS_DIMS.height / 2 - textBox.height / 2 + textBox.height * 0.06 + canvasTextCenterOffset[1]
+  ];
+
+  // version of useEffect that runs before brower repaints the screen
   useLayoutEffect(() => {
     const node = textRef.current;
     if (!node) return;
@@ -60,6 +70,20 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
       setTextBox({ width: measured.width, height: measured.height });
     }
   }, [text, fontSize]);
+
+  // Handle text drag end to update offset
+  const handleTextDragEnd = (e: any) => {
+    const textNode = e.target;
+    const newX = textNode.x();
+    const newY = textNode.y();
+    // Calculate the offset from the original center position
+    const centerX = CANVAS_DIMS.width / 2 - textBox.width / 2;
+    const centerY = CANVAS_DIMS.height / 2 - textBox.height / 2 + textBox.height * 0.06;
+    const offsetX = newX - centerX;
+    const offsetY = newY - centerY;
+    // Update the offset state
+    setCanvasTextCenterOffset([offsetX, offsetY]);
+  };
 
   // Mouse event handlers for gesture recording
   const onMouseDown = (e: any) => {
@@ -110,20 +134,22 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
         {/* Character Text */}
         <Text
           ref={textRef}
-          x={CANVAS_DIMS.width / 2}
-          y={CANVAS_DIMS.height / 2}
+          x={BASE_TEXT_CORRDINATES[0]}
+          y={BASE_TEXT_CORRDINATES[1]}
           text={text}
           fontSize={fontSize * 15}
           fontFamily={currentFontLoaded ? fontFamily : 'Arial'}
           fill="black"
           visible={mainTextPathVisible}
-          offsetX={textBox.width / 2}
-          offsetY={textBox.height / 2 - textBox.height * 0.06}
+          // offsetX={textBox.width / 2}
+          // offsetY={textBox.height / 2 - textBox.height * 0.06}
           draggable={!isRecording && !isDrawing}
+          onDragEnd={handleTextDragEnd}
         />
+        {/* ^ the offset is being subracted from the x and y coordinates of the text */}
 
         {/* Animated Gesture Lines */}
-        {animatedGestures
+        {canvasGesturesFlat
           .filter((g) => !(isRecording && g.index === selectedGestureIndex))
           // ^ not displaying the current gesture even if marked while recording
           .map((gesture) => (

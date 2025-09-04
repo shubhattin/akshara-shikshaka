@@ -22,7 +22,8 @@ const get_cached_text_data = cache(async (id: number) => {
       text: true,
       gestures: true,
       fontFamily: true,
-      fontSize: true
+      fontSize: true,
+      textCenterOffset: true
     }
   });
   return text_data;

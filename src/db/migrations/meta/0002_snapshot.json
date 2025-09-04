@@ -1,5 +1,5 @@
 {
-  "id": "69049f00-a36e-4b86-bde1-ec826c0de279",
+  "id": "52552f4c-9bb2-48c9-9a86-732299fd4e49",
   "prevId": "52c2224a-3900-4125-bac3-7d40696155a5",
   "version": "7",
   "dialect": "postgresql",
@@ -66,6 +66,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": 15
+        },
+        "text_center_offset": {
+          "name": "text_center_offset",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[0,0]'::jsonb"
         }
       },
       "indexes": {

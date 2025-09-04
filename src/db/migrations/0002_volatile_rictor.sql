@@ -2,4 +2,5 @@ DROP INDEX "text_data_text_idx";--> statement-breakpoint
 ALTER TABLE "text_data" ADD COLUMN "script_id" smallint NOT NULL;--> statement-breakpoint
 ALTER TABLE "text_data" ADD COLUMN "font_family" text DEFAULT 'Nirmala_UI' NOT NULL;--> statement-breakpoint
 ALTER TABLE "text_data" ADD COLUMN "font_size" smallint DEFAULT 15 NOT NULL;--> statement-breakpoint
+ALTER TABLE "text_data" ADD COLUMN "text_center_offset" jsonb DEFAULT '[0,0]'::jsonb NOT NULL;--> statement-breakpoint
 CREATE INDEX "text_data_script_text_id_idx" ON "text_data" USING btree ("script_id","text");

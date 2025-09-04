@@ -27,7 +27,8 @@ import {
   show_try_again_atom,
   last_accuracy_atom,
   scaling_factor_atom,
-  animated_gesture_lines_atom
+  animated_gesture_lines_atom,
+  current_gesture_points_atom
 } from './practice_state';
 
 // Dynamic import for PracticeKonvaCanvas to avoid SSR issues
@@ -84,6 +85,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const [lastAccuracy, setLastAccuracy] = useAtom(last_accuracy_atom);
   const [, setScalingFactor] = useAtom(scaling_factor_atom);
   const [, setAnimatedGestureLines] = useAtom(animated_gesture_lines_atom);
+  const [, setCurrentGesturePoints] = useAtom(current_gesture_points_atom);
 
   function updateScalingFactor() {
     if (typeof window === 'undefined') return;
@@ -166,21 +168,6 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     const currentGesture = gestureData[currentGestureIndex];
     if (!currentGesture) return;
 
-    // Add user stroke to visualization
-    const gestureLineId = Date.now(); // Unique ID for user stroke
-    const flatPoints = userPoints.flatMap((p) => [p[0], p[1]]);
-
-    setAnimatedGestureLines((prev) => [
-      ...prev,
-      {
-        index: gestureLineId,
-        points_flat: flatPoints,
-        color: '#0066cc',
-        width: currentGesture.width || 6,
-        gesture_type: 'user_gesture'
-      }
-    ]);
-
     // Evaluate gesture accuracy with error handling
     let accuracy = 0;
     try {
@@ -201,14 +188,14 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
       // Remove the user stroke after a delay
       setTimeout(() => {
-        setAnimatedGestureLines((prev) => prev.filter((line) => line.index !== gestureLineId));
+        setCurrentGesturePoints([]);
         setShowTryAgain(false);
       }, 5000);
     }
   };
 
   const playNextGesture = () => {
-    clearUserGestures();
+    setCurrentGesturePoints([]);
 
     setCurrentGestureIndex(currentGestureIndex + 1);
     setCompletedGesturesCount(completedGesturesCount + 1);
@@ -220,10 +207,6 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     } else {
       setIsDrawing(false);
     }
-  };
-
-  const clearUserGestures = () => {
-    setAnimatedGestureLines((prev) => prev.filter((line) => line.gesture_type !== 'user_gesture'));
   };
 
   const clearCurrentAnimatedGesture = () => {
@@ -412,7 +395,10 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
             <TryAgainSection
               accuracy={lastAccuracy}
               onSkipGesture={skipCurrentGesture}
-              onClose={() => setShowTryAgain(false)}
+              onClose={() => {
+                setCurrentGesturePoints([]);
+                setShowTryAgain(false);
+              }}
             />
           )}
         </AnimatePresence>

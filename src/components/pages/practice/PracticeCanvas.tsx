@@ -9,7 +9,7 @@ import { CANVAS_DIMS } from '~/tools/stroke_data/types';
 import {
   scaling_factor_atom,
   animated_gesture_lines_atom,
-  drawing_points_atom,
+  current_gesture_points_atom,
   is_recording_stroke_atom,
   is_drawing_atom,
   current_gesture_index_atom,
@@ -27,7 +27,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
     // Canvas state from atoms
     const scalingFactor = useAtomValue(scaling_factor_atom);
     const animatedGestureLines = useAtomValue(animated_gesture_lines_atom);
-    const [drawingPoints, setDrawingPoints] = useAtom(drawing_points_atom);
+    const [currentGesturePoints, setCurrentGesturePoints] = useAtom(current_gesture_points_atom);
     const [isRecordingStroke, setIsRecordingStroke] = useAtom(is_recording_stroke_atom);
     const isDrawing = useAtomValue(is_drawing_atom);
     const practiceMode = useAtomValue(practice_mode_atom);
@@ -57,7 +57,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         y: pos.y / scalingFactor
       };
 
-      setDrawingPoints([scaledPos.x, scaledPos.y]);
+      setCurrentGesturePoints([scaledPos.x, scaledPos.y]);
     };
 
     const handleStageMouseMove = (e: any) => {
@@ -70,7 +70,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         y: pos.y / scalingFactor
       };
 
-      setDrawingPoints((prev) => [...prev, scaledPos.x, scaledPos.y]);
+      setCurrentGesturePoints((prev) => [...prev, scaledPos.x, scaledPos.y]);
     };
 
     const handleStageMouseUp = () => {
@@ -82,15 +82,12 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       const gesturePoints: GesturePoint[] = [];
       const baseTime = strokeStartTime;
 
-      for (let i = 0; i < drawingPoints.length; i += 2) {
-        const x = drawingPoints[i];
-        const y = drawingPoints[i + 1];
+      for (let i = 0; i < currentGesturePoints.length; i += 2) {
+        const x = currentGesturePoints[i];
+        const y = currentGesturePoints[i + 1];
 
         gesturePoints.push([x, y]);
       }
-
-      // Clear drawing points and notify parent
-      setDrawingPoints([]);
 
       if (gesturePoints.length > 1) {
         onUserStroke(gesturePoints);
@@ -143,9 +140,9 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
           ))}
 
           {/* Current Drawing Stroke (while user is drawing) */}
-          {isDrawing && isRecordingStroke && drawingPoints.length > 0 && currentGesture && (
+          {currentGesturePoints.length > 0 && currentGesture && (
             <Line
-              points={drawingPoints} // No scaling needed - Stage handles it
+              points={currentGesturePoints} // No scaling needed - Stage handles it
               stroke="#0066cc"
               strokeWidth={currentGesture.width || 6}
               lineCap="round"

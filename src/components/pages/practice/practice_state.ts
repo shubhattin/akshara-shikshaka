@@ -18,10 +18,11 @@ export const scaling_factor_atom = atom(1);
 // Gesture data atoms
 export const animated_gesture_lines_atom = atom<
   (AnimationGesture & {
-    gesture_type: 'user_gesture' | 'current_animated_gesture' | null;
+    gesture_type: 'current_animated_gesture' | null;
   })[]
 >([]);
 
 // Drawing state
-export const drawing_points_atom = atom<number[]>([]);
+/** Current user drawn gesture on the canvas */
+export const current_gesture_points_atom = atom<number[]>([]);
 export const is_recording_stroke_atom = atom(false);

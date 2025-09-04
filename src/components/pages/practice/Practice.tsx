@@ -23,12 +23,10 @@ import {
   current_gesture_index_atom,
   is_drawing_atom,
   completed_gestures_count_atom,
-  show_all_gestures_done_atom,
   is_animating_current_gesture_atom,
   show_try_again_atom,
   last_accuracy_atom,
   scaling_factor_atom,
-  mounted_atom,
   animated_gesture_lines_atom
 } from './practice_state';
 
@@ -58,7 +56,6 @@ type Props = {
 
 export default function PracticeCanvasComponent({ text_data }: Props) {
   const stageRef = useRef<Konva.Stage>(null);
-  const canceledRef = useRef(false);
 
   // Initialize atoms with default values
   useHydrateAtoms([
@@ -66,12 +63,10 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     [current_gesture_index_atom, 0],
     [is_drawing_atom, false],
     [completed_gestures_count_atom, 0],
-    [show_all_gestures_done_atom, false],
     [is_animating_current_gesture_atom, false],
     [show_try_again_atom, false],
     [last_accuracy_atom, 0],
     [scaling_factor_atom, 1],
-    [mounted_atom, false],
     [animated_gesture_lines_atom, []]
   ]);
 
@@ -82,14 +77,12 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const [completedGesturesCount, setCompletedGesturesCount] = useAtom(
     completed_gestures_count_atom
   );
-  const [showAllGesturesDone, setShowAllGesturesDone] = useAtom(show_all_gestures_done_atom);
   const [isAnimatingCurrentGesture, setIsAnimatingCurrentGesture] = useAtom(
     is_animating_current_gesture_atom
   );
   const [showTryAgain, setShowTryAgain] = useAtom(show_try_again_atom);
   const [lastAccuracy, setLastAccuracy] = useAtom(last_accuracy_atom);
   const [, setScalingFactor] = useAtom(scaling_factor_atom);
-  const [, setMounted] = useAtom(mounted_atom);
   const [, setAnimatedGestureLines] = useAtom(animated_gesture_lines_atom);
 
   function updateScalingFactor() {
@@ -101,30 +94,18 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     setScalingFactor(scale);
   }
 
-  // Konva doesn't need manual dimension updates - scaling is handled via props
-
-  // Refs are no longer needed with direct state access
-
   useEffect(() => {
     updateScalingFactor();
-    canceledRef.current = false;
-    setMounted(true);
-
     window.addEventListener('resize', updateScalingFactor);
     const unsub_func = () => {
       window.removeEventListener('resize', updateScalingFactor);
     };
-
     return () => {
       unsub_func();
-      canceledRef.current = true;
-      // Konva cleanup is handled automatically by the Stage component
     };
   }, []);
 
   const gestureData = text_data.gestures ?? [];
-
-  const currentGesture = gestureData[currentGestureIndex];
 
   const totalGestures = gestureData.length;
 
@@ -132,10 +113,10 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
   const playAllGestures = async () => {
     setPracticeMode('playing');
-    clearAllPracticeGestures();
+    setAnimatedGestureLines([]);
 
     for (const gesture of gestureData) {
-      await playGestureWithKonva(gesture, false); // Not a guidance gesture
+      await playGestureWithKonva(gesture); // Not a guidance gesture
       await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION));
     }
 
@@ -143,10 +124,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   // Konva-based gesture animation
-  const playGestureWithKonva = async (
-    gesture: Gesture,
-    isCurrentAnimatedGesture: boolean = false
-  ): Promise<void> => {
+  const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {
     const gestureLineId = gesture.index;
 
     // Initialize the gesture line in state
@@ -179,7 +157,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     disableDrawingMode();
     setIsAnimatingCurrentGesture(true);
     clearCurrentAnimatedGesture();
-    await playGestureWithKonva(gestureData[gestureIndex], true); // This is a guidance gesture
+    await playGestureWithKonva(gestureData[gestureIndex]); // This is a guidance gesture
     setIsAnimatingCurrentGesture(false);
     enableDrawingMode();
   };
@@ -192,7 +170,6 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     setIsDrawing(false);
   };
 
-  // Handle user gesture drawing from Konva canvas
   // Handle user gesture drawing from Konva canvas
   const handleUserStroke = async (userPoints: GesturePoint[]) => {
     const currentGesture = gestureData[currentGestureIndex];
@@ -264,11 +241,6 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const finishPracticeMode = async () => {
     disableDrawingMode();
     clearUserGestures();
-    setShowAllGesturesDone(true);
-  };
-
-  const clearAllPracticeGestures = () => {
-    setAnimatedGestureLines([]);
   };
 
   const clearCurrentAnimatedGesture = () => {
@@ -300,10 +272,9 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     setPracticeMode('none');
     setCurrentGestureIndex(0);
     setCompletedGesturesCount(0);
-    setShowAllGesturesDone(false);
     setShowTryAgain(false);
     disableDrawingMode();
-    clearAllPracticeGestures();
+    setAnimatedGestureLines([]);
   };
 
   if (!gestureData.length) {
@@ -350,7 +321,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
                   setCurrentGestureIndex(0);
                   setCompletedGesturesCount(0);
                   setShowTryAgain(false);
-                  clearAllPracticeGestures();
+                  setAnimatedGestureLines([]);
                   playGestureIndex(currentGestureIndex);
                 }}
                 disabled={practiceMode === 'playing'}
@@ -406,7 +377,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
             </>
           )}
         </div>
-        {practiceMode === 'practicing' && !showAllGesturesDone && (
+        {practiceMode === 'practicing' && completedGesturesCount !== gestureData.length && (
           <ProgressDisplay
             currentGesture={currentGestureIndex + 1}
             totalGestures={totalGestures}
@@ -414,7 +385,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
           />
         )}
 
-        {showAllGesturesDone && (
+        {completedGesturesCount === gestureData.length && (
           <motion.div
             className={cn(
               'space-y-4 rounded-xl border border-gray-200 bg-gradient-to-br from-white via-gray-50 to-gray-100 p-6 text-center shadow-lg',
@@ -436,7 +407,6 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
               whileTap={{ scale: 0.95 }}
               whileHover={{ scale: 1.07 }}
               onClick={() => {
-                setShowAllGesturesDone(false);
                 resetPractice();
                 playAllGestures();
               }}
@@ -477,9 +447,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
             <PracticeKonvaCanvas
               ref={stageRef}
               gestureData={gestureData}
-              currentGestureIndex={currentGestureIndex}
               onUserStroke={handleUserStroke}
-              isDrawingEnabled={isDrawing}
             />
           </div>
         </div>

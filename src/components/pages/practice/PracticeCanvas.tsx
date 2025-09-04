@@ -11,19 +11,18 @@ import {
   animated_gesture_lines_atom,
   drawing_points_atom,
   is_recording_stroke_atom,
-  is_drawing_atom
+  is_drawing_atom,
+  current_gesture_index_atom
 } from './practice_state';
 import { cn } from '~/lib/utils';
 
 interface PracticeKonvaCanvasProps {
   gestureData: Gesture[];
-  currentGestureIndex: number;
   onUserStroke: (points: GesturePoint[]) => void;
-  isDrawingEnabled: boolean;
 }
 
 const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
-  ({ gestureData, currentGestureIndex, onUserStroke, isDrawingEnabled }, ref) => {
+  ({ gestureData, onUserStroke }, ref) => {
     // Canvas state from atoms
     const scalingFactor = useAtomValue(scaling_factor_atom);
     const animatedGestureLines = useAtomValue(animated_gesture_lines_atom);
@@ -35,6 +34,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
     const [strokeStartTime, setStrokeStartTime] = useState(0);
 
     // Get current gesture for brush settings
+    const currentGestureIndex = useAtomValue(current_gesture_index_atom);
     const currentGesture = gestureData[currentGestureIndex];
 
     // Calculate responsive canvas dimensions
@@ -43,7 +43,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
     // Mouse/touch event handlers for drawing
     const handleStageMouseDown = (e: any) => {
-      if (!isDrawingEnabled || !isDrawing) return;
+      if (!isDrawing || !isDrawing) return;
 
       setIsRecordingStroke(true);
       setStrokeStartTime(Date.now());
@@ -59,7 +59,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
     };
 
     const handleStageMouseMove = (e: any) => {
-      if (!isDrawingEnabled || !isDrawing || !isRecordingStroke) return;
+      if (!isDrawing || !isDrawing || !isRecordingStroke) return;
 
       const pos = e.target.getStage().getPointerPosition();
       // Scale coordinates back to logical space
@@ -72,7 +72,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
     };
 
     const handleStageMouseUp = () => {
-      if (!isDrawingEnabled || !isDrawing || !isRecordingStroke) return;
+      if (!isDrawing || !isRecordingStroke) return;
 
       setIsRecordingStroke(false);
 
@@ -138,7 +138,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
           ))}
 
           {/* Current Drawing Stroke (while user is drawing) */}
-          {isDrawingEnabled &&
+          {isDrawing &&
             isDrawing &&
             isRecordingStroke &&
             drawingPoints.length > 0 &&

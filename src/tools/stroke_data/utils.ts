@@ -11,7 +11,7 @@ export interface GestureAnimationFrame {
   isComplete: boolean;
 }
 
-export function* generateGestureAnimationFrames(
+function* generateGestureAnimationFrames(
   gesture: Gesture,
   maxSteps: number = 50
 ): Generator<GestureAnimationFrame> {

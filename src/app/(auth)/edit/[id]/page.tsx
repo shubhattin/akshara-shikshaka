@@ -21,12 +21,21 @@ const get_cached_text_data = cache(async (id: number) => {
       uuid: true,
       text: true,
       gestures: true,
-      fontFamily: true,
-      fontSize: true,
-      textCenterOffset: true
+      font_family: true,
+      font_size: true,
+      text_center_offset: true
     }
   });
-  return text_data;
+  const data = {
+    id: text_data!.id,
+    uuid: text_data!.uuid,
+    text: text_data!.text,
+    gestures: text_data!.gestures,
+    fontFamily: text_data!.font_family as FontFamily,
+    fontSize: text_data!.font_size,
+    textCenterOffset: text_data!.text_center_offset
+  };
+  return data as typeof data | undefined;
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

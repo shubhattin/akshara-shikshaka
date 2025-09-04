@@ -3,6 +3,6 @@ import { createSelectSchema } from 'drizzle-zod';
 import { text_data } from './schema';
 
 export const TextDataSchemaZod = createSelectSchema(text_data, {
-  createdAt: z.coerce.date(),
-  updatedAt: z.coerce.date()
+  created_at: z.coerce.date(),
+  updated_at: z.coerce.date()
 });

@@ -23,10 +23,10 @@ const add_text_data_route = protectedAdminProcedure
       .values({
         text: input.text,
         gestures: input.gestures,
-        scriptID: input.scriptID,
-        fontFamily: input.fontFamily as FontFamily,
-        fontSize: input.fontSize,
-        textCenterOffset: input.textCenterOffset
+        script_id: input.scriptID,
+        font_family: input.fontFamily as FontFamily,
+        font_size: input.fontSize,
+        text_center_offset: input.textCenterOffset
       })
       .returning();
     return {
@@ -51,9 +51,9 @@ const edit_text_data_route = protectedAdminProcedure
       .update(text_data)
       .set({
         gestures: input.gestures,
-        fontFamily: input.fontFamily as FontFamily,
-        fontSize: input.fontSize,
-        textCenterOffset: input.textCenterOffset
+        font_family: input.fontFamily as FontFamily,
+        font_size: input.fontSize,
+        text_center_offset: input.textCenterOffset
       })
       .where(and(eq(text_data.uuid, input.uuid), eq(text_data.id, input.id)));
     return {

@@ -13,7 +13,8 @@ import {
   is_recording_stroke_atom,
   is_drawing_atom,
   current_gesture_index_atom,
-  practice_mode_atom
+  practice_mode_atom,
+  USER_GESTURE_COLOR
 } from './practice_state';
 import { cn } from '~/lib/utils';
 
@@ -32,9 +33,6 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
     const isDrawing = useAtomValue(is_drawing_atom);
     const practiceMode = useAtomValue(practice_mode_atom);
 
-    // Local state for tracking stroke
-    const [strokeStartTime, setStrokeStartTime] = useState(0);
-
     // Get current gesture for brush settings
     const currentGestureIndex = useAtomValue(current_gesture_index_atom);
     const currentGesture = gestureData[currentGestureIndex];
@@ -48,7 +46,6 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       if (!isDrawing || !isDrawing) return;
 
       setIsRecordingStroke(true);
-      setStrokeStartTime(Date.now());
 
       const pos = e.target.getStage().getPointerPosition();
       // Scale coordinates back to logical space
@@ -80,7 +77,6 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
       // Convert drawing points to GesturePoint format
       const gesturePoints: GesturePoint[] = [];
-      const baseTime = strokeStartTime;
 
       for (let i = 0; i < currentGesturePoints.length; i += 2) {
         const x = currentGesturePoints[i];
@@ -143,7 +139,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
           {currentGesturePoints.length > 0 && currentGesture && (
             <Line
               points={currentGesturePoints} // No scaling needed - Stage handles it
-              stroke="#0066cc"
+              stroke={USER_GESTURE_COLOR}
               strokeWidth={currentGesture.width || 6}
               lineCap="round"
               lineJoin="round"

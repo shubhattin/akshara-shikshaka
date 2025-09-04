@@ -16,7 +16,7 @@ import {
 } from '~/tools/stroke_data/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AiOutlineSignature } from 'react-icons/ai';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import {
   practice_mode_atom,
@@ -28,7 +28,8 @@ import {
   last_accuracy_atom,
   scaling_factor_atom,
   animated_gesture_lines_atom,
-  current_gesture_points_atom
+  current_gesture_points_atom,
+  TRY_AGAIN_WAIT_DURATION
 } from './practice_state';
 
 // Dynamic import for PracticeKonvaCanvas to avoid SSR issues
@@ -39,7 +40,7 @@ const PracticeKonvaCanvas = dynamic(() => import('./PracticeCanvas'), {
       className="flex items-center justify-center rounded-lg border-2 bg-gray-50"
       style={{ width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }}
     >
-      <div className="text-gray-500">Loading canvas...</div>
+      {/* <div className="text-gray-500">Loading canvas...</div> */}
     </div>
   )
 });
@@ -83,9 +84,11 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   );
   const [showTryAgain, setShowTryAgain] = useAtom(show_try_again_atom);
   const [lastAccuracy, setLastAccuracy] = useAtom(last_accuracy_atom);
-  const [, setScalingFactor] = useAtom(scaling_factor_atom);
-  const [, setAnimatedGestureLines] = useAtom(animated_gesture_lines_atom);
-  const [, setCurrentGesturePoints] = useAtom(current_gesture_points_atom);
+  const setScalingFactor = useSetAtom(scaling_factor_atom);
+  const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
+  const setCurrentGesturePoints = useSetAtom(current_gesture_points_atom);
+
+  const tryAgainTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   function updateScalingFactor() {
     if (typeof window === 'undefined') return;
@@ -186,11 +189,13 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       setLastAccuracy(accuracy);
       setShowTryAgain(true);
 
-      // Remove the user stroke after a delay
-      setTimeout(() => {
+      if (tryAgainTimeoutRef.current) {
+        clearTimeout(tryAgainTimeoutRef.current);
+      }
+      tryAgainTimeoutRef.current = setTimeout(() => {
         setCurrentGesturePoints([]);
         setShowTryAgain(false);
-      }, 5000);
+      }, TRY_AGAIN_WAIT_DURATION);
     }
   };
 
@@ -392,14 +397,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
         <AnimatePresence>
           {showTryAgain && practiceMode === 'practicing' && (
-            <TryAgainSection
-              accuracy={lastAccuracy}
-              onSkipGesture={skipCurrentGesture}
-              onClose={() => {
-                setCurrentGesturePoints([]);
-                setShowTryAgain(false);
-              }}
-            />
+            <TryAgainSection accuracy={lastAccuracy} onSkipGesture={skipCurrentGesture} />
           )}
         </AnimatePresence>
 
@@ -425,15 +423,21 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 // Try Again Section Component
 const TryAgainSection = ({
   accuracy,
-  onSkipGesture,
-  onClose
+  onSkipGesture
 }: {
   accuracy: number;
   onSkipGesture: () => void;
-  onClose: () => void;
 }) => {
   const accuracyPercent = Math.round(accuracy * 100);
   const isBelowThreshold = accuracyPercent < 70;
+
+  const setCurrentGesturePoints = useSetAtom(current_gesture_points_atom);
+  const setShowTryAgain = useSetAtom(show_try_again_atom);
+
+  const onTryAgain = () => {
+    setCurrentGesturePoints([]);
+    setShowTryAgain(false);
+  };
 
   return (
     <motion.div
@@ -507,7 +511,7 @@ const TryAgainSection = ({
             {/* Action Buttons */}
             <div className="flex w-full flex-col gap-x-2.5 sm:w-auto sm:flex-row sm:gap-x-3.5">
               <motion.button
-                onClick={onClose}
+                onClick={() => onTryAgain()}
                 className={cn(
                   'flex items-center justify-center space-x-2 rounded-lg px-5 py-2.5 font-semibold shadow-lg transition-all duration-200',
                   'bg-gradient-to-r from-orange-400 to-red-500 text-white',
@@ -548,7 +552,7 @@ const TryAgainSection = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
+        onClick={onTryAgain}
       />
     </motion.div>
   );

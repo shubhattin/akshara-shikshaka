@@ -26,3 +26,7 @@ export const animated_gesture_lines_atom = atom<
 /** Current user drawn gesture on the canvas */
 export const current_gesture_points_atom = atom<number[]>([]);
 export const is_recording_stroke_atom = atom(false);
+
+// others constants
+export const USER_GESTURE_COLOR = '#0066cc'; // blue
+export const TRY_AGAIN_WAIT_DURATION = 5000;

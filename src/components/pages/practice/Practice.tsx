@@ -5,9 +5,9 @@ import { Card } from '~/components/ui/card';
 import dynamic from 'next/dynamic';
 import type Konva from 'konva';
 import { cn } from '~/lib/utils';
-import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward } from 'react-icons/md';
+import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward, MdRefresh } from 'react-icons/md';
 import { FiTrendingUp } from 'react-icons/fi';
-import { evaluateStrokeAccuracy, animateGesture } from '~/tools/stroke_data/utils';
+import { evaluateGestureAccuracy, animateGesture } from '~/tools/stroke_data/utils';
 import {
   GesturePoint,
   CANVAS_DIMS,
@@ -154,20 +154,11 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
   const playGestureIndex = async (gestureIndex: number) => {
     // Disable drawing while playing the guided animation for the current gesture
-    disableDrawingMode();
+    setIsDrawing(false);
     setIsAnimatingCurrentGesture(true);
-    clearCurrentAnimatedGesture();
     await playGestureWithKonva(gestureData[gestureIndex]); // This is a guidance gesture
     setIsAnimatingCurrentGesture(false);
-    enableDrawingMode();
-  };
-
-  const enableDrawingMode = () => {
     setIsDrawing(true);
-  };
-
-  const disableDrawingMode = () => {
-    setIsDrawing(false);
   };
 
   // Handle user gesture drawing from Konva canvas
@@ -193,7 +184,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     // Evaluate gesture accuracy with error handling
     let accuracy = 0;
     try {
-      accuracy = evaluateStrokeAccuracy(userPoints, currentGesture.points);
+      accuracy = evaluateGestureAccuracy(userPoints, currentGesture.points);
     } catch (error) {
       console.error('Error evaluating stroke accuracy:', error);
       // Treat evaluation errors as failed attempts
@@ -203,7 +194,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     if (accuracy > 0.7) {
       // completeCurrentGesture
       setShowTryAgain(false);
-      playNextGesture(currentGestureIndex, completedGesturesCount);
+      playNextGesture();
     } else {
       setLastAccuracy(accuracy);
       setShowTryAgain(true);
@@ -216,41 +207,29 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     }
   };
 
-  const playNextGesture = (currentGestureIdx: number, completedCount: number) => {
-    // Clear current animated gesture flag
-    setAnimatedGestureLines((prev) =>
-      prev.map((line) => ({ ...line, isCurrentAnimatedGesture: false }))
-    );
-
+  const playNextGesture = () => {
     clearUserGestures();
-    clearCurrentAnimatedGesture();
 
-    // Move to next gesture
-    setCurrentGestureIndex(currentGestureIdx + 1);
-    setCompletedGesturesCount(completedCount + 1);
-    if (currentGestureIdx < totalGestures - 1) {
+    setCurrentGestureIndex(currentGestureIndex + 1);
+    setCompletedGesturesCount(completedGesturesCount + 1);
+    if (currentGestureIndex < totalGestures - 1) {
       setTimeout(() => {
-        playGestureIndex(currentGestureIdx + 1);
+        playGestureIndex(currentGestureIndex + 1);
       }, 300);
-      disableDrawingMode();
+      setIsDrawing(false);
     } else {
-      finishPracticeMode();
+      setIsDrawing(false);
     }
   };
 
-  const finishPracticeMode = async () => {
-    disableDrawingMode();
-    clearUserGestures();
+  const clearUserGestures = () => {
+    setAnimatedGestureLines((prev) => prev.filter((line) => line.gesture_type !== 'user_gesture'));
   };
 
   const clearCurrentAnimatedGesture = () => {
     setAnimatedGestureLines((prev) =>
       prev.filter((line) => line.gesture_type !== 'current_animated_gesture')
     );
-  };
-
-  const clearUserGestures = () => {
-    setAnimatedGestureLines((prev) => prev.filter((line) => line.gesture_type !== 'user_gesture'));
   };
 
   const replayCurrentGesture = () => {
@@ -265,7 +244,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     setShowTryAgain(false);
 
     // Move to next gesture
-    playNextGesture(currentGestureIndex, completedGesturesCount);
+    playNextGesture();
   };
 
   const resetPractice = () => {
@@ -273,7 +252,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     setCurrentGestureIndex(0);
     setCompletedGesturesCount(0);
     setShowTryAgain(false);
-    disableDrawingMode();
+    setIsDrawing(false);
     setAnimatedGestureLines([]);
   };
 
@@ -322,6 +301,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
                   setCompletedGesturesCount(0);
                   setShowTryAgain(false);
                   setAnimatedGestureLines([]);
+                  clearCurrentAnimatedGesture();
                   playGestureIndex(currentGestureIndex);
                 }}
                 disabled={practiceMode === 'playing'}
@@ -466,6 +446,9 @@ const TryAgainSection = ({
   onSkipGesture: () => void;
   onClose: () => void;
 }) => {
+  const accuracyPercent = Math.round(accuracy * 100);
+  const isBelowThreshold = accuracyPercent < 70;
+
   return (
     <motion.div
       className="fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2"
@@ -495,61 +478,78 @@ const TryAgainSection = ({
           ease: 'easeInOut'
         }}
       >
-        <div className="rounded-xl border border-red-200 bg-white p-6 shadow-2xl dark:border-red-800 dark:bg-gray-900">
-          <div className="flex items-center justify-between space-x-6">
-            <div className="flex items-center space-x-3">
-              <motion.div
-                className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30"
-                animate={{
-                  scale: [1, 1.2, 1],
-                  rotate: [0, 5, -5, 0]
-                }}
-                transition={{
-                  duration: 0.6,
-                  repeat: Infinity,
-                  repeatDelay: 2
-                }}
-              >
-                <span className="text-2xl">😅</span>
-              </motion.div>
-              <div>
-                <motion.h3
-                  className="text-xl font-bold text-red-700 dark:text-red-400"
-                  animate={{
-                    scale: [1, 1.05, 1]
-                  }}
-                  transition={{
-                    duration: 0.8,
-                    repeat: Infinity,
-                    repeatDelay: 1.5
-                  }}
+        <div className="rounded-xl border border-red-200 bg-white p-4 shadow-2xl sm:p-6 dark:border-red-800 dark:bg-gray-900">
+          <div className="flex flex-col items-center space-y-2">
+            {/* Accuracy Display */}
+            <div className="text-center">
+              <div className="mb-2 flex items-center justify-center space-x-2">
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                 >
-                  Try Again!
-                </motion.h3>
-                <p className="text-sm text-red-600 dark:text-red-300">
-                  Accuracy: {Math.round(accuracy * 100)}% (need 70%+)
-                </p>
+                  <span className="text-2xl">📊</span>
+                </motion.div>
+                <span className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                  Accuracy Check
+                </span>
+              </div>
+
+              <div className="flex items-center justify-center space-x-3">
+                <div
+                  className={cn(
+                    'rounded-full px-4 py-2 text-lg font-bold shadow-md',
+                    isBelowThreshold
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                  )}
+                >
+                  {accuracyPercent}%
+                </div>
+                <span
+                  className={cn(
+                    'text-sm font-medium',
+                    isBelowThreshold
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-green-600 dark:text-green-400'
+                  )}
+                >
+                  {isBelowThreshold ? '(Need 70%+)' : '(Great!)'}
+                </span>
               </div>
             </div>
 
-            <div className="flex space-x-2">
+            {/* Action Buttons */}
+            <div className="flex w-full flex-col gap-x-2.5 sm:w-auto sm:flex-row sm:gap-x-3.5">
+              <motion.button
+                onClick={onClose}
+                className={cn(
+                  'flex items-center justify-center space-x-2 rounded-lg px-5 py-2.5 font-semibold shadow-lg transition-all duration-200',
+                  'bg-gradient-to-r from-orange-400 to-red-500 text-white',
+                  'hover:from-orange-500 hover:to-red-600 hover:shadow-xl',
+                  'focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 focus:outline-none',
+                  'dark:from-orange-600 dark:to-red-700 dark:hover:from-orange-700 dark:hover:to-red-800'
+                )}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <MdRefresh className="h-4 w-4" />
+                <span>Try Again</span>
+              </motion.button>
+
               <motion.button
                 onClick={onSkipGesture}
-                className="flex items-center space-x-2 rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                className={cn(
+                  'flex items-center justify-center space-x-2 rounded-lg px-5 py-2.5 font-semibold shadow-lg transition-all duration-200',
+                  'bg-gradient-to-r from-blue-400 to-blue-600 text-white',
+                  'hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
+                  'focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none',
+                  'dark:from-blue-600 dark:to-blue-800 dark:hover:from-blue-700 dark:hover:to-blue-900'
+                )}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
                 <MdArrowForward className="h-4 w-4" />
                 <span>Next Gesture</span>
-              </motion.button>
-
-              <motion.button
-                onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-600 transition-colors hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-800/40"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                ×
               </motion.button>
             </div>
           </div>

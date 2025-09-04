@@ -84,27 +84,40 @@ export async function animateGesture(
   }
 }
 
-// better
-export const evaluateStrokeAccuracy = (
+export const evaluateGestureAccuracy = (
   userPoints: GesturePoint[],
   targetPoints: GesturePoint[]
 ): number => {
   if (userPoints.length < 2 || targetPoints.length < 2) return 0;
   type EvalPoint = { x: number; y: number; timestamp: number };
 
-  // 1) Normalize and resample both sequences to fixed length
-  const SAMPLE_SIZE = 64;
-  const normalize = (pts: EvalPoint[]) => {
+  // Parameters
+  const SAMPLE_SIZE = 96; // more detail than 64
+  const CURV_SIZE = 48;
+  const DTW_WINDOW_FRAC = 0.15; // restrict warping for stricter matching
+  const REVERSE_PENALTY = 0.9; // allow reverse with penalty to reduce false negatives
+
+  // Helpers
+  const flatten = (pts: GesturePoint[]): EvalPoint[] =>
+    pts.map((p, i) => ({ x: p[0], y: p[1], timestamp: i }));
+
+  const pathLength = (pts: EvalPoint[]) =>
+    pts.reduce(
+      (acc, p, i) => (i === 0 ? 0 : acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y)),
+      0
+    );
+
+  const normalizeUnitSquare = (pts: EvalPoint[]) => {
     const xs = pts.map((p) => p.x);
     const ys = pts.map((p) => p.y);
     const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
     const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-    const w = Math.max(1, maxX - minX);
-    const h = Math.max(1, maxY - minY);
+    const w = Math.max(1e-6, maxX - minX);
+    const h = Math.max(1e-6, maxY - minY);
     const scale = 1 / Math.max(w, h);
-    return pts.map((p) => ({ x: (p.x - minX) * scale, y: (p.y - minY) * scale, timestamp: 0 }));
+    return pts.map((p, i) => ({ x: (p.x - minX) * scale, y: (p.y - minY) * scale, timestamp: i }));
   };
 
   const resample = (pts: EvalPoint[], n: number) => {
@@ -115,86 +128,204 @@ export const evaluateStrokeAccuracy = (
       const dy = pts[i].y - pts[i - 1].y;
       dists[i] = dists[i - 1] + Math.hypot(dx, dy);
     }
-    const total = dists[dists.length - 1] || 1;
+    const total = dists[dists.length - 1] || 1e-6;
     const step = total / (n - 1);
-    const res: EvalPoint[] = [];
+    const out: EvalPoint[] = [];
     let target = 0;
     let j = 0;
     for (let i = 0; i < n; i++) {
       while (j < dists.length - 1 && dists[j] < target) j++;
       const prev = Math.max(0, j - 1);
-      const t = dists[j] === dists[prev] ? 0 : (target - dists[prev]) / (dists[j] - dists[prev]);
+      const denom = dists[j] - dists[prev];
+      const t = denom === 0 ? 0 : (target - dists[prev]) / denom;
       const x = pts[prev].x + (pts[j].x - pts[prev].x) * t;
       const y = pts[prev].y + (pts[j].y - pts[prev].y) * t;
-      res.push({ x, y, timestamp: i });
+      out.push({ x, y, timestamp: i });
       target = i * step;
     }
-    return res;
+    return out;
   };
 
-  // Convert gesture points to evaluation points
-  const flatten = (pts: GesturePoint[]): EvalPoint[] =>
-    pts.map((p, i) => ({
-      x: p[0],
-      y: p[1],
-      timestamp: i
-    }));
+  const centroid = (pts: EvalPoint[]) => {
+    const s = pts.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+    const n = Math.max(1, pts.length);
+    return { x: s.x / n, y: s.y / n };
+  };
 
-  const uNorm = normalize(flatten(userPoints));
-  const tNorm = normalize(flatten(targetPoints));
-  const u = resample(uNorm, SAMPLE_SIZE);
-  const t = resample(tNorm, SAMPLE_SIZE);
+  const rotate = (pts: EvalPoint[], theta: number) => {
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    return pts.map((p) => ({ x: p.x * c - p.y * s, y: p.x * s + p.y * c, timestamp: p.timestamp }));
+  };
 
-  // 2) Compute direction similarity (cosine between overall vectors)
-  const vec = (pts: EvalPoint[]) => ({
-    x: pts[pts.length - 1].x - pts[0].x,
-    y: pts[pts.length - 1].y - pts[0].y
-  });
-  const dot = (a: { x: number; y: number }, b: { x: number; y: number }) => a.x * b.x + a.y * b.y;
-  const mag = (a: { x: number; y: number }) => Math.hypot(a.x, a.y) || 1e-6;
-  const vU = vec(u);
-  const vT = vec(t);
-  const directionCos = Math.max(0, Math.min(1, dot(vU, vT) / (mag(vU) * mag(vT))));
+  // Closed-form best rotation angle between two centered point sets
+  const bestRotationAngle = (a: EvalPoint[], b: EvalPoint[]) => {
+    let m = 0;
+    let n = 0;
+    const len = Math.min(a.length, b.length);
+    for (let i = 0; i < len; i++) {
+      m += a[i].x * b[i].y - a[i].y * b[i].x;
+      n += a[i].x * b[i].x + a[i].y * b[i].y;
+    }
+    return Math.atan2(m, n);
+  };
 
-  // 3) Endpoint proximity
-  const endDist = Math.hypot(
-    u[u.length - 1].x - t[t.length - 1].x,
-    u[u.length - 1].y - t[t.length - 1].y
-  );
-  const startDist = Math.hypot(u[0].x - t[0].x, u[0].y - t[0].y);
-  const endpointScore = Math.max(0, 1 - (startDist + endDist) / 2);
+  const center = (pts: EvalPoint[]) => {
+    const c = centroid(pts);
+    return pts.map((p) => ({ x: p.x - c.x, y: p.y - c.y, timestamp: p.timestamp }));
+  };
 
-  // 4) DTW path similarity for shape matching
-  const dtw = (a: EvalPoint[], b: EvalPoint[]) => {
+  const curvatureSignature = (pts: EvalPoint[], outLen: number) => {
+    if (pts.length < 3) return new Array(outLen).fill(0);
+    const angles: number[] = [];
+    for (let i = 1; i < pts.length; i++) {
+      const dx = pts[i].x - pts[i - 1].x;
+      const dy = pts[i].y - pts[i - 1].y;
+      angles.push(Math.atan2(dy, dx));
+    }
+    const turns: number[] = [];
+    for (let i = 1; i < angles.length; i++) {
+      let d = angles[i] - angles[i - 1];
+      // wrap to [-pi, pi]
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      turns.push(d);
+    }
+    // resample turns to outLen
+    const ptsTurns: EvalPoint[] = turns.map((v, i) => ({ x: i, y: v, timestamp: i }));
+    const rs = resample(ptsTurns, outLen).map((p) => p.y);
+    // z-normalize signature (avoid scale issues)
+    const mean = rs.reduce((a, b) => a + b, 0) / outLen;
+    const std =
+      Math.sqrt(
+        rs.reduce((acc, v) => acc + (v - mean) * (v - mean), 0) / Math.max(1, outLen - 1)
+      ) || 1e-6;
+    return rs.map((v) => (v - mean) / std);
+  };
+
+  const dtwWindowed = (a: EvalPoint[], b: EvalPoint[], windowFrac: number) => {
     const n = a.length;
     const m = b.length;
-    const dp = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(Infinity));
+    const w = Math.max(1, Math.floor(windowFrac * Math.max(n, m)));
+    const dp: number[][] = Array.from({ length: n + 1 }, () =>
+      new Array<number>(m + 1).fill(Infinity)
+    );
     dp[0][0] = 0;
-    const cost = (i: number, j: number) => Math.hypot(a[i].x - b[j].x, a[i].y - b[j].y);
     for (let i = 1; i <= n; i++) {
-      for (let j = 1; j <= m; j++) {
-        const c = cost(i - 1, j - 1);
+      const jStart = Math.max(1, i - w);
+      const jEnd = Math.min(m, i + w);
+      for (let j = jStart; j <= jEnd; j++) {
+        const c = Math.hypot(a[i - 1].x - b[j - 1].x, a[i - 1].y - b[j - 1].y);
         dp[i][j] = c + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
       }
     }
     return dp[n][m] / (n + m);
   };
 
-  const dtwDist = dtw(u, t);
-  const dtwScore = Math.max(0, 1 - dtwDist); // since coords are normalized to ~[0,1], distance ~[0,2]
+  const hausdorff = (a: EvalPoint[], b: EvalPoint[]) => {
+    const d = (p: EvalPoint, q: EvalPoint) => Math.hypot(p.x - q.x, p.y - q.y);
+    const h = (p: EvalPoint[], q: EvalPoint[]) => {
+      let maxMin = 0;
+      for (let i = 0; i < p.length; i++) {
+        let minD = Infinity;
+        for (let j = 0; j < q.length; j++) {
+          const dd = d(p[i], q[j]);
+          if (dd < minD) minD = dd;
+        }
+        if (minD > maxMin) maxMin = minD;
+      }
+      return maxMin;
+    };
+    const hAB = h(a, b);
+    const hBA = h(b, a);
+    return Math.max(hAB, hBA);
+  };
 
-  // 5) Path length ratio (to discourage overly short/long)
-  const lengthOf = (pts: EvalPoint[]) =>
-    pts.reduce((acc, p, i) => {
-      if (i === 0) return 0;
-      return acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y);
-    }, 0);
-  const lenU = lengthOf(u);
-  const lenT = lengthOf(t);
-  const lenRatio = lenT > 0 ? Math.min(lenU, lenT) / Math.max(lenU, lenT) : 0;
+  const directionCosine = (pts: EvalPoint[]) => {
+    const vx = pts[pts.length - 1].x - pts[0].x;
+    const vy = pts[pts.length - 1].y - pts[0].y;
+    const mag = Math.hypot(vx, vy) || 1e-6;
+    const ux = vx / mag;
+    const uy = vy / mag;
+    return { ux, uy };
+  };
 
-  // Weighted aggregate score
-  const score = 0.45 * dtwScore + 0.2 * directionCos + 0.2 * endpointScore + 0.15 * lenRatio;
+  // Prepare normalized, resampled sequences
+  const baseUser = resample(normalizeUnitSquare(flatten(userPoints)), SAMPLE_SIZE);
+  const baseTarget = resample(normalizeUnitSquare(flatten(targetPoints)), SAMPLE_SIZE);
 
-  return Math.max(0, Math.min(1, score));
+  // Reject degenerate strokes
+  if (pathLength(baseUser) < 1e-3 || pathLength(baseTarget) < 1e-3) return 0;
+
+  const evaluateSequence = (userSeq: EvalPoint[]) => {
+    // Procrustes-like alignment: center, best rotation, no reflection
+    const uC = center(userSeq);
+    const tC = center(baseTarget);
+    const theta = bestRotationAngle(uC, tC);
+    const uAligned = rotate(uC, theta);
+
+    // Compute metrics
+    const dtwDist = dtwWindowed(uAligned, tC, DTW_WINDOW_FRAC);
+    const dtwScore = Math.max(0, 1 - dtwDist);
+
+    const hDist = hausdorff(uAligned, tC); // both centered and within ~unit square
+    const hausdorffScore = Math.max(0, 1 - hDist);
+
+    // MSE between corresponding points
+    let mse = 0;
+    for (let i = 0; i < uAligned.length; i++) {
+      const dx = uAligned[i].x - tC[i].x;
+      const dy = uAligned[i].y - tC[i].y;
+      mse += dx * dx + dy * dy;
+    }
+    mse /= uAligned.length;
+    const mseScore = Math.max(0, 1 - Math.sqrt(mse));
+
+    // Curvature similarity
+    const curU = curvatureSignature(uAligned, CURV_SIZE);
+    const curT = curvatureSignature(tC, CURV_SIZE);
+    let curDiff = 0;
+    for (let i = 0; i < CURV_SIZE; i++) curDiff += Math.abs(curU[i] - curT[i]);
+    curDiff /= CURV_SIZE;
+    const curvatureScore = Math.max(0, 1 - Math.min(1, curDiff));
+
+    // Direction and endpoint gating
+    const uDir = directionCosine(userSeq);
+    const tDir = directionCosine(baseTarget);
+    const dirCos = Math.max(0, Math.min(1, uDir.ux * tDir.ux + uDir.uy * tDir.uy));
+    const startDist = Math.hypot(userSeq[0].x - baseTarget[0].x, userSeq[0].y - baseTarget[0].y);
+    const endDist = Math.hypot(
+      userSeq[userSeq.length - 1].x - baseTarget[baseTarget.length - 1].x,
+      userSeq[userSeq.length - 1].y - baseTarget[baseTarget.length - 1].y
+    );
+    const endpointScore = Math.max(0, 1 - (startDist + endDist) / 2);
+
+    // Length ratio gate (using normalized shapes, but still informative)
+    const lenU = pathLength(userSeq);
+    const lenT = pathLength(baseTarget);
+    const lenRatio = lenT > 0 ? Math.min(lenU, lenT) / Math.max(lenU, lenT) : 0;
+
+    // Hard gates to reduce false positives
+    if (hausdorffScore < 0.2) return 0;
+    if (curvatureScore < 0.2) return 0;
+
+    // Weighted aggregate
+    const score =
+      0.3 * dtwScore +
+      0.25 * hausdorffScore +
+      0.2 * mseScore +
+      0.15 * curvatureScore +
+      0.07 * endpointScore +
+      0.03 * lenRatio;
+
+    // Direction acts as soft gate multiplier
+    const gated = score * (0.6 + 0.4 * dirCos);
+    return Math.max(0, Math.min(1, gated));
+  };
+
+  const directScore = evaluateSequence(baseUser);
+  const reversedScore = evaluateSequence([...baseUser].reverse()) * REVERSE_PENALTY;
+  const finalScore = Math.max(directScore, reversedScore);
+
+  return Math.max(0, Math.min(1, finalScore));
 };

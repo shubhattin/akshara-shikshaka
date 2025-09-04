@@ -12,7 +12,8 @@ import {
   drawing_points_atom,
   is_recording_stroke_atom,
   is_drawing_atom,
-  current_gesture_index_atom
+  current_gesture_index_atom,
+  practice_mode_atom
 } from './practice_state';
 import { cn } from '~/lib/utils';
 
@@ -29,6 +30,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
     const [drawingPoints, setDrawingPoints] = useAtom(drawing_points_atom);
     const [isRecordingStroke, setIsRecordingStroke] = useAtom(is_recording_stroke_atom);
     const isDrawing = useAtomValue(is_drawing_atom);
+    const practiceMode = useAtomValue(practice_mode_atom);
 
     // Local state for tracking stroke
     const [strokeStartTime, setStrokeStartTime] = useState(0);
@@ -107,51 +109,50 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         onTouchStart={handleStageMouseDown}
         onTouchMove={handleStageMouseMove}
         onTouchEnd={handleStageMouseUp}
-        className={cn('bg-white', isRecordingStroke && 'cursor-crosshair')}
+        className={cn(
+          'bg-white',
+          (isRecordingStroke || practiceMode === 'practicing') && 'cursor-crosshair'
+        )}
       >
         <Layer>
           {/* Animated Gesture Lines (guidance and completed strokes) */}
           {animatedGestureLines.map((line, index) => (
             <Line
               key={`gesture-line-${line.index}-${index}`}
-              points={line.points_flat} // No scaling needed - Stage handles it
+              points={line.points_flat}
               stroke={line.color}
-              strokeWidth={line.width} // No scaling needed - Stage handles it
+              strokeWidth={line.width}
               lineCap="round"
               lineJoin="round"
               listening={false}
-              opacity={
-                line.gesture_type === 'user_gesture'
-                  ? 0.8
-                  : line.gesture_type === 'current_animated_gesture'
-                    ? 1
-                    : 0.6
-              }
-              dash={
-                line.gesture_type === 'current_animated_gesture'
-                  ? []
-                  : line.gesture_type === 'user_gesture'
-                    ? []
-                    : [5, 5]
-              }
+              // opacity={
+              //   line.gesture_type === 'user_gesture'
+              //     ? 0.8
+              //     : line.gesture_type === 'current_animated_gesture'
+              //       ? 1
+              //       : 0.6
+              // }
+              // dash={
+              //   line.gesture_type === 'current_animated_gesture'
+              //     ? []
+              //     : line.gesture_type === 'user_gesture'
+              //       ? []
+              //       : [5, 5]
+              // }
             />
           ))}
 
           {/* Current Drawing Stroke (while user is drawing) */}
-          {isDrawing &&
-            isDrawing &&
-            isRecordingStroke &&
-            drawingPoints.length > 0 &&
-            currentGesture && (
-              <Line
-                points={drawingPoints} // No scaling needed - Stage handles it
-                stroke="#0066cc"
-                strokeWidth={currentGesture.width || 6}
-                lineCap="round"
-                lineJoin="round"
-                listening={false}
-              />
-            )}
+          {isDrawing && isRecordingStroke && drawingPoints.length > 0 && currentGesture && (
+            <Line
+              points={drawingPoints} // No scaling needed - Stage handles it
+              stroke="#0066cc"
+              strokeWidth={currentGesture.width || 6}
+              lineCap="round"
+              lineJoin="round"
+              listening={false}
+            />
+          )}
         </Layer>
       </Stage>
     );

@@ -13,7 +13,7 @@ import {
   is_recording_stroke_atom,
   is_drawing_atom,
   current_gesture_index_atom,
-  practice_mode_atom,
+  canvas_current_mode,
   USER_GESTURE_COLOR
 } from './practice_state';
 import { cn } from '~/lib/utils';
@@ -31,7 +31,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
     const [currentGesturePoints, setCurrentGesturePoints] = useAtom(current_gesture_points_atom);
     const [isRecordingStroke, setIsRecordingStroke] = useAtom(is_recording_stroke_atom);
     const isDrawing = useAtomValue(is_drawing_atom);
-    const practiceMode = useAtomValue(practice_mode_atom);
+    const canvasCurrentMode = useAtomValue(canvas_current_mode);
 
     // Get current gesture for brush settings
     const currentGestureIndex = useAtomValue(current_gesture_index_atom);
@@ -104,7 +104,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         onTouchEnd={handleStageMouseUp}
         className={cn(
           'bg-white',
-          (isRecordingStroke || practiceMode === 'practicing') && 'cursor-crosshair'
+          (isRecordingStroke || canvasCurrentMode === 'practicing') && 'cursor-crosshair'
         )}
       >
         <Layer>

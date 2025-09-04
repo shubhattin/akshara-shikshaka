@@ -19,7 +19,7 @@ import { AiOutlineSignature } from 'react-icons/ai';
 import { useAtom, useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import {
-  practice_mode_atom,
+  canvas_current_mode,
   current_gesture_index_atom,
   is_drawing_atom,
   completed_gestures_count_atom,
@@ -61,7 +61,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
   // Initialize atoms with default values
   useHydrateAtoms([
-    [practice_mode_atom, 'none' as const],
+    [canvas_current_mode, 'none' as const],
     [current_gesture_index_atom, 0],
     [is_drawing_atom, false],
     [completed_gestures_count_atom, 0],
@@ -73,7 +73,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   ]);
 
   // Practice state from atoms
-  const [practiceMode, setPracticeMode] = useAtom(practice_mode_atom);
+  const [canvasCurrentMode, setCanvasCurrentMode] = useAtom(canvas_current_mode);
   const [currentGestureIndex, setCurrentGestureIndex] = useAtom(current_gesture_index_atom);
   const [isDrawing, setIsDrawing] = useAtom(is_drawing_atom);
   const [completedGesturesCount, setCompletedGesturesCount] = useAtom(
@@ -117,7 +117,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   // Konva initialization is handled by the Stage component automatically
 
   const playAllGestures = async () => {
-    setPracticeMode('playing');
+    setCanvasCurrentMode('playing');
     setAnimatedGestureLines([]);
 
     for (const gesture of gestureData) {
@@ -125,7 +125,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION));
     }
 
-    setPracticeMode('none');
+    setCanvasCurrentMode('none');
   };
 
   // Konva-based gesture animation
@@ -221,13 +221,13 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   const replayCurrentGesture = () => {
-    if (practiceMode !== 'practicing' || isAnimatingCurrentGesture) return;
+    if (canvasCurrentMode !== 'practicing' || isAnimatingCurrentGesture) return;
     clearCurrentAnimatedGesture();
     playGestureIndex(currentGestureIndex);
   };
 
   const skipCurrentGesture = () => {
-    if (practiceMode !== 'practicing' || isAnimatingCurrentGesture) return;
+    if (canvasCurrentMode !== 'practicing' || isAnimatingCurrentGesture) return;
 
     setShowTryAgain(false);
 
@@ -236,7 +236,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   const resetPractice = () => {
-    setPracticeMode('none');
+    setCanvasCurrentMode('none');
     setCurrentGestureIndex(0);
     setCompletedGesturesCount(0);
     setShowTryAgain(false);
@@ -262,11 +262,11 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         </div>
 
         <div className="flex justify-center gap-4">
-          {(practiceMode === 'none' || practiceMode === 'playing') && (
+          {(canvasCurrentMode === 'none' || canvasCurrentMode === 'playing') && (
             <>
               <button
                 onClick={playAllGestures}
-                disabled={practiceMode === 'playing'}
+                disabled={canvasCurrentMode === 'playing'}
                 className={cn(
                   'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
                   'bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-lg',
@@ -284,7 +284,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
                 onClick={() => {
                   if (totalGestures === 0) return;
 
-                  setPracticeMode('practicing');
+                  setCanvasCurrentMode('practicing');
                   setCurrentGestureIndex(0);
                   setCompletedGesturesCount(0);
                   setShowTryAgain(false);
@@ -292,7 +292,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
                   clearCurrentAnimatedGesture();
                   playGestureIndex(currentGestureIndex);
                 }}
-                disabled={practiceMode === 'playing'}
+                disabled={canvasCurrentMode === 'playing'}
                 className={cn(
                   'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
                   'bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white shadow-lg',
@@ -309,7 +309,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
             </>
           )}
 
-          {practiceMode === 'practicing' && (
+          {canvasCurrentMode === 'practicing' && (
             <>
               <button
                 onClick={replayCurrentGesture}
@@ -345,7 +345,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
             </>
           )}
         </div>
-        {practiceMode === 'practicing' && completedGesturesCount !== gestureData.length && (
+        {canvasCurrentMode === 'practicing' && completedGesturesCount !== gestureData.length && (
           <ProgressDisplay
             currentGesture={currentGestureIndex + 1}
             totalGestures={totalGestures}
@@ -396,7 +396,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         )}
 
         <AnimatePresence>
-          {showTryAgain && practiceMode === 'practicing' && (
+          {showTryAgain && canvasCurrentMode === 'practicing' && (
             <TryAgainSection accuracy={lastAccuracy} onSkipGesture={skipCurrentGesture} />
           )}
         </AnimatePresence>

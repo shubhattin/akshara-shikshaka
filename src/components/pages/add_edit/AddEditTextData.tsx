@@ -365,7 +365,7 @@ function AddEditTextData({
   }, [notToClearGesturesIndex]);
 
   useEffect(() => {
-    if (!selectedGestureIndex) return;
+    if (selectedGestureIndex === null) return;
     const currentGesture = gestureData.find((g) => g.index === selectedGestureIndex)!;
     // on gesture data change if there is a instance of it inside of animated gesture then update it
     setCanvasGesturesFlat((prev) =>
@@ -625,7 +625,7 @@ const SelectedGestureControls = ({
 
   // Path handling is now done directly via mouse events in the parent component
   const startRecording = () => {
-    if (!selectedGestureIndex) return;
+    if (selectedGestureIndex === null) return;
     setIsRecording(true);
     clearGestureVisualization();
   };
@@ -637,7 +637,7 @@ const SelectedGestureControls = ({
   };
 
   const saveRecording = () => {
-    if (!selectedGestureIndex || currentGestureRecordingPoints.length === 0) return;
+    if (selectedGestureIndex === null || currentGestureRecordingPoints.length === 0) return;
 
     const pointCount = currentGestureRecordingPoints.length;
 
@@ -676,7 +676,7 @@ const SelectedGestureControls = ({
   };
 
   const clearCurrentGesturePoints = () => {
-    if (!selectedGestureIndex) return;
+    if (selectedGestureIndex === null) return;
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
         gesture.index === selectedGestureIndex ? { ...gesture, points: [] } : gesture
@@ -689,8 +689,6 @@ const SelectedGestureControls = ({
     });
     clearGestureVisualization();
   };
-
-  // Brush settings are now handled declaratively via state
 
   return (
     <div className="space-y-3 rounded-lg border bg-muted/30 p-3">

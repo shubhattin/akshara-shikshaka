@@ -1,8 +1,8 @@
 import { atom } from 'jotai';
-import type { GesturePoint, AnimationGesture } from '~/tools/stroke_data/types';
+import type { AnimationGesture } from '~/tools/stroke_data/types';
 
 // Practice workflow state
-export const practice_mode_atom = atom<'none' | 'playing' | 'practicing'>('none');
+export const canvas_current_mode = atom<'none' | 'playing' | 'practicing'>('none');
 export const is_drawing_atom = atom(false);
 export const completed_gestures_count_atom = atom(0);
 

@@ -1,0 +1,1 @@
+ALTER TABLE "text_data" ADD CONSTRAINT "text_data_text_unique" UNIQUE("text");

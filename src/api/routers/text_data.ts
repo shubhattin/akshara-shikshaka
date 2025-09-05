@@ -17,7 +17,33 @@ const add_text_data_route = protectedAdminProcedure
       textCenterOffset: z.tuple([z.number(), z.number()])
     })
   )
+  .output(
+    z.discriminatedUnion('success', [
+      z.object({
+        success: z.literal(true),
+        id: z.number(),
+        uuid: z.string().uuid()
+      }),
+      z.object({
+        success: z.literal(false),
+        err_code: z.enum(['text_already_exists'])
+      })
+    ])
+  )
   .mutation(async ({ input }) => {
+    // Check if the text already exists
+    const existingText = await db
+      .select()
+      .from(text_data)
+      .where(eq(text_data.text, input.text))
+      .limit(1);
+    if (existingText.length > 0) {
+      return {
+        success: false,
+        err_code: 'text_already_exists'
+      };
+    }
+
     const result = await db
       .insert(text_data)
       .values({
@@ -30,6 +56,7 @@ const add_text_data_route = protectedAdminProcedure
       })
       .returning();
     return {
+      success: true,
       id: result[0].id,
       uuid: result[0].uuid
     };

@@ -486,7 +486,7 @@ function AddEditTextData({
               <Button
                 onClick={() => {
                   setTextEditMode(false);
-                  setText(textIntermediate);
+                  setText(textIntermediate.trim());
                 }}
               >
                 Save
@@ -1026,14 +1026,28 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const router = useRouter();
   const add_text_data_mut = client_q.text_data.add_text_data.useMutation({
     onSuccess(data) {
-      toast.success('Text Added');
-      router.push(`/edit/${data.id}`);
+      if (data.success) {
+        toast.success('Text Added');
+        router.push(`/edit/${data.id}`);
+      } else {
+        if (data.err_code === 'text_already_exists') {
+          toast.error('Text already exists');
+        } else {
+          toast.error('Failed to add text');
+        }
+      }
+    },
+    onError(error) {
+      toast.error('Failed to add text');
     }
   });
 
   const update_text_data_mut = client_q.text_data.edit_text_data.useMutation({
     onSuccess(data) {
       toast.success('Text Updated');
+    },
+    onError(error) {
+      toast.error('Failed to update text');
     }
   });
 
@@ -1041,6 +1055,9 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     onSuccess(data) {
       toast.success('Text Deleted');
       router.push('/list');
+    },
+    onError(error) {
+      toast.error('Failed to delete text');
     }
   });
 
@@ -1052,7 +1069,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
 
     if (is_addition) {
       add_text_data_mut.mutate({
-        text,
+        text: text.trim(),
         scriptID,
         gestures: gestureData,
         fontFamily,

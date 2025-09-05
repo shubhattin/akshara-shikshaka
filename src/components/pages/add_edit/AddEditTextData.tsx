@@ -188,6 +188,7 @@ function AddEditTextData({
   const [fontSize, setFontSize] = useAtom(font_size_atom);
   const [fontLoaded, setFontLoaded] = useAtom(font_loaded_atom);
   const [mainTextPathVisible, setMainTextPathVisible] = useAtom(main_text_path_visible_atom);
+  const [isDrawing] = useAtom(is_drawing_atom);
 
   // Gesture Recording State
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
@@ -393,6 +394,15 @@ function AddEditTextData({
       )
     );
   }, [gestureData, selectedGestureIndex]);
+
+  // while the gesture is being recorded do scroll lock to prevent scroll that would interfere with the recording
+  useEffect(() => {
+    if (isDrawing) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+  }, [isDrawing, isRecording]);
 
   return (
     <div className="space-y-4">

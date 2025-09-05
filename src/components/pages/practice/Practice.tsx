@@ -57,7 +57,7 @@ type Props = {
 };
 
 export default function PracticeCanvasComponent({ text_data }: Props) {
-  const stageRef = useRef<Konva.Stage>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
 
   // Initialize atoms with default values
   useHydrateAtoms([

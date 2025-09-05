@@ -397,7 +397,7 @@ function AddEditTextData({
 
   // while the gesture is being recorded do scroll lock to prevent scroll that would interfere with the recording
   useEffect(() => {
-    if (isDrawing) {
+    if (isDrawing || isRecording) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'auto';

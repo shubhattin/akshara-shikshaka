@@ -141,6 +141,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
               points={currentGesturePoints} // No scaling needed - Stage handles it
               stroke={USER_GESTURE_COLOR}
               strokeWidth={currentGesture.width || 6}
+              color={USER_GESTURE_COLOR}
               lineCap="round"
               lineJoin="round"
               listening={false}

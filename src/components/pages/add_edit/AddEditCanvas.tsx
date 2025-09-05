@@ -161,7 +161,6 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
               lineCap="round"
               lineJoin="round"
               listening={false}
-              tension={1}
             />
           ))}
 
@@ -171,10 +170,10 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
             points={currentGestureRecordingPoints.flatMap((p) => [p[0], p[1]])}
             stroke={selectedGesture.color}
             strokeWidth={selectedGesture.width}
+            color={selectedGesture.color}
             lineCap="round"
             lineJoin="round"
             listening={false}
-            tension={1}
           />
         )}
       </Layer>

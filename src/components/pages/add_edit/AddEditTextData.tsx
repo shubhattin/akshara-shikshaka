@@ -6,6 +6,13 @@ import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Slider } from '~/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '~/components/ui/select';
 import type Konva from 'konva';
 import { client_q } from '~/api/client';
 import { useRouter } from 'next/navigation';
@@ -262,7 +269,8 @@ function AddEditTextData({
       points: [],
       width: DEFAULTS.GESTURE_BRUSH_WIDTH,
       color: DEFAULTS.GESTURE_BRUSH_COLOR, // red
-      duration: DEFAULTS.GESTURE_ANIMATION_DURATION
+      duration: DEFAULTS.GESTURE_ANIMATION_DURATION,
+      anim_fn: DEFAULTS.GESTURE_ANIMATION_FUNCTION
     };
     setGestureData((prev: Gesture[]) => [...prev, newGesture]);
     clearGestureVisualization();
@@ -478,7 +486,7 @@ function AddEditTextData({
               <Button
                 onClick={() => {
                   setTextEditMode(false);
-                  setText(textIntermediate);
+                  setText(textIntermediate.trim());
                 }}
               >
                 Save
@@ -758,7 +766,7 @@ const SelectedGestureControls = ({
       </div>
 
       {/* Gesture Settings */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Brush Color */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Brush Color</Label>
@@ -780,6 +788,34 @@ const SelectedGestureControls = ({
             />
             <span className="text-xs text-muted-foreground">{selectedGesture.color}</span>
           </div>
+        </div>
+        {/* Animation Timing Function */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Animation Easing</Label>
+          <Select
+            value={selectedGesture.anim_fn}
+            onValueChange={(value) =>
+              setGestureData((prev: Gesture[]) =>
+                prev.map((gesture) =>
+                  gesture.index === selectedGestureIndex
+                    ? { ...gesture, anim_fn: value as Gesture['anim_fn'] }
+                    : gesture
+                )
+              )
+            }
+            disabled={isRecording || isPlaying}
+          >
+            <SelectTrigger size="sm" className="w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="linear">Linear</SelectItem>
+              <SelectItem value="ease">Ease</SelectItem>
+              <SelectItem value="ease-in">Ease In</SelectItem>
+              <SelectItem value="ease-out">Ease Out</SelectItem>
+              <SelectItem value="ease-in-out">Ease In-Out</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Brush Width */}
@@ -990,14 +1026,28 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const router = useRouter();
   const add_text_data_mut = client_q.text_data.add_text_data.useMutation({
     onSuccess(data) {
-      toast.success('Text Added');
-      router.push(`/edit/${data.id}`);
+      if (data.success) {
+        toast.success('Text Added');
+        router.push(`/edit/${data.id}`);
+      } else {
+        if (data.err_code === 'text_already_exists') {
+          toast.error('Text already exists');
+        } else {
+          toast.error('Failed to add text');
+        }
+      }
+    },
+    onError(error) {
+      toast.error('Failed to add text');
     }
   });
 
   const update_text_data_mut = client_q.text_data.edit_text_data.useMutation({
     onSuccess(data) {
       toast.success('Text Updated');
+    },
+    onError(error) {
+      toast.error('Failed to update text');
     }
   });
 
@@ -1005,6 +1055,9 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     onSuccess(data) {
       toast.success('Text Deleted');
       router.push('/list');
+    },
+    onError(error) {
+      toast.error('Failed to delete text');
     }
   });
 
@@ -1016,7 +1069,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
 
     if (is_addition) {
       add_text_data_mut.mutate({
-        text,
+        text: text.trim(),
         scriptID,
         gestures: gestureData,
         fontFamily,

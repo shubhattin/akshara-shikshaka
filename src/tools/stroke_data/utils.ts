@@ -1,7 +1,8 @@
-import type { Gesture, GesturePoint } from './types';
+import z from 'zod';
+import { type Gesture, type GesturePoint } from './types';
 
 // Framework-agnostic gesture animation data generator
-export interface GestureAnimationFrame {
+export type GestureAnimationFrame = {
   step: number;
   totalSteps: number;
   progress: number;
@@ -9,20 +10,49 @@ export interface GestureAnimationFrame {
   partialPoints: GesturePoint[];
   partialSvgPath: string;
   isComplete: boolean;
-}
+};
+
+const GenerateGestureAnimationFramesOptions = z.object({
+  maxSteps: z.number().int().min(2).optional().default(50)
+});
+
+// Map timing function names to easing implementations
+const applyEasing = (t: number, fn: Gesture['anim_fn']): number => {
+  switch (fn) {
+    case 'linear':
+      return t;
+    case 'ease-in':
+      // cubic-in (accelerating from 0 velocity)
+      return t * t * t;
+    case 'ease-out':
+      // cubic-out (decelerating to 0 velocity)
+      return 1 - Math.pow(1 - t, 3);
+    case 'ease-in-out':
+      // cubic-in-out
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    case 'ease':
+    default:
+      // Use a mild in-out cubic that approximates CSS 'ease'
+      return t < 0.5
+        ? (Math.pow(t * 2, 2) * t) / 2
+        : 1 - (Math.pow(-2 * t + 2, 2) * (-2 * t + 2)) / 2;
+  }
+};
 
 function* generateGestureAnimationFrames(
   gesture: Gesture,
-  maxSteps: number = 50
+  options: z.output<typeof GenerateGestureAnimationFramesOptions>
 ): Generator<GestureAnimationFrame> {
   if (!gesture.points.length) return;
+  const { maxSteps } = options;
 
   const sampledPoints = gesture.points;
   const totalPoints = sampledPoints.length;
   const animationSteps = Math.min(totalPoints * 2, maxSteps);
 
   for (let step = 1; step <= animationSteps; step++) {
-    const progress = step / animationSteps;
+    const linearProgress = step / animationSteps;
+    const progress = applyEasing(linearProgress, gesture.anim_fn);
     const pointIndex = Math.floor(progress * (totalPoints - 1));
 
     // Get partial points up to current position
@@ -66,13 +96,12 @@ function* generateGestureAnimationFrames(
 export async function animateGesture(
   gesture: Gesture,
   onFrame: (frame: GestureAnimationFrame) => void,
-  maxSteps: number = 50
+  options?: z.input<typeof GenerateGestureAnimationFramesOptions>
 ): Promise<void> {
-  if (maxSteps <= 0) {
-    throw new Error('maxSteps must be greater than 0');
-  }
+  const parsedOptions = GenerateGestureAnimationFramesOptions.parse(options ?? {});
+  const { maxSteps } = parsedOptions;
 
-  const generator = generateGestureAnimationFrames(gesture, maxSteps);
+  const generator = generateGestureAnimationFrames(gesture, parsedOptions);
   const stepDuration = Math.max(0, (gesture.duration || 0) / maxSteps);
 
   for (const frame of generator) {

@@ -87,6 +87,7 @@ import { Checkbox } from '~/components/ui/checkbox';
 import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
 import { FONT_LIST, FONT_SCRIPTS, type FontFamily } from '~/state/font_list';
 import { script_list_obj, script_list_type } from '~/state/lang_list';
+import { get_script_from_id } from '~/state/lang_list';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
 const KonvaCanvas = dynamic(() => import('./AddEditCanvas'), {
@@ -130,6 +131,7 @@ type text_data_type = {
   fontFamily: FontFamily;
   fontSize: number;
   textCenterOffset: [number, number];
+  scriptID: number;
 };
 
 type Props =
@@ -160,7 +162,8 @@ export default function AddEditTextDataWrapper(props: Props) {
     [font_family_atom, props.text_data.fontFamily],
     [font_loaded_atom, new Map<FontFamily, boolean>()],
     [font_size_atom, props.text_data.fontSize],
-    [canvas_text_center_offset_atoms, props.text_data.textCenterOffset]
+    [canvas_text_center_offset_atoms, props.text_data.textCenterOffset],
+    [script_atom, get_script_from_id(props.text_data.scriptID)]
   ]);
   const stageRef = useRef<Konva.Stage | null>(null);
 

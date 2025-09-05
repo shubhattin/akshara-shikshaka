@@ -23,7 +23,8 @@ const get_cached_text_data = cache(async (id: number) => {
       gestures: true,
       font_family: true,
       font_size: true,
-      text_center_offset: true
+      text_center_offset: true,
+      script_id: true
     }
   });
   const data = {
@@ -33,7 +34,8 @@ const get_cached_text_data = cache(async (id: number) => {
     gestures: text_data!.gestures,
     fontFamily: text_data!.font_family as FontFamily,
     fontSize: text_data!.font_size,
-    textCenterOffset: text_data!.text_center_offset
+    textCenterOffset: text_data!.text_center_offset,
+    scriptID: text_data!.script_id
   };
   return data as typeof data | undefined;
 });

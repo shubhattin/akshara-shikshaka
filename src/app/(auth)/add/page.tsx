@@ -6,6 +6,7 @@ import { IoMdArrowRoundBack } from 'react-icons/io';
 import Link from 'next/link';
 import { Provider as JotaiProvider } from 'jotai';
 import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
+import { script_list_obj } from '~/state/lang_list';
 
 const List = async () => {
   const session = await getCachedSession();
@@ -16,7 +17,8 @@ const List = async () => {
     gestures: [],
     fontFamily: DEFAULT_FONT_FAMILY as FontFamily,
     fontSize: DEFAULT_FONT_SIZE,
-    textCenterOffset: [0, 0] as [number, number]
+    textCenterOffset: [0, 0] as [number, number],
+    scriptID: script_list_obj['Devanagari']
   };
   return (
     <div>

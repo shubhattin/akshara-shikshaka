@@ -26,13 +26,13 @@ export default async function Home() {
 
       <Card className="p-6">
         <h2 className="mb-4 text-2xl font-semibold">Available Characters</h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+        <div className="grid grid-cols-4 gap-4 sm:grid-cols-6 md:grid-cols-8">
           {texts.map((text) => (
             <Link href={`/practice/${text.id}`} key={text.id}>
               <Button
                 key={text.id}
                 variant="outline"
-                className="h-16 text-2xl font-semibold transition-colors hover:bg-primary hover:text-primary-foreground"
+                className="h-16 text-center text-2xl font-semibold transition-colors hover:bg-primary hover:text-primary-foreground"
               >
                 {text.text}
               </Button>

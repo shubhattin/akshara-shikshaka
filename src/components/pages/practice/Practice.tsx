@@ -509,7 +509,7 @@ const TryAgainSection = ({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex w-full flex-col space-y-4 sm:w-auto sm:flex-row sm:space-x-4">
+            <div className="flex w-full flex-col gap-y-4 sm:w-auto sm:flex-row sm:gap-x-4">
               <motion.button
                 onClick={() => onTryAgain()}
                 className={cn(

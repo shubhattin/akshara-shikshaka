@@ -88,6 +88,7 @@ import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lek
 import { FONT_LIST, FONT_SCRIPTS, type FontFamily } from '~/state/font_list';
 import { script_list_obj, script_list_type } from '~/state/lang_list';
 import { get_script_from_id } from '~/state/lang_list';
+import { motion } from 'framer-motion';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
 const KonvaCanvas = dynamic(() => import('./AddEditCanvas'), {
@@ -703,71 +704,16 @@ const SelectedGestureControls = ({
   };
 
   return (
-    <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
-      <div className="flex items-center justify-between">
+    <motion.div
+      className="space-y-3 rounded-lg border bg-muted/30 p-3"
+      // initial={{ y: -100, opacity: 0 }}
+      // animate={{ y: 0, opacity: 1 }}
+      // exit={{ y: 100, opacity: 0 }}
+      // transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+    >
+      {/* <div className="flex items-center justify-between">
         <span className="font-medium">Selected: Gesture {selectedGesture.index + 1}</span>
-        <div className="flex gap-2">
-          {!isRecording && (
-            <Button
-              size="sm"
-              variant="outline"
-              onDoubleClick={clearCurrentGesturePoints}
-              disabled={isRecording || isPlaying || selectedGesture.points.length === 0}
-              className="text-sm"
-            >
-              <MdClear className="mr-1" />
-              Clear Gesture
-            </Button>
-          )}
-          {!isRecording ? (
-            <Button size="sm" variant="default" onClick={startRecording} disabled={isPlaying}>
-              <MdFiberManualRecord className="mr-1 text-red-500" />
-              Record
-            </Button>
-          ) : (
-            <>
-              {/* Record Again (clear temp points to start fresh). Shown only during recording */}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  // Clear previous temp points to start fresh
-                  setCurrentGestureRecordingPoints([]);
-                  clearGestureVisualization(); // Clear canvas for fresh start
-                }}
-                disabled={currentGestureRecordingPoints.length === 0}
-              >
-                <MdReplay className="mr-1" />
-                Record Again
-              </Button>
-              <Button size="sm" variant="secondary" onClick={stopRecording}>
-                <MdStop className="mr-1" />
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                variant="default"
-                onClick={saveRecording}
-                disabled={currentGestureRecordingPoints.length === 0}
-              >
-                Done
-              </Button>
-            </>
-          )}
-
-          {!isRecording && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => playGesture(selectedGesture.index)}
-              disabled={isRecording || isPlaying || selectedGesture.points.length === 0}
-            >
-              <MdPlayArrow className="mr-1" />
-              Play
-            </Button>
-          )}
-        </div>
-      </div>
+      </div> */}
 
       {/* Gesture Settings */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -865,12 +811,68 @@ const SelectedGestureControls = ({
         </div>
       </div>
 
-      {isRecording && (
-        <div className="text-sm font-medium text-destructive">
-          🔴 Recording... Draw on the canvas to record gesture
-        </div>
-      )}
-    </div>
+      <div className="mt-4 flex items-center justify-center gap-2">
+        {!isRecording && (
+          <Button
+            size="sm"
+            variant="outline"
+            onDoubleClick={clearCurrentGesturePoints}
+            disabled={isRecording || isPlaying || selectedGesture.points.length === 0}
+            className="text-sm"
+          >
+            <MdClear className="mr-1" />
+            Clear Gesture
+          </Button>
+        )}
+        {!isRecording ? (
+          <Button size="sm" variant="default" onClick={startRecording} disabled={isPlaying}>
+            <MdFiberManualRecord className="mr-1 text-red-500" />
+            Record
+          </Button>
+        ) : (
+          <>
+            {/* Record Again (clear temp points to start fresh). Shown only during recording */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                // Clear previous temp points to start fresh
+                setCurrentGestureRecordingPoints([]);
+                clearGestureVisualization(); // Clear canvas for fresh start
+              }}
+              disabled={currentGestureRecordingPoints.length === 0}
+            >
+              <MdReplay className="mr-1" />
+              Record Again
+            </Button>
+            <Button size="sm" variant="secondary" onClick={stopRecording}>
+              <MdStop className="mr-1" />
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={saveRecording}
+              disabled={currentGestureRecordingPoints.length === 0}
+            >
+              Done
+            </Button>
+          </>
+        )}
+
+        {!isRecording && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => playGesture(selectedGesture.index)}
+            disabled={isRecording || isPlaying || selectedGesture.points.length === 0}
+          >
+            <MdPlayArrow className="mr-1" />
+            Play
+          </Button>
+        )}
+      </div>
+    </motion.div>
   );
 };
 

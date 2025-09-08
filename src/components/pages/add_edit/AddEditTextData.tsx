@@ -395,15 +395,6 @@ function AddEditTextData({
     );
   }, [gestureData, selectedGestureIndex]);
 
-  // while the gesture is being recorded do scroll lock to prevent scroll that would interfere with the recording
-  useEffect(() => {
-    if (isDrawing || isRecording) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'auto';
-    }
-  }, [isDrawing, isRecording]);
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">

@@ -14,7 +14,8 @@ import {
   is_drawing_atom,
   current_gesture_index_atom,
   canvas_current_mode,
-  USER_GESTURE_COLOR
+  USER_GESTURE_COLOR,
+  completed_gestures_count_atom
 } from './practice_state';
 import { cn } from '~/lib/utils';
 
@@ -32,6 +33,8 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
     const [isRecordingStroke, setIsRecordingStroke] = useAtom(is_recording_stroke_atom);
     const isDrawing = useAtomValue(is_drawing_atom);
     const canvasCurrentMode = useAtomValue(canvas_current_mode);
+
+    const [completedGesturesCount] = useAtom(completed_gestures_count_atom);
 
     // Get current gesture for brush settings
     const currentGestureIndex = useAtomValue(current_gesture_index_atom);
@@ -90,65 +93,155 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       }
     };
 
-    return (
-      <Stage
-        width={canvasWidth}
-        height={canvasHeight}
-        scale={{ x: scalingFactor, y: scalingFactor }}
-        ref={ref}
-        onMouseDown={handleStageMouseDown}
-        onMouseMove={handleStageMouseMove}
-        onMouseUp={handleStageMouseUp}
-        onTouchStart={handleStageMouseDown}
-        onTouchMove={handleStageMouseMove}
-        onTouchEnd={handleStageMouseUp}
-        className={cn(
-          'bg-white',
-          (isRecordingStroke || canvasCurrentMode === 'practicing') && 'cursor-crosshair'
-        )}
-      >
-        <Layer>
-          {/* Animated Gesture Lines (guidance and completed strokes) */}
-          {animatedGestureLines.map((line, index) => (
-            <Line
-              key={`gesture-line-${line.index}-${index}`}
-              points={line.points_flat}
-              stroke={line.color}
-              strokeWidth={line.width}
-              lineCap="round"
-              lineJoin="round"
-              listening={false}
-              // opacity={
-              //   line.gesture_type === 'user_gesture'
-              //     ? 0.8
-              //     : line.gesture_type === 'current_animated_gesture'
-              //       ? 1
-              //       : 0.6
-              // }
-              // dash={
-              //   line.gesture_type === 'current_animated_gesture'
-              //     ? []
-              //     : line.gesture_type === 'user_gesture'
-              //       ? []
-              //       : [5, 5]
-              // }
-            />
-          ))}
+    // Prevent pull-to-refresh and other navigation gestures on mobile
+    useEffect(() => {
+      // Set body overflow to prevent page scroll when in practice mode
+      if (canvasCurrentMode === 'practicing' && completedGesturesCount !== gestureData.length) {
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
+      } else {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+      }
 
-          {/* Current Drawing Stroke (while user is drawing) */}
-          {currentGesturePoints.length > 0 && currentGesture && (
-            <Line
-              points={currentGesturePoints} // No scaling needed - Stage handles it
-              stroke={USER_GESTURE_COLOR}
-              strokeWidth={currentGesture.width || 6}
-              color={USER_GESTURE_COLOR}
-              lineCap="round"
-              lineJoin="round"
-              listening={false}
-            />
-          )}
-        </Layer>
-      </Stage>
+      if (canvasCurrentMode !== 'practicing' || completedGesturesCount === gestureData.length) {
+        return;
+      }
+
+      const isDrawingCanvas = (target: Element | null): boolean => {
+        return !!(
+          target &&
+          (target.closest('[data-drawing-canvas]') ||
+            target.hasAttribute('data-drawing-canvas') ||
+            target.closest('canvas') ||
+            target.tagName === 'CANVAS')
+        );
+      };
+
+      const preventTouchNavigation = (e: TouchEvent) => {
+        // Prevent all browser navigation gestures when touching the drawing canvas
+        if (isDrawingCanvas(e.target as Element)) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      };
+
+      const preventGestureZoom = (e: Event) => {
+        // Prevent pinch-to-zoom and other gesture events on the canvas
+        if (isDrawingCanvas(e.target as Element)) {
+          e.preventDefault();
+        }
+      };
+
+      const preventContextMenu = (e: Event) => {
+        // Prevent long press context menu on mobile
+        if (isDrawingCanvas(e.target as Element)) {
+          e.preventDefault();
+        }
+      };
+
+      const preventDoubleClickZoom = (e: Event) => {
+        // Prevent double-click zoom on mobile
+        if (isDrawingCanvas(e.target as Element)) {
+          e.preventDefault();
+        }
+      };
+
+      // Add event listeners with passive: false to allow preventDefault
+      document.addEventListener('touchstart', preventTouchNavigation, { passive: false });
+      document.addEventListener('touchmove', preventTouchNavigation, { passive: false });
+      document.addEventListener('touchend', preventTouchNavigation, { passive: false });
+      document.addEventListener('gesturestart', preventGestureZoom, { passive: false });
+      document.addEventListener('gesturechange', preventGestureZoom, { passive: false });
+      document.addEventListener('gestureend', preventGestureZoom, { passive: false });
+      document.addEventListener('contextmenu', preventContextMenu, { passive: false });
+      document.addEventListener('dblclick', preventDoubleClickZoom, { passive: false });
+
+      return () => {
+        // Reset body styles
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+
+        // Remove event listeners
+        document.removeEventListener('touchstart', preventTouchNavigation);
+        document.removeEventListener('touchmove', preventTouchNavigation);
+        document.removeEventListener('touchend', preventTouchNavigation);
+        document.removeEventListener('gesturestart', preventGestureZoom);
+        document.removeEventListener('gesturechange', preventGestureZoom);
+        document.removeEventListener('gestureend', preventGestureZoom);
+        document.removeEventListener('contextmenu', preventContextMenu);
+        document.removeEventListener('dblclick', preventDoubleClickZoom);
+      };
+    }, [canvasCurrentMode, completedGesturesCount, gestureData.length]);
+
+    return (
+      <div
+        className={cn(
+          'inline-block touch-none select-none',
+          canvasCurrentMode === 'practicing' && 'cursor-crosshair'
+        )}
+        style={{
+          // Critical: Prevent all browser touch gestures on this container
+          touchAction: 'none',
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+          // Prevent iOS Safari bounce and zoom
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'none',
+          // Prevent context menu on long press
+          WebkitTapHighlightColor: 'transparent'
+        }}
+        data-drawing-canvas="true"
+      >
+        <Stage
+          width={canvasWidth}
+          height={canvasHeight}
+          scale={{ x: scalingFactor, y: scalingFactor }}
+          ref={ref}
+          onMouseDown={handleStageMouseDown}
+          onMouseMove={handleStageMouseMove}
+          onMouseUp={handleStageMouseUp}
+          onTouchStart={handleStageMouseDown}
+          onTouchMove={handleStageMouseMove}
+          onTouchEnd={handleStageMouseUp}
+          className="bg-white"
+        >
+          <Layer>
+            {/* Animated Gesture Lines (guidance and completed strokes) */}
+            {animatedGestureLines.map((line, index) => (
+              <Line
+                key={`gesture-line-${line.index}-${index}`}
+                points={line.points_flat}
+                stroke={line.color}
+                strokeWidth={line.width}
+                lineCap="round"
+                lineJoin="round"
+                listening={false}
+              />
+            ))}
+
+            {/* Current Drawing Stroke (while user is drawing) */}
+            {currentGesturePoints.length > 0 && currentGesture && (
+              <Line
+                points={currentGesturePoints} // No scaling needed - Stage handles it
+                stroke={USER_GESTURE_COLOR}
+                strokeWidth={currentGesture.width || 6}
+                color={USER_GESTURE_COLOR}
+                lineCap="round"
+                lineJoin="round"
+                listening={false}
+              />
+            )}
+          </Layer>
+        </Stage>
+      </div>
     );
   }
 );

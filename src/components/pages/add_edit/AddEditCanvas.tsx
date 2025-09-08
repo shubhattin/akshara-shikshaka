@@ -117,67 +117,171 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     }
   };
 
-  return (
-    <Stage
-      width={CANVAS_DIMS.width}
-      height={CANVAS_DIMS.height}
-      ref={ref}
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onTouchStart={onMouseDown}
-      onTouchMove={onMouseMove}
-      onTouchEnd={onMouseUp}
-      className={cn('bg-white', isRecording && 'cursor-crosshair')}
-    >
-      <Layer>
-        {/* Character Text */}
-        <Text
-          ref={textRef}
-          x={BASE_TEXT_CORRDINATES[0]}
-          y={BASE_TEXT_CORRDINATES[1]}
-          text={text}
-          fontSize={fontSize * 15}
-          fontFamily={currentFontLoaded ? fontFamily : 'Arial'}
-          fill="black"
-          visible={mainTextPathVisible}
-          // offsetX={textBox.width / 2}
-          // offsetY={textBox.height / 2 - textBox.height * 0.06}
-          draggable={!isRecording && !isDrawing}
-          onDragEnd={handleTextDragEnd}
-        />
-        {/* ^ the offset is being subracted from the x and y coordinates of the text */}
+  // Prevent pull-to-refresh and other navigation gestures on mobile
+  useEffect(() => {
+    // Set body overflow to prevent page scroll when recording
+    if (isRecording) {
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+    }
 
-        {/* Animated Gesture Lines */}
-        {canvasGesturesFlat
-          .filter((g) => !(isRecording && g.index === selectedGestureIndex))
-          // ^ not displaying the current gesture even if marked while recording
-          .map((gesture) => (
+    if (!isRecording) {
+      return;
+    }
+
+    const isDrawingCanvas = (target: Element | null): boolean => {
+      return !!(
+        target &&
+        (target.closest('[data-drawing-canvas]') ||
+          target.hasAttribute('data-drawing-canvas') ||
+          target.closest('canvas') ||
+          target.tagName === 'CANVAS')
+      );
+    };
+
+    const preventTouchNavigation = (e: TouchEvent) => {
+      // Prevent all browser navigation gestures when touching the drawing canvas
+      if (isDrawingCanvas(e.target as Element)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    const preventGestureZoom = (e: Event) => {
+      // Prevent pinch-to-zoom and other gesture events on the canvas
+      if (isDrawingCanvas(e.target as Element)) {
+        e.preventDefault();
+      }
+    };
+
+    const preventContextMenu = (e: Event) => {
+      // Prevent long press context menu on mobile
+      if (isDrawingCanvas(e.target as Element)) {
+        e.preventDefault();
+      }
+    };
+
+    const preventDoubleClickZoom = (e: Event) => {
+      // Prevent double-click zoom on mobile
+      if (isDrawingCanvas(e.target as Element)) {
+        e.preventDefault();
+      }
+    };
+
+    // Add event listeners with passive: false to allow preventDefault
+    document.addEventListener('touchstart', preventTouchNavigation, { passive: false });
+    document.addEventListener('touchmove', preventTouchNavigation, { passive: false });
+    document.addEventListener('touchend', preventTouchNavigation, { passive: false });
+    document.addEventListener('gesturestart', preventGestureZoom, { passive: false });
+    document.addEventListener('gesturechange', preventGestureZoom, { passive: false });
+    document.addEventListener('gestureend', preventGestureZoom, { passive: false });
+    document.addEventListener('contextmenu', preventContextMenu, { passive: false });
+    document.addEventListener('dblclick', preventDoubleClickZoom, { passive: false });
+
+    return () => {
+      // Reset body styles
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+
+      // Remove event listeners
+      document.removeEventListener('touchstart', preventTouchNavigation);
+      document.removeEventListener('touchmove', preventTouchNavigation);
+      document.removeEventListener('touchend', preventTouchNavigation);
+      document.removeEventListener('gesturestart', preventGestureZoom);
+      document.removeEventListener('gesturechange', preventGestureZoom);
+      document.removeEventListener('gestureend', preventGestureZoom);
+      document.removeEventListener('contextmenu', preventContextMenu);
+      document.removeEventListener('dblclick', preventDoubleClickZoom);
+    };
+  }, [isRecording]);
+
+  return (
+    <div
+      className={cn('inline-block touch-none select-none', isRecording && 'cursor-crosshair')}
+      style={{
+        // Critical: Prevent all browser touch gestures on this container
+        touchAction: 'none',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+        // Prevent iOS Safari bounce and zoom
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'none',
+        // Prevent context menu on long press
+        WebkitTapHighlightColor: 'transparent'
+      }}
+      data-drawing-canvas="true"
+    >
+      <Stage
+        width={CANVAS_DIMS.width}
+        height={CANVAS_DIMS.height}
+        ref={ref}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onTouchStart={onMouseDown}
+        onTouchMove={onMouseMove}
+        onTouchEnd={onMouseUp}
+        className="bg-white"
+      >
+        <Layer>
+          {/* Character Text */}
+          <Text
+            ref={textRef}
+            x={BASE_TEXT_CORRDINATES[0]}
+            y={BASE_TEXT_CORRDINATES[1]}
+            text={text}
+            fontSize={fontSize * 15}
+            fontFamily={currentFontLoaded ? fontFamily : 'Arial'}
+            fill="black"
+            visible={mainTextPathVisible}
+            // offsetX={textBox.width / 2}
+            // offsetY={textBox.height / 2 - textBox.height * 0.06}
+            draggable={!isRecording && !isDrawing}
+            onDragEnd={handleTextDragEnd}
+          />
+          {/* ^ the offset is being subracted from the x and y coordinates of the text */}
+
+          {/* Animated Gesture Lines */}
+          {canvasGesturesFlat
+            .filter((g) => !(isRecording && g.index === selectedGestureIndex))
+            // ^ not displaying the current gesture even if marked while recording
+            .map((gesture) => (
+              <Line
+                key={`animated-${gesture.index}`}
+                points={gesture.points_flat}
+                stroke={gesture.color}
+                strokeWidth={gesture.width}
+                lineCap="round"
+                lineJoin="round"
+                listening={false}
+              />
+            ))}
+
+          {/* Current Drawing Line (during recording) */}
+          {currentGestureRecordingPoints.length > 0 && selectedGesture && (
             <Line
-              key={`animated-${gesture.index}`}
-              points={gesture.points_flat}
-              stroke={gesture.color}
-              strokeWidth={gesture.width}
+              points={currentGestureRecordingPoints.flatMap((p) => [p[0], p[1]])}
+              stroke={selectedGesture.color}
+              strokeWidth={selectedGesture.width}
+              color={selectedGesture.color}
               lineCap="round"
               lineJoin="round"
               listening={false}
             />
-          ))}
-
-        {/* Current Drawing Line (during recording) */}
-        {currentGestureRecordingPoints.length > 0 && selectedGesture && (
-          <Line
-            points={currentGestureRecordingPoints.flatMap((p) => [p[0], p[1]])}
-            stroke={selectedGesture.color}
-            strokeWidth={selectedGesture.width}
-            color={selectedGesture.color}
-            lineCap="round"
-            lineJoin="round"
-            listening={false}
-          />
-        )}
-      </Layer>
-    </Stage>
+          )}
+        </Layer>
+      </Stage>
+    </div>
   );
 });
 

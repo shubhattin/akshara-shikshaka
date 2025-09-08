@@ -497,19 +497,19 @@ const TryAgainSection = ({
                 </div>
                 <span
                   className={cn(
-                    'text-sm font-medium',
+                    'text-sm font-medium brightness-75',
                     isBelowThreshold
                       ? 'text-red-600 dark:text-red-400'
                       : 'text-green-600 dark:text-green-400'
                   )}
                 >
-                  {isBelowThreshold ? '(Need 70%+)' : '(Great!)'}
+                  {isBelowThreshold ? 'Need 70%+' : 'Great!'}
                 </span>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex w-full flex-col gap-x-2.5 sm:w-auto sm:flex-row sm:gap-x-3.5">
+            <div className="flex w-full flex-col space-y-4 sm:w-auto sm:flex-row sm:space-x-4">
               <motion.button
                 onClick={() => onTryAgain()}
                 className={cn(

@@ -1,3 +1,45 @@
-.font-devangari {
-  font-family: var(--font-noto-sans-devanagari);
+/* Mobile drawing canvas optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Mobile-specific styles - only applied on touch devices */
+
+  html {
+    /* Prevent iOS Safari pull-to-refresh */
+    overscroll-behavior-y: none;
+    /* Prevent zoom on double tap */
+    touch-action: manipulation;
+  }
+
+  body {
+    /* Prevent iOS Safari bounce effect */
+    overscroll-behavior: none;
+    /* Disable text selection highlighting */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+
+  /* Canvas container improvements */
+  [data-drawing-canvas] {
+    /* Critical: Block all browser gestures on drawing area */
+    touch-action: none !important;
+    /* Prevent context menu */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    /* Prevent iOS Safari tap highlighting */
+    -webkit-tap-highlight-color: transparent;
+    /* Prevent dragging */
+    -webkit-user-drag: none;
+  }
+
+  /* Konva canvas specific */
+  canvas {
+    /* Ensure canvas itself doesn't interfere */
+    touch-action: none !important;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
 }

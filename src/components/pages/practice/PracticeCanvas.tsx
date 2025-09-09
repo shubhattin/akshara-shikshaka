@@ -224,6 +224,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
                 lineCap="round"
                 lineJoin="round"
                 listening={false}
+                tension={0.8}
               />
             ))}
 
@@ -237,6 +238,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
                 lineCap="round"
                 lineJoin="round"
                 listening={false}
+                tension={0.8}
               />
             )}
           </Layer>

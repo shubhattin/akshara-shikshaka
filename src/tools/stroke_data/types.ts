@@ -38,4 +38,5 @@ export const CANVAS_DIMS = {
   height: 400
 } as const;
 
-export const GESTURE_GAP_DURATION = 100 as const;
+export const GESTURE_GAP_DURATION = 100;
+export const KONVA_LINE_TENSION = 0.5;

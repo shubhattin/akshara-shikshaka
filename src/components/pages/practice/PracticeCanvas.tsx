@@ -5,7 +5,7 @@ import { Stage, Layer, Line } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue } from 'jotai';
 import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
-import { CANVAS_DIMS } from '~/tools/stroke_data/types';
+import { CANVAS_DIMS, KONVA_LINE_TENSION } from '~/tools/stroke_data/types';
 import {
   scaling_factor_atom,
   animated_gesture_lines_atom,
@@ -224,7 +224,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
                 lineCap="round"
                 lineJoin="round"
                 listening={false}
-                tension={0.8}
+                tension={KONVA_LINE_TENSION}
               />
             ))}
 
@@ -238,7 +238,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
                 lineCap="round"
                 lineJoin="round"
                 listening={false}
-                tension={0.8}
+                tension={KONVA_LINE_TENSION}
               />
             )}
           </Layer>

@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Stage, Layer, Line, Text } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { CANVAS_DIMS, GesturePoint } from '~/tools/stroke_data/types';
+import { CANVAS_DIMS, GesturePoint, KONVA_LINE_TENSION } from '~/tools/stroke_data/types';
 import {
   main_text_path_visible_atom,
   font_size_atom,
@@ -264,7 +264,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
                 lineCap="round"
                 lineJoin="round"
                 listening={false}
-                tension={0.8}
+                tension={KONVA_LINE_TENSION}
               />
             ))}
 
@@ -278,7 +278,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
               lineCap="round"
               lineJoin="round"
               listening={false}
-              tension={0.8}
+              tension={KONVA_LINE_TENSION}
             />
           )}
         </Layer>

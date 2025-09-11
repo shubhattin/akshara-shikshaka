@@ -3,7 +3,7 @@ import './app.scss';
 import { ThemeProvider } from '@/components/theme-provider';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/sonner';
-import { Metadata } from 'next';
+import { Metadata, Viewport } from 'next';
 import TRPCProvider from '~/api/TRPCProvider';
 
 export default async function RootLayout({
@@ -38,14 +38,15 @@ export const metadata: Metadata = {
   icons: {
     icon: '/favicon.ico',
     apple: '/favicon.ico'
-  },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: 'cover'
   }
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover'
 };
 
 export const dynamic = 'force-dynamic';

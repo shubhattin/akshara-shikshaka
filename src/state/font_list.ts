@@ -16,21 +16,27 @@ type FontEntry<F extends FontFamily> = {
 };
 type FontList = Partial<Record<script_list_type, FontEntry<FontFamily>[]>>;
 
-const get_font_entry = (font_family: FontFamily) => {
+const get_font_entry = (font_family: FontFamily, loc: 'regular' | 'variable') => {
   return {
     font_family,
-    url: `/fonts/regular/woff2/${font_family}.woff2`
+    url: `/fonts/${loc}/woff2/${font_family}.woff2`
   } satisfies FontEntry<FontFamily>;
 };
 
 export const FONT_LIST: FontList = {
-  Devanagari: [get_font_entry('Nirmala_UI'), get_font_entry('Adobe_Devanagari')],
-  Telugu: [
-    get_font_entry('Nirmala_UI'),
-    get_font_entry('Adobe_Telugu'),
-    get_font_entry('Noto_Serif_Telugu')
+  Devanagari: [
+    get_font_entry('Nirmala_UI', 'regular'),
+    get_font_entry('Adobe_Devanagari', 'regular')
   ],
-  Kannada: [get_font_entry('Nirmala_UI'), get_font_entry('Noto_Serif_Kannada')]
+  Telugu: [
+    get_font_entry('Nirmala_UI', 'regular'),
+    get_font_entry('Adobe_Telugu', 'regular'),
+    get_font_entry('Noto_Serif_Telugu', 'variable')
+  ],
+  Kannada: [
+    get_font_entry('Nirmala_UI', 'regular'),
+    get_font_entry('Noto_Serif_Kannada', 'variable')
+  ]
 };
 
 export const DEFAULT_FONT_FAMILY = 'Nirmala_UI' satisfies FontFamily;

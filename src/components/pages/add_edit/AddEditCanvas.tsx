@@ -5,7 +5,11 @@ import { Stage, Layer, Path, Text } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { CANVAS_DIMS, GesturePoint } from '~/tools/stroke_data/types';
-import { gesturePointsToPath } from '~/tools/stroke_data/utils';
+import {
+  gesturePointsToPath,
+  smoothRawPoints,
+  smoothGesturePointsRealtime
+} from '~/tools/stroke_data/utils';
 import {
   main_text_path_visible_atom,
   font_size_atom,
@@ -111,6 +115,9 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     setIsDrawing(false);
     // Keep the temp points for user to save or discard
+
+    const smoothedPoints = smoothRawPoints([...currentGestureRecordingPoints]);
+    setCurrentGestureRecordingPoints(smoothedPoints);
 
     if (selectedGesture && gestureData.length === selectedGesture.index + 1) {
       // ^ only if last gesture in the list
@@ -271,7 +278,11 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
           {/* Current Drawing Path (during recording) */}
           {currentGestureRecordingPoints.length > 0 && selectedGesture && (
             <Path
-              data={gesturePointsToPath(currentGestureRecordingPoints)}
+              data={gesturePointsToPath(
+                isRecording
+                  ? smoothGesturePointsRealtime(currentGestureRecordingPoints)
+                  : currentGestureRecordingPoints
+              )}
               stroke={selectedGesture.color}
               strokeWidth={selectedGesture.width}
               lineCap="round"

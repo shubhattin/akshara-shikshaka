@@ -175,6 +175,82 @@ export async function animateGesture(
   }
 }
 
+// Fabric-like smoothing: M, multiple Q segments, end with L to last point
+export const smoothRawPoints = (
+  rawPoints: GesturePoint[],
+  options?: { alpha?: number; minDistance?: number }
+): GesturePoint[] => {
+  const alpha = options?.alpha ?? 0.5; // midpoint blend (0..1)
+  const minDistance = options?.minDistance ?? 1.2; // px threshold to skip jitter
+
+  if (rawPoints.length < 2) return rawPoints;
+
+  // Extract XY array and downsample for stability
+  const xy: { x: number; y: number }[] = rawPoints.map((p) => ({ x: p[1], y: p[2] }));
+  const filtered: { x: number; y: number }[] = [];
+  for (const pt of xy) {
+    if (filtered.length === 0) {
+      filtered.push(pt);
+      continue;
+    }
+    const prev = filtered[filtered.length - 1];
+    const dx = pt.x - prev.x;
+    const dy = pt.y - prev.y;
+    if (dx * dx + dy * dy >= minDistance * minDistance) filtered.push(pt);
+  }
+
+  if (filtered.length === 1) return [['M', filtered[0].x, filtered[0].y]];
+  if (filtered.length === 2)
+    return [
+      ['M', filtered[0].x, filtered[0].y],
+      ['L', filtered[1].x, filtered[1].y]
+    ];
+
+  const out: GesturePoint[] = [];
+  out.push(['M', filtered[0].x, filtered[0].y]);
+  for (let i = 1; i < filtered.length - 1; i++) {
+    const curr = filtered[i];
+    const next = filtered[i + 1];
+    const endX = curr.x * (1 - alpha) + next.x * alpha; // weighted midpoint
+    const endY = curr.y * (1 - alpha) + next.y * alpha;
+    out.push(['Q', endX, endY, curr.x, curr.y]);
+  }
+  const last = filtered[filtered.length - 1];
+  out.push(['L', last.x, last.y]);
+  return out;
+};
+
+// Advanced real-time smoothing that creates more natural curves
+export const smoothGesturePointsRealtime = (
+  rawPoints: GesturePoint[],
+  alpha: number = 0.5,
+  minDistance: number = 1.2
+): GesturePoint[] => {
+  // Smooth only the tail to keep CPU low, and ensure final L behavior
+  if (rawPoints.length < 2) return rawPoints;
+  if (rawPoints.length <= 4) return smoothRawPoints(rawPoints, { alpha, minDistance });
+
+  const head = rawPoints.slice(0, -3);
+  const tail = rawPoints.slice(-3);
+
+  const headSm = smoothRawPoints(head, { alpha, minDistance });
+  const tailSm = smoothRawPoints(tail, { alpha, minDistance });
+
+  // Merge without duplicating initial M of the tail
+  const merged: GesturePoint[] = [...headSm];
+  if (tailSm.length > 0) {
+    merged.push(...(tailSm[0][0] === 'M' ? tailSm.slice(1) : tailSm));
+  }
+  // Ensure last is L
+  if (merged.length >= 1) {
+    const last = merged[merged.length - 1];
+    if (last.length === 5) {
+      merged[merged.length - 1] = ['L', last[1], last[2]];
+    }
+  }
+  return merged;
+};
+
 export const evaluateGestureAccuracy = (
   userPoints: GesturePoint[],
   targetPoints: GesturePoint[]

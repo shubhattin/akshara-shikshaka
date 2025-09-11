@@ -10,10 +10,17 @@ import { z } from 'zod';
 const ANIMATION_FUNCTIONS = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'] as const;
 export const AnimationsFunctionsEnumSchema = z.enum(ANIMATION_FUNCTIONS);
 
+/**
+ * `M` (Move to) `x, y` :- Move to point (x, y)
+ *
+ * `L` (Line to) `x, y` :- Line to point (x, y)
+ *
+ * `Q` (Quadratic Bezier Curve) `[cpx, cpy, x, y]` :- Quadratic Bezier Curve from current point to (x, y) with control point (cpx, cpy)
+ */
 export const StrokePointSchema = z.union([
   // x y
   z.tuple([z.enum(['M', 'L']), z.number(), z.number()]),
-  // x y cpx cpy
+  // cpx, cpy, x, y
   z.tuple([z.enum(['Q']), z.number(), z.number(), z.number(), z.number()])
 ]);
 
@@ -23,7 +30,7 @@ export const GestureSchema = z.object({
   color: z.string(),
   duration: z.number(),
   anim_fn: AnimationsFunctionsEnumSchema,
-  points: z.array(StrokePointSchema)
+  path_array: z.array(StrokePointSchema)
 });
 export const AnimationGestureSchema = GestureSchema.pick({
   index: true,
@@ -33,7 +40,7 @@ export const AnimationGestureSchema = GestureSchema.pick({
   path_string: z.string()
 });
 
-export type GesturePoint = z.infer<typeof StrokePointSchema>;
+export type GesturePathArray = z.infer<typeof StrokePointSchema>;
 
 export type Gesture = z.infer<typeof GestureSchema>;
 export type AnimationGesture = z.infer<typeof AnimationGestureSchema>;

@@ -9,7 +9,7 @@ import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward, MdRefresh } from '
 import { FiTrendingUp } from 'react-icons/fi';
 import { evaluateGestureAccuracy, animateGesture } from '~/tools/stroke_data/utils';
 import {
-  GesturePoint,
+  GesturePathArray,
   CANVAS_DIMS,
   Gesture,
   GESTURE_GAP_DURATION
@@ -167,14 +167,14 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   // Handle user gesture drawing from Konva canvas
-  const handleUserStroke = async (userPoints: GesturePoint[]) => {
+  const handleUserStroke = async (userPoints: GesturePathArray[]) => {
     const currentGesture = gestureData[currentGestureIndex];
     if (!currentGesture) return;
 
     // Evaluate gesture accuracy with error handling
     let accuracy = 0;
     try {
-      accuracy = evaluateGestureAccuracy(userPoints, currentGesture.points);
+      accuracy = evaluateGestureAccuracy(userPoints, currentGesture.path_array);
     } catch (error) {
       console.error('Error evaluating stroke accuracy:', error);
       // Treat evaluation errors as failed attempts

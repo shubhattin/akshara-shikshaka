@@ -1,8 +1,8 @@
 import z from 'zod';
-import { type Gesture, type GesturePoint } from './types';
+import { type Gesture, type GesturePathArray } from './types';
 
 // Helper Utility function to convert GesturePoint array to SVG path string
-export const gesturePointsToPath = (points: GesturePoint[]): string => {
+export const gesturePointsToPath = (points: GesturePathArray[]): string => {
   if (!points.length) return '';
 
   return points
@@ -12,8 +12,8 @@ export const gesturePointsToPath = (points: GesturePoint[]): string => {
         const [command, x, y] = point;
         return `${command} ${x} ${y}`;
       } else if (point.length === 5) {
-        // Q command: [command, x, y, cpx, cpy]
-        const [command, x, y, cpx, cpy] = point;
+        // Q command: [command, cpx, cpy, x, y]
+        const [command, cpx, cpy, x, y] = point;
         return `${command} ${cpx} ${cpy} ${x} ${y}`;
       }
       return '';
@@ -63,10 +63,10 @@ function* generateGestureAnimationFrames(
   gesture: Gesture,
   options: z.output<typeof GenerateGestureAnimationFramesOptions>
 ): Generator<GestureAnimationFrame> {
-  if (!gesture.points.length) return;
+  if (!gesture.path_array.length) return;
   const { maxSteps } = options;
 
-  const sampledPoints = gesture.points;
+  const sampledPoints = gesture.path_array;
   const totalPoints = sampledPoints.length;
   const animationSteps = Math.min(totalPoints * 2, maxSteps);
 
@@ -101,8 +101,8 @@ function* generateGestureAnimationFrames(
         // Current is M/L, next is Q: interpolate to create intermediate L point
         const currentX = currentPoint[1];
         const currentY = currentPoint[2];
-        const nextX = nextPoint[1];
-        const nextY = nextPoint[2];
+        const nextX = nextPoint[3];
+        const nextY = nextPoint[4];
 
         const interpolatedX = currentX + (nextX - currentX) * subProgress;
         const interpolatedY = currentY + (nextY - currentY) * subProgress;
@@ -110,8 +110,8 @@ function* generateGestureAnimationFrames(
         partialPoints.push(['L', interpolatedX, interpolatedY]);
       } else if (currentPoint.length === 5 && nextPoint.length === 3) {
         // Current is Q, next is M/L: interpolate from Q end point
-        const currentX = currentPoint[1];
-        const currentY = currentPoint[2];
+        const currentX = currentPoint[3];
+        const currentY = currentPoint[4];
         const nextX = nextPoint[1];
         const nextY = nextPoint[2];
 
@@ -121,22 +121,28 @@ function* generateGestureAnimationFrames(
         partialPoints.push(['L', interpolatedX, interpolatedY]);
       } else if (currentPoint.length === 5 && nextPoint.length === 5) {
         // Both are Q commands: interpolate control points and end points
-        const currentX = currentPoint[1];
-        const currentY = currentPoint[2];
-        const currentCpX = currentPoint[3];
-        const currentCpY = currentPoint[4];
+        const currentCpX = currentPoint[1];
+        const currentCpY = currentPoint[2];
+        const currentEndX = currentPoint[3];
+        const currentEndY = currentPoint[4];
 
-        const nextX = nextPoint[1];
-        const nextY = nextPoint[2];
-        const nextCpX = nextPoint[3];
-        const nextCpY = nextPoint[4];
+        const nextCpX = nextPoint[1];
+        const nextCpY = nextPoint[2];
+        const nextEndX = nextPoint[3];
+        const nextEndY = nextPoint[4];
 
-        const interpolatedX = currentX + (nextX - currentX) * subProgress;
-        const interpolatedY = currentY + (nextY - currentY) * subProgress;
+        const interpolatedEndX = currentEndX + (nextEndX - currentEndX) * subProgress;
+        const interpolatedEndY = currentEndY + (nextEndY - currentEndY) * subProgress;
         const interpolatedCpX = currentCpX + (nextCpX - currentCpX) * subProgress;
         const interpolatedCpY = currentCpY + (nextCpY - currentCpY) * subProgress;
 
-        partialPoints.push(['Q', interpolatedX, interpolatedY, interpolatedCpX, interpolatedCpY]);
+        partialPoints.push([
+          'Q',
+          interpolatedCpX,
+          interpolatedCpY,
+          interpolatedEndX,
+          interpolatedEndY
+        ]);
       }
     }
 
@@ -177,9 +183,9 @@ export async function animateGesture(
 
 // Fabric-like smoothing: M, multiple Q segments, end with L to last point
 export const smoothRawPoints = (
-  rawPoints: GesturePoint[],
+  rawPoints: GesturePathArray[],
   options?: { alpha?: number; minDistance?: number }
-): GesturePoint[] => {
+): GesturePathArray[] => {
   const alpha = options?.alpha ?? 0.5; // midpoint blend (0..1)
   const minDistance = options?.minDistance ?? 1.2; // px threshold to skip jitter
 
@@ -206,14 +212,14 @@ export const smoothRawPoints = (
       ['L', filtered[1].x, filtered[1].y]
     ];
 
-  const out: GesturePoint[] = [];
+  const out: GesturePathArray[] = [];
   out.push(['M', filtered[0].x, filtered[0].y]);
   for (let i = 1; i < filtered.length - 1; i++) {
     const curr = filtered[i];
     const next = filtered[i + 1];
     const endX = curr.x * (1 - alpha) + next.x * alpha; // weighted midpoint
     const endY = curr.y * (1 - alpha) + next.y * alpha;
-    out.push(['Q', endX, endY, curr.x, curr.y]);
+    out.push(['Q', curr.x, curr.y, endX, endY]);
   }
   const last = filtered[filtered.length - 1];
   out.push(['L', last.x, last.y]);
@@ -222,10 +228,10 @@ export const smoothRawPoints = (
 
 // Advanced real-time smoothing that creates more natural curves
 export const smoothGesturePointsRealtime = (
-  rawPoints: GesturePoint[],
+  rawPoints: GesturePathArray[],
   alpha: number = 0.5,
   minDistance: number = 1.2
-): GesturePoint[] => {
+): GesturePathArray[] => {
   // Smooth only the tail to keep CPU low, and ensure final L behavior
   if (rawPoints.length < 2) return rawPoints;
   if (rawPoints.length <= 4) return smoothRawPoints(rawPoints, { alpha, minDistance });
@@ -237,7 +243,7 @@ export const smoothGesturePointsRealtime = (
   const tailSm = smoothRawPoints(tail, { alpha, minDistance });
 
   // Merge without duplicating initial M of the tail
-  const merged: GesturePoint[] = [...headSm];
+  const merged: GesturePathArray[] = [...headSm];
   if (tailSm.length > 0) {
     merged.push(...(tailSm[0][0] === 'M' ? tailSm.slice(1) : tailSm));
   }
@@ -245,15 +251,15 @@ export const smoothGesturePointsRealtime = (
   if (merged.length >= 1) {
     const last = merged[merged.length - 1];
     if (last.length === 5) {
-      merged[merged.length - 1] = ['L', last[1], last[2]];
+      merged[merged.length - 1] = ['L', last[3], last[4]];
     }
   }
   return merged;
 };
 
 export const evaluateGestureAccuracy = (
-  userPoints: GesturePoint[],
-  targetPoints: GesturePoint[]
+  userPoints: GesturePathArray[],
+  targetPoints: GesturePathArray[]
 ): number => {
   if (userPoints.length < 2 || targetPoints.length < 2) return 0;
   type EvalPoint = { x: number; y: number; timestamp: number };
@@ -265,7 +271,7 @@ export const evaluateGestureAccuracy = (
   const REVERSE_PENALTY = 0.9; // allow reverse with penalty to reduce false negatives
 
   // Helpers - convert GesturePoints to EvalPoints, expanding quadratic curves
-  const flatten = (pts: GesturePoint[]): EvalPoint[] => {
+  const flatten = (pts: GesturePathArray[]): EvalPoint[] => {
     const result: EvalPoint[] = [];
     let timestamp = 0;
 
@@ -274,8 +280,8 @@ export const evaluateGestureAccuracy = (
         // M or L command: [command, x, y]
         result.push({ x: point[1], y: point[2], timestamp: timestamp++ });
       } else if (point.length === 5) {
-        // Q command: [command, x, y, cpx, cpy] - expand to multiple line segments
-        const [, endX, endY, cpX, cpY] = point;
+        // Q command: [command, cpx, cpy, x, y] - expand to multiple line segments
+        const [, cpX, cpY, endX, endY] = point;
 
         // Get the previous point to use as start point for the curve
         const prevPoint = result[result.length - 1];

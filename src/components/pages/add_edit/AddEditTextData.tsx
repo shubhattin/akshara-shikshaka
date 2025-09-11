@@ -271,7 +271,7 @@ function AddEditTextData({
   const addNewGesture = () => {
     const newGesture: Gesture = {
       index: gestureData.length,
-      points: [],
+      path_array: [],
       width: DEFAULTS.GESTURE_BRUSH_WIDTH,
       color: DEFAULTS.GESTURE_BRUSH_COLOR, // red
       duration: DEFAULTS.GESTURE_ANIMATION_DURATION,
@@ -292,7 +292,7 @@ function AddEditTextData({
     setCanvasGesturesPath(
       allowed_gestures.map((g) => ({
         ...g,
-        path_string: gesturePointsToPath(g.points)
+        path_string: gesturePointsToPath(g.path_array)
       }))
     );
   };
@@ -302,7 +302,7 @@ function AddEditTextData({
     clearGestureVisualization(true);
 
     for (const gesture of gestureData) {
-      if (gesture.points.length === 0) continue;
+      if (gesture.path_array.length === 0) continue;
       await playGestureWithKonva(gesture);
       await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION)); // Small delay between gestures
     }
@@ -388,7 +388,7 @@ function AddEditTextData({
               color: currentGesture.color,
               width: currentGesture.width,
               index: currentGesture.index,
-              path_string: gesturePointsToPath(currentGesture.points)
+              path_string: gesturePointsToPath(currentGesture.path_array)
             }
           : g
       )
@@ -554,7 +554,9 @@ function AddEditTextData({
               size="sm"
               variant="outline"
               onClick={playAllGestures}
-              disabled={isRecording || isPlaying || gestureData.every((g) => g.points.length === 0)}
+              disabled={
+                isRecording || isPlaying || gestureData.every((g) => g.path_array.length === 0)
+              }
             >
               <MdPlayArrow className="mr-1" />
               Play All
@@ -659,7 +661,7 @@ const SelectedGestureControls = ({
         gesture.index === selectedGestureIndex
           ? {
               ...gesture,
-              points: currentGestureRecordingPoints
+              paths: currentGestureRecordingPoints
             }
           : gesture
       )
@@ -691,7 +693,7 @@ const SelectedGestureControls = ({
     if (selectedGestureIndex === null) return;
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
-        gesture.index === selectedGestureIndex ? { ...gesture, points: [] } : gesture
+        gesture.index === selectedGestureIndex ? { ...gesture, path_array: [] } : gesture
       )
     );
     setNotToClearGesturesIndex((prev) => {
@@ -816,7 +818,7 @@ const SelectedGestureControls = ({
             size="sm"
             variant="outline"
             onDoubleClick={clearCurrentGesturePoints}
-            disabled={isRecording || isPlaying || selectedGesture.points.length === 0}
+            disabled={isRecording || isPlaying || selectedGesture.path_array.length === 0}
             className="text-sm"
           >
             <MdClear className="mr-1" />
@@ -864,7 +866,7 @@ const SelectedGestureControls = ({
             size="sm"
             variant="outline"
             onClick={() => playGesture(selectedGesture.index)}
-            disabled={isRecording || isPlaying || selectedGesture.points.length === 0}
+            disabled={isRecording || isPlaying || selectedGesture.path_array.length === 0}
           >
             <MdPlayArrow className="mr-1" />
             Play

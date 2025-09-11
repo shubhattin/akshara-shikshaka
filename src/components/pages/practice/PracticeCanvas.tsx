@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useState } from 'react';
 import { Stage, Layer, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue } from 'jotai';
-import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
+import type { GesturePathArray, Gesture } from '~/tools/stroke_data/types';
 import { CANVAS_DIMS } from '~/tools/stroke_data/types';
 import { gesturePointsToPath } from '~/tools/stroke_data/utils';
 import {
@@ -22,7 +22,7 @@ import { cn } from '~/lib/utils';
 
 interface PracticeKonvaCanvasProps {
   gestureData: Gesture[];
-  onUserStroke: (points: GesturePoint[]) => void;
+  onUserStroke: (points: GesturePathArray[]) => void;
 }
 
 const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
@@ -80,7 +80,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       setIsRecordingStroke(false);
 
       // Convert drawing points to GesturePoint format - they're already in the right format
-      const gesturePoints: GesturePoint[] = currentGesturePoints;
+      const gesturePoints: GesturePathArray[] = currentGesturePoints;
 
       if (gesturePoints.length > 1) {
         onUserStroke(gesturePoints);

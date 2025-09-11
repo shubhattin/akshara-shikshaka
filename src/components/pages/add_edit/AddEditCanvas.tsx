@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Stage, Layer, Path, Text } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { CANVAS_DIMS, GesturePoint } from '~/tools/stroke_data/types';
+import { CANVAS_DIMS, GesturePathArray } from '~/tools/stroke_data/types';
 import {
   gesturePointsToPath,
   smoothRawPoints,
@@ -90,27 +90,33 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     setCanvasTextCenterOffset([offsetX, offsetY]);
   };
 
+  type KonvaMouseTouchEvent =
+    | Konva.KonvaEventObject<MouseEvent>
+    | Konva.KonvaEventObject<TouchEvent>;
+
   // Mouse event handlers for gesture recording
-  const onMouseDown = (e: any) => {
+  const onMouseDown = (e: KonvaMouseTouchEvent) => {
     if (!isRecording || !selectedGesture) return;
 
     setIsDrawing(true);
 
-    const pos = e.target.getStage().getPointerPosition();
-    const point: GesturePoint = ['M', pos.x, pos.y]; // Move command for start point
+    const pos = e.currentTarget.getStage()?.getPointerPosition();
+    if (!pos) return;
+    const point: GesturePathArray = ['M', pos.x, pos.y]; // Move command for start point
     setCurrentGestureRecordingPoints([point]);
   };
 
-  const onMouseMove = (e: any) => {
+  const onMouseMove = (e: KonvaMouseTouchEvent) => {
     if (!isRecording || !isDrawing || !selectedGesture) return;
 
-    const pos = e.target.getStage().getPointerPosition();
+    const pos = e.currentTarget.getStage()?.getPointerPosition();
+    if (!pos) return;
 
-    const point: GesturePoint = ['L', pos.x, pos.y]; // Line command for subsequent points
+    const point: GesturePathArray = ['L', pos.x, pos.y]; // Line command for subsequent points
     setCurrentGestureRecordingPoints((prev) => [...prev, point]);
   };
 
-  const onMouseUp = () => {
+  const onMouseUp = (e: KonvaMouseTouchEvent) => {
     if (!isRecording || !isDrawing) return;
 
     setIsDrawing(false);

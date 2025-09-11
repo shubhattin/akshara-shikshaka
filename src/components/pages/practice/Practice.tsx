@@ -309,11 +309,11 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
             </>
           )}
 
-          {canvasCurrentMode === 'practicing' && (
+          {canvasCurrentMode === 'practicing' && completedGesturesCount !== totalGestures && (
             <>
               <button
                 onClick={replayCurrentGesture}
-                disabled={isAnimatingCurrentGesture}
+                disabled={isAnimatingCurrentGesture || completedGesturesCount === totalGestures}
                 className={cn(
                   'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
                   'bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-lg',

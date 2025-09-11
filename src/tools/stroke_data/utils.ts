@@ -1,13 +1,20 @@
 import z from 'zod';
 import { type Gesture, type GesturePoint } from './types';
 
+// Helper Utility function to convert GesturePoint array to SVG path string
+export const gesturePointsToPath = (points: GesturePoint[]): string => {
+  if (!points.length) return '';
+
+  return points.map(([command, x, y]) => `${command} ${x} ${y}`).join(' ');
+};
+
 // Framework-agnostic gesture animation data generator
 export type GestureAnimationFrame = {
   step: number;
   totalSteps: number;
   progress: number;
   pointIndex: number;
-  partialPoints: GesturePoint[];
+  // partialPoints: GesturePoint[];
   partialSvgPath: string;
   isComplete: boolean;
 };
@@ -64,28 +71,27 @@ function* generateGestureAnimationFrames(
       const nextPoint = sampledPoints[pointIndex + 1];
       const subProgress = (progress * (totalPoints - 1)) % 1;
 
-      const interpolatedX = currentPoint[0] + (nextPoint[0] - currentPoint[0]) * subProgress;
-      const interpolatedY = currentPoint[1] + (nextPoint[1] - currentPoint[1]) * subProgress;
+      // Extract coordinates from the path command format [command, x, y]
+      const currentX = currentPoint[1];
+      const currentY = currentPoint[2];
+      const nextX = nextPoint[1];
+      const nextY = nextPoint[2];
 
-      partialPoints.push([interpolatedX, interpolatedY]);
+      const interpolatedX = currentX + (nextX - currentX) * subProgress;
+      const interpolatedY = currentY + (nextY - currentY) * subProgress;
+
+      // Add interpolated point as a line command
+      partialPoints.push(['L', interpolatedX, interpolatedY]);
     }
 
-    // Build SVG path for current frame
-    let partialSvgPath = '';
-    partialPoints.forEach((point, i) => {
-      if (i === 0) {
-        partialSvgPath += `M ${point[0]} ${point[1]}`;
-      } else {
-        partialSvgPath += ` L ${point[0]} ${point[1]}`;
-      }
-    });
+    // Build SVG path for current frame using the utility function
+    const partialSvgPath = gesturePointsToPath(partialPoints);
 
     yield {
       step,
       totalSteps: animationSteps,
       progress,
       pointIndex,
-      partialPoints,
       partialSvgPath,
       isComplete: step === animationSteps
     };
@@ -128,7 +134,7 @@ export const evaluateGestureAccuracy = (
 
   // Helpers
   const flatten = (pts: GesturePoint[]): EvalPoint[] =>
-    pts.map((p, i) => ({ x: p[0], y: p[1], timestamp: i }));
+    pts.map((p, i) => ({ x: p[1], y: p[2], timestamp: i }));
 
   const pathLength = (pts: EvalPoint[]) =>
     pts.reduce(

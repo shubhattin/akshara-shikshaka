@@ -1,10 +1,11 @@
 'use client';
 
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Stage, Layer, Line, Text } from 'react-konva';
+import { Stage, Layer, Path, Text } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { CANVAS_DIMS, GesturePoint, KONVA_LINE_TENSION } from '~/tools/stroke_data/types';
+import { CANVAS_DIMS, GesturePoint } from '~/tools/stroke_data/types';
+import { gesturePointsToPath } from '~/tools/stroke_data/utils';
 import {
   main_text_path_visible_atom,
   font_size_atom,
@@ -92,7 +93,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     setIsDrawing(true);
 
     const pos = e.target.getStage().getPointerPosition();
-    const point: GesturePoint = [pos.x, pos.y];
+    const point: GesturePoint = ['M', pos.x, pos.y]; // Move command for start point
     setCurrentGestureRecordingPoints([point]);
   };
 
@@ -101,7 +102,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     const pos = e.target.getStage().getPointerPosition();
 
-    const point: GesturePoint = [pos.x, pos.y];
+    const point: GesturePoint = ['L', pos.x, pos.y]; // Line command for subsequent points
     setCurrentGestureRecordingPoints((prev) => [...prev, point]);
   };
 
@@ -251,34 +252,31 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
           />
           {/* ^ the offset is being subracted from the x and y coordinates of the text */}
 
-          {/* Animated Gesture Lines */}
+          {/* Animated Gesture Paths */}
           {canvasGesturesFlat
             .filter((g) => !(isRecording && g.index === selectedGestureIndex))
             // ^ not displaying the current gesture even if marked while recording
             .map((gesture) => (
-              <Line
+              <Path
                 key={`animated-${gesture.index}`}
-                points={gesture.points_flat}
+                data={gesture.path_string}
                 stroke={gesture.color}
                 strokeWidth={gesture.width}
                 lineCap="round"
                 lineJoin="round"
                 listening={false}
-                tension={KONVA_LINE_TENSION}
               />
             ))}
 
-          {/* Current Drawing Line (during recording) */}
+          {/* Current Drawing Path (during recording) */}
           {currentGestureRecordingPoints.length > 0 && selectedGesture && (
-            <Line
-              points={currentGestureRecordingPoints.flatMap((p) => [p[0], p[1]])}
+            <Path
+              data={gesturePointsToPath(currentGestureRecordingPoints)}
               stroke={selectedGesture.color}
               strokeWidth={selectedGesture.width}
-              color={selectedGesture.color}
               lineCap="round"
               lineJoin="round"
               listening={false}
-              tension={KONVA_LINE_TENSION}
             />
           )}
         </Layer>

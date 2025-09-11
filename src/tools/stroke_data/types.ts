@@ -10,7 +10,7 @@ import { z } from 'zod';
 const ANIMATION_FUNCTIONS = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'] as const;
 export const AnimationsFunctionsEnumSchema = z.enum(ANIMATION_FUNCTIONS);
 
-export const StrokePointSchema = z.tuple([z.number(), z.number()]);
+export const StrokePointSchema = z.tuple([z.enum(['M', 'L']), z.number(), z.number()]);
 
 export const GestureSchema = z.object({
   index: z.number().int(),
@@ -25,7 +25,7 @@ export const AnimationGestureSchema = GestureSchema.pick({
   width: true,
   color: true
 }).extend({
-  points_flat: z.number().array()
+  path_string: z.string()
 });
 
 export type GesturePoint = z.infer<typeof StrokePointSchema>;
@@ -39,7 +39,3 @@ export const CANVAS_DIMS = {
 } as const;
 
 export const GESTURE_GAP_DURATION = 100;
-
-const BASE_KONVA_LINE_TENSION = 0.5;
-const BASE_KONVA_LINE_TENSION_DEVIATION = +0.3;
-export const KONVA_LINE_TENSION = BASE_KONVA_LINE_TENSION + BASE_KONVA_LINE_TENSION_DEVIATION;

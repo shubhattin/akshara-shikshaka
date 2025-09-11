@@ -1,11 +1,12 @@
 'use client';
 
 import { forwardRef, useEffect, useState } from 'react';
-import { Stage, Layer, Line } from 'react-konva';
+import { Stage, Layer, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue } from 'jotai';
 import type { GesturePoint, Gesture } from '~/tools/stroke_data/types';
-import { CANVAS_DIMS, KONVA_LINE_TENSION } from '~/tools/stroke_data/types';
+import { CANVAS_DIMS } from '~/tools/stroke_data/types';
+import { gesturePointsToPath } from '~/tools/stroke_data/utils';
 import {
   scaling_factor_atom,
   animated_gesture_lines_atom,
@@ -57,7 +58,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         y: pos.y / scalingFactor
       };
 
-      setCurrentGesturePoints([scaledPos.x, scaledPos.y]);
+      setCurrentGesturePoints([['M', scaledPos.x, scaledPos.y]]);
     };
 
     const handleStageMouseMove = (e: any) => {
@@ -70,7 +71,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         y: pos.y / scalingFactor
       };
 
-      setCurrentGesturePoints((prev) => [...prev, scaledPos.x, scaledPos.y]);
+      setCurrentGesturePoints((prev) => [...prev, ['L', scaledPos.x, scaledPos.y]]);
     };
 
     const handleStageMouseUp = () => {
@@ -82,10 +83,11 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       const gesturePoints: GesturePoint[] = [];
 
       for (let i = 0; i < currentGesturePoints.length; i += 2) {
-        const x = currentGesturePoints[i];
-        const y = currentGesturePoints[i + 1];
+        const x = currentGesturePoints[i][1];
+        const y = currentGesturePoints[i + 1][2];
 
-        gesturePoints.push([x, y]);
+        // First point is a move command, subsequent points are line commands
+        gesturePoints.push(i === 0 ? ['M', x, y] : ['L', x, y]);
       }
 
       if (gesturePoints.length > 1) {
@@ -214,31 +216,28 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
           className="bg-white"
         >
           <Layer>
-            {/* Animated Gesture Lines (guidance and completed strokes) */}
+            {/* Animated Gesture Paths (guidance and completed strokes) */}
             {animatedGestureLines.map((line, index) => (
-              <Line
-                key={`gesture-line-${line.index}-${index}`}
-                points={line.points_flat}
+              <Path
+                key={`gesture-path-${line.index}-${index}`}
+                data={line.path_string}
                 stroke={line.color}
                 strokeWidth={line.width}
                 lineCap="round"
                 lineJoin="round"
                 listening={false}
-                tension={KONVA_LINE_TENSION}
               />
             ))}
 
             {/* Current Drawing Stroke (while user is drawing) */}
             {currentGesturePoints.length > 0 && currentGesture && (
-              <Line
-                points={currentGesturePoints} // No scaling needed - Stage handles it
+              <Path
+                data={gesturePointsToPath(currentGesturePoints)}
                 stroke={USER_GESTURE_COLOR}
                 strokeWidth={currentGesture.width || 6}
-                color={USER_GESTURE_COLOR}
                 lineCap="round"
                 lineJoin="round"
                 listening={false}
-                tension={KONVA_LINE_TENSION}
               />
             )}
           </Layer>

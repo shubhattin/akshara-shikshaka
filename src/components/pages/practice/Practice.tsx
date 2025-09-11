@@ -132,12 +132,12 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {
     const gestureLineId = gesture.index;
 
-    // Initialize the gesture line in state
+    // Initialize the gesture path in state
     setAnimatedGestureLines((prev) => [
       ...prev.filter((line) => line.index !== gestureLineId),
       {
         index: gestureLineId,
-        points_flat: [],
+        path_string: '',
         color: gesture.color,
         width: gesture.width,
         gesture_type: 'current_animated_gesture'
@@ -146,12 +146,12 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
     // Use the framework-agnostic animation helper
     await animateGesture(gesture, (frame) => {
-      // Convert points to flat array for Konva Line component
-      const flatPoints = frame.partialPoints.flatMap((p) => [p[0], p[1]]);
+      // Use the path string directly from the animation frame
+      const pathString = frame.partialSvgPath;
 
       setAnimatedGestureLines((prev) =>
         prev.map((line) =>
-          line.index === gestureLineId ? { ...line, points_flat: flatPoints } : line
+          line.index === gestureLineId ? { ...line, path_string: pathString } : line
         )
       );
     });

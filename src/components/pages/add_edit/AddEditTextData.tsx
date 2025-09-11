@@ -62,7 +62,7 @@ import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
 import type { Gesture } from '~/tools/stroke_data/types';
 import { CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
-import { animateGesture } from '~/tools/stroke_data/utils';
+import { animateGesture, gesturePointsToPath } from '~/tools/stroke_data/utils';
 import {
   text_atom,
   text_edit_mode_atom,
@@ -287,12 +287,12 @@ function AddEditTextData({
       setCanvasGesturesFlat([]);
       return;
     }
-    // Clear animated gesture lines from state
+    // Clear animated gesture paths from state
     const allowed_gestures = gestureData.filter((g) => notToClearGesturesIndex.has(g.index));
     setCanvasGesturesFlat(
       allowed_gestures.map((g) => ({
         ...g,
-        points_flat: g.points.flatMap((p) => [p[0], p[1]])
+        path_string: gesturePointsToPath(g.points)
       }))
     );
   };
@@ -312,14 +312,14 @@ function AddEditTextData({
 
   // Konva-based gesture animation using framework-agnostic helper
   const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {
-    const gestureLineId = gesture.index;
+    const gesturePathId = gesture.index;
 
-    // Initialize the gesture line in state
+    // Initialize the gesture path in state
     setCanvasGesturesFlat((prev) => [
-      ...prev.filter((line) => line.index !== gestureLineId),
+      ...prev.filter((path) => path.index !== gesturePathId),
       {
-        index: gestureLineId,
-        points_flat: [],
+        index: gesturePathId,
+        path_string: '',
         color: gesture.color,
         width: gesture.width
       }
@@ -327,12 +327,12 @@ function AddEditTextData({
 
     // Use the framework-agnostic animation helper
     await animateGesture(gesture, (frame) => {
-      // Convert points to flat array for Konva Line component
-      const flatPoints = frame.partialPoints.flatMap((p) => [p[0], p[1]]);
+      // Use the path string directly from the animation frame
+      const pathString = frame.partialSvgPath;
 
       setCanvasGesturesFlat((prev) =>
-        prev.map((line) =>
-          line.index === gestureLineId ? { ...line, points_flat: flatPoints } : line
+        prev.map((path) =>
+          path.index === gesturePathId ? { ...path, path_string: pathString } : path
         )
       );
     });
@@ -386,10 +386,9 @@ function AddEditTextData({
         g.index === currentGesture.index
           ? {
               color: currentGesture.color,
-              points: currentGesture.points,
               width: currentGesture.width,
               index: currentGesture.index,
-              points_flat: currentGesture.points.flatMap((p) => [p[0], p[1]])
+              path_string: gesturePointsToPath(currentGesture.points)
             }
           : g
       )

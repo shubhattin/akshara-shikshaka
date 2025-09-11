@@ -6,7 +6,12 @@ import type Konva from 'konva';
 import { useAtom, useAtomValue } from 'jotai';
 import type { GesturePathArray, Gesture } from '~/tools/stroke_data/types';
 import { CANVAS_DIMS } from '~/tools/stroke_data/types';
-import { gesturePointsToPath } from '~/tools/stroke_data/utils';
+import {
+  gesturePointsToPath,
+  smoothGesturePointsRealtime,
+  smoothRawPoints,
+  calculateStrokeCorrection
+} from '~/tools/stroke_data/utils';
 import {
   scaling_factor_atom,
   animated_gesture_lines_atom,
@@ -79,11 +84,16 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
       setIsRecordingStroke(false);
 
-      // Convert drawing points to GesturePoint format - they're already in the right format
-      const gesturePoints: GesturePathArray[] = currentGesturePoints;
+      // Apply final smoothing with stroke correction for better results
+      let finalGesturePoints: GesturePathArray[] = currentGesturePoints;
 
-      if (gesturePoints.length > 1) {
-        onUserStroke(gesturePoints);
+      if (currentGesturePoints.length > 2 && currentGesture) {
+        const correction = calculateStrokeCorrection(currentGesture.width || 6);
+        finalGesturePoints = smoothRawPoints(currentGesturePoints, correction);
+      }
+
+      if (finalGesturePoints.length > 1) {
+        onUserStroke(finalGesturePoints);
       }
     };
 
@@ -224,7 +234,14 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
             {/* Current Drawing Stroke (while user is drawing) */}
             {currentGesturePoints.length > 0 && currentGesture && (
               <Path
-                data={gesturePointsToPath(currentGesturePoints)}
+                data={gesturePointsToPath(
+                  isRecordingStroke && currentGesturePoints.length > 2
+                    ? smoothGesturePointsRealtime(
+                        currentGesturePoints,
+                        calculateStrokeCorrection(currentGesture.width || 6)
+                      )
+                    : currentGesturePoints
+                )}
                 stroke={USER_GESTURE_COLOR}
                 strokeWidth={currentGesture.width || 6}
                 lineCap="round"

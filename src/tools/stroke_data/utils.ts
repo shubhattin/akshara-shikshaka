@@ -5,20 +5,9 @@ import { type Gesture, type GesturePathArray } from './types';
 export const gesturePointsToPath = (points: GesturePathArray[]): string => {
   if (!points.length) return '';
 
-  return points
-    .map((point) => {
-      if (point.length === 3) {
-        // M or L command: [command, x, y]
-        const [command, x, y] = point;
-        return `${command} ${x} ${y}`;
-      } else if (point.length === 5) {
-        // Q command: [command, cpx, cpy, x, y]
-        const [command, cpx, cpy, x, y] = point;
-        return `${command} ${cpx} ${cpy} ${x} ${y}`;
-      }
-      return '';
-    })
-    .join(' ');
+  return points.map((point) => point.join(' ')).join(' ');
+  // as the array is arranged is same order as the SVG path string
+  // so we can directly join the array with space
 };
 
 // Framework-agnostic gesture animation data generator
@@ -181,81 +170,193 @@ export async function animateGesture(
   }
 }
 
-// Fabric-like smoothing: M, multiple Q segments, end with L to last point
+// Fabric.js smoothing algorithm - converts raw x,y points to smooth quadratic bezier curves
 export const smoothRawPoints = (
   rawPoints: GesturePathArray[],
-  options?: { alpha?: number; minDistance?: number }
+  correction: number = 0
 ): GesturePathArray[] => {
-  const alpha = options?.alpha ?? 0.5; // midpoint blend (0..1)
-  const minDistance = options?.minDistance ?? 1.2; // px threshold to skip jitter
-
   if (rawPoints.length < 2) return rawPoints;
 
-  // Extract XY array and downsample for stability
-  const xy: { x: number; y: number }[] = rawPoints.map((p) => ({ x: p[1], y: p[2] }));
-  const filtered: { x: number; y: number }[] = [];
-  for (const pt of xy) {
-    if (filtered.length === 0) {
-      filtered.push(pt);
-      continue;
-    }
-    const prev = filtered[filtered.length - 1];
-    const dx = pt.x - prev.x;
-    const dy = pt.y - prev.y;
-    if (dx * dx + dy * dy >= minDistance * minDistance) filtered.push(pt);
+  // Extract points as {x, y} objects for easier manipulation
+  const points = rawPoints.map((p) => ({ x: p[1], y: p[2] }));
+
+  if (points.length === 1) {
+    return [['M', points[0].x, points[0].y]];
   }
 
-  if (filtered.length === 1) return [['M', filtered[0].x, filtered[0].y]];
-  if (filtered.length === 2)
+  if (points.length === 2) {
     return [
-      ['M', filtered[0].x, filtered[0].y],
-      ['L', filtered[1].x, filtered[1].y]
+      ['M', points[0].x, points[0].y],
+      ['L', points[1].x, points[1].y]
     ];
-
-  const out: GesturePathArray[] = [];
-  out.push(['M', filtered[0].x, filtered[0].y]);
-  for (let i = 1; i < filtered.length - 1; i++) {
-    const curr = filtered[i];
-    const next = filtered[i + 1];
-    const endX = curr.x * (1 - alpha) + next.x * alpha; // weighted midpoint
-    const endY = curr.y * (1 - alpha) + next.y * alpha;
-    out.push(['Q', curr.x, curr.y, endX, endY]);
   }
-  const last = filtered[filtered.length - 1];
-  out.push(['L', last.x, last.y]);
-  return out;
+
+  let p1 = points[0];
+  let p2 = points[1];
+  const path: GesturePathArray[] = [];
+  const len = points.length;
+  const manyPoints = len > 2;
+
+  // Calculate direction signs for correction (based on first 3 points)
+  let multSignX = 1;
+  let multSignY = 0;
+  if (manyPoints) {
+    multSignX = points[2].x < p2.x ? -1 : points[2].x === p2.x ? 0 : 1;
+    multSignY = points[2].y < p2.y ? -1 : points[2].y === p2.y ? 0 : 1;
+  }
+
+  // Start with Move to first point (with correction)
+  path.push(['M', p1.x - multSignX * correction, p1.y - multSignY * correction]);
+
+  // Create quadratic bezier curves for each segment
+  let i;
+  for (i = 1; i < len; i++) {
+    // Skip identical consecutive points
+    if (!(p1.x === p2.x && p1.y === p2.y)) {
+      // Calculate midpoint between p1 and p2
+      const midPointX = (p1.x + p2.x) / 2;
+      const midPointY = (p1.y + p2.y) / 2;
+
+      // p1 is our bezier control point, midpoint is our endpoint
+      path.push(['Q', p1.x, p1.y, midPointX, midPointY]);
+    }
+
+    p1 = points[i];
+    if (i + 1 < points.length) {
+      p2 = points[i + 1];
+    }
+  }
+
+  // Calculate final direction signs for end correction
+  if (manyPoints) {
+    const lastIdx = len - 1;
+    multSignX = p1.x > points[lastIdx - 1].x ? 1 : p1.x === points[lastIdx - 1].x ? 0 : -1;
+    multSignY = p1.y > points[lastIdx - 1].y ? 1 : p1.y === points[lastIdx - 1].y ? 0 : -1;
+  }
+
+  // End with Line to last point (with correction)
+  path.push(['L', p1.x + multSignX * correction, p1.y + multSignY * correction]);
+
+  return path;
 };
 
-// Advanced real-time smoothing that creates more natural curves
+// Real-time smoothing based on Fabric.js approach
+// For performance, this applies smoothing incrementally as new points are added
 export const smoothGesturePointsRealtime = (
   rawPoints: GesturePathArray[],
-  alpha: number = 0.5,
-  minDistance: number = 1.2
+  correction: number = 0
 ): GesturePathArray[] => {
-  // Smooth only the tail to keep CPU low, and ensure final L behavior
   if (rawPoints.length < 2) return rawPoints;
-  if (rawPoints.length <= 4) return smoothRawPoints(rawPoints, { alpha, minDistance });
 
-  const head = rawPoints.slice(0, -3);
-  const tail = rawPoints.slice(-3);
-
-  const headSm = smoothRawPoints(head, { alpha, minDistance });
-  const tailSm = smoothRawPoints(tail, { alpha, minDistance });
-
-  // Merge without duplicating initial M of the tail
-  const merged: GesturePathArray[] = [...headSm];
-  if (tailSm.length > 0) {
-    merged.push(...(tailSm[0][0] === 'M' ? tailSm.slice(1) : tailSm));
+  // For very short paths, use full smoothing
+  if (rawPoints.length <= 4) {
+    return smoothRawPoints(rawPoints, correction);
   }
-  // Ensure last is L
-  if (merged.length >= 1) {
-    const last = merged[merged.length - 1];
-    if (last.length === 5) {
-      merged[merged.length - 1] = ['L', last[3], last[4]];
-    }
+
+  // For longer paths, smooth incrementally for performance
+  // Keep most of the path stable and only re-smooth the last few points
+  const stableHead = rawPoints.slice(0, -3);
+  const activeTail = rawPoints.slice(-4); // Last 4 points for smooth continuation
+
+  // Get smoothed head (cache this in real implementation for better performance)
+  const smoothedHead = smoothRawPoints(stableHead, correction);
+
+  // Get smoothed tail
+  const smoothedTail = smoothRawPoints(activeTail, correction);
+
+  // Merge head and tail, avoiding duplicate M command
+  const result: GesturePathArray[] = [...smoothedHead];
+
+  if (smoothedTail.length > 0) {
+    // Skip the M command from tail and merge the rest
+    const tailWithoutM = smoothedTail[0][0] === 'M' ? smoothedTail.slice(1) : smoothedTail;
+    result.push(...tailWithoutM);
   }
-  return merged;
+
+  return result;
 };
+
+// Helper function to calculate correction factor like Fabric.js (width / 1000)
+export const calculateStrokeCorrection = (strokeWidth: number): number => {
+  return strokeWidth / 1000;
+};
+
+// Fabric.js style incremental drawing for real-time canvas updates
+// This matches Fabric.js PencilBrush.drawSegment behavior
+export const drawSmoothSegment = (
+  p1: { x: number; y: number },
+  p2: { x: number; y: number }
+): {
+  controlPoint: { x: number; y: number };
+  endPoint: { x: number; y: number };
+  pathCommand: GesturePathArray;
+} => {
+  // Calculate midpoint between p1 and p2
+  const midPointX = (p1.x + p2.x) / 2;
+  const midPointY = (p1.y + p2.y) / 2;
+
+  return {
+    controlPoint: { x: p1.x, y: p1.y },
+    endPoint: { x: midPointX, y: midPointY },
+    pathCommand: ['Q', p1.x, p1.y, midPointX, midPointY]
+  };
+};
+
+// Example usage and testing of the Fabric.js smoothing functions
+/*
+Usage Examples:
+
+1. Basic smoothing with stroke correction:
+```typescript
+const rawPoints: GesturePathArray[] = [
+  ['M', 100, 100],
+  ['L', 120, 110], 
+  ['L', 140, 105],
+  ['L', 160, 120],
+  ['L', 180, 115]
+];
+
+const strokeWidth = 5;
+const correction = calculateStrokeCorrection(strokeWidth);
+const smoothed = smoothRawPoints(rawPoints, correction);
+// Result: Smooth quadratic bezier curves between all points
+```
+
+2. Real-time smoothing for drawing:
+```typescript
+let currentPoints: GesturePathArray[] = [['M', 100, 100]];
+
+// As user draws, add points incrementally
+currentPoints.push(['L', 120, 110]);
+currentPoints.push(['L', 140, 105]);
+
+// Apply real-time smoothing for performance
+const correction = calculateStrokeCorrection(strokeWidth);
+const realtimeSmoothed = smoothGesturePointsRealtime(currentPoints, correction);
+```
+
+3. Incremental segment drawing (like Fabric.js PencilBrush):
+```typescript
+let p1 = { x: 100, y: 100 };
+let p2 = { x: 120, y: 110 };
+
+const segment = drawSmoothSegment(p1, p2);
+// segment.controlPoint = { x: 100, y: 100 }
+// segment.endPoint = { x: 110, y: 105 }  // midpoint
+// segment.pathCommand = ['Q', 100, 100, 110, 105]
+
+// For canvas drawing:
+// ctx.moveTo(100, 100);
+// ctx.quadraticCurveTo(100, 100, 110, 105);
+```
+
+Key differences from old implementation:
+- No distance filtering (follows Fabric.js exactly)
+- Each raw point becomes a control point
+- Endpoints are always exact midpoints
+- Simpler and faster algorithm
+- Correction factor applied to start/end points
+*/
 
 export const evaluateGestureAccuracy = (
   userPoints: GesturePathArray[],

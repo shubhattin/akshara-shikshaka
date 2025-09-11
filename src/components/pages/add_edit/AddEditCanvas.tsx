@@ -8,7 +8,8 @@ import { CANVAS_DIMS, GesturePathArray } from '~/tools/stroke_data/types';
 import {
   gesturePointsToPath,
   smoothRawPoints,
-  smoothGesturePointsRealtime
+  smoothGesturePointsRealtime,
+  calculateStrokeCorrection
 } from '~/tools/stroke_data/utils';
 import {
   main_text_path_visible_atom,
@@ -122,7 +123,9 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     setIsDrawing(false);
     // Keep the temp points for user to save or discard
 
-    const smoothedPoints = smoothRawPoints([...currentGestureRecordingPoints]);
+    // Apply final smoothing with stroke width correction
+    const correction = selectedGesture ? calculateStrokeCorrection(selectedGesture.width) : 0;
+    const smoothedPoints = smoothRawPoints([...currentGestureRecordingPoints], correction);
     setCurrentGestureRecordingPoints(smoothedPoints);
 
     if (selectedGesture && gestureData.length === selectedGesture.index + 1) {
@@ -285,8 +288,11 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
           {currentGestureRecordingPoints.length > 0 && selectedGesture && (
             <Path
               data={gesturePointsToPath(
-                isRecording
-                  ? smoothGesturePointsRealtime(currentGestureRecordingPoints)
+                isRecording && currentGestureRecordingPoints.length > 2
+                  ? smoothGesturePointsRealtime(
+                      currentGestureRecordingPoints,
+                      selectedGesture ? calculateStrokeCorrection(selectedGesture.width) : 0
+                    )
                   : currentGestureRecordingPoints
               )}
               stroke={selectedGesture.color}

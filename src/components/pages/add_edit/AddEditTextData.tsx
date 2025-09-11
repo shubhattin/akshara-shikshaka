@@ -661,7 +661,7 @@ const SelectedGestureControls = ({
         gesture.index === selectedGestureIndex
           ? {
               ...gesture,
-              paths: currentGestureRecordingPoints
+              path_array: currentGestureRecordingPoints
             }
           : gesture
       )

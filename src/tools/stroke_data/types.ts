@@ -11,9 +11,9 @@ const ANIMATION_FUNCTIONS = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-o
 export const AnimationsFunctionsEnumSchema = z.enum(ANIMATION_FUNCTIONS);
 
 /**
- * `M` (Move to) `x, y` :- Move to point (x, y)
+ * `M` (Move to) `[x, y]` :- Move to point (x, y)
  *
- * `L` (Line to) `x, y` :- Line to point (x, y)
+ * `L` (Line to) `[x, y]` :- Line to point (x, y)
  *
  * `Q` (Quadratic Bezier Curve) `[cpx, cpy, x, y]` :- Quadratic Bezier Curve from current point to (x, y) with control point (cpx, cpy)
  */

@@ -10,7 +10,12 @@ import { z } from 'zod';
 const ANIMATION_FUNCTIONS = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'] as const;
 export const AnimationsFunctionsEnumSchema = z.enum(ANIMATION_FUNCTIONS);
 
-export const StrokePointSchema = z.tuple([z.enum(['M', 'L']), z.number(), z.number()]);
+export const StrokePointSchema = z.union([
+  // x y
+  z.tuple([z.enum(['M', 'L']), z.number(), z.number()]),
+  // x y cpx cpy
+  z.tuple([z.enum(['Q']), z.number(), z.number(), z.number(), z.number()])
+]);
 
 export const GestureSchema = z.object({
   index: z.number().int(),

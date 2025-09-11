@@ -72,7 +72,7 @@ import {
   is_recording_atom,
   is_playing_atom,
   main_text_path_visible_atom,
-  canvas_gestures_flat_atom,
+  canvas_gestures_path_atom,
   DEFAULTS,
   is_drawing_atom,
   current_gesture_recording_points_atom,
@@ -197,7 +197,7 @@ function AddEditTextData({
   const [selectedGestureIndex, setSelectedGestureIndex] = useAtom(selected_gesture_index_atom);
   const [isRecording] = useAtom(is_recording_atom);
   const [isPlaying, setIsPlaying] = useAtom(is_playing_atom);
-  const setCanvasGesturesFlat = useSetAtom(canvas_gestures_flat_atom);
+  const setCanvasGesturesPath = useSetAtom(canvas_gestures_path_atom);
   const [notToClearGesturesIndex, setNotToClearGesturesIndex] = useAtom(
     not_to_clear_gestures_index_atom
   );
@@ -284,12 +284,12 @@ function AddEditTextData({
 
   const clearGestureVisualization = (all = false) => {
     if (all) {
-      setCanvasGesturesFlat([]);
+      setCanvasGesturesPath([]);
       return;
     }
     // Clear animated gesture paths from state
     const allowed_gestures = gestureData.filter((g) => notToClearGesturesIndex.has(g.index));
-    setCanvasGesturesFlat(
+    setCanvasGesturesPath(
       allowed_gestures.map((g) => ({
         ...g,
         path_string: gesturePointsToPath(g.points)
@@ -315,7 +315,7 @@ function AddEditTextData({
     const gesturePathId = gesture.index;
 
     // Initialize the gesture path in state
-    setCanvasGesturesFlat((prev) => [
+    setCanvasGesturesPath((prev) => [
       ...prev.filter((path) => path.index !== gesturePathId),
       {
         index: gesturePathId,
@@ -330,7 +330,7 @@ function AddEditTextData({
       // Use the path string directly from the animation frame
       const pathString = frame.partialSvgPath;
 
-      setCanvasGesturesFlat((prev) =>
+      setCanvasGesturesPath((prev) =>
         prev.map((path) =>
           path.index === gesturePathId ? { ...path, path_string: pathString } : path
         )
@@ -381,7 +381,7 @@ function AddEditTextData({
     if (selectedGestureIndex === null) return;
     const currentGesture = gestureData.find((g) => g.index === selectedGestureIndex)!;
     // on gesture data change if there is a instance of it inside of animated gesture then update it
-    setCanvasGesturesFlat((prev) =>
+    setCanvasGesturesPath((prev) =>
       prev.map((g) =>
         g.index === currentGesture.index
           ? {

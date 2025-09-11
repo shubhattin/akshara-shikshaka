@@ -5,7 +5,20 @@ import { type Gesture, type GesturePoint } from './types';
 export const gesturePointsToPath = (points: GesturePoint[]): string => {
   if (!points.length) return '';
 
-  return points.map(([command, x, y]) => `${command} ${x} ${y}`).join(' ');
+  return points
+    .map((point) => {
+      if (point.length === 3) {
+        // M or L command: [command, x, y]
+        const [command, x, y] = point;
+        return `${command} ${x} ${y}`;
+      } else if (point.length === 5) {
+        // Q command: [command, x, y, cpx, cpy]
+        const [command, x, y, cpx, cpy] = point;
+        return `${command} ${cpx} ${cpy} ${x} ${y}`;
+      }
+      return '';
+    })
+    .join(' ');
 };
 
 // Framework-agnostic gesture animation data generator
@@ -71,17 +84,60 @@ function* generateGestureAnimationFrames(
       const nextPoint = sampledPoints[pointIndex + 1];
       const subProgress = (progress * (totalPoints - 1)) % 1;
 
-      // Extract coordinates from the path command format [command, x, y]
-      const currentX = currentPoint[1];
-      const currentY = currentPoint[2];
-      const nextX = nextPoint[1];
-      const nextY = nextPoint[2];
+      // Handle different point types for interpolation
+      if (currentPoint.length === 3 && nextPoint.length === 3) {
+        // Both are M/L commands: [command, x, y]
+        const currentX = currentPoint[1];
+        const currentY = currentPoint[2];
+        const nextX = nextPoint[1];
+        const nextY = nextPoint[2];
 
-      const interpolatedX = currentX + (nextX - currentX) * subProgress;
-      const interpolatedY = currentY + (nextY - currentY) * subProgress;
+        const interpolatedX = currentX + (nextX - currentX) * subProgress;
+        const interpolatedY = currentY + (nextY - currentY) * subProgress;
 
-      // Add interpolated point as a line command
-      partialPoints.push(['L', interpolatedX, interpolatedY]);
+        // Add interpolated point as a line command
+        partialPoints.push(['L', interpolatedX, interpolatedY]);
+      } else if (currentPoint.length === 3 && nextPoint.length === 5) {
+        // Current is M/L, next is Q: interpolate to create intermediate L point
+        const currentX = currentPoint[1];
+        const currentY = currentPoint[2];
+        const nextX = nextPoint[1];
+        const nextY = nextPoint[2];
+
+        const interpolatedX = currentX + (nextX - currentX) * subProgress;
+        const interpolatedY = currentY + (nextY - currentY) * subProgress;
+
+        partialPoints.push(['L', interpolatedX, interpolatedY]);
+      } else if (currentPoint.length === 5 && nextPoint.length === 3) {
+        // Current is Q, next is M/L: interpolate from Q end point
+        const currentX = currentPoint[1];
+        const currentY = currentPoint[2];
+        const nextX = nextPoint[1];
+        const nextY = nextPoint[2];
+
+        const interpolatedX = currentX + (nextX - currentX) * subProgress;
+        const interpolatedY = currentY + (nextY - currentY) * subProgress;
+
+        partialPoints.push(['L', interpolatedX, interpolatedY]);
+      } else if (currentPoint.length === 5 && nextPoint.length === 5) {
+        // Both are Q commands: interpolate control points and end points
+        const currentX = currentPoint[1];
+        const currentY = currentPoint[2];
+        const currentCpX = currentPoint[3];
+        const currentCpY = currentPoint[4];
+
+        const nextX = nextPoint[1];
+        const nextY = nextPoint[2];
+        const nextCpX = nextPoint[3];
+        const nextCpY = nextPoint[4];
+
+        const interpolatedX = currentX + (nextX - currentX) * subProgress;
+        const interpolatedY = currentY + (nextY - currentY) * subProgress;
+        const interpolatedCpX = currentCpX + (nextCpX - currentCpX) * subProgress;
+        const interpolatedCpY = currentCpY + (nextCpY - currentCpY) * subProgress;
+
+        partialPoints.push(['Q', interpolatedX, interpolatedY, interpolatedCpX, interpolatedCpY]);
+      }
     }
 
     // Build SVG path for current frame using the utility function
@@ -132,9 +188,43 @@ export const evaluateGestureAccuracy = (
   const DTW_WINDOW_FRAC = 0.15; // restrict warping for stricter matching
   const REVERSE_PENALTY = 0.9; // allow reverse with penalty to reduce false negatives
 
-  // Helpers
-  const flatten = (pts: GesturePoint[]): EvalPoint[] =>
-    pts.map((p, i) => ({ x: p[1], y: p[2], timestamp: i }));
+  // Helpers - convert GesturePoints to EvalPoints, expanding quadratic curves
+  const flatten = (pts: GesturePoint[]): EvalPoint[] => {
+    const result: EvalPoint[] = [];
+    let timestamp = 0;
+
+    for (const point of pts) {
+      if (point.length === 3) {
+        // M or L command: [command, x, y]
+        result.push({ x: point[1], y: point[2], timestamp: timestamp++ });
+      } else if (point.length === 5) {
+        // Q command: [command, x, y, cpx, cpy] - expand to multiple line segments
+        const [, endX, endY, cpX, cpY] = point;
+
+        // Get the previous point to use as start point for the curve
+        const prevPoint = result[result.length - 1];
+        if (prevPoint) {
+          const startX = prevPoint.x;
+          const startY = prevPoint.y;
+
+          // Sample the quadratic curve with several points for better accuracy
+          const segments = 5; // Number of line segments to approximate the curve
+          for (let i = 1; i <= segments; i++) {
+            const t = i / segments;
+            // Quadratic Bézier formula: B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
+            const x = Math.pow(1 - t, 2) * startX + 2 * (1 - t) * t * cpX + Math.pow(t, 2) * endX;
+            const y = Math.pow(1 - t, 2) * startY + 2 * (1 - t) * t * cpY + Math.pow(t, 2) * endY;
+            result.push({ x, y, timestamp: timestamp++ });
+          }
+        } else {
+          // No previous point, treat as a simple end point
+          result.push({ x: endX, y: endY, timestamp: timestamp++ });
+        }
+      }
+    }
+
+    return result;
+  };
 
   const pathLength = (pts: EvalPoint[]) =>
     pts.reduce(

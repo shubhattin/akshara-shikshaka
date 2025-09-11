@@ -9,7 +9,7 @@ import { gesturePointsToPath } from '~/tools/stroke_data/utils';
 import {
   main_text_path_visible_atom,
   font_size_atom,
-  canvas_gestures_flat_atom,
+  canvas_gestures_path_atom,
   selected_gesture_index_atom,
   gesture_data_atom,
   is_recording_atom,
@@ -28,7 +28,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   const mainTextPathVisible = useAtomValue(main_text_path_visible_atom);
   const text = useAtomValue(text_atom);
   const fontSize = useAtomValue(font_size_atom);
-  const canvasGesturesFlat = useAtomValue(canvas_gestures_flat_atom);
+  const canvasGesturesPath = useAtomValue(canvas_gestures_path_atom);
   const selectedGestureIndex = useAtomValue(selected_gesture_index_atom);
   const gestureData = useAtomValue(gesture_data_atom);
   const isRecording = useAtomValue(is_recording_atom);
@@ -253,7 +253,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
           {/* ^ the offset is being subracted from the x and y coordinates of the text */}
 
           {/* Animated Gesture Paths */}
-          {canvasGesturesFlat
+          {canvasGesturesPath
             .filter((g) => !(isRecording && g.index === selectedGestureIndex))
             // ^ not displaying the current gesture even if marked while recording
             .map((gesture) => (

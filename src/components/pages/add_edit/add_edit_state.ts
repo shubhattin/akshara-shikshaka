@@ -31,14 +31,14 @@ export const current_gesture_recording_points_atom = atom<Gesture['points']>([])
  * Used for displaying the animated/ing gestures or the ones that are marked to stay on screen, use for `Play` buttons
  * Stores the attributes of all the different gestures to be used
  */
-export const canvas_gestures_flat_atom = atom<AnimationGesture[]>([]);
+export const canvas_gestures_path_atom = atom<AnimationGesture[]>([]);
 
 /** offset from the base(Centre) text coordinates, this will be used to restore the position of the text */
 export const canvas_text_center_offset_atoms = atom<[number, number]>([0, 0]);
 
 // Export constants for use in components
 export const DEFAULTS = {
-  GESTURE_BRUSH_WIDTH: 8,
+  GESTURE_BRUSH_WIDTH: 7,
   GESTURE_BRUSH_COLOR: '#ff0000',
   GESTURE_ANIMATION_DURATION: 600,
   FONT_SIZE: DEFAULT_FONT_SIZE,
@@ -47,8 +47,8 @@ export const DEFAULTS = {
 
 export const RANGES = {
   brush_width: {
-    min: 5,
-    max: 15,
+    min: 4,
+    max: 12,
     step: 1
   },
   animation_duration: {

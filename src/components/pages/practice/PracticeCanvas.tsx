@@ -79,16 +79,8 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
       setIsRecordingStroke(false);
 
-      // Convert drawing points to GesturePoint format
-      const gesturePoints: GesturePoint[] = [];
-
-      for (let i = 0; i < currentGesturePoints.length; i += 2) {
-        const x = currentGesturePoints[i][1];
-        const y = currentGesturePoints[i + 1][2];
-
-        // First point is a move command, subsequent points are line commands
-        gesturePoints.push(i === 0 ? ['M', x, y] : ['L', x, y]);
-      }
+      // Convert drawing points to GesturePoint format - they're already in the right format
+      const gesturePoints: GesturePoint[] = currentGesturePoints;
 
       if (gesturePoints.length > 1) {
         onUserStroke(gesturePoints);

@@ -9,7 +9,7 @@ import { getCachedSession } from '~/lib/cache_server_route_data';
 
 const List = async () => {
   const session = await getCachedSession();
-  if (!session || session.user.role !== 'admin' || !session.user.is_approved)
+  if (!session || session.user.role !== 'admin')
     redirect(`${process.env.NEXT_PUBLIC_BETTER_AUTH_URL}/login`);
 
   const list = await db.query.text_data.findMany({

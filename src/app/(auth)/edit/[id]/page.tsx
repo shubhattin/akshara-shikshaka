@@ -56,7 +56,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 const MainEdit = async ({ params }: Props) => {
   const session = await getCachedSession();
-  if (!session || session.user.role !== 'admin' || !session.user.is_approved) redirect('/');
+  if (!session || session.user.role !== 'admin') redirect('/');
 
   const [id_str] = decodeURIComponent((await params).id).split(':');
   const id = z.coerce.number().int().parse(id_str);

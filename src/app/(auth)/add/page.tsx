@@ -10,7 +10,7 @@ import { script_list_obj } from '~/state/lang_list';
 
 const List = async () => {
   const session = await getCachedSession();
-  if (!session || session.user.role !== 'admin' || !session.user.is_approved) redirect('/');
+  if (!session || session.user.role !== 'admin') redirect('/');
 
   const text_data = {
     text: '',

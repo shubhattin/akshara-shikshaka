@@ -1,7 +1,8 @@
 // ALWAYS BE CAREFUL BEFORE CHANGING LANG JSON
 // AS CHNAGE IN PRE-EXISTING LANG IDS WOULD CAUSE DATA MISMATCHs
 
-import { script_list, lang_list } from './langs.json';
+import langs from './langs.json';
+const { script_list, lang_list } = langs;
 
 export const SCRIPT_LIST = Object.keys(script_list);
 export type script_list_type = keyof typeof script_list;

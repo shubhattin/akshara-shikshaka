@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import type { AnimationGesture, GesturePathArray } from '~/tools/stroke_data/types';
+import type { AnimationGesture, GesturePath } from '~/tools/stroke_data/types';
 
 // Practice workflow state
 export const canvas_current_mode = atom<'none' | 'playing' | 'practicing'>('none');
@@ -24,7 +24,7 @@ export const animated_gesture_lines_atom = atom<
 
 // Drawing state
 /** Current user drawn gesture on the canvas */
-export const current_gesture_points_atom = atom<GesturePathArray[]>([]);
+export const current_gesture_points_atom = atom<GesturePath[]>([]);
 export const is_recording_stroke_atom = atom(false);
 
 // others constants

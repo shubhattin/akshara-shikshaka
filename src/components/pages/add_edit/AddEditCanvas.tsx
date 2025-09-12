@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Stage, Layer, Path, Text } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { CANVAS_DIMS, GesturePathArray } from '~/tools/stroke_data/types';
+import { CANVAS_DIMS, GesturePath } from '~/tools/stroke_data/types';
 import {
   gesturePointsToPath,
   smoothRawPoints,
@@ -103,7 +103,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     const pos = e.currentTarget.getStage()?.getPointerPosition();
     if (!pos) return;
-    const point: GesturePathArray = ['M', pos.x, pos.y]; // Move command for start point
+    const point: GesturePath = ['M', pos.x, pos.y]; // Move command for start point
     setCurrentGestureRecordingPoints([point]);
   };
 
@@ -113,7 +113,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     const pos = e.currentTarget.getStage()?.getPointerPosition();
     if (!pos) return;
 
-    const point: GesturePathArray = ['L', pos.x, pos.y]; // Line command for subsequent points
+    const point: GesturePath = ['L', pos.x, pos.y]; // Line command for subsequent points
     setCurrentGestureRecordingPoints((prev) => [...prev, point]);
   };
 

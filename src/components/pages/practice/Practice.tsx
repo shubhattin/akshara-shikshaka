@@ -8,12 +8,7 @@ import { cn } from '~/lib/utils';
 import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward, MdRefresh } from 'react-icons/md';
 import { FiTrendingUp } from 'react-icons/fi';
 import { evaluateGestureAccuracy, animateGesture } from '~/tools/stroke_data/utils';
-import {
-  GesturePathArray,
-  CANVAS_DIMS,
-  Gesture,
-  GESTURE_GAP_DURATION
-} from '~/tools/stroke_data/types';
+import { GesturePath, CANVAS_DIMS, Gesture, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AiOutlineSignature } from 'react-icons/ai';
 import { useAtom, useSetAtom } from 'jotai';
@@ -167,7 +162,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   // Handle user gesture drawing from Konva canvas
-  const handleUserStroke = async (userPoints: GesturePathArray[]) => {
+  const handleUserStroke = async (userPoints: GesturePath[]) => {
     const currentGesture = gestureData[currentGestureIndex];
     if (!currentGesture) return;
 

@@ -1,8 +1,8 @@
 import z from 'zod';
-import { type Gesture, type GesturePathArray } from './types';
+import { type Gesture, type GesturePath } from './types';
 
 // Helper Utility function to convert GesturePoint array to SVG path string
-export const gesturePointsToPath = (points: GesturePathArray[]): string => {
+export const gesturePointsToPath = (points: GesturePath[]): string => {
   if (!points.length) return '';
 
   return points.map((point) => point.join(' ')).join(' ');
@@ -172,9 +172,9 @@ export async function animateGesture(
 
 // Fabric.js smoothing algorithm - converts raw x,y points to smooth quadratic bezier curves
 export const smoothRawPoints = (
-  rawPoints: GesturePathArray[],
+  rawPoints: GesturePath[],
   correction: number = 0
-): GesturePathArray[] => {
+): GesturePath[] => {
   if (rawPoints.length < 2) return rawPoints;
 
   // Extract points as {x, y} objects for easier manipulation
@@ -193,7 +193,7 @@ export const smoothRawPoints = (
 
   let p1 = points[0];
   let p2 = points[1];
-  const path: GesturePathArray[] = [];
+  const path: GesturePath[] = [];
   const len = points.length;
   const manyPoints = len > 2;
 
@@ -243,9 +243,9 @@ export const smoothRawPoints = (
 // Real-time smoothing based on Fabric.js approach
 // For performance, this applies smoothing incrementally as new points are added
 export const smoothGesturePointsRealtime = (
-  rawPoints: GesturePathArray[],
+  rawPoints: GesturePath[],
   correction: number = 0
-): GesturePathArray[] => {
+): GesturePath[] => {
   if (rawPoints.length < 2) return rawPoints;
 
   // For very short paths, use full smoothing
@@ -265,7 +265,7 @@ export const smoothGesturePointsRealtime = (
   const smoothedTail = smoothRawPoints(activeTail, correction);
 
   // Merge head and tail, avoiding duplicate M command
-  const result: GesturePathArray[] = [...smoothedHead];
+  const result: GesturePath[] = [...smoothedHead];
 
   if (smoothedTail.length > 0) {
     // Skip the M command from tail and merge the rest
@@ -289,7 +289,7 @@ export const drawSmoothSegment = (
 ): {
   controlPoint: { x: number; y: number };
   endPoint: { x: number; y: number };
-  pathCommand: GesturePathArray;
+  pathCommand: GesturePath;
 } => {
   // Calculate midpoint between p1 and p2
   const midPointX = (p1.x + p2.x) / 2;
@@ -359,8 +359,8 @@ Key differences from old implementation:
 */
 
 export const evaluateGestureAccuracy = (
-  userPoints: GesturePathArray[],
-  targetPoints: GesturePathArray[]
+  userPoints: GesturePath[],
+  targetPoints: GesturePath[]
 ): number => {
   if (userPoints.length < 2 || targetPoints.length < 2) return 0;
   type EvalPoint = { x: number; y: number; timestamp: number };
@@ -372,7 +372,7 @@ export const evaluateGestureAccuracy = (
   const REVERSE_PENALTY = 0.9; // allow reverse with penalty to reduce false negatives
 
   // Helpers - convert GesturePoints to EvalPoints, expanding quadratic curves
-  const flatten = (pts: GesturePathArray[]): EvalPoint[] => {
+  const flatten = (pts: GesturePath[]): EvalPoint[] => {
     const result: EvalPoint[] = [];
     let timestamp = 0;
 

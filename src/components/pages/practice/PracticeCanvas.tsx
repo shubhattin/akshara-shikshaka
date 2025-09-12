@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useState } from 'react';
 import { Stage, Layer, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue } from 'jotai';
-import type { GesturePathArray, Gesture } from '~/tools/stroke_data/types';
+import type { GesturePath, Gesture } from '~/tools/stroke_data/types';
 import { CANVAS_DIMS } from '~/tools/stroke_data/types';
 import {
   gesturePointsToPath,
@@ -27,7 +27,7 @@ import { cn } from '~/lib/utils';
 
 interface PracticeKonvaCanvasProps {
   gestureData: Gesture[];
-  onUserStroke: (points: GesturePathArray[]) => void;
+  onUserStroke: (points: GesturePath[]) => void;
 }
 
 const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
@@ -85,7 +85,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       setIsRecordingStroke(false);
 
       // Apply final smoothing with stroke correction for better results
-      let finalGesturePoints: GesturePathArray[] = currentGesturePoints;
+      let finalGesturePoints: GesturePath[] = currentGesturePoints;
 
       if (currentGesturePoints.length > 2 && currentGesture) {
         const correction = calculateStrokeCorrection(currentGesture.width || 6);

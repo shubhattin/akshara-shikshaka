@@ -28,5 +28,5 @@ export const current_gesture_points_atom = atom<GesturePath[]>([]);
 export const is_recording_stroke_atom = atom(false);
 
 // others constants
-export const USER_GESTURE_COLOR = '#0066cc'; // blue
+export const USER_GESTURE_COLOR = '#000000'; // black
 export const TRY_AGAIN_WAIT_DURATION = 5000;

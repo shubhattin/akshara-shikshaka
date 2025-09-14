@@ -38,8 +38,8 @@ export const canvas_text_center_offset_atoms = atom<[number, number]>([0, 0]);
 
 // Export constants for use in components
 export const DEFAULTS = {
-  GESTURE_BRUSH_WIDTH: 7,
-  GESTURE_BRUSH_COLOR: '#ff0000',
+  GESTURE_BRUSH_WIDTH: 12,
+  GESTURE_BRUSH_COLOR: '#0161fd', // blue
   GESTURE_ANIMATION_DURATION: 600,
   FONT_SIZE: DEFAULT_FONT_SIZE,
   GESTURE_ANIMATION_FUNCTION: 'linear'
@@ -47,8 +47,8 @@ export const DEFAULTS = {
 
 export const RANGES = {
   brush_width: {
-    min: 4,
-    max: 12,
+    min: 6,
+    max: 15,
     step: 1
   },
   animation_duration: {

@@ -78,7 +78,7 @@ export const text_lesson_words = pgTable('text_lesson_words', {
 export const image_assets = pgTable('image_assets', {
   id: serial().primaryKey(),
   description: text().notNull().default(''),
-  image_s3_key: text().notNull(),
+  s3_key: text().notNull(),
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
     .notNull()
@@ -88,7 +88,8 @@ export const image_assets = pgTable('image_assets', {
 export const audio_assets = pgTable('audio_assets', {
   id: serial().primaryKey(),
   description: text().notNull().default(''),
-  audio_s3_key: text().notNull(),
+  lang_id: smallint(), // optional language id for the audio like for words and pronunciation specific to a language
+  s3_key: text().notNull(),
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
     .notNull()

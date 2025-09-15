@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { t, protectedAdminProcedure } from '~/api/trpc_init';
 import { db } from '~/db/db';
-import { text_data } from '~/db/schema';
+import { text_gestures } from '~/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { GestureSchema } from '~/tools/stroke_data/types';
 import { type FontFamily } from '~/state/font_list';
@@ -34,8 +34,8 @@ const add_text_data_route = protectedAdminProcedure
     // Check if the text already exists
     const existingText = await db
       .select()
-      .from(text_data)
-      .where(eq(text_data.text, input.text))
+      .from(text_gestures)
+      .where(eq(text_gestures.text, input.text))
       .limit(1);
     if (existingText.length > 0) {
       return {
@@ -45,7 +45,7 @@ const add_text_data_route = protectedAdminProcedure
     }
 
     const result = await db
-      .insert(text_data)
+      .insert(text_gestures)
       .values({
         text: input.text,
         gestures: input.gestures,
@@ -75,14 +75,14 @@ const edit_text_data_route = protectedAdminProcedure
   )
   .mutation(async ({ input }) => {
     await db
-      .update(text_data)
+      .update(text_gestures)
       .set({
         gestures: input.gestures,
         font_family: input.fontFamily as FontFamily,
         font_size: input.fontSize,
         text_center_offset: input.textCenterOffset
       })
-      .where(and(eq(text_data.uuid, input.uuid), eq(text_data.id, input.id)));
+      .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)));
     return {
       updated: true
     };
@@ -92,8 +92,8 @@ const delete_text_data_route = protectedAdminProcedure
   .input(z.object({ id: z.number(), uuid: z.string().uuid() }))
   .mutation(async ({ input }) => {
     await db
-      .delete(text_data)
-      .where(and(eq(text_data.uuid, input.uuid), eq(text_data.id, input.id)));
+      .delete(text_gestures)
+      .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)));
     return {
       deleted: true
     };

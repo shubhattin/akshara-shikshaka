@@ -1,8 +1,8 @@
 import { dbClient_ext as db, queryClient } from './client';
 import { readFile } from 'fs/promises';
 import { dbMode, take_input } from '~/tools/kry.server';
-import { text_data } from '~/db/schema';
-import { TextDataSchemaZod } from '~/db/schema_zod';
+import { text_gestures } from '~/db/schema';
+import { TextGesturesSchemaZod } from '~/db/schema_zod';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
 import chalk from 'chalk';
@@ -25,13 +25,13 @@ const main = async () => {
 
   const data = z
     .object({
-      text_data: TextDataSchemaZod.array()
+      text_data: TextGesturesSchemaZod.array()
     })
     .parse(JSON.parse((await readFile(`./out/${in_file_name}`)).toString()));
 
   // deleting all the tables initially
   try {
-    await db.delete(text_data);
+    await db.delete(text_gestures);
     console.log(chalk.green('✓ Deleted All Tables Successfully'));
   } catch (e) {
     console.log(chalk.red('✗ Error while deleting tables:'), chalk.yellow(e));
@@ -39,7 +39,7 @@ const main = async () => {
 
   // inserting word_puzzles
   try {
-    await db.insert(text_data).values(data.text_data);
+    await db.insert(text_gestures).values(data.text_data);
     console.log(chalk.green('✓ Successfully added values into table'), chalk.blue('`text_data`'));
   } catch (e) {
     console.log(chalk.red('✗ Error while inserting word_puzzles:'), chalk.yellow(e));

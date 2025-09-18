@@ -2,9 +2,13 @@ import { Card } from '~/components/ui/card';
 import { Button } from '~/components/ui/button';
 import Link from 'next/link';
 import { db } from '~/db/db';
+import { getCachedSession } from '~/lib/cache_server_route_data';
+import ManageMenuList from './ManageMenuList';
 
 export default async function Home() {
-  const texts = await db.query.text_data.findMany({
+  const session = await getCachedSession();
+
+  const texts = await db.query.text_gestures.findMany({
     columns: {
       id: true,
       text: true
@@ -19,9 +23,12 @@ export default async function Home() {
         <p className="text-lg text-gray-600">Learn to write Indian script characters</p>
       </div>
       <div className="flex justify-center">
-        <Link href="/list">
-          <Button variant="blue">Manage List</Button>
-        </Link>
+        {session?.user?.role === 'admin' && <ManageMenuList />}
+        {!session && (
+          <Button asChild variant="outline">
+            <Link href={`${process.env.NEXT_PUBLIC_BETTER_AUTH_URL}/login`}>Login</Link>
+          </Button>
+        )}
       </div>
 
       <Card className="p-6">

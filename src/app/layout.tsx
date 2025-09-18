@@ -5,12 +5,16 @@ import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/sonner';
 import { Metadata, Viewport } from 'next';
 import TRPCProvider from '~/api/TRPCProvider';
+import { getCachedSession } from '~/lib/cache_server_route_data';
+import { AppContextProvider } from '~/components/AppDataContext';
 
 export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getCachedSession();
+
   return (
     <html lang="en" suppressHydrationWarning className="dark" style={{ colorScheme: 'dark' }}>
       <body className={cn('antialiased', 'overflow-y-scroll sm:px-2 lg:px-3 xl:px-4 2xl:px-4')}>
@@ -21,10 +25,12 @@ export default async function RootLayout({
           disableTransitionOnChange
         >
           <TRPCProvider>
-            <div className="container mx-auto mb-1">
-              <Toaster richColors={true} />
-              {children}
-            </div>
+            <AppContextProvider initialSession={session}>
+              <div className="container mx-auto mb-1">
+                <Toaster richColors={true} />
+                {children}
+              </div>
+            </AppContextProvider>
           </TRPCProvider>
         </ThemeProvider>
       </body>

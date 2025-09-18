@@ -14,7 +14,7 @@ import { FontFamily } from '~/state/font_list';
 type Props = { params: Promise<{ id: string }> };
 
 const get_cached_text_data = cache(async (id: number) => {
-  const text_data = await db.query.text_data.findFirst({
+  const text_data = await db.query.text_gestures.findFirst({
     where: (table, { eq }) => eq(table.id, id),
     columns: {
       id: true,
@@ -66,7 +66,7 @@ const MainEdit = async ({ params }: Props) => {
   return (
     <div>
       <div className="my-2 mb-4 px-2">
-        <Link href="/list" className="flex items-center gap-1 text-lg font-semibold">
+        <Link href="/gestures/list" className="flex items-center gap-1 text-lg font-semibold">
           <IoMdArrowRoundBack className="inline-block text-xl" />
           सूची
         </Link>

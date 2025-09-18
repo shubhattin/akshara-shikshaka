@@ -1,5 +1,5 @@
 {
-  "id": "b18f5a60-8e57-45fb-92fa-9dcb0df1c528",
+  "id": "03893045-52d7-4bf9-8964-9347ca82d2fb",
   "prevId": "438df8cc-5df2-4cc0-8694-b910e61c277e",
   "version": "7",
   "dialect": "postgresql",
@@ -278,11 +278,12 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "text_gestures_text_unique": {
-          "name": "text_gestures_text_unique",
+        "text_gestures_text_key_script_id_unique": {
+          "name": "text_gestures_text_key_script_id_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "text"
+            "text_key",
+            "script_id"
           ]
         }
       },

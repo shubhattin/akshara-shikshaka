@@ -20,7 +20,7 @@ export const text_gestures = pgTable(
   {
     id: serial().primaryKey(),
     uuid: uuid().notNull().defaultRandom(),
-    text: text().notNull().unique(),
+    text: text().notNull(),
     text_key: text().notNull(),
     // for searching across multiple scripts for the same akshara
     gestures: jsonb().$type<Gesture[]>().notNull().default([]),
@@ -35,7 +35,8 @@ export const text_gestures = pgTable(
   },
   (table) => [
     index('text_gestures_script_text_id_idx').on(table.script_id, table.text),
-    index('text_gestures_text_key_idx').on(table.text_key)
+    index('text_gestures_text_key_idx').on(table.text_key),
+    unique('text_gestures_text_key_script_id_unique').on(table.text_key, table.script_id)
   ]
 );
 

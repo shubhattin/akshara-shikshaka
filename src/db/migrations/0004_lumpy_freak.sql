@@ -52,4 +52,4 @@ ALTER TABLE "text_lesson_words" ADD CONSTRAINT "text_lesson_words_audio_id_audio
 ALTER TABLE "text_lessons" ADD CONSTRAINT "text_lessons_audio_id_audio_assets_id_fk" FOREIGN KEY ("audio_id") REFERENCES "public"."audio_assets"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "text_gestures_script_text_id_idx" ON "text_gestures" USING btree ("script_id","text");--> statement-breakpoint
 CREATE INDEX "text_gestures_text_key_idx" ON "text_gestures" USING btree ("text_key");--> statement-breakpoint
-ALTER TABLE "text_gestures" ADD CONSTRAINT "text_gestures_text_unique" UNIQUE("text");
+ALTER TABLE "text_gestures" ADD CONSTRAINT "text_gestures_text_key_script_id_unique" UNIQUE("text_key","script_id");

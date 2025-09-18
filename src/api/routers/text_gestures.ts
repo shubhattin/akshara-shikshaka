@@ -5,8 +5,9 @@ import { text_gestures } from '~/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { GestureSchema } from '~/tools/stroke_data/types';
 import { type FontFamily } from '~/state/font_list';
+import { dev_delay } from '~/tools/delay';
 
-const add_text_data_route = protectedAdminProcedure
+const add_text_gesture_data_route = protectedAdminProcedure
   .input(
     z.object({
       text: z.string().min(1),
@@ -62,7 +63,7 @@ const add_text_data_route = protectedAdminProcedure
     };
   });
 
-const edit_text_data_route = protectedAdminProcedure
+const edit_text_gesture_data_route = protectedAdminProcedure
   .input(
     z.object({
       id: z.number(),
@@ -88,7 +89,7 @@ const edit_text_data_route = protectedAdminProcedure
     };
   });
 
-const delete_text_data_route = protectedAdminProcedure
+const delete_text_gesture_data_route = protectedAdminProcedure
   .input(z.object({ id: z.number(), uuid: z.string().uuid() }))
   .mutation(async ({ input }) => {
     await db
@@ -99,8 +100,26 @@ const delete_text_data_route = protectedAdminProcedure
     };
   });
 
-export const text_data_router = t.router({
-  add_text_data: add_text_data_route,
-  edit_text_data: edit_text_data_route,
-  delete_text_data: delete_text_data_route
+const list_text_gesture_data_route = protectedAdminProcedure
+  .input(z.object({ script_id: z.number().int() }))
+  .query(async ({ input }) => {
+    await dev_delay(500);
+    const list = await db.query.text_gestures.findMany({
+      where: eq(text_gestures.script_id, input.script_id),
+      orderBy: (text_gestures, { asc }) => [asc(text_gestures.text)],
+      columns: {
+        id: true,
+        text: true,
+        created_at: true,
+        updated_at: true
+      }
+    });
+    return list;
+  });
+
+export const text_gestures_router = t.router({
+  add_text_gesture_data: add_text_gesture_data_route,
+  edit_text_gesture_data: edit_text_gesture_data_route,
+  delete_text_gesture_data: delete_text_gesture_data_route,
+  list_text_gesture_data: list_text_gesture_data_route
 });

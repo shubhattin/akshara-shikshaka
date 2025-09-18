@@ -1031,7 +1031,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const is_addition = text_data.id === undefined && text_data.uuid === undefined;
 
   const router = useRouter();
-  const add_text_data_mut = client_q.text_data.add_text_data.useMutation({
+  const add_text_data_mut = client_q.text_gestures.add_text_gesture_data.useMutation({
     onSuccess(data) {
       if (data.success) {
         toast.success('Text Added');
@@ -1049,7 +1049,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     }
   });
 
-  const update_text_data_mut = client_q.text_data.edit_text_data.useMutation({
+  const update_text_data_mut = client_q.text_gestures.edit_text_gesture_data.useMutation({
     onSuccess(data) {
       toast.success('Text Updated');
     },
@@ -1058,7 +1058,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     }
   });
 
-  const delete_text_data_mut = client_q.text_data.delete_text_data.useMutation({
+  const delete_text_data_mut = client_q.text_gestures.delete_text_gesture_data.useMutation({
     onSuccess(data) {
       toast.success('Text Deleted');
       router.push('/gestures/list');

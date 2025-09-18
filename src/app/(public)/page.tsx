@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { db } from '~/db/db';
 
 export default async function Home() {
-  const texts = await db.query.text_data.findMany({
+  const texts = await db.query.text_gestures.findMany({
     columns: {
       id: true,
       text: true

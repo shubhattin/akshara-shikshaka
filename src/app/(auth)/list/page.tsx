@@ -12,7 +12,7 @@ const List = async () => {
   if (!session || session.user.role !== 'admin')
     redirect(`${process.env.NEXT_PUBLIC_BETTER_AUTH_URL}/login`);
 
-  const list = await db.query.text_data.findMany({
+  const list = await db.query.text_gestures.findMany({
     columns: {
       id: true,
       text: true,

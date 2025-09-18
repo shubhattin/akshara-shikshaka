@@ -14,7 +14,7 @@ import { FontFamily } from '~/state/font_list';
 type Props = { params: Promise<{ id: string }> };
 
 const get_cached_text_data = cache(async (id: number) => {
-  const text_data = await db.query.text_data.findFirst({
+  const text_data = await db.query.text_gestures.findFirst({
     where: (table, { eq }) => eq(table.id, id),
     columns: {
       id: true,

@@ -84,7 +84,11 @@ import {
   canvas_text_center_offset_atoms
 } from './add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
-import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
+import {
+  lekhika_typing_tool,
+  lipi_parivartak,
+  load_parivartak_lang_data
+} from '~/tools/lipi_lekhika';
 import { FONT_LIST, FONT_SCRIPTS, type FontFamily } from '~/state/font_list';
 import { script_list_obj, script_list_type } from '~/state/lang_list';
 import { get_script_from_id } from '~/state/lang_list';
@@ -1068,7 +1072,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     }
   });
 
-  const handle_save = () => {
+  const handle_save = async () => {
     if (text.trim().length === 0) return;
 
     // With Konva, we don't need to manipulate canvas objects for saving
@@ -1077,6 +1081,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     if (is_addition) {
       add_text_data_mut.mutate({
         text: text.trim(),
+        textKey: await lipi_parivartak(text.trim(), script, 'Normal'),
         scriptID,
         gestures: gestureData,
         fontFamily,

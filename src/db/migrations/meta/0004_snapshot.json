@@ -1,5 +1,5 @@
 {
-  "id": "9da32afe-b0c5-404c-97b4-87534985ff7b",
+  "id": "b18f5a60-8e57-45fb-92fa-9dcb0df1c528",
   "prevId": "438df8cc-5df2-4cc0-8694-b910e61c277e",
   "version": "7",
   "dialect": "postgresql",
@@ -183,6 +183,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "text_key": {
+          "name": "text_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "gestures": {
           "name": "gestures",
           "type": "jsonb",
@@ -232,8 +238,8 @@
         }
       },
       "indexes": {
-        "text_data_script_text_id_idx": {
-          "name": "text_data_script_text_id_idx",
+        "text_gestures_script_text_id_idx": {
+          "name": "text_gestures_script_text_id_idx",
           "columns": [
             {
               "expression": "script_id",
@@ -243,6 +249,21 @@
             },
             {
               "expression": "text",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "text_gestures_text_key_idx": {
+          "name": "text_gestures_text_key_idx",
+          "columns": [
+            {
+              "expression": "text_key",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

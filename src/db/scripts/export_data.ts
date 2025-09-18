@@ -129,7 +129,21 @@ const main = async () => {
 
   // resetting SERIAL
   try {
-    await db.execute(sql`SELECT setval('"text_data_id_seq"', (select MAX(id) from "text_data"))`);
+    await db.execute(
+      sql`SELECT setval('"text_gestures_id_seq"', (select MAX(id) from "text_gestures"))`
+    );
+    await db.execute(
+      sql`SELECT setval('"text_lessons_id_seq"', (select MAX(id) from "text_lessons"))`
+    );
+    await db.execute(
+      sql`SELECT setval('"text_lesson_words_id_seq"', (select MAX(id) from "text_lesson_words"))`
+    );
+    await db.execute(
+      sql`SELECT setval('"audio_assets_id_seq"', (select MAX(id) from "audio_assets"))`
+    );
+    await db.execute(
+      sql`SELECT setval('"image_assets_id_seq"', (select MAX(id) from "image_assets"))`
+    );
     console.log(chalk.green('✓ Successfully resetted ALL SERIAL'));
   } catch (e) {
     console.log(chalk.red('✗ Error while resetting SERIAL:'), chalk.yellow(e));

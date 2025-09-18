@@ -11,6 +11,7 @@ const add_text_gesture_data_route = protectedAdminProcedure
   .input(
     z.object({
       text: z.string().min(1),
+      textKey: z.string().min(1),
       gestures: GestureSchema.array(),
       scriptID: z.number().int(),
       fontFamily: z.string().min(1),
@@ -49,6 +50,7 @@ const add_text_gesture_data_route = protectedAdminProcedure
       .insert(text_gestures)
       .values({
         text: input.text,
+        text_key: input.textKey,
         gestures: input.gestures,
         script_id: input.scriptID,
         font_family: input.fontFamily as FontFamily,

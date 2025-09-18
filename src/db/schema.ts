@@ -9,7 +9,8 @@ import {
   index,
   smallint,
   integer,
-  primaryKey
+  primaryKey,
+  unique
 } from 'drizzle-orm/pg-core';
 import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE } from '~/state/font_list';
 import type { Gesture } from '~/tools/stroke_data/types';
@@ -20,6 +21,8 @@ export const text_gestures = pgTable(
     id: serial().primaryKey(),
     uuid: uuid().notNull().defaultRandom(),
     text: text().notNull().unique(),
+    text_key: text().notNull(),
+    // for searching across multiple scripts for the same akshara
     gestures: jsonb().$type<Gesture[]>().notNull().default([]),
     created_at: timestamp().notNull().defaultNow(),
     updated_at: timestamp()
@@ -30,7 +33,10 @@ export const text_gestures = pgTable(
     font_size: smallint().notNull().default(DEFAULT_FONT_SIZE),
     text_center_offset: jsonb().$type<[number, number]>().notNull().default([0, 0])
   },
-  (table) => [index('text_data_script_text_id_idx').on(table.script_id, table.text)]
+  (table) => [
+    index('text_gestures_script_text_id_idx').on(table.script_id, table.text),
+    index('text_gestures_text_key_idx').on(table.text_key)
+  ]
 );
 
 export const text_lessons = pgTable('text_lessons', {

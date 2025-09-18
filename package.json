@@ -17,6 +17,7 @@
     "migration:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.891.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -57,6 +58,7 @@
     "js-cookie": "^3.0.5",
     "konva": "^9.3.22",
     "lucide-react": "^0.510.0",
+    "mime-types": "^3.0.1",
     "ms": "^2.1.3",
     "next": "15.3.2",
     "next-themes": "^0.4.6",
@@ -82,6 +84,7 @@
     "@tanstack/react-query-devtools": "^5.87.3",
     "@types/fabric": "^5.3.10",
     "@types/js-cookie": "^3.0.6",
+    "@types/mime-types": "^3.0.1",
     "@types/ms": "^2.1.0",
     "@types/node": "^20.19.13",
     "@types/react": "^19.1.12",

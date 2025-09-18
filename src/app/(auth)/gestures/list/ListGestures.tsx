@@ -124,39 +124,43 @@ export default function ListGestures({}: Props) {
         </div>
       </div>
       <ul className="grid grid-cols-4 gap-4 sm:grid-cols-6 md:grid-cols-8">
-        {isLoading ? (
-          Array.from({ length: limit }).map((_, i) => (
-            <li key={`skeleton-${i}`}>
-              <Card className="p-2">
-                <CardHeader>
-                  <Skeleton className="mx-auto h-6 w-16" />
-                </CardHeader>
-              </Card>
-            </li>
-          ))
-        ) : items.length > 0 ? (
-          items.map((item) => (
-            <li key={item.id}>
-              <Link href={`/gestures/edit/${item.id}`}>
-                <Card className="p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800">
+        {
+          isLoading ? (
+            Array.from({ length: limit }).map((_, i) => (
+              <li key={`skeleton-${i}`}>
+                <Card className="p-2">
                   <CardHeader>
-                    <CardTitle className="text-center">{item.text}</CardTitle>
+                    <Skeleton className="mx-auto h-6 w-16" />
                   </CardHeader>
                 </Card>
-              </Link>
-            </li>
-          ))
-        ) : (
-          <li className="col-span-full">
-            <Card className="py-10">
-              <CardHeader>
-                <CardTitle className="text-center text-base text-muted-foreground">
-                  {debouncedSearch ? 'No results match your search.' : 'No items to display.'}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-          </li>
-        )}
+              </li>
+            ))
+          ) : items.length > 0 ? (
+            items.map((item) => (
+              <li key={item.id}>
+                <Link href={`/gestures/edit/${item.id}`}>
+                  <Card className="p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800">
+                    <CardHeader>
+                      <CardTitle className="text-center">{item.text}</CardTitle>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              </li>
+            ))
+          ) : (
+            <></>
+          )
+          // (
+          //   <li className="col-span-full">
+          //     <Card className="py-10">
+          //       <CardHeader>
+          //         <CardTitle className="text-center text-base text-muted-foreground">
+          //           {debouncedSearch ? 'No results match your search.' : 'No items to display.'}
+          //         </CardTitle>
+          //       </CardHeader>
+          //     </Card>
+          //   </li>
+        }
       </ul>
       {!!scriptId && (
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 sm:flex-row">
@@ -166,7 +170,7 @@ export default function ListGestures({}: Props) {
                 Page {data.page} of {data.pageCount} • Total {data.total}
               </span>
             ) : (
-              <span></span>
+              <span className="text-sm text-muted-foreground">Loading...</span>
             )}
           </div>
           <div className="flex items-center gap-2">

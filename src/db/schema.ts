@@ -43,7 +43,7 @@ export const text_lessons = pgTable('text_lessons', {
   updated_at: timestamp()
     .notNull()
     .$onUpdate(() => new Date()),
-  audio_id: integer().references(() => audio_assets.id)
+  audio_id: integer().references(() => audio_assets.id, { onDelete: 'set null' })
   // optional audio for the lesson, eg :- when no words for the "text"
 });
 
@@ -53,10 +53,10 @@ export const lesson_gestures = pgTable(
   {
     text_gesture_id: integer()
       .notNull()
-      .references(() => text_gestures.id),
+      .references(() => text_gestures.id, { onDelete: 'cascade' }),
     text_lesson_id: integer()
       .notNull()
-      .references(() => text_lessons.id)
+      .references(() => text_lessons.id, { onDelete: 'cascade' })
   },
   (table) => [primaryKey({ columns: [table.text_gesture_id, table.text_lesson_id] })]
 );
@@ -65,14 +65,15 @@ export const text_lesson_words = pgTable('text_lesson_words', {
   id: serial().primaryKey(),
   text_lesson_id: integer()
     .notNull()
-    .references(() => text_lessons.id),
+    .references(() => text_lessons.id, { onDelete: 'cascade' }),
+  // ^ auto delete on text lessons deletion
   word: text().notNull(),
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
     .notNull()
     .$onUpdate(() => new Date()),
-  image_id: integer().references(() => image_assets.id),
-  audio_id: integer().references(() => audio_assets.id)
+  image_id: integer().references(() => image_assets.id, { onDelete: 'set null' }),
+  audio_id: integer().references(() => audio_assets.id, { onDelete: 'set null' })
 });
 
 export const image_assets = pgTable('image_assets', {

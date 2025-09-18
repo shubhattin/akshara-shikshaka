@@ -31,7 +31,7 @@ const List = async () => {
         </Link>
       </div>
       <div className="mt-2 mb-5 flex items-center justify-center gap-4 px-2">
-        <Link href="/add">
+        <Link href="/gestures/add">
           <Button variant={'blue'} className="gap-2 text-lg font-semibold">
             <IoMdAdd className="size-5.5" /> नवाक्षरं युञ्जतु
           </Button>
@@ -40,7 +40,7 @@ const List = async () => {
       <ul className="grid grid-cols-4 gap-4 sm:grid-cols-6 md:grid-cols-8">
         {list.map((item) => (
           <li key={item.id}>
-            <Link href={`/edit/${item.id}`}>
+            <Link href={`/gestures/edit/${item.id}`}>
               <Card className="p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800">
                 <CardHeader>
                   <CardTitle className="text-center">{item.text}</CardTitle>

@@ -1035,7 +1035,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     onSuccess(data) {
       if (data.success) {
         toast.success('Text Added');
-        router.push(`/edit/${data.id}`);
+        router.push(`/gestures/edit/${data.id}`);
       } else {
         if (data.err_code === 'text_already_exists') {
           toast.error('Text already exists');
@@ -1061,7 +1061,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const delete_text_data_mut = client_q.text_data.delete_text_data.useMutation({
     onSuccess(data) {
       toast.success('Text Deleted');
-      router.push('/list');
+      router.push('/gestures/list');
     },
     onError(error) {
       toast.error('Failed to delete text');

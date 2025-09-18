@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   experimental: {
     reactCompiler: true
   },
+  typedRoutes: true,
   webpack: (config, { isServer }) => {
     // Fix for Konva.js server-side rendering issues
     if (!isServer) {

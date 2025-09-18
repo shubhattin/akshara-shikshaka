@@ -47,6 +47,9 @@ export const text_lessons = pgTable('text_lessons', {
   // optional audio for the lesson, eg :- when no words for the "text"
 });
 
+// A text lesson will have multiple gestures connected to it. But as other text lessons can alsp access the same gestures
+// So we need to join table for the M2M relationship between text_gestures and text_lessons
+
 // for many-to-many relationship between text_gestures and text_lessons
 export const lesson_gestures = pgTable(
   'lesson_gestures',

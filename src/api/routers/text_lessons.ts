@@ -2,8 +2,9 @@ import { t, protectedAdminProcedure } from '../trpc_init';
 import { z } from 'zod';
 import { lesson_gestures, text_lesson_words, text_lessons } from '~/db/schema';
 import { db } from '~/db/db';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray } from 'drizzle-orm';
 import { TextLessonsSchemaZod, TextLessonWordsSchemaZod } from '~/db/schema_zod';
+import { dev_delay } from '~/tools/delay';
 
 /**
  * Only for adding text lessons and not for adding words related\
@@ -15,26 +16,28 @@ const add_text_lesson_route = protectedAdminProcedure
       lesson_info: TextLessonsSchemaZod.pick({
         lang_id: true,
         base_word_script_id: true,
-        audio_id: true
+        audio_id: true,
+        text: true
       }),
       gesture_ids: z.array(z.number().int())
     })
   )
   .output(
     z.object({
-      id: z.number().int()
+      id: z.number().int(),
+      uuid: z.string().uuid()
     })
   )
   .mutation(
     async ({
       input: {
-        lesson_info: { lang_id, base_word_script_id, audio_id },
+        lesson_info: { lang_id, base_word_script_id, audio_id, text },
         gesture_ids: gestures_ids
       }
     }) => {
       const result = await db
         .insert(text_lessons)
-        .values({ lang_id, base_word_script_id, audio_id })
+        .values({ lang_id, base_word_script_id, audio_id, text })
         .returning();
 
       // insert values in the join table
@@ -46,7 +49,8 @@ const add_text_lesson_route = protectedAdminProcedure
       );
 
       return {
-        id: result[0].id
+        id: result[0].id,
+        uuid: result[0].uuid
       };
     }
   );
@@ -56,9 +60,11 @@ const update_text_lesson_route = protectedAdminProcedure
     z.object({
       lesson_info: TextLessonsSchemaZod.pick({
         id: true,
-        lang_id: true,
-        base_word_script_id: true,
-        audio_id: true
+        // lang_id: true,
+        // base_word_script_id: true,
+        audio_id: true,
+        text: true,
+        uuid: true
       }),
       gesture_ids: z.array(z.number().int())
     })
@@ -66,15 +72,15 @@ const update_text_lesson_route = protectedAdminProcedure
   .mutation(
     async ({
       input: {
-        lesson_info: { id, lang_id, base_word_script_id, audio_id },
+        lesson_info: { id, audio_id, text, uuid },
         gesture_ids
       }
     }) => {
       // updating text lessons
       await db
         .update(text_lessons)
-        .set({ lang_id, base_word_script_id, audio_id })
-        .where(eq(text_lessons.id, id));
+        .set({ audio_id, text })
+        .where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
 
       // updating lesson gestures
       const existing_gesture_ids = (
@@ -99,12 +105,13 @@ const update_text_lesson_route = protectedAdminProcedure
               eq(lesson_gestures.text_lesson_id, id)
             )
           ),
-        db.insert(lesson_gestures).values(
-          to_add_gesture_ids.map((gesture_id) => ({
-            text_lesson_id: id,
-            text_gesture_id: gesture_id
-          }))
-        )
+        to_add_gesture_ids.length > 0 &&
+          db.insert(lesson_gestures).values(
+            to_add_gesture_ids.map((gesture_id) => ({
+              text_lesson_id: id,
+              text_gesture_id: gesture_id
+            }))
+          )
       ]);
 
       return {
@@ -114,9 +121,9 @@ const update_text_lesson_route = protectedAdminProcedure
   );
 
 const delete_text_lesson_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int() }))
-  .mutation(async ({ input: { id } }) => {
-    await db.delete(text_lessons).where(eq(text_lessons.id, id));
+  .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
+  .mutation(async ({ input: { id, uuid } }) => {
+    await db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
 
     // the words and lesson gestures will be deleted automatically due to the cascade delete constraint
 
@@ -143,17 +150,20 @@ const add_lesson_words_route = protectedAdminProcedure
     })
   )
   .mutation(async ({ input: { text_lesson_id, words } }) => {
-    const result = await db
-      .insert(text_lesson_words)
-      .values(
-        words.map((word) => {
-          return {
-            ...word,
-            text_lesson_id
-          };
-        })
-      )
-      .returning();
+    const result =
+      words.length > 0
+        ? await db
+            .insert(text_lesson_words)
+            .values(
+              words.map((word) => {
+                return {
+                  ...word,
+                  text_lesson_id
+                };
+              })
+            )
+            .returning()
+        : [];
     return {
       added: result.length,
       ids: result.map((word) => word.id)
@@ -189,10 +199,79 @@ const update_lesson_words_route = protectedAdminProcedure
     };
   });
 
+const list_text_lessons_route = protectedAdminProcedure
+  .input(
+    z.object({
+      lang_id: z.number().int(),
+      search_text: z.string().optional(),
+      page: z.number().int().min(1),
+      limit: z.number().int().min(1)
+    })
+  )
+  .query(async ({ input: { page, limit, lang_id, search_text } }) => {
+    await dev_delay(500);
+
+    const baseWhereClause = eq(text_lessons.lang_id, lang_id);
+    const [{ count: totalCount }] = await db
+      .select({ count: count() })
+      .from(text_lessons)
+      .where(baseWhereClause);
+
+    const offset = (page - 1) * limit;
+
+    const list = await db.query.text_lessons.findMany({
+      where: () => {
+        if (search_text && search_text.trim().length > 0) {
+          return and(baseWhereClause, ilike(text_lessons.text, `%${search_text.trim()}%`))!;
+        }
+        return baseWhereClause;
+      },
+      orderBy: (text_lessons, { asc }) => [asc(text_lessons.text)],
+      limit: limit,
+      offset,
+      columns: {
+        id: true,
+        text: true,
+        created_at: true,
+        updated_at: true
+      }
+    });
+
+    const total = Number(totalCount ?? 0);
+    const pageCount = Math.max(1, Math.ceil(total / limit));
+    const hasPrev = page > 1;
+    const hasNext = page < pageCount;
+
+    return {
+      list,
+      total,
+      page: page,
+      pageCount,
+      hasPrev,
+      hasNext
+    };
+  });
+
+const get_gestures_from_text_key_route = protectedAdminProcedure
+  .input(z.object({ text_key: z.string().min(1) }))
+  .query(async ({ input: { text_key } }) => {
+    const gestures = await db.query.text_gestures.findMany({
+      where: (tbl, { eq }) => eq(tbl.text_key, text_key),
+      columns: {
+        id: true,
+        text: true,
+        script_id: true
+      }
+    });
+    return gestures;
+  });
+
 export const text_lessons_router = t.router({
   add_text_lesson: add_text_lesson_route,
   update_text_lesson: update_text_lesson_route,
   delete_text_lesson: delete_text_lesson_route,
   add_lesson_words: add_lesson_words_route,
-  update_lesson_words: update_lesson_words_route
+  update_lesson_words: update_lesson_words_route,
+  list_text_lessons: list_text_lessons_route,
+  get_gestures_from_text_key: get_gestures_from_text_key_route
 });

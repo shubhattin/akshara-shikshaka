@@ -42,10 +42,13 @@ export const text_gestures = pgTable(
 
 export const text_lessons = pgTable('text_lessons', {
   id: serial().primaryKey(),
+  uuid: uuid().notNull().defaultRandom(),
   lang_id: smallint().notNull(),
   base_word_script_id: smallint().notNull(),
   // ^ script in which the words are stored, used for transliteration
   // it is the script used for writing those words
+  text: text().notNull(),
+  // ^ will be in the base_word_script_id script
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
     .notNull()

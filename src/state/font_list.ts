@@ -9,6 +9,9 @@ export const FONT_FAMILIES = [
 ] as const;
 export type FontFamily = (typeof FONT_FAMILIES)[number];
 
+/**
+ * These are the scripts for which the fonts have been specified and setup properly
+ */
 export const FONT_SCRIPTS = ['Devanagari', 'Telugu', 'Kannada'] as const;
 type FontEntry<F extends FontFamily> = {
   font_family: F;

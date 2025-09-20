@@ -25,7 +25,7 @@ import {
   font_family_atom,
   font_loaded_atom,
   canvas_text_center_offset_atoms
-} from './add_edit_state';
+} from './gesture_add_edit_state';
 import { cn } from '~/lib/utils';
 
 const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {

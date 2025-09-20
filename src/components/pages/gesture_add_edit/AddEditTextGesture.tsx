@@ -82,7 +82,7 @@ import {
   font_loaded_atom,
   RANGES,
   canvas_text_center_offset_atoms
-} from './add_edit_state';
+} from './gesture_add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
 import {
   lekhika_typing_tool,
@@ -95,7 +95,7 @@ import { get_script_from_id } from '~/state/lang_list';
 import { motion } from 'framer-motion';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
-const KonvaCanvas = dynamic(() => import('./AddEditCanvas'), {
+const KonvaCanvas = dynamic(() => import('./AddEditGestureCanvas'), {
   ssr: false,
   loading: () => (
     <div

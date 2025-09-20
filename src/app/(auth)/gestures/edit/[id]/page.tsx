@@ -4,7 +4,7 @@ import { cache } from 'react';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 import { db } from '~/db/db';
 import Link from 'next/link';
-import AddEditTextDataWrapper from '~/components/pages/add_edit/AddEditTextData';
+import AddEditTextDataWrapper from '~/components/pages/gesture_add_edit/AddEditTextGesture';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { getCachedSession } from '~/lib/cache_server_route_data';
 import { redirect } from 'next/navigation';
@@ -48,8 +48,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     ...getMetadata({
-      title: text_data ? text_data.text + ' - Edit' : 'Not Found',
-      description: text_data ? text_data.text + ' - Edit' : null
+      title: text_data ? text_data.text + ' - Edit Text Gesture' : 'Not Found',
+      description: text_data ? text_data.text + ' - Edit Text Gesture' : null
     })
   };
 }
@@ -68,7 +68,7 @@ const MainEdit = async ({ params }: Props) => {
       <div className="my-2 mb-4 px-2">
         <Link href="/gestures/list" className="flex items-center gap-1 text-lg font-semibold">
           <IoMdArrowRoundBack className="inline-block text-xl" />
-          सूची
+          Text Gesture List
         </Link>
       </div>
       {text_data ? (

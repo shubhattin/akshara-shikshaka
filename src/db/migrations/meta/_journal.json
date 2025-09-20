@@ -36,6 +36,13 @@
       "when": 1758217902798,
       "tag": "0004_lumpy_freak",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1758376932764,
+      "tag": "0005_amazing_ghost_rider",
+      "breakpoints": true
     }
   ]
 }

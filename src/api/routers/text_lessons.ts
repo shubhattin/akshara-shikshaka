@@ -24,7 +24,8 @@ const add_text_lesson_route = protectedAdminProcedure
   )
   .output(
     z.object({
-      id: z.number().int()
+      id: z.number().int(),
+      uuid: z.string().uuid()
     })
   )
   .mutation(
@@ -48,7 +49,8 @@ const add_text_lesson_route = protectedAdminProcedure
       );
 
       return {
-        id: result[0].id
+        id: result[0].id,
+        uuid: result[0].uuid
       };
     }
   );
@@ -60,7 +62,9 @@ const update_text_lesson_route = protectedAdminProcedure
         id: true,
         lang_id: true,
         base_word_script_id: true,
-        audio_id: true
+        audio_id: true,
+        text: true,
+        uuid: true
       }),
       gesture_ids: z.array(z.number().int())
     })
@@ -68,15 +72,15 @@ const update_text_lesson_route = protectedAdminProcedure
   .mutation(
     async ({
       input: {
-        lesson_info: { id, lang_id, base_word_script_id, audio_id },
+        lesson_info: { id, lang_id, base_word_script_id, audio_id, text, uuid },
         gesture_ids
       }
     }) => {
       // updating text lessons
       await db
         .update(text_lessons)
-        .set({ lang_id, base_word_script_id, audio_id })
-        .where(eq(text_lessons.id, id));
+        .set({ lang_id, base_word_script_id, audio_id, text })
+        .where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
 
       // updating lesson gestures
       const existing_gesture_ids = (
@@ -116,9 +120,9 @@ const update_text_lesson_route = protectedAdminProcedure
   );
 
 const delete_text_lesson_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int() }))
-  .mutation(async ({ input: { id } }) => {
-    await db.delete(text_lessons).where(eq(text_lessons.id, id));
+  .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
+  .mutation(async ({ input: { id, uuid } }) => {
+    await db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
 
     // the words and lesson gestures will be deleted automatically due to the cascade delete constraint
 

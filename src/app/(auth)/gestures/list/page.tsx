@@ -33,5 +33,5 @@ const List = async () => {
 export default List;
 
 export const metadata: Metadata = {
-  title: 'Aksara सूची'
+  title: 'Text Gesture List'
 };

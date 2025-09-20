@@ -1,35 +1,36 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getCachedSession } from '~/lib/cache_server_route_data';
-import AddEditTextDataWrapper from '~/components/pages/gesture_add_edit/AddEditTextGesture';
+import TextLessonAddEdit from '~/components/pages/lesson_add_edit/TextLessonAddEdit';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import Link from 'next/link';
 import { Provider as JotaiProvider } from 'jotai';
-import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
-import { script_list_obj } from '~/state/lang_list';
+import { lang_list_obj, script_list_obj } from '~/state/lang_list';
 
 const List = async () => {
   const session = await getCachedSession();
   if (!session || session.user.role !== 'admin') redirect('/');
 
-  const text_data = {
+  const text_lesson_info = {
     text: '',
-    gestures: [],
-    fontFamily: DEFAULT_FONT_FAMILY as FontFamily,
-    fontSize: DEFAULT_FONT_SIZE,
-    textCenterOffset: [0, 0] as [number, number],
-    scriptID: script_list_obj['Devanagari']
+    lang_id: lang_list_obj['Sanskrit'],
+    base_word_script_id: script_list_obj['Devanagari']
   };
   return (
     <div>
       <div className="my-2 mb-4 px-2">
         <Link href="/gestures/list" className="flex items-center gap-1 text-lg font-semibold">
           <IoMdArrowRoundBack className="inline-block text-xl" />
-          Text Gesture List
+          Text Lesson List
         </Link>
       </div>
-      <JotaiProvider key={`add_akdhara_page-${crypto.randomUUID()}`}>
-        <AddEditTextDataWrapper location="add" text_data={text_data} />
+      <JotaiProvider key={`add_lesson_page-${crypto.randomUUID()}`}>
+        <TextLessonAddEdit
+          location="add"
+          gesture_ids={[]}
+          words={[]}
+          text_lesson_info={text_lesson_info}
+        />
       </JotaiProvider>
     </div>
   );

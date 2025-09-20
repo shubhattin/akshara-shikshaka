@@ -60,8 +60,8 @@ const update_text_lesson_route = protectedAdminProcedure
     z.object({
       lesson_info: TextLessonsSchemaZod.pick({
         id: true,
-        lang_id: true,
-        base_word_script_id: true,
+        // lang_id: true,
+        // base_word_script_id: true,
         audio_id: true,
         text: true,
         uuid: true
@@ -72,14 +72,14 @@ const update_text_lesson_route = protectedAdminProcedure
   .mutation(
     async ({
       input: {
-        lesson_info: { id, lang_id, base_word_script_id, audio_id, text, uuid },
+        lesson_info: { id, audio_id, text, uuid },
         gesture_ids
       }
     }) => {
       // updating text lessons
       await db
         .update(text_lessons)
-        .set({ lang_id, base_word_script_id, audio_id, text })
+        .set({ audio_id, text })
         .where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
 
       // updating lesson gestures
@@ -105,12 +105,13 @@ const update_text_lesson_route = protectedAdminProcedure
               eq(lesson_gestures.text_lesson_id, id)
             )
           ),
-        db.insert(lesson_gestures).values(
-          to_add_gesture_ids.map((gesture_id) => ({
-            text_lesson_id: id,
-            text_gesture_id: gesture_id
-          }))
-        )
+        to_add_gesture_ids.length > 0 &&
+          db.insert(lesson_gestures).values(
+            to_add_gesture_ids.map((gesture_id) => ({
+              text_lesson_id: id,
+              text_gesture_id: gesture_id
+            }))
+          )
       ]);
 
       return {
@@ -149,17 +150,20 @@ const add_lesson_words_route = protectedAdminProcedure
     })
   )
   .mutation(async ({ input: { text_lesson_id, words } }) => {
-    const result = await db
-      .insert(text_lesson_words)
-      .values(
-        words.map((word) => {
-          return {
-            ...word,
-            text_lesson_id
-          };
-        })
-      )
-      .returning();
+    const result =
+      words.length > 0
+        ? await db
+            .insert(text_lesson_words)
+            .values(
+              words.map((word) => {
+                return {
+                  ...word,
+                  text_lesson_id
+                };
+              })
+            )
+            .returning()
+        : [];
     return {
       added: result.length,
       ids: result.map((word) => word.id)
@@ -248,11 +252,26 @@ const list_text_lessons_route = protectedAdminProcedure
     };
   });
 
+const get_gestures_from_text_key_route = protectedAdminProcedure
+  .input(z.object({ text_key: z.string().min(1) }))
+  .query(async ({ input: { text_key } }) => {
+    const gestures = await db.query.text_gestures.findMany({
+      where: (tbl, { eq }) => eq(tbl.text_key, text_key),
+      columns: {
+        id: true,
+        text: true,
+        script_id: true
+      }
+    });
+    return gestures;
+  });
+
 export const text_lessons_router = t.router({
   add_text_lesson: add_text_lesson_route,
   update_text_lesson: update_text_lesson_route,
   delete_text_lesson: delete_text_lesson_route,
   add_lesson_words: add_lesson_words_route,
   update_lesson_words: update_lesson_words_route,
-  list_text_lessons: list_text_lessons_route
+  list_text_lessons: list_text_lessons_route,
+  get_gestures_from_text_key: get_gestures_from_text_key_route
 });

@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { getCachedSession } from '~/lib/cache_server_route_data';
-import AddEditTextDataWrapper from '~/components/pages/add_edit/AddEditTextData';
+import AddEditTextDataWrapper from '~/components/pages/gesture_add_edit/AddEditTextGesture';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import Link from 'next/link';
 import { Provider as JotaiProvider } from 'jotai';

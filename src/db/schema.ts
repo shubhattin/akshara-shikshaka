@@ -46,6 +46,8 @@ export const text_lessons = pgTable('text_lessons', {
   base_word_script_id: smallint().notNull(),
   // ^ script in which the words are stored, used for transliteration
   // it is the script used for writing those words
+  text: text().notNull(),
+  // ^ will be in the base_word_script_id script
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
     .notNull()

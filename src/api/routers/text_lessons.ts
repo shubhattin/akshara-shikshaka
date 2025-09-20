@@ -2,8 +2,9 @@ import { t, protectedAdminProcedure } from '../trpc_init';
 import { z } from 'zod';
 import { lesson_gestures, text_lesson_words, text_lessons } from '~/db/schema';
 import { db } from '~/db/db';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, count, eq, ilike, inArray } from 'drizzle-orm';
 import { TextLessonsSchemaZod, TextLessonWordsSchemaZod } from '~/db/schema_zod';
+import { dev_delay } from '~/tools/delay';
 
 /**
  * Only for adding text lessons and not for adding words related\
@@ -15,7 +16,8 @@ const add_text_lesson_route = protectedAdminProcedure
       lesson_info: TextLessonsSchemaZod.pick({
         lang_id: true,
         base_word_script_id: true,
-        audio_id: true
+        audio_id: true,
+        text: true
       }),
       gesture_ids: z.array(z.number().int())
     })
@@ -28,13 +30,13 @@ const add_text_lesson_route = protectedAdminProcedure
   .mutation(
     async ({
       input: {
-        lesson_info: { lang_id, base_word_script_id, audio_id },
+        lesson_info: { lang_id, base_word_script_id, audio_id, text },
         gesture_ids: gestures_ids
       }
     }) => {
       const result = await db
         .insert(text_lessons)
-        .values({ lang_id, base_word_script_id, audio_id })
+        .values({ lang_id, base_word_script_id, audio_id, text })
         .returning();
 
       // insert values in the join table
@@ -189,10 +191,64 @@ const update_lesson_words_route = protectedAdminProcedure
     };
   });
 
+const list_text_lessons_route = protectedAdminProcedure
+  .input(
+    z.object({
+      lang_id: z.number().int(),
+      search_text: z.string().optional(),
+      page: z.number().int().min(1),
+      limit: z.number().int().min(1)
+    })
+  )
+  .query(async ({ input: { page, limit, lang_id, search_text } }) => {
+    await dev_delay(500);
+
+    const baseWhereClause = eq(text_lessons.lang_id, lang_id);
+    const [{ count: totalCount }] = await db
+      .select({ count: count() })
+      .from(text_lessons)
+      .where(baseWhereClause);
+
+    const offset = (page - 1) * limit;
+
+    const list = await db.query.text_lessons.findMany({
+      where: () => {
+        if (search_text && search_text.trim().length > 0) {
+          return and(baseWhereClause, ilike(text_lessons.text, `%${search_text.trim()}%`))!;
+        }
+        return baseWhereClause;
+      },
+      orderBy: (text_lessons, { asc }) => [asc(text_lessons.text)],
+      limit: limit,
+      offset,
+      columns: {
+        id: true,
+        text: true,
+        created_at: true,
+        updated_at: true
+      }
+    });
+
+    const total = Number(totalCount ?? 0);
+    const pageCount = Math.max(1, Math.ceil(total / limit));
+    const hasPrev = page > 1;
+    const hasNext = page < pageCount;
+
+    return {
+      list,
+      total,
+      page: page,
+      pageCount,
+      hasPrev,
+      hasNext
+    };
+  });
+
 export const text_lessons_router = t.router({
   add_text_lesson: add_text_lesson_route,
   update_text_lesson: update_text_lesson_route,
   delete_text_lesson: delete_text_lesson_route,
   add_lesson_words: add_lesson_words_route,
-  update_lesson_words: update_lesson_words_route
+  update_lesson_words: update_lesson_words_route,
+  list_text_lessons: list_text_lessons_route
 });

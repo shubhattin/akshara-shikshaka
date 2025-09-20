@@ -4,7 +4,7 @@ import { cache } from 'react';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 import { db } from '~/db/db';
 import Link from 'next/link';
-import AddEditTextDataWrapper from '~/components/pages/add_edit/AddEditTextData';
+import AddEditTextDataWrapper from '~/components/pages/gesture_add_edit/AddEditTextGesture';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { getCachedSession } from '~/lib/cache_server_route_data';
 import { redirect } from 'next/navigation';

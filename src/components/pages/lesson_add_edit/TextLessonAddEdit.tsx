@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { FiSave } from 'react-icons/fi';
 import { IoMdAdd } from 'react-icons/io';
-import { MdDeleteOutline } from 'react-icons/md';
+import { MdDeleteOutline, MdDragHandle } from 'react-icons/md';
 import { toast } from 'sonner';
 import { client_q } from '~/api/client';
 import {
@@ -25,6 +25,23 @@ import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Skeleton } from '~/components/ui/skeleton';
 import { cn } from '~/lib/utils';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { FONT_SCRIPTS } from '~/state/font_list';
 import {
   lang_list_obj,
@@ -40,7 +57,7 @@ import {
   lipi_parivartak,
   load_parivartak_lang_data
 } from '~/tools/lipi_lekhika';
-import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
+import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 import type { text_lesson_words, text_lessons } from '~/db/schema';
 
 type text_lesson_info_type = Omit<
@@ -48,9 +65,11 @@ type text_lesson_info_type = Omit<
   'created_at' | 'updated_at'
 >;
 type text_lesson_word_type = Omit<
-  InferInsertModel<typeof text_lesson_words>,
+  InferSelectModel<typeof text_lesson_words>,
   'created_at' | 'updated_at' | 'text_lesson_id'
->;
+> & {
+  id?: number;
+};
 
 type Props =
   | {
@@ -87,9 +106,10 @@ export default function TextLessonAddEditComponent(props: Props) {
   ]);
 
   return (
-    <div className="gap-4">
+    <div className="space-y-6">
       <LessonInfo {...props} />
-      {props.location === 'edit' && <LessonWords {...props} />}
+      <LessonWords {...props} />
+      <AddEditSave {...props} />
     </div>
   );
 }
@@ -114,9 +134,10 @@ const LessonInfo = (props: Props) => {
   }, [text, lang_id]);
 
   useEffect(() => {
-    // load lipi lekhika for typing tool
+    // load lipi lekhika language/script data for typing tool
     load_parivartak_lang_data(get_lang_from_id(lang_id));
-  }, [lang_id]);
+    load_parivartak_lang_data(get_script_from_id(base_word_script_id));
+  }, [lang_id, base_word_script_id]);
 
   const searched_gestures_q = client_q.text_lessons.get_gestures_from_text_key.useQuery(
     {
@@ -209,7 +230,6 @@ const LessonInfo = (props: Props) => {
           {props.location === 'edit' && <span className="text-base font-bold">{text}</span>}
         </Label>
       </div>
-
       <div className="space-y-3">
         {searched_gestures_q.isLoading && <Skeleton className="h-32 w-full" />}
         {searched_gestures_q.isSuccess && !searched_gestures_q.isLoading && (
@@ -249,18 +269,153 @@ const LessonInfo = (props: Props) => {
           </div>
         )}
       </div>
-
-      <LessonInfoSave {...props} />
     </div>
   );
 };
 
-const LessonInfoSave = (props: Props) => {
+const LessonWords = (props: Props) => {
+  const [words, setWords] = useAtom(words_atom);
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeOrder = parseInt(active.id.toString(), 10);
+    const overOrder = parseInt(over.id.toString(), 10);
+
+    const fromIndex = words.findIndex((w) => w.order === activeOrder);
+    const toIndex = words.findIndex((w) => w.order === overOrder);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    const reordered = arrayMove(words, fromIndex, toIndex).map((w, idx) => ({
+      ...w,
+      order: idx + 1
+    }));
+    setWords(reordered);
+  };
+
+  const handleWordChange = (order: number, value: string) => {
+    setWords((prev) => prev.map((w) => (w.order === order ? { ...w, word: value } : w)));
+  };
+
+  const handleDelete = (order: number) => {
+    setWords((prev) =>
+      prev.filter((w) => w.order !== order).map((w, idx) => ({ ...w, order: idx + 1 }))
+    );
+  };
+
+  const handleAddNew = () => {
+    setWords((prev) => [
+      ...prev,
+      {
+        word: '',
+        order: prev.length + 1,
+        image_id: null,
+        audio_id: null
+      } as text_lesson_word_type
+    ]);
+  };
+
+  useEffect(() => {
+    console.log(words);
+  }, [words]);
+
+  return (
+    <div className="space-y-3">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext
+          items={words.map((w) => w.order.toString())}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="flex flex-col gap-2">
+            {words.map((w) => (
+              <SortableWordItem
+                key={w.order}
+                wordItem={w}
+                onChange={handleWordChange}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      <Button size="sm" variant="outline" onClick={handleAddNew}>
+        <IoMdAdd className="mr-1" /> Add Word
+      </Button>
+    </div>
+  );
+};
+
+type SortableWordItemProps = {
+  wordItem: text_lesson_word_type;
+  onChange: (order: number, value: string) => void;
+  onDelete: (order: number) => void;
+};
+
+function SortableWordItem({ wordItem, onChange, onDelete }: SortableWordItemProps) {
+  const base_word_script_id = useAtomValue(base_word_script_id_atom);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: wordItem.order.toString()
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1
+  } as React.CSSProperties;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn('w-full rounded-md px-3 py-2', 'flex items-center gap-2')}
+    >
+      <div {...attributes} {...listeners} className="cursor-grab rounded p-1 hover:bg-muted">
+        <MdDragHandle className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <Input
+        value={wordItem.word}
+        onInput={(e) => {
+          onChange(wordItem.order, e.currentTarget.value);
+          lekhika_typing_tool(
+            e.nativeEvent.target,
+            // @ts-ignore
+            e.nativeEvent.data,
+            get_script_from_id(base_word_script_id),
+            true,
+            // @ts-ignore
+            (val) => {
+              onChange(wordItem.order, val);
+            }
+          );
+        }}
+        // onChange={(e) => onChange(wordItem.order, e.target.value)}
+        className="w-32"
+      />
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 w-6 p-0"
+        onClick={() => onDelete(wordItem.order)}
+      >
+        <MdDeleteOutline className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}
+
+const AddEditSave = (props: Props) => {
   const router = useRouter();
   const text = useAtomValue(text_atom);
   const lang_id = useAtomValue(lang_id_atom);
   const base_word_script_id = useAtomValue(base_word_script_id_atom);
   const gesture_ids = useAtomValue(gesture_ids_atom);
+  const [words, setWords] = useAtom(words_atom);
 
   const add_text_data_mut = client_q.text_lessons.add_text_lesson.useMutation({
     onSuccess(data) {
@@ -268,13 +423,36 @@ const LessonInfoSave = (props: Props) => {
       router.push(`/lessons/edit/${data.id}`);
     },
     onError(error) {
-      toast.error('Failed to Add Text Lesson');
+      toast.error('Failed to Add Text Lesson ' + error.message);
     }
   });
 
   const update_text_data_mut = client_q.text_lessons.update_text_lesson.useMutation({
     onSuccess(data) {
+      // find indexes or words that were to be added, they will have no id
+      const to_be_added_word_indexes = words
+        .map((w, idx) => [w, idx] as [text_lesson_word_type, number])
+        .filter(([w]) => w.id === undefined || w.id === null)
+        .map(([w, idx]) => idx);
+
+      if (to_be_added_word_indexes.length !== data.inserted_words_ids.length) {
+        toast.error('Failed to Add Text Lesson');
+        return;
+      }
+
+      // update the words with the added ids
+      setWords((prev) =>
+        prev.map((w, idx) =>
+          to_be_added_word_indexes.includes(idx)
+            ? { ...w, id: data.inserted_words_ids[to_be_added_word_indexes.indexOf(idx)] }
+            : w
+        )
+      );
+
       toast.success('Text Lesson Information Updated');
+    },
+    onError(error) {
+      toast.error('Failed to Update Text Lesson ' + error.message);
     }
   });
 
@@ -289,6 +467,19 @@ const LessonInfoSave = (props: Props) => {
   });
 
   const handleSave = () => {
+    if (text.trim().length === 0) {
+      toast.error('Text is required');
+      return;
+    }
+    if (
+      lang_id === null ||
+      lang_id === undefined ||
+      base_word_script_id === null ||
+      base_word_script_id === undefined
+    ) {
+      toast.error('Language and Base Word Script are required');
+      return;
+    }
     if (props.location === 'add') {
       add_text_data_mut.mutate({
         lesson_info: {
@@ -297,19 +488,18 @@ const LessonInfoSave = (props: Props) => {
           base_word_script_id: base_word_script_id,
           audio_id: null
         },
-        gesture_ids: Array.from(gesture_ids)
+        gesture_ids: Array.from(gesture_ids),
+        words
       });
     } else {
       update_text_data_mut.mutate({
         lesson_info: {
           id: props.text_lesson_info.id!,
           uuid: props.text_lesson_info.uuid!,
-          text: text,
-          // lang_id: lang_id,
-          // base_word_script_id: base_word_script_id,
           audio_id: null
         },
-        gesture_ids: Array.from(gesture_ids)
+        gesture_ids: Array.from(gesture_ids),
+        words
       });
     }
   };
@@ -387,12 +577,4 @@ const LessonInfoSave = (props: Props) => {
       )}
     </div>
   );
-};
-
-const LessonWords = (props: Props) => {
-  const [lang_id, setLangId] = useAtom(lang_id_atom);
-  const [base_word_script_id, setBaseWordScriptId] = useAtom(base_word_script_id_atom);
-  const [audio_id, setAudioId] = useAtom(audio_id_optional_atom);
-  const [text, setText] = useAtom(text_atom);
-  return <div></div>;
 };

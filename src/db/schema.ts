@@ -158,5 +158,5 @@ export const imageAssetsRelations = relations(image_assets, ({ many }) => ({
 
 export const audioAssetsRelations = relations(audio_assets, ({ many }) => ({
   words: many(text_lesson_words),
-  optional_lesson: many(text_lessons)
+  optional_lessons: many(text_lessons)
 }));

@@ -4,12 +4,11 @@ import { cache } from 'react';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 import { db } from '~/db/db';
 import Link from 'next/link';
-import AddEditTextDataWrapper from '~/components/pages/add_edit/AddEditTextData';
+import AddEditTextDataWrapper from '~/components/pages/gesture_add_edit/AddEditTextGesture';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { getCachedSession } from '~/lib/cache_server_route_data';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { Provider as JotaiProvider } from 'jotai';
-import { FontFamily } from '~/state/font_list';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -24,20 +23,11 @@ const get_cached_text_data = cache(async (id: number) => {
       font_family: true,
       font_size: true,
       text_center_offset: true,
-      script_id: true
+      script_id: true,
+      text_key: true
     }
   });
-  const data = {
-    id: text_data!.id,
-    uuid: text_data!.uuid,
-    text: text_data!.text,
-    gestures: text_data!.gestures,
-    fontFamily: text_data!.font_family as FontFamily,
-    fontSize: text_data!.font_size,
-    textCenterOffset: text_data!.text_center_offset,
-    scriptID: text_data!.script_id
-  };
-  return data as typeof data | undefined;
+  return text_data;
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -48,8 +38,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     ...getMetadata({
-      title: text_data ? text_data.text + ' - Edit' : 'Not Found',
-      description: text_data ? text_data.text + ' - Edit' : null
+      title: text_data ? text_data.text + ' - Edit Text Gesture' : 'Not Found',
+      description: text_data ? text_data.text + ' - Edit Text Gesture' : null
     })
   };
 }
@@ -62,25 +52,22 @@ const MainEdit = async ({ params }: Props) => {
   const id = z.coerce.number().int().parse(id_str);
 
   const text_data = await get_cached_text_data(id);
+  if (!text_data) {
+    notFound();
+  }
 
   return (
     <div>
       <div className="my-2 mb-4 px-2">
         <Link href="/gestures/list" className="flex items-center gap-1 text-lg font-semibold">
           <IoMdArrowRoundBack className="inline-block text-xl" />
-          सूची
+          Text Gesture List
         </Link>
       </div>
-      {text_data ? (
-        <JotaiProvider key={`edit_akdhara_page-${id}`}>
-          <AddEditTextDataWrapper
-            location="edit"
-            text_data={{ ...text_data, fontFamily: text_data.fontFamily as FontFamily }}
-          />
-        </JotaiProvider>
-      ) : (
-        <div>Text data not found</div>
-      )}
+
+      <JotaiProvider key={`edit_akdhara_page-${id}`}>
+        <AddEditTextDataWrapper location="edit" text_data={text_data} />
+      </JotaiProvider>
     </div>
   );
 };

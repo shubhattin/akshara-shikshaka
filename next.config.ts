@@ -2,7 +2,8 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   experimental: {
-    reactCompiler: true
+    reactCompiler: true,
+    optimizePackageImports: ['react-icons']
   },
   typedRoutes: true,
   webpack: (config, { isServer }) => {
@@ -42,5 +43,11 @@ const nextConfig: NextConfig = {
     return config;
   }
 };
+
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true'
+});
+
+module.exports = withBundleAnalyzer(nextConfig);
 
 export default nextConfig;

@@ -82,7 +82,7 @@ import {
   font_loaded_atom,
   RANGES,
   canvas_text_center_offset_atoms
-} from './add_edit_state';
+} from './gesture_add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
 import {
   lekhika_typing_tool,
@@ -93,9 +93,11 @@ import { FONT_LIST, FONT_SCRIPTS, type FontFamily } from '~/state/font_list';
 import { script_list_obj, script_list_type } from '~/state/lang_list';
 import { get_script_from_id } from '~/state/lang_list';
 import { motion } from 'framer-motion';
+import type { InferSelectModel } from 'drizzle-orm';
+import type { text_gestures } from '~/db/schema';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
-const KonvaCanvas = dynamic(() => import('./AddEditCanvas'), {
+const KonvaCanvas = dynamic(() => import('./AddEditGestureCanvas'), {
   ssr: false,
   loading: () => (
     <div
@@ -128,15 +130,13 @@ const ClientOnly = ({
   return <>{children}</>;
 };
 
-type text_data_type = {
-  text: string;
+type text_data_type = Omit<
+  InferSelectModel<typeof text_gestures>,
+  'created_at' | 'updated_at' | 'text_key' | 'id' | 'uuid'
+> & {
   id?: number;
   uuid?: string;
-  gestures: Gesture[];
-  fontFamily: FontFamily;
-  fontSize: number;
-  textCenterOffset: [number, number];
-  scriptID: number;
+  font_family: FontFamily;
 };
 
 type Props =
@@ -164,11 +164,11 @@ export default function AddEditTextDataWrapper(props: Props) {
     [is_playing_atom, false],
     [is_drawing_atom, false],
     [current_gesture_recording_points_atom, []],
-    [font_family_atom, props.text_data.fontFamily],
+    [font_family_atom, props.text_data.font_family],
     [font_loaded_atom, new Map<FontFamily, boolean>()],
-    [font_size_atom, props.text_data.fontSize],
-    [canvas_text_center_offset_atoms, props.text_data.textCenterOffset],
-    [script_atom, get_script_from_id(props.text_data.scriptID)]
+    [font_size_atom, props.text_data.font_size],
+    [canvas_text_center_offset_atoms, props.text_data.text_center_offset],
+    [script_atom, get_script_from_id(props.text_data.script_id)]
   ]);
   const stageRef = useRef<Konva.Stage | null>(null);
 

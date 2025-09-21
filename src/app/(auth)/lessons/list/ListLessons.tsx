@@ -15,15 +15,20 @@ import {
 } from '~/components/ui/select';
 import { Input } from '~/components/ui/input';
 import { Button } from '~/components/ui/button';
-import { FONT_SCRIPTS } from '~/state/font_list';
-import { script_list_obj, type script_list_type, get_script_from_id } from '~/state/lang_list';
+import {
+  LANG_LIST,
+  lang_list_obj,
+  type lang_list_type,
+  get_lang_from_id,
+  LANG_SCRIPT_MAP
+} from '~/state/lang_list';
 import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
 
 type Props = {};
 
 const DEFAULT_LIMIT = 24;
-export default function ListGestures({}: Props) {
-  const [scriptId, setScriptId] = useState<number | undefined>(script_list_obj['Devanagari']);
+export default function ListLessons({}: Props) {
+  const [langId, setLangId] = useState<number | undefined>(lang_list_obj['Sanskrit']);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [page, setPage] = useState<number>(1);
@@ -35,45 +40,51 @@ export default function ListGestures({}: Props) {
   }, [searchText]);
 
   useEffect(() => {
-    // reset page when script or search changes
     setPage(1);
-  }, [scriptId, debouncedSearch, limit]);
+  }, [langId, debouncedSearch, limit]);
 
-  const list_q = client_q.text_gestures.list_text_gesture_data.useQuery(
+  const list_q = client_q.text_lessons.list_text_lessons.useQuery(
     {
-      script_id: scriptId!,
+      lang_id: langId!,
       search_text: debouncedSearch || undefined,
       page,
       limit
     },
     {
-      enabled: !!scriptId
+      enabled: !!langId
     }
   );
-  const isLoading = !!scriptId && (list_q.isLoading || list_q.isFetching);
+  const isLoading = !!langId && (list_q.isLoading || list_q.isFetching);
   const data = list_q.data;
-  const scriptOptions = FONT_SCRIPTS.map((name) => ({
+
+  const langOptions = LANG_LIST.map((name) => ({
     name,
-    id: script_list_obj[name as script_list_type]
+    id: lang_list_obj[name as lang_list_type]
   }));
 
   const items = useMemo(() => data?.list ?? [], [data]);
 
+  const currentScriptForLang = useMemo(() => {
+    if (!langId) return undefined;
+    const langName = get_lang_from_id(langId);
+    return LANG_SCRIPT_MAP[langName];
+  }, [langId]);
+
   useEffect(() => {
-    if (!scriptId) return;
-    load_parivartak_lang_data(get_script_from_id(scriptId));
-  }, [scriptId]);
+    if (!currentScriptForLang) return;
+    load_parivartak_lang_data(currentScriptForLang);
+  }, [currentScriptForLang]);
 
   return (
     <div className="space-y-6">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3">
         <div className="min-w-56">
-          <Select value={scriptId?.toString()} onValueChange={(val) => setScriptId(Number(val))}>
+          <Select value={langId?.toString()} onValueChange={(val) => setLangId(Number(val))}>
             <SelectTrigger className="w-56">
-              <SelectValue placeholder="Select a Script" />
+              <SelectValue placeholder="Select a Language" />
             </SelectTrigger>
             <SelectContent>
-              {scriptOptions.map((opt) => (
+              {langOptions.map((opt) => (
                 <SelectItem key={opt.id} value={opt.id.toString()}>
                   {opt.name}
                 </SelectItem>
@@ -90,12 +101,12 @@ export default function ListGestures({}: Props) {
             value={searchText}
             onInput={(e) => {
               setSearchText(e.currentTarget.value);
-              if (!scriptId) return;
+              if (!currentScriptForLang) return;
               lekhika_typing_tool(
                 e.nativeEvent.target,
                 // @ts-ignore
                 e.nativeEvent.data,
-                get_script_from_id(scriptId),
+                currentScriptForLang,
                 true,
                 // @ts-ignore
                 (val) => {
@@ -103,7 +114,7 @@ export default function ListGestures({}: Props) {
                 }
               );
             }}
-            disabled={!scriptId}
+            disabled={!langId}
             aria-label="Search text"
           />
         </div>
@@ -124,45 +135,33 @@ export default function ListGestures({}: Props) {
         </div>
       </div>
       <ul className="grid grid-cols-4 gap-4 sm:grid-cols-6 md:grid-cols-8">
-        {
-          isLoading ? (
-            Array.from({ length: limit }).map((_, i) => (
-              <li key={`skeleton-${i}`}>
-                <Card className="p-2">
+        {isLoading ? (
+          Array.from({ length: limit }).map((_, i) => (
+            <li key={`skeleton-${i}`}>
+              <Card className="p-2">
+                <CardHeader>
+                  <Skeleton className="mx-auto h-6 w-16" />
+                </CardHeader>
+              </Card>
+            </li>
+          ))
+        ) : items.length > 0 ? (
+          items.map((item: any) => (
+            <li key={item.id}>
+              <Link href={`/lessons/edit/${item.id}`}>
+                <Card className="p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800">
                   <CardHeader>
-                    <Skeleton className="mx-auto h-6 w-16" />
+                    <CardTitle className="text-center">{item.text}</CardTitle>
                   </CardHeader>
                 </Card>
-              </li>
-            ))
-          ) : items.length > 0 ? (
-            items.map((item) => (
-              <li key={item.id}>
-                <Link href={`/gestures/edit/${item.id}`}>
-                  <Card className="p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800">
-                    <CardHeader>
-                      <CardTitle className="text-center">{item.text}</CardTitle>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              </li>
-            ))
-          ) : (
-            <></>
-          )
-          // (
-          //   <li className="col-span-full">
-          //     <Card className="py-10">
-          //       <CardHeader>
-          //         <CardTitle className="text-center text-base text-muted-foreground">
-          //           {debouncedSearch ? 'No results match your search.' : 'No items to display.'}
-          //         </CardTitle>
-          //       </CardHeader>
-          //     </Card>
-          //   </li>
-        }
+              </Link>
+            </li>
+          ))
+        ) : (
+          <></>
+        )}
       </ul>
-      {!!scriptId && (
+      {!!langId && (
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 sm:flex-row">
           <div className="text-sm text-muted-foreground">
             {data ? (

@@ -18,7 +18,7 @@ import {
   TextLessonWordsSchemaZod
 } from '~/db/schema_zod';
 import { z } from 'zod';
-import { sql } from 'drizzle-orm';
+import { InferInsertModel, sql } from 'drizzle-orm';
 import chalk from 'chalk';
 
 const main = async () => {
@@ -63,7 +63,9 @@ const main = async () => {
 
   // inserting text gestures
   try {
-    await db.insert(text_gestures).values(data.text_gestures);
+    await db
+      .insert(text_gestures)
+      .values(data.text_gestures as InferInsertModel<typeof text_gestures>[]);
     console.log(
       chalk.green('✓ Successfully added values into table'),
       chalk.blue('`text_gestures`')

@@ -12,7 +12,7 @@ import {
   primaryKey,
   unique
 } from 'drizzle-orm/pg-core';
-import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE } from '~/state/font_list';
+import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
 import type { Gesture } from '~/tools/stroke_data/types';
 
 export const text_gestures = pgTable(
@@ -29,7 +29,7 @@ export const text_gestures = pgTable(
       .notNull()
       .$onUpdate(() => new Date()),
     script_id: smallint().notNull(),
-    font_family: text().notNull().default(DEFAULT_FONT_FAMILY),
+    font_family: text().notNull().default(DEFAULT_FONT_FAMILY).$type<FontFamily>(),
     font_size: smallint().notNull().default(DEFAULT_FONT_SIZE),
     text_center_offset: jsonb().$type<[number, number]>().notNull().default([0, 0])
   },
@@ -42,10 +42,13 @@ export const text_gestures = pgTable(
 
 export const text_lessons = pgTable('text_lessons', {
   id: serial().primaryKey(),
+  uuid: uuid().notNull().defaultRandom(),
   lang_id: smallint().notNull(),
   base_word_script_id: smallint().notNull(),
   // ^ script in which the words are stored, used for transliteration
   // it is the script used for writing those words
+  text: text().notNull(),
+  // ^ will be in the base_word_script_id script
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
     .notNull()
@@ -78,6 +81,7 @@ export const text_lesson_words = pgTable('text_lesson_words', {
     .references(() => text_lessons.id, { onDelete: 'cascade' }),
   // ^ auto delete on text lessons deletion
   word: text().notNull(),
+  order: smallint().notNull(),
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
     .notNull()
@@ -154,5 +158,5 @@ export const imageAssetsRelations = relations(image_assets, ({ many }) => ({
 
 export const audioAssetsRelations = relations(audio_assets, ({ many }) => ({
   words: many(text_lesson_words),
-  optional_lesson: many(text_lessons)
+  optional_lessons: many(text_lessons)
 }));

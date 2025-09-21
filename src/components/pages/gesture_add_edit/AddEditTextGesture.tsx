@@ -95,6 +95,7 @@ import { get_script_from_id } from '~/state/lang_list';
 import { motion } from 'framer-motion';
 import type { InferSelectModel } from 'drizzle-orm';
 import type { text_gestures } from '~/db/schema';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
 const KonvaCanvas = dynamic(() => import('./AddEditGestureCanvas'), {
@@ -1058,9 +1059,14 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     }
   });
 
+  const queryClient = useQueryClient();
+
   const delete_text_data_mut = client_q.text_gestures.delete_text_gesture_data.useMutation({
-    onSuccess(data) {
+    async onSuccess(data) {
       toast.success('Text Deleted');
+      await queryClient.invalidateQueries({
+        queryKey: [['text_gestures', 'list_text_gesture_data']]
+      });
       router.push('/gestures/list');
     },
     onError(error) {

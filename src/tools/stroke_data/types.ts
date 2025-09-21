@@ -18,6 +18,9 @@ export const AnimationsFunctionsEnumSchema = z.enum(ANIMATION_FUNCTIONS);
  * `Q` (Quadratic Bezier Curve) `[cpx, cpy, x, y]` :- Quadratic Bezier Curve from current point to (x, y) with control point (cpx, cpy)
  */
 
+/**
+ * The points recorded and stored are raw and they are only smoothened and processed for display at runtime
+ */
 export const StrokePathSchema = z.tuple([z.number(), z.number()]);
 
 export const GestureSchema = z.object({
@@ -31,9 +34,10 @@ export const GestureSchema = z.object({
 export const AnimationGestureSchema = GestureSchema.pick({
   index: true,
   width: true,
-  color: true
+  color: true,
+  points: true
 }).extend({
-  points: z.array(StrokePathSchema)
+  isAnimatedPath: z.boolean().optional()
 });
 
 export type GesturePoints = z.infer<typeof StrokePathSchema>;

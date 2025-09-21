@@ -38,7 +38,7 @@ export const canvas_text_center_offset_atoms = atom<[number, number]>([0, 0]);
 
 // Export constants for use in components
 export const DEFAULTS = {
-  GESTURE_BRUSH_WIDTH: 7,
+  GESTURE_BRUSH_WIDTH: 12,
   GESTURE_BRUSH_COLOR: '#0161fd', // blue
   GESTURE_ANIMATION_DURATION: 600,
   FONT_SIZE: DEFAULT_FONT_SIZE,

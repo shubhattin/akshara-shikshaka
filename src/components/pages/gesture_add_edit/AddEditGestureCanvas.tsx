@@ -1,11 +1,11 @@
 'use client';
 
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Stage, Layer, Line, Text } from 'react-konva';
+import { Stage, Layer, Line, Text, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { CANVAS_DIMS, GesturePoints } from '~/tools/stroke_data/types';
-import { getSmoothenedPoints, flattenPoints } from '~/tools/stroke_data/utils';
+import { getSmoothenedPoints, pointsToSvgPath } from '~/tools/stroke_data/utils';
 import {
   main_text_path_visible_atom,
   font_size_atom,
@@ -263,31 +263,31 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
             .filter((g) => !(isRecording && g.index === selectedGestureIndex))
             // ^ not displaying the current gesture even if marked while recording
             .map((gesture) => (
-              <Line
+              <Path
                 key={`animated-${gesture.index}`}
-                points={flattenPoints(gesture.points)}
-                stroke={gesture.color}
-                strokeWidth={gesture.width}
-                lineCap="round"
-                lineJoin="round"
+                // points={flattenPoints(gesture.points)}
+                data={pointsToSvgPath(
+                  gesture.isAnimatedPath
+                    ? gesture.points
+                    : getSmoothenedPoints(gesture.points, { size: gesture.width })
+                  // to prevent smoothening multiple times which distorts the path
+                )}
+                fill={gesture.color}
+                strokeEnabled={false}
                 listening={false}
               />
             ))}
 
           {/* Current Drawing Path (during recording) */}
-          {currentGestureRecordingPoints.length > 0 && selectedGesture && (
-            <Line
-              points={flattenPoints(
-                isRecording && currentGestureRecordingPoints.length > 2
-                  ? getSmoothenedPoints(currentGestureRecordingPoints, {
-                      size: selectedGesture.width
-                    })
-                  : currentGestureRecordingPoints
+          {currentGestureRecordingPoints.length > 2 && selectedGesture && (
+            <Path
+              data={pointsToSvgPath(
+                getSmoothenedPoints(currentGestureRecordingPoints, {
+                  size: selectedGesture.width
+                })
               )}
-              stroke={selectedGesture.color}
-              strokeWidth={selectedGesture.width}
-              lineCap="round"
-              lineJoin="round"
+              fill={selectedGesture.color}
+              strokeEnabled={false}
               listening={false}
             />
           )}

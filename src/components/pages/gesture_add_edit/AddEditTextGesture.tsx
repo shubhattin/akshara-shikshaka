@@ -62,7 +62,7 @@ import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
 import type { Gesture } from '~/tools/stroke_data/types';
 import { CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
-import { animateGesture, getSmoothenedPoints } from '~/tools/stroke_data/utils';
+import { animateGesture } from '~/tools/stroke_data/utils';
 import {
   text_atom,
   text_edit_mode_atom,
@@ -335,7 +335,9 @@ function AddEditTextData({
     await animateGesture(gesture, (frame) => {
       setCanvasGesturesPath((prev) =>
         prev.map((path) =>
-          path.index === gesturePathId ? { ...path, points: frame.partialPoints } : path
+          path.index === gesturePathId
+            ? { ...path, points: frame.partialPoints, isAnimatedPath: true }
+            : path
         )
       );
     });
@@ -654,21 +656,14 @@ const SelectedGestureControls = ({
   const saveRecording = () => {
     if (selectedGestureIndex === null || currentGestureRecordingPoints.length === 0) return;
 
-    const finalSmoothedPoints = getSmoothenedPoints(currentGestureRecordingPoints, {
-      size: selectedGesture.width
-    });
-
-    const pointCount = finalSmoothedPoints.length;
+    // Save CENTERLINE points; rendering/animation derive polygons from these
+    const centerlinePoints = currentGestureRecordingPoints;
+    const pointCount = centerlinePoints.length;
 
     // Set the points for the selected gesture (overwrite previous points)
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
-        gesture.index === selectedGestureIndex
-          ? {
-              ...gesture,
-              points: finalSmoothedPoints
-            }
-          : gesture
+        gesture.index === selectedGestureIndex ? { ...gesture, points: centerlinePoints } : gesture
       )
     );
 

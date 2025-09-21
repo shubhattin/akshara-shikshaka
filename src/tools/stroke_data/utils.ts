@@ -1,15 +1,6 @@
-import z from 'zod';
+import { z } from 'zod';
 import { type Gesture, type GesturePoints } from './types';
 import { getStroke, type StrokeOptions } from 'perfect-freehand';
-
-// Helper: flatten [x, y][] into number[] for Konva Line
-export const flattenPoints = (points: GesturePoints[]): number[] => {
-  const out: number[] = [];
-  for (let i = 0; i < points.length; i++) {
-    out.push(points[i][0], points[i][1]);
-  }
-  return out;
-};
 
 // Framework-agnostic gesture animation data generator
 export type GestureAnimationFrame = {
@@ -55,8 +46,9 @@ function* generateGestureAnimationFrames(
   if (!gesture.points.length) return;
   const { maxSteps } = options;
 
-  const sampledPoints = gesture.points;
-  const totalPoints = sampledPoints.length;
+  // Use centerline points as the source for animation
+  const centerlinePoints = gesture.points;
+  const totalPoints = centerlinePoints.length;
   const animationSteps = Math.min(totalPoints * 2, maxSteps);
 
   for (let step = 1; step <= animationSteps; step++) {
@@ -64,21 +56,29 @@ function* generateGestureAnimationFrames(
     const progress = applyEasing(linearProgress, gesture.anim_fn);
     const pointIndex = Math.floor(progress * (totalPoints - 1));
 
-    // Get partial points up to current position
-    const partialPoints: GesturePoints[] = sampledPoints.slice(0, pointIndex + 1);
+    // Get partial centerline up to current position
+    const partialCenterline: GesturePoints[] = centerlinePoints.slice(0, pointIndex + 1);
 
-    // Add interpolated point for smooth animation
+    // Add interpolated point for smooth animation along the centerline
     if (pointIndex < totalPoints - 1) {
-      const currentPoint = sampledPoints[pointIndex];
-      const nextPoint = sampledPoints[pointIndex + 1];
+      const currentPoint = centerlinePoints[pointIndex];
+      const nextPoint = centerlinePoints[pointIndex + 1];
       const subProgress = (progress * (totalPoints - 1)) % 1;
 
       const [cx, cy] = currentPoint;
       const [nx, ny] = nextPoint;
       const interpolatedX = cx + (nx - cx) * subProgress;
       const interpolatedY = cy + (ny - cy) * subProgress;
-      partialPoints.push([interpolatedX, interpolatedY]);
+      partialCenterline.push([interpolatedX, interpolatedY]);
     }
+
+    // Generate polygon outline from the partial centerline
+    const partialPoints = getSmoothenedPoints(partialCenterline, {
+      size: gesture.width,
+      thinning: 0.5,
+      smoothing: 0.5,
+      streamline: 0.5
+    });
 
     yield {
       step,
@@ -360,29 +360,50 @@ export const evaluateGestureAccuracy = (
 
 /**
  * Given centerline points, produce an SVG path for the smoothed stroke outline.
+ *
+ * Simulating pressure by default
+ *
+ * **This function should be applied to point array only once** otherwise it distorts it
  */
 export function getSmoothenedPoints(
   points: GesturePoints[],
   options: Partial<StrokeOptions> = {}
 ): GesturePoints[] {
   const stroke = getStroke(points, {
-    // {
+    // reasonable defaults; callers typically override size
     size: 16,
     smoothing: 0.5,
     thinning: 0.5,
     streamline: 0.5,
     easing: (t) => t,
-    start: {
-      taper: 0,
-      cap: true
-    },
-    end: {
-      taper: 0,
-      cap: true
-    },
-    simulatePressure: true,
-    // }
+    start: { taper: 0, cap: true },
+    end: { taper: 0, cap: true },
+    simulatePressure: false,
     ...options
   });
   return stroke as GesturePoints[];
+}
+
+/**
+ * Convert perfect-freehand stroke outline points to SVG path string
+ */
+export function pointsToSvgPath(points: GesturePoints[]): string {
+  if (!points || points.length === 0) return '';
+
+  const pathCommands: string[] = [];
+
+  // Move to the first point
+  const [x0, y0] = points[0];
+  pathCommands.push(`M ${x0.toFixed(2)} ${y0.toFixed(2)}`);
+
+  // Draw lines to all subsequent points
+  for (let i = 1; i < points.length; i++) {
+    const [x, y] = points[i];
+    pathCommands.push(`L ${x.toFixed(2)} ${y.toFixed(2)}`);
+  }
+
+  // Close the path (perfect-freehand returns a closed polygon)
+  pathCommands.push('Z');
+
+  return pathCommands.join(' ');
 }

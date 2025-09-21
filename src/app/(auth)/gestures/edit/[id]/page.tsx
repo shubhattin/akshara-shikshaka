@@ -9,7 +9,6 @@ import { IoMdArrowRoundBack } from 'react-icons/io';
 import { getCachedSession } from '~/lib/cache_server_route_data';
 import { redirect } from 'next/navigation';
 import { Provider as JotaiProvider } from 'jotai';
-import { FontFamily } from '~/state/font_list';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -24,20 +23,11 @@ const get_cached_text_data = cache(async (id: number) => {
       font_family: true,
       font_size: true,
       text_center_offset: true,
-      script_id: true
+      script_id: true,
+      text_key: true
     }
   });
-  const data = {
-    id: text_data!.id,
-    uuid: text_data!.uuid,
-    text: text_data!.text,
-    gestures: text_data!.gestures,
-    fontFamily: text_data!.font_family as FontFamily,
-    fontSize: text_data!.font_size,
-    textCenterOffset: text_data!.text_center_offset,
-    scriptID: text_data!.script_id
-  };
-  return data as typeof data | undefined;
+  return text_data;
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -73,10 +63,7 @@ const MainEdit = async ({ params }: Props) => {
       </div>
       {text_data ? (
         <JotaiProvider key={`edit_akdhara_page-${id}`}>
-          <AddEditTextDataWrapper
-            location="edit"
-            text_data={{ ...text_data, fontFamily: text_data.fontFamily as FontFamily }}
-          />
+          <AddEditTextDataWrapper location="edit" text_data={text_data} />
         </JotaiProvider>
       ) : (
         <div>Text data not found</div>

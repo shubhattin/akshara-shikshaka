@@ -15,10 +15,10 @@ const List = async () => {
   const text_data = {
     text: '',
     gestures: [],
-    fontFamily: DEFAULT_FONT_FAMILY as FontFamily,
-    fontSize: DEFAULT_FONT_SIZE,
-    textCenterOffset: [0, 0] as [number, number],
-    scriptID: script_list_obj['Devanagari']
+    font_family: DEFAULT_FONT_FAMILY as FontFamily,
+    font_size: DEFAULT_FONT_SIZE,
+    text_center_offset: [0, 0] as [number, number],
+    script_id: script_list_obj['Devanagari']
   };
   return (
     <div>

@@ -12,7 +12,7 @@ import {
   primaryKey,
   unique
 } from 'drizzle-orm/pg-core';
-import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE } from '~/state/font_list';
+import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
 import type { Gesture } from '~/tools/stroke_data/types';
 
 export const text_gestures = pgTable(
@@ -29,7 +29,7 @@ export const text_gestures = pgTable(
       .notNull()
       .$onUpdate(() => new Date()),
     script_id: smallint().notNull(),
-    font_family: text().notNull().default(DEFAULT_FONT_FAMILY),
+    font_family: text().notNull().default(DEFAULT_FONT_FAMILY).$type<FontFamily>(),
     font_size: smallint().notNull().default(DEFAULT_FONT_SIZE),
     text_center_offset: jsonb().$type<[number, number]>().notNull().default([0, 0])
   },

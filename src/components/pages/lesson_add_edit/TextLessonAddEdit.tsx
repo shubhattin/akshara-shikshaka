@@ -40,23 +40,17 @@ import {
   lipi_parivartak,
   load_parivartak_lang_data
 } from '~/tools/lipi_lekhika';
+import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
+import type { text_lesson_words, text_lessons } from '~/db/schema';
 
-type text_lesson_info_type = {
-  id?: number;
-  uuid?: string;
-  lang_id: number;
-  base_word_script_id: number;
-  audio_id?: number | null; // optional audio for varnas which might not have a word(s)
-  text: string;
-};
-
-type text_lesson_word_type = {
-  id: number;
-  word: string;
-  order: number;
-  image_id?: number | null;
-  audio_id?: number | null;
-};
+type text_lesson_info_type = Omit<
+  InferInsertModel<typeof text_lessons>,
+  'created_at' | 'updated_at'
+>;
+type text_lesson_word_type = Omit<
+  InferInsertModel<typeof text_lesson_words>,
+  'created_at' | 'updated_at' | 'text_lesson_id'
+>;
 
 type Props =
   | {

@@ -269,6 +269,32 @@ export const evaluateGestureAccuracy = (
     return Math.max(hAB, hBA);
   };
 
+  // Heuristic: detect whether a stroke is essentially a straight line. We look at the
+  // maximum perpendicular distance of any point from the line joining the first and
+  // last points.  After normalisation into the unit square this threshold can be made
+  // small – e.g. 1 %–2 % of the unit length.
+  const isMostlyStraight = (pts: EvalPoint[], tol = 0.02) => {
+    if (pts.length < 3) return true;
+    const p0 = pts[0];
+    const p1 = pts[pts.length - 1];
+    const vx = p1.x - p0.x;
+    const vy = p1.y - p0.y;
+    const len = Math.hypot(vx, vy) || 1e-6;
+    // Unit direction vector of the reference line
+    const ux = vx / len;
+    const uy = vy / len;
+    let maxDev = 0;
+    for (let i = 1; i < pts.length - 1; i++) {
+      // Vector from p0 to current
+      const wx = pts[i].x - p0.x;
+      const wy = pts[i].y - p0.y;
+      // Perpendicular (signed) distance magnitude via cross-product magnitude
+      const dev = Math.abs(wx * uy - wy * ux);
+      if (dev > maxDev) maxDev = dev;
+    }
+    return maxDev <= tol;
+  };
+
   const directionCosine = (pts: EvalPoint[]) => {
     const vx = pts[pts.length - 1].x - pts[0].x;
     const vy = pts[pts.length - 1].y - pts[0].y;
@@ -286,6 +312,7 @@ export const evaluateGestureAccuracy = (
   if (pathLength(baseUser) < 1e-3 || pathLength(baseTarget) < 1e-3) return 0;
 
   const evaluateSequence = (userSeq: EvalPoint[]) => {
+    const straightShape = isMostlyStraight(baseTarget);
     // Procrustes-like alignment: center, best rotation, no reflection
     const uC = center(userSeq);
     const tC = center(baseTarget);
@@ -333,18 +360,37 @@ export const evaluateGestureAccuracy = (
     const lenT = pathLength(baseTarget);
     const lenRatio = lenT > 0 ? Math.min(lenU, lenT) / Math.max(lenU, lenT) : 0;
 
-    // Hard gates to reduce false positives
-    if (hausdorffScore < 0.2) return 0;
-    if (curvatureScore < 0.2) return 0;
+    // Hard gates to reduce false positives.  For essentially straight strokes we
+    // relax the gating criteria that depend on curvature as it carries little
+    // information in that case.
+    if (!straightShape) {
+      if (hausdorffScore < 0.2) return 0;
+      if (curvatureScore < 0.2) return 0;
+    } else {
+      // For a straight gesture we only enforce a looser Hausdorff requirement.
+      if (hausdorffScore < 0.35) return 0;
+    }
 
-    // Weighted aggregate
-    const score =
-      0.3 * dtwScore +
-      0.25 * hausdorffScore +
-      0.2 * mseScore +
-      0.15 * curvatureScore +
-      0.07 * endpointScore +
-      0.03 * lenRatio;
+    // Weighted aggregate – rebalanced for straight vs non-straight gestures.
+    let score: number;
+    if (straightShape) {
+      // For a straight line curvature is uninformative, instead we emphasise
+      // endpoint alignment and DTW.
+      score =
+        0.4 * dtwScore +
+        0.25 * endpointScore +
+        0.2 * hausdorffScore +
+        0.1 * mseScore +
+        0.05 * lenRatio;
+    } else {
+      score =
+        0.3 * dtwScore +
+        0.25 * hausdorffScore +
+        0.2 * mseScore +
+        0.15 * curvatureScore +
+        0.07 * endpointScore +
+        0.03 * lenRatio;
+    }
 
     // Direction acts as soft gate multiplier
     const gated = score * (0.6 + 0.4 * dirCos);

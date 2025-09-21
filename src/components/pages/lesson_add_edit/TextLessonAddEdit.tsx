@@ -53,6 +53,7 @@ type text_lesson_info_type = {
 type text_lesson_word_type = {
   id: number;
   word: string;
+  order: number;
   image_id?: number | null;
   audio_id?: number | null;
 };

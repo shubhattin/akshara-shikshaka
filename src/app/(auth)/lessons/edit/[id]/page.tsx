@@ -7,8 +7,6 @@ import Link from 'next/link';
 import { Provider as JotaiProvider } from 'jotai';
 import { cache } from 'react';
 import { db } from '~/db/db';
-import { text_lessons } from '~/db/schema';
-import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 
@@ -16,7 +14,7 @@ type Props = { params: Promise<{ id: string }> };
 
 const get_cached_text_lesson_info = cache(async (id: number) => {
   const text_lesson_info = await db.query.text_lessons.findFirst({
-    where: eq(text_lessons.id, id),
+    where: (tbl, { eq }) => eq(tbl.id, id),
     columns: {
       id: true,
       uuid: true,
@@ -24,6 +22,7 @@ const get_cached_text_lesson_info = cache(async (id: number) => {
       text: true,
       base_word_script_id: true
     },
+    orderBy: (tbl, { asc }) => [asc(tbl.text)],
     with: {
       gestures: {
         columns: {
@@ -35,8 +34,10 @@ const get_cached_text_lesson_info = cache(async (id: number) => {
           id: true,
           word: true,
           image_id: true,
-          audio_id: true
-        }
+          audio_id: true,
+          order: true
+        },
+        orderBy: (tbl, { asc }) => [asc(tbl.order)]
       }
     }
   });

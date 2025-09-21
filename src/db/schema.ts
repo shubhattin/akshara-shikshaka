@@ -81,6 +81,7 @@ export const text_lesson_words = pgTable('text_lesson_words', {
     .references(() => text_lessons.id, { onDelete: 'cascade' }),
   // ^ auto delete on text lessons deletion
   word: text().notNull(),
+  order: smallint().notNull(),
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
     .notNull()

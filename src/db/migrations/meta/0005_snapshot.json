@@ -1,5 +1,5 @@
 {
-  "id": "2c74d1e8-0da7-4058-9498-d7914d201463",
+  "id": "95ed48c0-8231-477e-968e-b01a08ff894e",
   "prevId": "03893045-52d7-4bf9-8964-9347ca82d2fb",
   "version": "7",
   "dialect": "postgresql",
@@ -310,6 +310,12 @@
         "word": {
           "name": "word",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "order": {
+          "name": "order",
+          "type": "smallint",
           "primaryKey": false,
           "notNull": true
         },

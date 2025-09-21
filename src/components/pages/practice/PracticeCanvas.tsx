@@ -1,12 +1,12 @@
 'use client';
 
 import { forwardRef, useEffect, useState } from 'react';
-import { Stage, Layer, Line } from 'react-konva';
+import { Stage, Layer, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue } from 'jotai';
 import type { GesturePoints, Gesture } from '~/tools/stroke_data/types';
 import { CANVAS_DIMS } from '~/tools/stroke_data/types';
-import { getSmoothenedPoints, flattenPoints } from '~/tools/stroke_data/utils';
+import { getSmoothenedPoints, pointsToSvgPath } from '~/tools/stroke_data/utils';
 import {
   scaling_factor_atom,
   animated_gesture_lines_atom,
@@ -81,12 +81,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
       // Apply final smoothing with stroke correction for better results
       let finalGesturePoints: GesturePoints[] = currentGesturePoints;
-
-      if (currentGesturePoints.length > 2 && currentGesture) {
-        finalGesturePoints = getSmoothenedPoints(currentGesturePoints, {
-          size: currentGesture.width || 6
-        }) as GesturePoints[];
-      }
+      // compare the original points recorded for accuarcy and not the smoothened points
 
       if (finalGesturePoints.length > 1) {
         onUserStroke(finalGesturePoints);
@@ -216,31 +211,29 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
           <Layer>
             {/* Animated Gesture Paths (guidance and completed strokes) */}
             {animatedGestureLines.map((line, index) => (
-              <Line
+              <Path
                 key={`gesture-path-${line.index}-${index}`}
-                points={flattenPoints(line.points)}
-                stroke={line.color}
-                strokeWidth={line.width}
-                lineCap="round"
-                lineJoin="round"
+                data={pointsToSvgPath(
+                  line.isAnimatedPath
+                    ? line.points
+                    : getSmoothenedPoints(line.points, { size: line.width })
+                )}
+                fill={line.color}
+                strokeEnabled={false}
                 listening={false}
               />
             ))}
 
             {/* Current Drawing Stroke (while user is drawing) */}
-            {currentGesturePoints.length > 0 && currentGesture && (
-              <Line
-                points={flattenPoints(
-                  isRecordingStroke && currentGesturePoints.length > 2
-                    ? (getSmoothenedPoints(currentGesturePoints, {
-                        size: currentGesture.width || 6
-                      }) as GesturePoints[])
-                    : currentGesturePoints
+            {currentGesturePoints.length > 2 && currentGesture && (
+              <Path
+                data={pointsToSvgPath(
+                  getSmoothenedPoints(currentGesturePoints, {
+                    size: currentGesture.width || 6
+                  }) as GesturePoints[]
                 )}
-                stroke={USER_GESTURE_COLOR}
-                strokeWidth={currentGesture.width || 6}
-                lineCap="round"
-                lineJoin="round"
+                fill={USER_GESTURE_COLOR}
+                strokeEnabled={false}
                 listening={false}
               />
             )}

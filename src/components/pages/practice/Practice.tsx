@@ -144,11 +144,13 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       }
     ]);
 
-    // Use the framework-agnostic animation helper
+    // Use the centerline->polygon animation helper
     await animateGesture(gesture, (frame) => {
       setAnimatedGestureLines((prev) =>
         prev.map((line) =>
-          line.index === gestureLineId ? { ...line, points: frame.partialPoints } : line
+          line.index === gestureLineId
+            ? { ...line, points: frame.partialPoints, isAnimatedPath: true }
+            : line
         )
       );
     });

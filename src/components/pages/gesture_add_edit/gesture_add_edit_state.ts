@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import type { GesturePath, Gesture, AnimationGesture } from '~/tools/stroke_data/types';
+import type { GesturePoints, Gesture, AnimationGesture } from '~/tools/stroke_data/types';
 import type { script_list_type } from '~/state/lang_list';
 import { type FontFamily, DEFAULT_FONT_SIZE } from '~/state/font_list';
 
@@ -26,7 +26,7 @@ export const selected_gesture_index_atom = atom<number | null>(null);
 export const not_to_clear_gestures_index_atom = atom<ReadonlySet<number>>(new Set<number>());
 
 /** Stores point when the user is currently drawing (mouse down state), does not needs to store gesture attributes */
-export const current_gesture_recording_points_atom = atom<GesturePath[]>([]);
+export const current_gesture_recording_points_atom = atom<GesturePoints[]>([]);
 /**
  * Used for displaying the animated/ing gestures or the ones that are marked to stay on screen, use for `Play` buttons
  * Stores the attributes of all the different gestures to be used
@@ -38,7 +38,7 @@ export const canvas_text_center_offset_atoms = atom<[number, number]>([0, 0]);
 
 // Export constants for use in components
 export const DEFAULTS = {
-  GESTURE_BRUSH_WIDTH: 12,
+  GESTURE_BRUSH_WIDTH: 7,
   GESTURE_BRUSH_COLOR: '#0161fd', // blue
   GESTURE_ANIMATION_DURATION: 600,
   FONT_SIZE: DEFAULT_FONT_SIZE,

@@ -1,17 +1,12 @@
 'use client';
 
 import { forwardRef, useEffect, useState } from 'react';
-import { Stage, Layer, Path } from 'react-konva';
+import { Stage, Layer, Line } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue } from 'jotai';
-import type { GesturePath, Gesture } from '~/tools/stroke_data/types';
+import type { GesturePoints, Gesture } from '~/tools/stroke_data/types';
 import { CANVAS_DIMS } from '~/tools/stroke_data/types';
-import {
-  gesturePointsToPath,
-  smoothGesturePointsRealtime,
-  smoothRawPoints,
-  calculateStrokeCorrection
-} from '~/tools/stroke_data/utils';
+import { getSmoothenedPoints, flattenPoints } from '~/tools/stroke_data/utils';
 import {
   scaling_factor_atom,
   animated_gesture_lines_atom,
@@ -27,7 +22,7 @@ import { cn } from '~/lib/utils';
 
 interface PracticeKonvaCanvasProps {
   gestureData: Gesture[];
-  onUserStroke: (points: GesturePath[]) => void;
+  onUserStroke: (points: GesturePoints[]) => void;
 }
 
 const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
@@ -63,7 +58,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         y: pos.y / scalingFactor
       };
 
-      setCurrentGesturePoints([['M', scaledPos.x, scaledPos.y]]);
+      setCurrentGesturePoints([[scaledPos.x, scaledPos.y]]);
     };
 
     const handleStageMouseMove = (e: any) => {
@@ -76,7 +71,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         y: pos.y / scalingFactor
       };
 
-      setCurrentGesturePoints((prev) => [...prev, ['L', scaledPos.x, scaledPos.y]]);
+      setCurrentGesturePoints((prev) => [...prev, [scaledPos.x, scaledPos.y]]);
     };
 
     const handleStageMouseUp = () => {
@@ -85,11 +80,12 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       setIsRecordingStroke(false);
 
       // Apply final smoothing with stroke correction for better results
-      let finalGesturePoints: GesturePath[] = currentGesturePoints;
+      let finalGesturePoints: GesturePoints[] = currentGesturePoints;
 
       if (currentGesturePoints.length > 2 && currentGesture) {
-        const correction = calculateStrokeCorrection(currentGesture.width || 6);
-        finalGesturePoints = smoothRawPoints(currentGesturePoints, correction);
+        finalGesturePoints = getSmoothenedPoints(currentGesturePoints, {
+          size: currentGesture.width || 6
+        }) as GesturePoints[];
       }
 
       if (finalGesturePoints.length > 1) {
@@ -220,9 +216,9 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
           <Layer>
             {/* Animated Gesture Paths (guidance and completed strokes) */}
             {animatedGestureLines.map((line, index) => (
-              <Path
+              <Line
                 key={`gesture-path-${line.index}-${index}`}
-                data={line.path_string}
+                points={flattenPoints(line.points)}
                 stroke={line.color}
                 strokeWidth={line.width}
                 lineCap="round"
@@ -233,13 +229,12 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
             {/* Current Drawing Stroke (while user is drawing) */}
             {currentGesturePoints.length > 0 && currentGesture && (
-              <Path
-                data={gesturePointsToPath(
+              <Line
+                points={flattenPoints(
                   isRecordingStroke && currentGesturePoints.length > 2
-                    ? smoothGesturePointsRealtime(
-                        currentGesturePoints,
-                        calculateStrokeCorrection(currentGesture.width || 6)
-                      )
+                    ? (getSmoothenedPoints(currentGesturePoints, {
+                        size: currentGesture.width || 6
+                      }) as GesturePoints[])
                     : currentGesturePoints
                 )}
                 stroke={USER_GESTURE_COLOR}

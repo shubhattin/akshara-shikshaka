@@ -1,16 +1,11 @@
 'use client';
 
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Stage, Layer, Path, Text } from 'react-konva';
+import { Stage, Layer, Line, Text } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { CANVAS_DIMS, GesturePath } from '~/tools/stroke_data/types';
-import {
-  gesturePointsToPath,
-  smoothRawPoints,
-  smoothGesturePointsRealtime,
-  calculateStrokeCorrection
-} from '~/tools/stroke_data/utils';
+import { CANVAS_DIMS, GesturePoints } from '~/tools/stroke_data/types';
+import { getSmoothenedPoints, flattenPoints } from '~/tools/stroke_data/utils';
 import {
   main_text_path_visible_atom,
   font_size_atom,
@@ -103,7 +98,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     const pos = e.currentTarget.getStage()?.getPointerPosition();
     if (!pos) return;
-    const point: GesturePath = ['M', pos.x, pos.y]; // Move command for start point
+    const point: GesturePoints = [pos.x, pos.y];
     setCurrentGestureRecordingPoints([point]);
   };
 
@@ -113,7 +108,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     const pos = e.currentTarget.getStage()?.getPointerPosition();
     if (!pos) return;
 
-    const point: GesturePath = ['L', pos.x, pos.y]; // Line command for subsequent points
+    const point: GesturePoints = [pos.x, pos.y];
     setCurrentGestureRecordingPoints((prev) => [...prev, point]);
   };
 
@@ -122,11 +117,6 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     setIsDrawing(false);
     // Keep the temp points for user to save or discard
-
-    // Apply final smoothing with stroke width correction
-    const correction = selectedGesture ? calculateStrokeCorrection(selectedGesture.width) : 0;
-    const smoothedPoints = smoothRawPoints([...currentGestureRecordingPoints], correction);
-    setCurrentGestureRecordingPoints(smoothedPoints);
 
     if (selectedGesture && gestureData.length === selectedGesture.index + 1) {
       // ^ only if last gesture in the list
@@ -273,9 +263,9 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
             .filter((g) => !(isRecording && g.index === selectedGestureIndex))
             // ^ not displaying the current gesture even if marked while recording
             .map((gesture) => (
-              <Path
+              <Line
                 key={`animated-${gesture.index}`}
-                data={gesture.path_string}
+                points={flattenPoints(gesture.points)}
                 stroke={gesture.color}
                 strokeWidth={gesture.width}
                 lineCap="round"
@@ -286,13 +276,12 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
           {/* Current Drawing Path (during recording) */}
           {currentGestureRecordingPoints.length > 0 && selectedGesture && (
-            <Path
-              data={gesturePointsToPath(
+            <Line
+              points={flattenPoints(
                 isRecording && currentGestureRecordingPoints.length > 2
-                  ? smoothGesturePointsRealtime(
-                      currentGestureRecordingPoints,
-                      selectedGesture ? calculateStrokeCorrection(selectedGesture.width) : 0
-                    )
+                  ? getSmoothenedPoints(currentGestureRecordingPoints, {
+                      size: selectedGesture.width
+                    })
                   : currentGestureRecordingPoints
               )}
               stroke={selectedGesture.color}

@@ -9,6 +9,7 @@ import { cache } from 'react';
 import { db } from '~/db/db';
 import { z } from 'zod';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
+import { notFound } from 'next/navigation';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -69,8 +70,10 @@ const List = async ({ params }: Props) => {
     .int()
     .parse((await params).id);
 
-  const text_lesson_info = (await get_cached_text_lesson_info(id))!;
-
+  const text_lesson_info = await get_cached_text_lesson_info(id);
+  if (!text_lesson_info) {
+    notFound();
+  }
   const gesture_ids = text_lesson_info.gestures.map((gesture) => gesture.text_gesture_id);
 
   return (

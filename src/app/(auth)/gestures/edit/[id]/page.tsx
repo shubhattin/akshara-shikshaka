@@ -7,7 +7,7 @@ import Link from 'next/link';
 import AddEditTextDataWrapper from '~/components/pages/gesture_add_edit/AddEditTextGesture';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { getCachedSession } from '~/lib/cache_server_route_data';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { Provider as JotaiProvider } from 'jotai';
 
 type Props = { params: Promise<{ id: string }> };
@@ -52,6 +52,9 @@ const MainEdit = async ({ params }: Props) => {
   const id = z.coerce.number().int().parse(id_str);
 
   const text_data = await get_cached_text_data(id);
+  if (!text_data) {
+    notFound();
+  }
 
   return (
     <div>
@@ -61,13 +64,10 @@ const MainEdit = async ({ params }: Props) => {
           Text Gesture List
         </Link>
       </div>
-      {text_data ? (
-        <JotaiProvider key={`edit_akdhara_page-${id}`}>
-          <AddEditTextDataWrapper location="edit" text_data={text_data} />
-        </JotaiProvider>
-      ) : (
-        <div>Text data not found</div>
-      )}
+
+      <JotaiProvider key={`edit_akdhara_page-${id}`}>
+        <AddEditTextDataWrapper location="edit" text_data={text_data} />
+      </JotaiProvider>
     </div>
   );
 };

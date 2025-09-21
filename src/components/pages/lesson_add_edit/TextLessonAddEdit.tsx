@@ -505,6 +505,10 @@ const AddEditSave = (props: Props) => {
   };
 
   const handleDelete = () => {
+    if (delete_text_data_mut.isPending) {
+      toast.error('Please wait for the text lesson to be deleted');
+      return;
+    }
     if (props.location !== 'add') {
       delete_text_data_mut.mutate({
         id: props.text_lesson_info.id!,

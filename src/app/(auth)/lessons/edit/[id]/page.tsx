@@ -76,12 +76,12 @@ const List = async ({ params }: Props) => {
   return (
     <div>
       <div className="my-2 mb-4 px-2">
-        <Link href="/gestures/list" className="flex items-center gap-1 text-lg font-semibold">
+        <Link href="/lessons/list" className="flex items-center gap-1 text-lg font-semibold">
           <IoMdArrowRoundBack className="inline-block text-xl" />
           Text Lesson List
         </Link>
       </div>
-      <JotaiProvider key={`add_lesson_page-${crypto.randomUUID()}`}>
+      <JotaiProvider key={`edit_lesson_page-${id}`}>
         <TextLessonAddEdit
           location="edit"
           gesture_ids={gesture_ids}

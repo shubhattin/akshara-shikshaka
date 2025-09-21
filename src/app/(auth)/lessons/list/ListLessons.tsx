@@ -28,7 +28,7 @@ type Props = {};
 
 const DEFAULT_LIMIT = 24;
 export default function ListLessons({}: Props) {
-  const [langId, setLangId] = useState<number | undefined>(undefined);
+  const [langId, setLangId] = useState<number | undefined>(lang_list_obj['Sanskrit']);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [page, setPage] = useState<number>(1);

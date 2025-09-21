@@ -23,7 +23,7 @@ type Props = {};
 
 const DEFAULT_LIMIT = 24;
 export default function ListGestures({}: Props) {
-  const [scriptId, setScriptId] = useState<number | undefined>(undefined);
+  const [scriptId, setScriptId] = useState<number | undefined>(script_list_obj['Devanagari']);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [page, setPage] = useState<number>(1);

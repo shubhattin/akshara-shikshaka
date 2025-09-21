@@ -59,6 +59,7 @@ import {
 } from '~/tools/lipi_lekhika';
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 import type { text_lesson_words, text_lessons } from '~/db/schema';
+import { useQueryClient } from '@tanstack/react-query';
 
 type text_lesson_info_type = Omit<
   InferInsertModel<typeof text_lessons>,
@@ -456,9 +457,14 @@ const AddEditSave = (props: Props) => {
     }
   });
 
+  const queryClient = useQueryClient();
+
   const delete_text_data_mut = client_q.text_lessons.delete_text_lesson.useMutation({
-    onSuccess(data) {
+    async onSuccess(data) {
       toast.success('Text Lesson Deleted');
+      await queryClient.invalidateQueries({
+        queryKey: [['text_lessons', 'list_text_lessons']]
+      });
       router.push('/lessons/list');
     },
     onError(error) {

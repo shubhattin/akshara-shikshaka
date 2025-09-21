@@ -8,7 +8,12 @@ import { cn } from '~/lib/utils';
 import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward, MdRefresh } from 'react-icons/md';
 import { FiTrendingUp } from 'react-icons/fi';
 import { evaluateGestureAccuracy, animateGesture } from '~/tools/stroke_data/utils';
-import { GesturePath, CANVAS_DIMS, Gesture, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
+import {
+  GesturePoints,
+  CANVAS_DIMS,
+  Gesture,
+  GESTURE_GAP_DURATION
+} from '~/tools/stroke_data/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AiOutlineSignature } from 'react-icons/ai';
 import { useAtom, useSetAtom } from 'jotai';
@@ -132,21 +137,20 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       ...prev.filter((line) => line.index !== gestureLineId),
       {
         index: gestureLineId,
-        path_string: '',
+        points: [],
         color: gesture.color,
         width: gesture.width,
         gesture_type: 'current_animated_gesture'
       }
     ]);
 
-    // Use the framework-agnostic animation helper
+    // Use the centerline->polygon animation helper
     await animateGesture(gesture, (frame) => {
-      // Use the path string directly from the animation frame
-      const pathString = frame.partialSvgPath;
-
       setAnimatedGestureLines((prev) =>
         prev.map((line) =>
-          line.index === gestureLineId ? { ...line, path_string: pathString } : line
+          line.index === gestureLineId
+            ? { ...line, points: frame.partialPoints, isAnimatedPath: true }
+            : line
         )
       );
     });
@@ -162,14 +166,14 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   };
 
   // Handle user gesture drawing from Konva canvas
-  const handleUserStroke = async (userPoints: GesturePath[]) => {
+  const handleUserStroke = async (userPoints: GesturePoints[]) => {
     const currentGesture = gestureData[currentGestureIndex];
     if (!currentGesture) return;
 
     // Evaluate gesture accuracy with error handling
     let accuracy = 0;
     try {
-      accuracy = evaluateGestureAccuracy(userPoints, currentGesture.path_array);
+      accuracy = evaluateGestureAccuracy(userPoints, currentGesture.points);
     } catch (error) {
       console.error('Error evaluating stroke accuracy:', error);
       // Treat evaluation errors as failed attempts

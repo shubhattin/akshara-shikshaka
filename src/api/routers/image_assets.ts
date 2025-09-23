@@ -4,7 +4,7 @@ import { db } from '~/db/db';
 import { EMBEDDINGS_DIMENSIONS, image_assets } from '~/db/schema';
 import { dev_delay } from '~/tools/delay';
 import { getDescriptionEmbeddings } from '~/utils/ai/vector_embeddings.server';
-import { sql, cosineDistance, asc, count, desc, gte, eq } from 'drizzle-orm';
+import { sql, cosineDistance, asc, count, desc, eq, gte, or, ilike } from 'drizzle-orm';
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { get_lang_from_id, get_script_from_id } from '~/state/lang_list';
@@ -31,7 +31,10 @@ const list_image_assets_route = protectedAdminProcedure
         ? await getDescriptionEmbeddings(trimmed)
         : { embeddings: Array(EMBEDDINGS_DIMENSIONS).fill(0) as number[] };
     const similarity = sql<number>`1 - (${cosineDistance(image_assets.embeddings, embedding.embeddings)})`;
-    const whereClause = trimmed && trimmed.length > 0 ? gte(similarity, 0.6) : undefined;
+    const whereClause =
+      trimmed && trimmed.length > 0
+        ? or(gte(similarity, 0.5), ilike(image_assets.description, `%${trimmed}%`))
+        : undefined;
 
     const [{ count: totalCount }] = await db
       .select({ count: count() })
@@ -90,8 +93,7 @@ const make_upload_image_asset_route = protectedAdminProcedure
     z.object({
       lang_id: z.number().int(),
       word_script_id: z.number().int(),
-      word: z.string(),
-      description: z.string()
+      word: z.string()
     })
   )
   .output(
@@ -100,7 +102,8 @@ const make_upload_image_asset_route = protectedAdminProcedure
         success: z.literal(true),
         time_ms: z.number().int(),
         id: z.number().int(),
-        s3_key: z.string()
+        s3_key: z.string(),
+        description: z.string()
       }),
       z.object({
         success: z.literal(false),
@@ -118,20 +121,27 @@ const make_upload_image_asset_route = protectedAdminProcedure
     const response = await generateObject({
       model: openai('gpt-4.1'),
       schema: z.object({
-        image_prompt: z.string().describe('Image prompt for the word'),
+        image_prompt: z.string().describe('Image prompt for the word in English'),
         file_name: z
           .string()
           .describe(
             'A 3-4 word max file name for the image. It should not contain any spaces. Do not add any file extension. ' +
               'Words should be in lowercase, separated by underscores and no extra special characters. Eg: good_apple_image, cute_cat_image, etc. '
+          ),
+
+        description: z
+          .string()
+          .describe(
+            'A short description of the image in English in a few words (max 4-5 words, preferrable 3 words). This will be used for searching via embedding models, so keep it short and concise.'
           )
       }),
       prompt:
         `We want to generate an image for the word "${word}" in the language ${lang}, the word provided is written in script ${word_script}. ` +
+        `Keep the image, file names and description in Indian context even if in English. Use Indian concepts and Visualizations for the Words provided for respective Indian Languages. ` +
         `The image should be in picture book style, image used for illustations in books. No text should be added to the image. ` +
         `So Generate an image prompt and a file name for the provided word which we can then feed into gpt-image-1 model to generate the image.`
     });
-    const { image_prompt, file_name } = response.object;
+    const { image_prompt, file_name, description } = response.object;
     console.log('image prompt generated');
 
     const s3_image_key = `image_assets/${file_name}_${crypto.randomUUID()}.webp` as const;
@@ -158,11 +168,11 @@ const make_upload_image_asset_route = protectedAdminProcedure
       };
     }
 
-    const description_embeddings = await getDescriptionEmbeddings(input.description);
+    const description_embeddings = await getDescriptionEmbeddings(description);
     const [result] = await db
       .insert(image_assets)
       .values({
-        description: input.description,
+        description: description,
         embeddings: description_embeddings.embeddings,
         embedding_model: description_embeddings.model,
         width: IMAGE_DIMENSIONS,
@@ -175,7 +185,8 @@ const make_upload_image_asset_route = protectedAdminProcedure
       success: true,
       time_ms: Date.now() - start_time,
       id: result.id,
-      s3_key: s3_image_key
+      s3_key: s3_image_key,
+      description: description
     };
   });
 

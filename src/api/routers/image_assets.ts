@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { t, protectedAdminProcedure } from '../trpc_init';
 import { db } from '~/db/db';
-import { image_assets } from '~/db/schema';
+import { EMBEDDINGS_DIMENSIONS, image_assets } from '~/db/schema';
 import { dev_delay } from '~/tools/delay';
 import { getDescriptionEmbeddings } from '~/utils/ai/vector_embeddings.server';
 import { sql, cosineDistance, asc, count, desc, gte, eq } from 'drizzle-orm';
@@ -29,7 +29,7 @@ const list_image_assets_route = protectedAdminProcedure
     const embedding =
       trimmed && trimmed.length > 0
         ? await getDescriptionEmbeddings(trimmed)
-        : { embeddings: [] as number[] };
+        : { embeddings: Array(EMBEDDINGS_DIMENSIONS).fill(0) as number[] };
     const similarity = sql<number>`1 - (${cosineDistance(image_assets.embeddings, embedding.embeddings)})`;
     const whereClause = trimmed && trimmed.length > 0 ? gte(similarity, 0.6) : undefined;
 
@@ -204,8 +204,28 @@ const delete_image_asset_route = protectedAdminProcedure
     };
   });
 
+const update_image_asset_route = protectedAdminProcedure
+  .input(z.object({ id: z.number().int(), description: z.string() }))
+  .mutation(async ({ input }) => {
+    const embeddings = await getDescriptionEmbeddings(input.description);
+
+    await db
+      .update(image_assets)
+      .set({
+        description: input.description,
+        embeddings: embeddings.embeddings,
+        embedding_model: embeddings.model
+      })
+      .where(eq(image_assets.id, input.id));
+
+    return {
+      updated: true
+    };
+  });
+
 export const image_assets_router = t.router({
   list_image_assets: list_image_assets_route,
   make_upload_image_asset: make_upload_image_asset_route,
-  delete_image_asset: delete_image_asset_route
+  delete_image_asset: delete_image_asset_route,
+  update_image_asset: update_image_asset_route
 });

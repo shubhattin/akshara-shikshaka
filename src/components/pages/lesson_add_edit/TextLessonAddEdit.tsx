@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { FiSave } from 'react-icons/fi';
 import { IoMdAdd } from 'react-icons/io';
 import { MdDeleteOutline, MdDragHandle } from 'react-icons/md';
+import { RiImageAddLine } from 'react-icons/ri';
 import { toast } from 'sonner';
 import { client_q } from '~/api/client';
 import {
@@ -60,6 +61,14 @@ import {
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 import type { text_lesson_words, text_lessons } from '~/db/schema';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+  DialogTitle
+} from '~/components/ui/dialog';
+import ImageSelect from './ImageSelect';
 
 type text_lesson_info_type = Omit<
   InferInsertModel<typeof text_lessons>,
@@ -339,6 +348,7 @@ const LessonWords = (props: Props) => {
                 wordItem={w}
                 onChange={handleWordChange}
                 onDelete={handleDelete}
+                lesson_id={props.text_lesson_info.id!}
               />
             ))}
           </div>
@@ -356,19 +366,44 @@ type SortableWordItemProps = {
   wordItem: text_lesson_word_type;
   onChange: (order: number, value: string) => void;
   onDelete: (order: number) => void;
+  lesson_id: number;
 };
 
-function SortableWordItem({ wordItem, onChange, onDelete }: SortableWordItemProps) {
+function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableWordItemProps) {
   const base_word_script_id = useAtomValue(base_word_script_id_atom);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: wordItem.order.toString()
   });
+
+  const [, setWords] = useAtom(words_atom);
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1
   } as React.CSSProperties;
+
+  const get_text_lesson_word_media_data_q =
+    client_q.text_lessons.get_text_lesson_word_media_data.useQuery(
+      {
+        word_id: wordItem.id!,
+        lesson_id: lesson_id
+      },
+      {
+        enabled: !!wordItem.id && !!lesson_id
+      }
+    );
+
+  const image_asset = get_text_lesson_word_media_data_q.data?.image_asset;
+  const audio_asset = get_text_lesson_word_media_data_q.data?.audio_asset;
+
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const onImageSelect = (image_id: number) => {
+    setWords((prev) =>
+      prev.map((w) => (w.order === wordItem.order ? { ...w, image_id: image_id } : w))
+    );
+    setImageDialogOpen(false);
+  };
 
   return (
     <div
@@ -406,6 +441,26 @@ function SortableWordItem({ wordItem, onChange, onDelete }: SortableWordItemProp
       >
         <MdDeleteOutline className="h-3 w-3" />
       </Button>
+      {get_text_lesson_word_media_data_q.isSuccess &&
+        !get_text_lesson_word_media_data_q.isLoading && (
+          <div className="flex items-center gap-4">
+            {!image_asset && !audio_asset && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <RiImageAddLine className="size-6 text-sky-500 dark:text-sky-400" /> Add Image
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="h-[70vh] w-full overflow-hidden px-3 py-2 outline-hidden sm:max-w-4xl md:max-w-5xl lg:max-w-7xl">
+                  <DialogHeader className="sr-only">
+                    <DialogTitle>Add Image</DialogTitle>
+                  </DialogHeader>
+                  <ImageSelect onImageSelect={onImageSelect} />
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        )}
     </div>
   );
 }

@@ -10,7 +10,9 @@ import {
   smallint,
   integer,
   primaryKey,
-  unique
+  unique,
+  varchar,
+  vector
 } from 'drizzle-orm/pg-core';
 import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
 import type { Gesture } from '~/tools/stroke_data/types';
@@ -90,9 +92,17 @@ export const text_lesson_words = pgTable('text_lesson_words', {
   audio_id: integer().references(() => audio_assets.id, { onDelete: 'set null' })
 });
 
+/**
+ * Changing this field will cause **DATA LOSS**
+ */
+export const EMBEDDINGS_DIMENSIONS = 512 as const;
+
 export const image_assets = pgTable('image_assets', {
   id: serial().primaryKey(),
-  description: text().notNull().default(''),
+  description: varchar('description', { length: 150 }).notNull().default(''),
+  embeddings: vector('embeddings', { dimensions: EMBEDDINGS_DIMENSIONS }),
+  width: smallint().notNull().default(256),
+  height: smallint().notNull().default(256),
   s3_key: text().notNull(),
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
@@ -102,7 +112,8 @@ export const image_assets = pgTable('image_assets', {
 
 export const audio_assets = pgTable('audio_assets', {
   id: serial().primaryKey(),
-  description: text().notNull().default(''),
+  description: varchar('description', { length: 150 }).notNull().default(''),
+  embeddings: vector('embeddings', { dimensions: EMBEDDINGS_DIMENSIONS }),
   lang_id: smallint(), // optional language id for the audio like for words and pronunciation specific to a language
   s3_key: text().notNull(),
   created_at: timestamp().notNull().defaultNow(),

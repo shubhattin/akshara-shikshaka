@@ -46,3 +46,5 @@ src/db/scripts/backup/
 tmp
 
 **/a.ts
+**/a.png
+**/a.webp

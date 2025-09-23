@@ -248,15 +248,17 @@ const ImageCreation = ({ wordItem }: Props) => {
   return (
     <div className="my-8 flex flex-col items-center justify-center space-y-4">
       <div className="flex items-center justify-center">
-        <Button
-          className="gap-4 text-lg font-semibold text-amber-600 dark:text-amber-400"
-          variant={'outline'}
-          disabled={create_image_mut.isPending}
-          onClick={handleCreateImage}
-        >
-          <FaImage className="size-7 text-sky-600 dark:text-sky-500" />
-          Create Image for Word "{wordItem.word}"
-        </Button>
+        {!create_image_mut.isSuccess && (
+          <Button
+            className="gap-4 text-lg font-semibold text-amber-600 dark:text-amber-400"
+            variant={'outline'}
+            disabled={create_image_mut.isPending}
+            onClick={handleCreateImage}
+          >
+            <FaImage className="size-7 text-sky-600 dark:text-sky-500" />
+            Create Image for Word "{wordItem.word}"
+          </Button>
+        )}
       </div>
       {create_image_mut.isPending && (
         <div className="flex items-center justify-center">

@@ -92,16 +92,9 @@ export const text_lesson_words = pgTable('text_lesson_words', {
   audio_id: integer().references(() => audio_assets.id, { onDelete: 'set null' })
 });
 
-/**
- * Changing this field will cause **DATA LOSS**
- */
-export const EMBEDDINGS_DIMENSIONS = 512 as const;
-
 export const image_assets = pgTable('image_assets', {
   id: serial().primaryKey(),
   description: varchar('description', { length: 150 }).notNull().default(''),
-  embeddings: vector('embeddings', { dimensions: EMBEDDINGS_DIMENSIONS }),
-  embedding_model: text().notNull(),
   width: smallint().notNull().default(256),
   height: smallint().notNull().default(256),
   s3_key: text().notNull(),
@@ -114,8 +107,6 @@ export const image_assets = pgTable('image_assets', {
 export const audio_assets = pgTable('audio_assets', {
   id: serial().primaryKey(),
   description: varchar('description', { length: 150 }).notNull().default(''),
-  embeddings: vector('embeddings', { dimensions: EMBEDDINGS_DIMENSIONS }),
-  embedding_model: text().notNull(),
   lang_id: smallint(), // optional language id for the audio like for words and pronunciation specific to a language
   s3_key: text().notNull(),
   created_at: timestamp().notNull().defaultNow(),

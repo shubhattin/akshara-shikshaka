@@ -1,6 +1,5 @@
 import { embed } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
-import { EMBEDDINGS_DIMENSIONS } from '~/db/schema';
 
 const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -27,12 +26,3 @@ async function getOpenAIVectorEmbeddings(
   });
   return embedding;
 }
-
-export const getDescriptionEmbeddings = async (value: string) => {
-  const model: embed_models = 'text-embedding-3-small';
-  return {
-    embeddings: await getOpenAIVectorEmbeddings(value, EMBEDDINGS_DIMENSIONS, model),
-    dimensions: EMBEDDINGS_DIMENSIONS,
-    model: model
-  };
-};

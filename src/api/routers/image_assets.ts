@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import { t, protectedAdminProcedure } from '../trpc_init';
 import { db } from '~/db/db';
-import { EMBEDDINGS_DIMENSIONS, image_assets } from '~/db/schema';
+import { image_assets } from '~/db/schema';
 import { dev_delay } from '~/tools/delay';
-import { getDescriptionEmbeddings } from '~/utils/ai/vector_embeddings.server';
-import { sql, cosineDistance, asc, count, desc, eq, gte, or, ilike } from 'drizzle-orm';
+import { asc, count, desc, eq, ilike } from 'drizzle-orm';
 import { generateObject } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { get_lang_from_id, get_script_from_id } from '~/state/lang_list';
@@ -26,15 +25,9 @@ const list_image_assets_route = protectedAdminProcedure
     await dev_delay(500);
 
     const trimmed = input.search_text?.trim();
-    const embedding =
-      trimmed && trimmed.length > 0
-        ? await getDescriptionEmbeddings(trimmed)
-        : { embeddings: Array(EMBEDDINGS_DIMENSIONS).fill(0) as number[] };
-    const similarity = sql<number>`1 - (${cosineDistance(image_assets.embeddings, embedding.embeddings)})`;
+
     const whereClause =
-      trimmed && trimmed.length > 0
-        ? or(gte(similarity, 0.5), ilike(image_assets.description, `%${trimmed}%`))
-        : undefined;
+      trimmed && trimmed.length > 0 ? ilike(image_assets.description, `%${trimmed}%`) : undefined;
 
     const [{ count: totalCount }] = await db
       .select({ count: count() })
@@ -51,14 +44,12 @@ const list_image_assets_route = protectedAdminProcedure
         height: image_assets.height,
         s3_key: image_assets.s3_key,
         created_at: image_assets.created_at,
-        updated_at: image_assets.updated_at,
-        similarity
+        updated_at: image_assets.updated_at
       })
       .from(image_assets)
       .where(whereClause ?? undefined)
       .orderBy((t) => {
         return [
-          desc(t.similarity),
           (input.order_by === 'asc' ? asc : desc)(
             (input.sort_by ?? 'created_at') === 'updated_at'
               ? image_assets.updated_at
@@ -138,8 +129,11 @@ const make_upload_image_asset_route = protectedAdminProcedure
       prompt:
         `We want to generate an image for the word "${word}" in the language ${lang}, the word provided is written in script ${word_script}. ` +
         `Keep the image, file names and description in Indian context even if in English. Use Indian concepts and Visualizations for the Words provided for respective Indian Languages. ` +
+        `Only include references to Hindu Dharma, lifestyle, cities, culture, traditions, kings, etc and Indian culture in the image prompt. ` +
+        `There can be helping objects in the image alongside with the image describing the main word, But the focus should be only the main word's image.` +
         `The image should be in picture book style, image used for illustations in books. No text should be added to the image. ` +
-        `So Generate an image prompt and a file name for the provided word which we can then feed into gpt-image-1 model to generate the image.`
+        `So Generate an image prompt and a file name for the provided word which we can then feed into gpt-image-1 model to generate the image. ` +
+        `As the model GPT-Image-1 can understand the details well, so also include the deatils provided here in the image prompt alongside the prompt generated.`
     });
     const { image_prompt, file_name, description } = response.object;
     console.log('image prompt generated');
@@ -168,13 +162,10 @@ const make_upload_image_asset_route = protectedAdminProcedure
       };
     }
 
-    const description_embeddings = await getDescriptionEmbeddings(description);
     const [result] = await db
       .insert(image_assets)
       .values({
         description: description,
-        embeddings: description_embeddings.embeddings,
-        embedding_model: description_embeddings.model,
         width: IMAGE_DIMENSIONS,
         height: IMAGE_DIMENSIONS,
         s3_key: s3_image_key
@@ -218,14 +209,10 @@ const delete_image_asset_route = protectedAdminProcedure
 const update_image_asset_route = protectedAdminProcedure
   .input(z.object({ id: z.number().int(), description: z.string() }))
   .mutation(async ({ input }) => {
-    const embeddings = await getDescriptionEmbeddings(input.description);
-
     await db
       .update(image_assets)
       .set({
-        description: input.description,
-        embeddings: embeddings.embeddings,
-        embedding_model: embeddings.model
+        description: input.description
       })
       .where(eq(image_assets.id, input.id));
 

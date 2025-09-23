@@ -465,7 +465,7 @@ const AddEditSave = (props: Props) => {
       await queryClient.invalidateQueries({
         queryKey: [['text_lessons', 'list_text_lessons']]
       });
-      router.push('/lessons/list');
+      router.push('/lessons');
     },
     onError(error) {
       toast.error('Failed to delete text');

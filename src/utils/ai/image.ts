@@ -25,7 +25,7 @@ export async function generateImageGptImage1(prompt: string) {
   };
 }
 
-export async function generateImageDallE3(prompt: string) {
+export async function generateImageDallE3_(prompt: string) {
   const response = await openai.images.generate({
     model: 'dall-e-3',
     prompt: prompt,

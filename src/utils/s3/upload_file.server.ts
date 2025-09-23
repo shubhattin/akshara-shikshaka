@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import mime from 'mime-types';
 import {
+  DeleteObjectCommand,
   PutObjectCommand,
   PutObjectCommandInput,
   S3Client,
@@ -44,9 +45,18 @@ async function uploadFile(bucketName: string, key: string, fileBuffer: Buffer) {
 
 const ASSET_BUCKET_NAME = envs.AWS_S3_FILES_BUCKET_NAME;
 
-type folder_types = 'image_assets' | 'audio_assets';
-type location_types = `${folder_types}/${string}`;
+type location_types = `image_assets/${string}.webp` | `audio_assets/${string}.mp3`;
 export const uploadAssetFile = async (key: location_types, fileBuffer: Buffer) => {
   const data = await uploadFile(ASSET_BUCKET_NAME, key, fileBuffer);
+  return data;
+};
+
+export const deleteAssetFile = async (key: string) => {
+  const data = await s3.send(
+    new DeleteObjectCommand({
+      Bucket: ASSET_BUCKET_NAME,
+      Key: key
+    })
+  );
   return data;
 };

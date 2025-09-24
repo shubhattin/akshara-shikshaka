@@ -291,10 +291,44 @@ const get_gestures_from_text_key_route = protectedAdminProcedure
     return gestures;
   });
 
+const get_text_lesson_word_media_data_route = protectedAdminProcedure
+  .input(z.object({ word_id: z.number().int(), lesson_id: z.number().int() }))
+  .query(async ({ input: { word_id, lesson_id } }) => {
+    const word = await db.query.text_lesson_words.findFirst({
+      where: (tbl, { eq }) => and(eq(tbl.id, word_id), eq(tbl.text_lesson_id, lesson_id)),
+      columns: {
+        id: true
+      },
+      with: {
+        image: {
+          columns: {
+            id: true,
+            description: true,
+            s3_key: true,
+            height: true,
+            width: true
+          }
+        },
+        audio: {
+          columns: {
+            id: true,
+            description: true,
+            s3_key: true
+          }
+        }
+      }
+    });
+    return {
+      image_asset: word?.image,
+      audio_asset: word?.audio
+    };
+  });
+
 export const text_lessons_router = t.router({
   add_text_lesson: add_text_lesson_route,
   update_text_lesson: update_text_lesson_route,
   delete_text_lesson: delete_text_lesson_route,
   list_text_lessons: list_text_lessons_route,
-  get_gestures_from_text_key: get_gestures_from_text_key_route
+  get_gestures_from_text_key: get_gestures_from_text_key_route,
+  get_text_lesson_word_media_data: get_text_lesson_word_media_data_route
 });

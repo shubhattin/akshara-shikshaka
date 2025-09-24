@@ -1,12 +1,13 @@
 'use client';
 
-import { atom, useAtomValue, useAtom } from 'jotai';
+import { useAtomValue, useAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { FiSave } from 'react-icons/fi';
 import { IoMdAdd } from 'react-icons/io';
-import { MdDeleteOutline, MdDragHandle } from 'react-icons/md';
+import { MdClose, MdDeleteOutline, MdDragHandle } from 'react-icons/md';
+import { RiImageAddLine } from 'react-icons/ri';
 import { toast } from 'sonner';
 import { client_q } from '~/api/client';
 import {
@@ -57,20 +58,27 @@ import {
   lipi_parivartak,
   load_parivartak_lang_data
 } from '~/tools/lipi_lekhika';
-import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
-import type { text_lesson_words, text_lessons } from '~/db/schema';
+import {
+  audio_id_optional_atom,
+  base_word_script_id_atom,
+  gesture_ids_atom,
+  lang_id_atom,
+  text_atom,
+  words_atom,
+  type audio_type,
+  type image_type,
+  type text_lesson_info_type,
+  type text_lesson_word_type
+} from './lesson_add_edit_state';
 import { useQueryClient } from '@tanstack/react-query';
-
-type text_lesson_info_type = Omit<
-  InferInsertModel<typeof text_lessons>,
-  'created_at' | 'updated_at'
->;
-type text_lesson_word_type = Omit<
-  InferSelectModel<typeof text_lesson_words>,
-  'created_at' | 'updated_at' | 'text_lesson_id'
-> & {
-  id?: number;
-};
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTrigger,
+  DialogTitle
+} from '~/components/ui/dialog';
+import ImageSelect from './ImageSelect';
 
 type Props =
   | {
@@ -88,13 +96,6 @@ type Props =
       gesture_ids: number[];
       words: text_lesson_word_type[];
     };
-
-const lang_id_atom = atom<number>(0);
-const base_word_script_id_atom = atom<number>(0);
-const audio_id_optional_atom = atom<number | null | undefined>(undefined);
-const text_atom = atom<string>('');
-const gesture_ids_atom = atom<Set<number>>(new Set<number>([]));
-const words_atom = atom<text_lesson_word_type[]>([]);
 
 export default function TextLessonAddEditComponent(props: Props) {
   useHydrateAtoms([
@@ -321,10 +322,6 @@ const LessonWords = (props: Props) => {
     ]);
   };
 
-  useEffect(() => {
-    console.log(words);
-  }, [words]);
-
   return (
     <div className="space-y-3">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -339,6 +336,7 @@ const LessonWords = (props: Props) => {
                 wordItem={w}
                 onChange={handleWordChange}
                 onDelete={handleDelete}
+                lesson_id={props.text_lesson_info.id!}
               />
             ))}
           </div>
@@ -356,19 +354,61 @@ type SortableWordItemProps = {
   wordItem: text_lesson_word_type;
   onChange: (order: number, value: string) => void;
   onDelete: (order: number) => void;
+  lesson_id: number;
 };
 
-function SortableWordItem({ wordItem, onChange, onDelete }: SortableWordItemProps) {
+function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableWordItemProps) {
   const base_word_script_id = useAtomValue(base_word_script_id_atom);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: wordItem.order.toString()
   });
+
+  const [, setWords] = useAtom(words_atom);
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1
   } as React.CSSProperties;
+
+  const get_text_lesson_word_media_data_q =
+    client_q.text_lessons.get_text_lesson_word_media_data.useQuery(
+      {
+        word_id: wordItem.id!,
+        lesson_id: lesson_id
+      },
+      {
+        enabled: !!wordItem.id && !!lesson_id
+      }
+    );
+
+  const [toSaveImageInfo, setToSaveImageInfo] = useState<image_type | null>(null);
+  const [toSaveAudioInfo, setToSaveAudioInfo] = useState<audio_type | null>(null);
+  const [deleteImageInfoStatus, setDeleteImageInfoStatus] = useState(false);
+
+  const image_asset = !deleteImageInfoStatus
+    ? (toSaveImageInfo ?? get_text_lesson_word_media_data_q.data?.image_asset)
+    : null;
+  const audio_asset = toSaveAudioInfo ?? get_text_lesson_word_media_data_q.data?.audio_asset;
+
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [imageViewDialogOpen, setImageViewDialogOpen] = useState(false);
+
+  const onImageSelect = (image: image_type) => {
+    setDeleteImageInfoStatus(false);
+    setWords((prev) =>
+      prev.map((w) => (w.order === wordItem.order ? { ...w, image_id: image.id! } : w))
+    );
+    setToSaveImageInfo(image);
+    setImageDialogOpen(false);
+  };
+
+  const onRemoveImage = () => {
+    setWords((prev) =>
+      prev.map((w) => (w.order === wordItem.order ? { ...w, image_id: null } : w))
+    );
+    setDeleteImageInfoStatus(true);
+  };
 
   return (
     <div
@@ -406,6 +446,73 @@ function SortableWordItem({ wordItem, onChange, onDelete }: SortableWordItemProp
       >
         <MdDeleteOutline className="h-3 w-3" />
       </Button>
+      <div className="flex items-center gap-4">
+        {/* show skeleton while fetching image data */}
+        {get_text_lesson_word_media_data_q.isLoading && (
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-14 w-14 rounded" />
+            <div className="flex flex-col">
+              {/* <Skeleton className="h-4 w-24" /> */}
+              {/* <Skeleton className="mt-1 h-4 w-20" /> */}
+            </div>
+          </div>
+        )}
+
+        {!image_asset &&
+          wordItem.word.trim().length > 0 &&
+          !get_text_lesson_word_media_data_q.isLoading && (
+            <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <RiImageAddLine className="size-6 text-sky-500 dark:text-sky-400" /> Add Image
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="h-[70vh] w-full overflow-y-scroll px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
+                <DialogHeader className="sr-only">
+                  <DialogTitle>Add Image</DialogTitle>
+                </DialogHeader>
+                <ImageSelect wordItem={wordItem} onImageSelect={onImageSelect} />
+              </DialogContent>
+            </Dialog>
+          )}
+
+        {image_asset && wordItem.word.trim().length > 0 && (
+          <>
+            <div className="flex items-center justify-center gap-2">
+              <img
+                onClick={() => setImageViewDialogOpen(true)}
+                src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${image_asset.s3_key}`}
+                alt={image_asset.description}
+                title={image_asset.description}
+                className="size-14"
+              />
+              {/* <span className="text-sm text-muted-foreground">{image_asset.description}</span> */}
+              <button
+                onClick={onRemoveImage}
+                className="rounded-full p-1 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500/50 dark:hover:bg-gray-800"
+              >
+                <MdClose className="size-4" />
+              </button>
+            </div>
+            <Dialog open={imageViewDialogOpen} onOpenChange={setImageViewDialogOpen}>
+              {/* <DialogTrigger asChild className="cursor-pointer"></DialogTrigger> */}
+              <DialogContent className="flex items-center justify-center px-8 py-6">
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    {image_asset.description}
+                  </span>
+
+                  <img
+                    src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${image_asset.s3_key}`}
+                    alt={image_asset.description}
+                    style={{ height: '256px', width: '256px' }}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -465,7 +572,7 @@ const AddEditSave = (props: Props) => {
       await queryClient.invalidateQueries({
         queryKey: [['text_lessons', 'list_text_lessons']]
       });
-      router.push('/lessons/list');
+      router.push('/lessons');
     },
     onError(error) {
       toast.error('Failed to delete text');

@@ -1,5 +1,5 @@
 {
-  "id": "95ed48c0-8231-477e-968e-b01a08ff894e",
+  "id": "bd54a861-d828-475c-aa66-c6950729979a",
   "prevId": "03893045-52d7-4bf9-8964-9347ca82d2fb",
   "version": "7",
   "dialect": "postgresql",
@@ -16,7 +16,7 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
+          "type": "varchar(150)",
           "primaryKey": false,
           "notNull": true,
           "default": "''"
@@ -67,10 +67,24 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
+          "type": "varchar(150)",
           "primaryKey": false,
           "notNull": true,
           "default": "''"
+        },
+        "width": {
+          "name": "width",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 256
+        },
+        "height": {
+          "name": "height",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 256
         },
         "s3_key": {
           "name": "s3_key",

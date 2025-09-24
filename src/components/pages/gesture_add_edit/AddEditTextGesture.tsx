@@ -1067,7 +1067,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
       await queryClient.invalidateQueries({
         queryKey: [['text_gestures', 'list_text_gesture_data']]
       });
-      router.push('/gestures/list');
+      router.push('/gestures');
     },
     onError(error) {
       toast.error('Failed to delete text');

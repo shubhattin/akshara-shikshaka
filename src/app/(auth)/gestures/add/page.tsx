@@ -23,7 +23,7 @@ const List = async () => {
   return (
     <div>
       <div className="my-2 mb-4 px-2">
-        <Link href="/gestures/list" className="flex items-center gap-1 text-lg font-semibold">
+        <Link href="/gestures" className="flex items-center gap-1 text-lg font-semibold">
           <IoMdArrowRoundBack className="inline-block text-xl" />
           Text Gesture List
         </Link>

@@ -29,13 +29,15 @@ export const GestureSchema = z.object({
   color: z.string(),
   duration: z.number(),
   anim_fn: AnimationsFunctionsEnumSchema,
+  simulate_pressure: z.boolean(),
   points: z.array(StrokePathSchema)
 });
 export const AnimationGestureSchema = GestureSchema.pick({
   index: true,
   width: true,
   color: true,
-  points: true
+  points: true,
+  simulate_pressure: true
 }).extend({
   isAnimatedPath: z.boolean().optional()
 });

@@ -280,7 +280,8 @@ function AddEditTextData({
       width: DEFAULTS.GESTURE_BRUSH_WIDTH,
       color: DEFAULTS.GESTURE_BRUSH_COLOR, // red
       duration: DEFAULTS.GESTURE_ANIMATION_DURATION,
-      anim_fn: DEFAULTS.GESTURE_ANIMATION_FUNCTION
+      anim_fn: DEFAULTS.GESTURE_ANIMATION_FUNCTION,
+      simulate_pressure: DEFAULTS.GESTURE_SIMULATE_PRESSURE
     };
     setGestureData((prev: Gesture[]) => [...prev, newGesture]);
     clearGestureVisualization();
@@ -299,7 +300,8 @@ function AddEditTextData({
         index: g.index,
         color: g.color,
         width: g.width,
-        points: g.points
+        points: g.points,
+        simulate_pressure: g.simulate_pressure
       }))
     );
   };
@@ -328,7 +330,8 @@ function AddEditTextData({
         index: gesturePathId,
         points: [],
         color: gesture.color,
-        width: gesture.width
+        width: gesture.width,
+        simulate_pressure: gesture.simulate_pressure
       }
     ]);
 
@@ -394,7 +397,8 @@ function AddEditTextData({
               color: currentGesture.color,
               width: currentGesture.width,
               index: currentGesture.index,
-              points: currentGesture.points
+              points: currentGesture.points,
+              simulate_pressure: currentGesture.simulate_pressure
             }
           : g
       )
@@ -810,6 +814,25 @@ const SelectedGestureControls = ({
             className="w-full"
             disabled={isRecording || isPlaying}
           />
+        </div>
+        {/* Simulate Pressure */}
+        <div className="flex items-center justify-center gap-2">
+          <Label className="gap-2 text-sm font-medium">
+            <Switch
+              checked={selectedGesture.simulate_pressure}
+              onCheckedChange={(value) =>
+                setGestureData((prev: Gesture[]) =>
+                  prev.map((gesture) =>
+                    gesture.index === selectedGestureIndex
+                      ? { ...gesture, simulate_pressure: value }
+                      : gesture
+                  )
+                )
+              }
+              disabled={isRecording || isPlaying}
+            />
+            Simulate Pressure
+          </Label>
         </div>
       </div>
 

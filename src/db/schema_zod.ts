@@ -8,10 +8,12 @@ import {
   text_lessons,
   lesson_gestures
 } from './schema';
+import { GestureSchema } from '~/tools/stroke_data/types';
 
 export const TextGesturesSchemaZod = createSelectSchema(text_gestures, {
   created_at: z.coerce.date(),
-  updated_at: z.coerce.date()
+  updated_at: z.coerce.date(),
+  gestures: GestureSchema.array()
 });
 
 export const TextLessonsSchemaZod = createSelectSchema(text_lessons, {

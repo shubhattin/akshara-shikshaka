@@ -77,7 +77,8 @@ function* generateGestureAnimationFrames(
       size: gesture.width,
       thinning: 0.5,
       smoothing: 0.5,
-      streamline: 0.5
+      streamline: 0.5,
+      simulatePressure: gesture.simulate_pressure
     });
 
     yield {

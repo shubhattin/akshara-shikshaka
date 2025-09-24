@@ -216,7 +216,10 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
                 data={pointsToSvgPath(
                   line.isAnimatedPath
                     ? line.points
-                    : getSmoothenedPoints(line.points, { size: line.width })
+                    : getSmoothenedPoints(line.points, {
+                        size: line.width,
+                        simulatePressure: line.simulate_pressure
+                      })
                 )}
                 fill={line.color}
                 strokeEnabled={false}
@@ -229,7 +232,8 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
               <Path
                 data={pointsToSvgPath(
                   getSmoothenedPoints(currentGesturePoints, {
-                    size: currentGesture.width || 6
+                    size: currentGesture.width || 6,
+                    simulatePressure: currentGesture.simulate_pressure
                   }) as GesturePoints[]
                 )}
                 fill={USER_GESTURE_COLOR}

@@ -140,7 +140,8 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         points: [],
         color: gesture.color,
         width: gesture.width,
-        gesture_type: 'current_animated_gesture'
+        gesture_type: 'current_animated_gesture',
+        simulate_pressure: gesture.simulate_pressure
       }
     ]);
 

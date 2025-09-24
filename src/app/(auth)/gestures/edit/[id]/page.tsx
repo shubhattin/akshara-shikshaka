@@ -3,12 +3,9 @@ import { type Metadata } from 'next';
 import { cache } from 'react';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 import { db } from '~/db/db';
-import Link from 'next/link';
-import AddEditTextDataWrapper from '~/components/pages/gesture_add_edit/AddEditTextGesture';
-import { IoMdArrowRoundBack } from 'react-icons/io';
 import { getCachedSession } from '~/lib/cache_server_route_data';
 import { notFound, redirect } from 'next/navigation';
-import { Provider as JotaiProvider } from 'jotai';
+import GestureEditClient from './GestureEditClient';
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -56,20 +53,7 @@ const MainEdit = async ({ params }: Props) => {
     notFound();
   }
 
-  return (
-    <div>
-      <div className="my-2 mb-4 px-2">
-        <Link href="/gestures" className="flex items-center gap-1 text-lg font-semibold">
-          <IoMdArrowRoundBack className="inline-block text-xl" />
-          Text Gesture List
-        </Link>
-      </div>
-
-      <JotaiProvider key={`edit_akdhara_page-${id}`}>
-        <AddEditTextDataWrapper location="edit" text_data={text_data} />
-      </JotaiProvider>
-    </div>
-  );
+  return <GestureEditClient text_data={text_data} id={id} />;
 };
 
 export default MainEdit;

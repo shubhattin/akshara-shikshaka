@@ -64,13 +64,15 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   useLayoutEffect(() => {
     const node = textRef.current;
     if (!node) return;
+    // Avoid measuring when text is hidden to prevent zero sizes overriding state
+    if (!mainTextPathVisible) return;
     // Ensure layout is up to date before measuring
     node.getLayer()?.batchDraw();
     const measured = node.getClientRect({ skipShadow: true, skipStroke: true });
     if (measured.width !== textBox.width || measured.height !== textBox.height) {
       setTextBox({ width: measured.width, height: measured.height });
     }
-  }, [text, fontSize]);
+  }, [text, fontSize, fontFamily, currentFontLoaded, mainTextPathVisible]);
 
   // Handle text drag end to update offset
   const handleTextDragEnd = (e: any) => {
@@ -80,8 +82,8 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     // Calculate the offset from the original center position
     const centerX = CANVAS_DIMS.width / 2 - textBox.width / 2;
     const centerY = CANVAS_DIMS.height / 2 - textBox.height / 2 + textBox.height * 0.06;
-    const offsetX = newX - centerX;
-    const offsetY = newY - centerY;
+    const offsetX = Math.round(newX - centerX);
+    const offsetY = Math.round(newY - centerY);
     // Update the offset state
     setCanvasTextCenterOffset([offsetX, offsetY]);
   };
@@ -244,8 +246,8 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
           {/* Character Text */}
           <Text
             ref={textRef}
-            x={BASE_TEXT_CORRDINATES[0]}
-            y={BASE_TEXT_CORRDINATES[1]}
+            x={Math.round(BASE_TEXT_CORRDINATES[0])}
+            y={Math.round(BASE_TEXT_CORRDINATES[1])}
             text={text}
             fontSize={fontSize * 15}
             fontFamily={currentFontLoaded ? fontFamily : 'Arial'}
@@ -253,7 +255,13 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
             visible={mainTextPathVisible}
             // offsetX={textBox.width / 2}
             // offsetY={textBox.height / 2 - textBox.height * 0.06}
-            draggable={!isRecording && !isDrawing}
+            draggable={
+              !isRecording &&
+              !isDrawing &&
+              currentFontLoaded &&
+              textBox.width > 0 &&
+              textBox.height > 0
+            }
             onDragEnd={handleTextDragEnd}
           />
           {/* ^ the offset is being subracted from the x and y coordinates of the text */}

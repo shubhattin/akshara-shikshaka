@@ -5,20 +5,35 @@ import AddEditTextDataWrapper from '~/components/pages/gesture_add_edit/AddEditT
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import Link from 'next/link';
 import { Provider as JotaiProvider } from 'jotai';
-import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
-import { script_list_obj } from '~/state/lang_list';
+import { DEFAULT_FONT_SIZE } from '~/state/font_list';
+import { cache } from 'react';
+import { cookies } from 'next/headers';
+import {
+  get_script_id_from_cookie,
+  get_font_family_from_cookie,
+  FONT_FAMILY_COOKIE_KEY,
+  SCRIPT_ID_COOKIE_KEY
+} from '~/state/cookie';
+
+export const getCachedInfo = cache(async () => {
+  const cookie = await cookies();
+  const script_id = get_script_id_from_cookie(cookie.get(SCRIPT_ID_COOKIE_KEY)?.value);
+  const font_family = get_font_family_from_cookie(cookie.get(FONT_FAMILY_COOKIE_KEY)?.value);
+  return { script_id, font_family };
+});
 
 const List = async () => {
   const session = await getCachedSession();
   if (!session || session.user.role !== 'admin') redirect('/');
 
+  const { script_id, font_family } = await getCachedInfo();
   const text_data = {
     text: '',
     gestures: [],
-    font_family: DEFAULT_FONT_FAMILY as FontFamily,
     font_size: DEFAULT_FONT_SIZE,
     text_center_offset: [0, 0] as [number, number],
-    script_id: script_list_obj['Devanagari']
+    font_family: font_family,
+    script_id: script_id
   };
   return (
     <div>

@@ -96,6 +96,8 @@ import { motion } from 'framer-motion';
 import type { InferSelectModel } from 'drizzle-orm';
 import type { text_gestures } from '~/db/schema';
 import { useQueryClient } from '@tanstack/react-query';
+import Cookie from 'js-cookie';
+import { FONT_FAMILY_COOKIE_KEY, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
 const KonvaCanvas = dynamic(() => import('./AddEditGestureCanvas'), {
@@ -131,7 +133,7 @@ const ClientOnly = ({
   return <>{children}</>;
 };
 
-type text_data_type = Omit<
+export type text_data_type = Omit<
   InferSelectModel<typeof text_gestures>,
   'created_at' | 'updated_at' | 'text_key' | 'id' | 'uuid'
 > & {
@@ -354,9 +356,14 @@ function AddEditTextData({
 
   const currentScriptFontList = FONT_LIST[script]!;
 
+  const first_script_set_ref = useRef(true);
   useEffect(() => {
     if (location !== 'add') return;
     load_parivartak_lang_data(script);
+    if (first_script_set_ref.current) {
+      first_script_set_ref.current = false;
+      return;
+    }
     setFontFamily(currentScriptFontList[0].font_family);
   }, [script]);
 
@@ -415,6 +422,13 @@ function AddEditTextData({
               value={script}
               onChange={(e) => {
                 setScript(e.target.value as script_list_type);
+                Cookie.set(
+                  SCRIPT_ID_COOKIE_KEY,
+                  script_list_obj[e.target.value as script_list_type].toString(),
+                  {
+                    expires: 30 // 30 days
+                  }
+                );
               }}
               className={cn(
                 'w-32 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm transition-colors',
@@ -446,6 +460,9 @@ function AddEditTextData({
             value={fontFamily}
             onChange={(e) => {
               setFontFamily(e.target.value as FontFamily);
+              Cookie.set(FONT_FAMILY_COOKIE_KEY, e.target.value as FontFamily, {
+                expires: 30 // 30 days
+              });
             }}
             className={cn(
               'w-40 rounded-md border border-input bg-background px-2 py-1 shadow-sm transition-colors',

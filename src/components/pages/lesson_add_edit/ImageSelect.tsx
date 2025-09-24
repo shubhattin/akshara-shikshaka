@@ -335,13 +335,18 @@ const ImageCreation = ({ wordItem }: Props) => {
       )}
       {create_image_mut.isSuccess && create_image_mut.data.success && (
         <>
-          <img
-            src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${create_image_mut.data.s3_key}`}
-            alt={create_image_mut.data.description}
-            title={create_image_mut.data.image_prompt}
-            className="block rounded object-contain"
-            style={{ height: '256px', width: '256px' }}
-          />
+          <div className="space-y-1">
+            <span className="line-clamp-2 text-center text-sm text-muted-foreground">
+              {create_image_mut.data.description}
+            </span>
+            <img
+              src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${create_image_mut.data.s3_key}`}
+              alt={create_image_mut.data.description}
+              title={create_image_mut.data.image_prompt}
+              className="block rounded object-contain"
+              style={{ height: '256px', width: '256px' }}
+            />
+          </div>
           <div className="space-x-4">
             <Button
               variant={'destructive'}

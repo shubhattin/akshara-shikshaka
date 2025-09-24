@@ -10,6 +10,21 @@ import { get_lang_from_id, get_script_from_id } from '~/state/lang_list';
 import { generateImageGptImage1 } from '~/utils/ai/image.server';
 import { resizeImage } from '~/utils/sharp/resize.server';
 import { deleteAssetFile, uploadAssetFile } from '~/utils/s3/upload_file.server';
+import { format_string_text } from '~/tools/kry';
+
+const SYSTEN_PROMPT = `
+You have to generate an image prompt, file name and description for the word provided. 
+Keep the image prompt, file names and description in Indian context even if in English. Use Indian concepts and Visualizations for the Words provided for respective Indian Languages. 
+Only include references to Hindu Dharma, lifestyle, cities, culture, traditions, kings, etc and Indian culture in the image prompt. 
+There can be helping objects in the image alongside with the image describing the main word, But the focus should be only the main word's image 
+The image should be in picture book style, image used for illustations in books. No text should be added to the image. 
+So Generate an image prompt and a file name for the provided word which we can then feed into gpt-image-1 model to generate the image. 
+As the model GPT-Image-1 can understand the details well, so also include the deatils provided here in the image prompt alongside the prompt generated. 
+Generate the image prompt, file name and description for the word as per the details provided above. These are the word details
+` as const;
+const PROMPT = `
+The word is "{word}" in the language {lang}, the word provided is written in script {word_script}. 
+`;
 
 const list_image_assets_route = protectedAdminProcedure
   .input(
@@ -116,7 +131,7 @@ const make_upload_image_asset_route = protectedAdminProcedure
         file_name: z
           .string()
           .describe(
-            'A 3-4 word max file name for the image. It should not contain any spaces. Do not add any file extension. ' +
+            'A 3-4 word max file name for the image, preferrable 2-3 words. It should not contain any spaces. Do not add any file extension. These files are only for debugging purposes and not actual file names displayed to users. ' +
               'Words should be in lowercase, separated by underscores and no extra special characters. Eg: good_apple_image, cute_cat_image, etc. '
           ),
 
@@ -126,14 +141,8 @@ const make_upload_image_asset_route = protectedAdminProcedure
             'A short description of the image in English in a few words (max 4-5 words, preferrable 3 words). This will be used for searching via embedding models, so keep it short and concise.'
           )
       }),
-      prompt:
-        `We want to generate an image for the word "${word}" in the language ${lang}, the word provided is written in script ${word_script}. ` +
-        `Keep the image, file names and description in Indian context even if in English. Use Indian concepts and Visualizations for the Words provided for respective Indian Languages. ` +
-        `Only include references to Hindu Dharma, lifestyle, cities, culture, traditions, kings, etc and Indian culture in the image prompt. ` +
-        `There can be helping objects in the image alongside with the image describing the main word, But the focus should be only the main word's image.` +
-        `The image should be in picture book style, image used for illustations in books. No text should be added to the image. ` +
-        `So Generate an image prompt and a file name for the provided word which we can then feed into gpt-image-1 model to generate the image. ` +
-        `As the model GPT-Image-1 can understand the details well, so also include the deatils provided here in the image prompt alongside the prompt generated.`
+      system: SYSTEN_PROMPT,
+      prompt: format_string_text(PROMPT, { word, lang, word_script })
     });
     const { image_prompt, file_name, description } = response.object;
     console.log('image prompt generated');

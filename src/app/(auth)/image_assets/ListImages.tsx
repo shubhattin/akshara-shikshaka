@@ -13,9 +13,41 @@ import { Button } from '~/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
 import { IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
-import { Filter, ArrowUpDown } from 'lucide-react';
+import { Filter, ArrowUpDown, MoreVertical, CalendarIcon } from 'lucide-react';
+import Link from 'next/link';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '~/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '~/components/ui/alert-dialog';
+import { useQueryClient } from '@tanstack/react-query';
+import { MdDeleteOutline } from 'react-icons/md';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+
+dayjs.extend(relativeTime);
 
 const DEFAULT_LIMIT = 24;
+
+type ImageItem = {
+  id: number;
+  description: string;
+  s3_key: string;
+  created_at: string;
+  updated_at: string;
+};
 
 export default function ListImages() {
   const [searchText, setSearchText] = useState<string>('');
@@ -24,6 +56,8 @@ export default function ListImages() {
   const [orderBy, setOrderBy] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(DEFAULT_LIMIT);
+  const [deleteImageId, setDeleteImageId] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(searchText.trim()), 300);
@@ -50,6 +84,15 @@ export default function ListImages() {
   const isLoading = list_q?.isLoading || list_q?.isFetching;
   const data = list_q?.data;
   const items = useMemo(() => data?.list ?? [], [data]);
+
+  const delete_image_mut = client_q.image_assets.delete_image_asset.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [['image_assets', 'list_image_assets']]
+      });
+      setDeleteImageId(null);
+    }
+  });
 
   return (
     <div className="space-y-6">
@@ -123,25 +166,57 @@ export default function ListImages() {
             </li>
           ))
         ) : items.length > 0 ? (
-          items.map((item: any) => (
+          items.map((item: ImageItem) => (
             <li key={item.id}>
-              <Card className="p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800">
-                <CardHeader className="p-2">
-                  <CardTitle className="text-sm text-muted-foreground">
-                    {new Date(item[sortBy]).toLocaleDateString()}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-start gap-3 p-2">
-                  <img
-                    src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${item.s3_key}`}
-                    alt={item.description}
-                    className="h-16 w-16 rounded object-cover"
-                    loading="lazy"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-sm">{item.description}</p>
-                  </div>
-                </CardContent>
+              <Card className="relative p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800">
+                <Link href={`/image_assets/edit/${item.id}`} className="block">
+                  <CardContent className="flex items-start gap-3 p-2">
+                    <img
+                      src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${item.s3_key}`}
+                      alt={item.description}
+                      className="h-16 w-16 rounded object-cover"
+                      loading="lazy"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 text-sm">{item.description}</p>
+                    </div>
+                  </CardContent>
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2 h-8 w-8 p-0"
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={(e) => e.preventDefault()}
+                      className="gap-2"
+                      onClick={() => setDeleteImageId(item.id)}
+                    >
+                      <MdDeleteOutline className="mr-1 size-5 text-destructive" />
+                      <span className="font-semibold">Delete Image</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <CalendarIcon className="inline-block size-3" />
+                      {dayjs(item.created_at).format('MMM D, YYYY')}
+                    </DropdownMenuItem>
+                    {/* <DropdownMenuItem className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <RxUpdate className="inline-block size-3" />
+                      {dayjs(item.updated_at).format('MMM D, YYYY')}
+                    </DropdownMenuItem> */}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <CalendarIcon className="inline-block size-3" />
+                  {dayjs(item.created_at).fromNow()}
+                </span>
               </Card>
             </li>
           ))
@@ -179,6 +254,39 @@ export default function ListImages() {
           </Button>
         </div>
       </div>
+
+      {/* Alert Dialog for delete confirmation */}
+      <AlertDialog open={deleteImageId !== null} onOpenChange={() => setDeleteImageId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Image</AlertDialogTitle>
+            <AlertDialogDescription>
+              <div>Are you sure you want to delete this image?</div>
+              <div>
+                <span className="font-bold">ID:</span> {deleteImageId}
+              </div>
+              <br />
+              <div>
+                <span className="font-bold">Description:</span>{' '}
+                {items.find((item: ImageItem) => item.id === deleteImageId)?.description}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteImageId) {
+                  delete_image_mut.mutate({ id: deleteImageId });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -37,15 +37,15 @@ export default function ManageMenuList() {
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem>
-            <Link href="/audio_assets" className="flex items-center gap-2">
-              <FaVolumeUp className="h-4 w-4" />
-              Audio
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
             <Link href="/image_assets" className="flex items-center gap-2">
               <FaRegImage className="h-4 w-4" />
               Images
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Link href="/audio_assets" className="flex items-center gap-2">
+              <FaVolumeUp className="h-4 w-4" />
+              Audio
             </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>

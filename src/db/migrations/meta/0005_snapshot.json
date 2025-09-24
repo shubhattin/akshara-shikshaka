@@ -1,5 +1,5 @@
 {
-  "id": "fdb9feb7-9cc4-4cac-a7b5-4908d06b4664",
+  "id": "bd54a861-d828-475c-aa66-c6950729979a",
   "prevId": "03893045-52d7-4bf9-8964-9347ca82d2fb",
   "version": "7",
   "dialect": "postgresql",
@@ -16,7 +16,7 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
+          "type": "varchar(150)",
           "primaryKey": false,
           "notNull": true,
           "default": "''"
@@ -67,10 +67,24 @@
         },
         "description": {
           "name": "description",
-          "type": "text",
+          "type": "varchar(150)",
           "primaryKey": false,
           "notNull": true,
           "default": "''"
+        },
+        "width": {
+          "name": "width",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 256
+        },
+        "height": {
+          "name": "height",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 256
         },
         "s3_key": {
           "name": "s3_key",
@@ -122,28 +136,28 @@
         "lesson_gestures_text_gesture_id_text_gestures_id_fk": {
           "name": "lesson_gestures_text_gesture_id_text_gestures_id_fk",
           "tableFrom": "lesson_gestures",
+          "tableTo": "text_gestures",
           "columnsFrom": [
             "text_gesture_id"
           ],
-          "tableTo": "text_gestures",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "lesson_gestures_text_lesson_id_text_lessons_id_fk": {
           "name": "lesson_gestures_text_lesson_id_text_lessons_id_fk",
           "tableFrom": "lesson_gestures",
+          "tableTo": "text_lessons",
           "columnsFrom": [
             "text_lesson_id"
           ],
-          "tableTo": "text_lessons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
@@ -255,9 +269,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "text_gestures_text_key_idx": {
           "name": "text_gestures_text_key_idx",
@@ -270,9 +284,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -280,11 +294,11 @@
       "uniqueConstraints": {
         "text_gestures_text_key_script_id_unique": {
           "name": "text_gestures_text_key_script_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "text_key",
             "script_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -310,6 +324,12 @@
         "word": {
           "name": "word",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "order": {
+          "name": "order",
+          "type": "smallint",
           "primaryKey": false,
           "notNull": true
         },
@@ -344,41 +364,41 @@
         "text_lesson_words_text_lesson_id_text_lessons_id_fk": {
           "name": "text_lesson_words_text_lesson_id_text_lessons_id_fk",
           "tableFrom": "text_lesson_words",
+          "tableTo": "text_lessons",
           "columnsFrom": [
             "text_lesson_id"
           ],
-          "tableTo": "text_lessons",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "text_lesson_words_image_id_image_assets_id_fk": {
           "name": "text_lesson_words_image_id_image_assets_id_fk",
           "tableFrom": "text_lesson_words",
+          "tableTo": "image_assets",
           "columnsFrom": [
             "image_id"
           ],
-          "tableTo": "image_assets",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         },
         "text_lesson_words_audio_id_audio_assets_id_fk": {
           "name": "text_lesson_words_audio_id_audio_assets_id_fk",
           "tableFrom": "text_lesson_words",
+          "tableTo": "audio_assets",
           "columnsFrom": [
             "audio_id"
           ],
-          "tableTo": "audio_assets",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -397,6 +417,13 @@
           "primaryKey": true,
           "notNull": true
         },
+        "uuid": {
+          "name": "uuid",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
         "lang_id": {
           "name": "lang_id",
           "type": "smallint",
@@ -406,6 +433,12 @@
         "base_word_script_id": {
           "name": "base_word_script_id",
           "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -434,15 +467,15 @@
         "text_lessons_audio_id_audio_assets_id_fk": {
           "name": "text_lessons_audio_id_audio_assets_id_fk",
           "tableFrom": "text_lessons",
+          "tableTo": "audio_assets",
           "columnsFrom": [
             "audio_id"
           ],
-          "tableTo": "audio_assets",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "set null"
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -454,10 +487,10 @@
   },
   "enums": {},
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

@@ -26,6 +26,25 @@ const PROMPT = `
 The word is "{word}" in the language {lang}, the word provided is written in script {word_script}. 
 `;
 
+const description_file_name_response_schema = z.object({
+  file_name: z
+    .string()
+    .describe(
+      'A 3-4 word max file name for the image, preferrable 2-3 words. It should not contain any spaces. Do not add any file extension. These files are only for debugging purposes and not actual file names displayed to users. ' +
+        'Words should be in lowercase, separated by underscores and no extra special characters. Eg: good_apple_image, cute_cat_image, etc. '
+    ),
+
+  description: z
+    .string()
+    .describe(
+      'A short description of the image in English in a few words (max 4-5 words, preferrable 3 words). This will be used for searching, so keep it short and concise.'
+    )
+});
+const description_file_name_image_prompt_response_schema =
+  description_file_name_response_schema.extend({
+    image_prompt: z.string().describe('Image prompt for the word in English')
+  });
+
 const list_image_assets_route = protectedAdminProcedure
   .input(
     z.object({
@@ -99,7 +118,8 @@ const make_upload_image_asset_route = protectedAdminProcedure
     z.object({
       lang_id: z.number().int(),
       word_script_id: z.number().int(),
-      word: z.string()
+      word: z.string(),
+      existing_image_prompt: z.string().optional()
     })
   )
   .output(
@@ -109,7 +129,8 @@ const make_upload_image_asset_route = protectedAdminProcedure
         time_ms: z.number().int(),
         id: z.number().int(),
         s3_key: z.string(),
-        description: z.string()
+        description: z.string(),
+        image_prompt: z.string()
       }),
       z.object({
         success: z.literal(false),
@@ -124,30 +145,29 @@ const make_upload_image_asset_route = protectedAdminProcedure
     const lang = get_lang_from_id(lang_id);
     const word_script = get_script_from_id(word_script_id);
 
-    const response = await generateObject({
-      model: openai('gpt-4.1'),
-      schema: z.object({
-        image_prompt: z.string().describe('Image prompt for the word in English'),
-        file_name: z
-          .string()
-          .describe(
-            'A 3-4 word max file name for the image, preferrable 2-3 words. It should not contain any spaces. Do not add any file extension. These files are only for debugging purposes and not actual file names displayed to users. ' +
-              'Words should be in lowercase, separated by underscores and no extra special characters. Eg: good_apple_image, cute_cat_image, etc. '
-          ),
-
-        description: z
-          .string()
-          .describe(
-            'A short description of the image in English in a few words (max 4-5 words, preferrable 3 words). This will be used for searching via embedding models, so keep it short and concise.'
-          )
-      }),
-      system: SYSTEN_PROMPT,
-      prompt: format_string_text(PROMPT, { word, lang, word_script })
-    });
-    const { image_prompt, file_name, description } = response.object;
+    const get_prompt_result = async () => {
+      if (input.existing_image_prompt) {
+        const response = await generateObject({
+          model: openai('gpt-4.1'),
+          schema: description_file_name_response_schema,
+          system: 'Generate a file name and description for the image prompt provided',
+          prompt: input.existing_image_prompt
+        });
+        return { ...response.object, image_prompt: input.existing_image_prompt };
+      }
+      const response = await generateObject({
+        model: openai('gpt-4.1'),
+        schema: description_file_name_image_prompt_response_schema,
+        system: SYSTEN_PROMPT,
+        prompt: format_string_text(PROMPT, { word, lang, word_script })
+      });
+      return response.object;
+    };
+    const { image_prompt, file_name, description } = await get_prompt_result();
     console.log('image prompt generated');
 
     const s3_image_key = `image_assets/${file_name}_${crypto.randomUUID()}.webp` as const;
+    // ^ prefer the existing image prompt if provided
     const generated_image = await generateImageGptImage1(image_prompt);
     console.log('image generated');
 
@@ -158,7 +178,7 @@ const make_upload_image_asset_route = protectedAdminProcedure
       IMAGE_DIMENSIONS,
       IMAGE_DIMENSIONS
     );
-    console.log('image resized');
+    console.log('image resized/compressed');
 
     try {
       await uploadAssetFile(s3_image_key, resized_image_buffer);
@@ -186,7 +206,8 @@ const make_upload_image_asset_route = protectedAdminProcedure
       time_ms: Date.now() - start_time,
       id: result.id,
       s3_key: s3_image_key,
-      description: description
+      description: description,
+      image_prompt: image_prompt
     };
   });
 

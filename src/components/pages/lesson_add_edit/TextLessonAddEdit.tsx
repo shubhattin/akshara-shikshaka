@@ -458,29 +458,32 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
           </div>
         )}
 
-        {!image_asset && !get_text_lesson_word_media_data_q.isLoading && (
-          <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <RiImageAddLine className="size-6 text-sky-500 dark:text-sky-400" /> Add Image
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="h-[70vh] w-full overflow-hidden px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
-              <DialogHeader className="sr-only">
-                <DialogTitle>Add Image</DialogTitle>
-              </DialogHeader>
-              <ImageSelect wordItem={wordItem} onImageSelect={onImageSelect} />
-            </DialogContent>
-          </Dialog>
-        )}
+        {!image_asset &&
+          wordItem.word.trim().length > 0 &&
+          !get_text_lesson_word_media_data_q.isLoading && (
+            <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <RiImageAddLine className="size-6 text-sky-500 dark:text-sky-400" /> Add Image
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="h-[70vh] w-full overflow-y-scroll px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
+                <DialogHeader className="sr-only">
+                  <DialogTitle>Add Image</DialogTitle>
+                </DialogHeader>
+                <ImageSelect wordItem={wordItem} onImageSelect={onImageSelect} />
+              </DialogContent>
+            </Dialog>
+          )}
 
-        {image_asset && (
+        {image_asset && wordItem.word.trim().length > 0 && (
           <>
             <div className="flex items-center justify-center gap-2">
               <img
                 onClick={() => setImageViewDialogOpen(true)}
                 src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${image_asset.s3_key}`}
                 alt={image_asset.description}
+                title={image_asset.description}
                 className="size-14"
               />
               {/* <span className="text-sm text-muted-foreground">{image_asset.description}</span> */}

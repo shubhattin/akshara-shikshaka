@@ -8,6 +8,8 @@ import { IoAddOutline } from 'react-icons/io5';
 import { Input } from '~/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
+import { Progress } from '~/components/ui/progress';
+import { Textarea } from '~/components/ui/textarea';
 import { IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
 import { cn } from '~/lib/utils';
 import {
@@ -19,6 +21,8 @@ import {
 import { FaImage } from 'react-icons/fa';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useQueryClient } from '@tanstack/react-query';
+import ms from 'ms';
+import { Label } from '~/components/ui/label';
 
 type Props = {
   onImageSelect: (image: image_type) => void;
@@ -60,6 +64,8 @@ export default function ImageSelect(props: Props) {
     </div>
   );
 }
+
+const IMAGE_AVERAGE_TIME_MS = ms('28secs');
 
 const ImageList = () => {
   const [selectedImage, setSelectedImage] = useAtom(selected_image_atom);
@@ -203,6 +209,8 @@ const ImageList = () => {
 const ImageCreation = ({ wordItem }: Props) => {
   const [, setSelectedImage] = useAtom(selected_image_atom);
   const queryClient = useQueryClient();
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [imagePrompt, setImagePrompt] = useState('');
 
   const create_image_mut = client_q.image_assets.make_upload_image_asset.useMutation({
     onSuccess: (data) => {
@@ -214,6 +222,7 @@ const ImageCreation = ({ wordItem }: Props) => {
           height: 256,
           width: 256
         });
+        setImagePrompt(data.image_prompt);
         queryClient.invalidateQueries({
           queryKey: [['image_assets', 'list_image_assets']]
         });
@@ -223,11 +232,12 @@ const ImageCreation = ({ wordItem }: Props) => {
   const lang_id = useAtomValue(lang_id_atom);
   const word_script_id = useAtomValue(base_word_script_id_atom);
 
-  const handleCreateImage = () => {
+  const handleCreateImage = (existingPrompt?: string) => {
     create_image_mut.mutate({
       word: wordItem.word,
       lang_id: lang_id,
-      word_script_id: word_script_id
+      word_script_id: word_script_id,
+      existing_image_prompt: existingPrompt || imagePrompt || undefined
     });
   };
 
@@ -236,6 +246,7 @@ const ImageCreation = ({ wordItem }: Props) => {
       queryClient.invalidateQueries({
         queryKey: [['image_assets', 'list_image_assets']]
       });
+      setSelectedImage(null);
     }
   });
 
@@ -245,15 +256,60 @@ const ImageCreation = ({ wordItem }: Props) => {
     });
   };
 
+  const handleDeleteAndRemake = async () => {
+    if (!create_image_mut.data?.success) return;
+    await handleDeleteImage(create_image_mut.data.id);
+    handleCreateImage();
+  };
+
+  const handleRemakeImage = () => {
+    handleCreateImage();
+  };
+
+  // Timer effect for tracking elapsed time
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+
+    if (create_image_mut.isPending) {
+      // Reset elapsed time when starting
+      setElapsedTime(0);
+
+      // Start timer that updates every 100ms for smooth progress
+      intervalId = setInterval(() => {
+        setElapsedTime((prev) => prev + 100);
+      }, 100);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [create_image_mut.isPending]);
+
+  // Reset elapsed time when mutation completes or resets
+  useEffect(() => {
+    if (create_image_mut.isSuccess || create_image_mut.isError || !create_image_mut.isPending) {
+      setElapsedTime(0);
+    }
+  }, [create_image_mut.isSuccess, create_image_mut.isError, create_image_mut.isPending]);
+
+  // Reset image prompt when mutation resets
+  useEffect(() => {
+    if (create_image_mut.isIdle) {
+      setImagePrompt('');
+    }
+  }, [create_image_mut.isIdle]);
+
   return (
-    <div className="my-8 flex flex-col items-center justify-center space-y-4">
+    <div className="my-6 flex flex-col items-center justify-center space-y-4">
       <div className="flex items-center justify-center">
         {!create_image_mut.isSuccess && (
           <Button
             className="gap-4 text-lg font-semibold text-amber-600 dark:text-amber-400"
             variant={'outline'}
             disabled={create_image_mut.isPending}
-            onClick={handleCreateImage}
+            onClick={() => handleCreateImage()}
           >
             <FaImage className="size-7 text-sky-600 dark:text-sky-500" />
             Create Image for Word "{wordItem.word}"
@@ -261,8 +317,20 @@ const ImageCreation = ({ wordItem }: Props) => {
         )}
       </div>
       {create_image_mut.isPending && (
-        <div className="flex items-center justify-center">
-          <Skeleton style={{ height: '256px', width: '256px' }} />
+        <div className="flex flex-col items-center justify-center space-y-4">
+          <div className="flex items-center justify-center">
+            <Skeleton style={{ height: '256px', width: '256px' }} />
+          </div>
+          <div className="w-64 space-y-2">
+            <Progress
+              value={Math.min((elapsedTime / IMAGE_AVERAGE_TIME_MS) * 100, 100)}
+              className="h-2"
+            />
+            {/* <p className="text-center text-sm text-muted-foreground">
+              Creating image... {Math.round(elapsedTime / 1000)}s /{' '}
+              {Math.round(IMAGE_AVERAGE_TIME_MS / 1000)}s
+            </p> */}
+          </div>
         </div>
       )}
       {create_image_mut.isSuccess && create_image_mut.data.success && (
@@ -270,6 +338,7 @@ const ImageCreation = ({ wordItem }: Props) => {
           <img
             src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${create_image_mut.data.s3_key}`}
             alt={create_image_mut.data.description}
+            title={create_image_mut.data.image_prompt}
             className="block rounded object-contain"
             style={{ height: '256px', width: '256px' }}
           />
@@ -295,6 +364,30 @@ const ImageCreation = ({ wordItem }: Props) => {
             >
               Remake Image
             </Button>
+          </div>
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="text-base font-semibold">Edit Image Prompt</div>
+            <div className="w-full space-y-2">
+              <Label className="text-sm font-semibold">Image Prompt</Label>
+              <Textarea
+                value={imagePrompt}
+                onChange={(e) => setImagePrompt(e.target.value)}
+                placeholder="Enter custom image prompt..."
+                className="h-24 resize-none text-sm sm:w-[70vw] md:w-[50vw] lg:w-[45vw]"
+              />
+            </div>
+            <div className="flex items-center justify-center space-x-4">
+              <Button
+                variant={'blue'}
+                onClick={handleDeleteAndRemake}
+                disabled={delete_image_mut.isPending || !create_image_mut.data?.success}
+              >
+                Delete and Make Image
+              </Button>
+              <Button variant={'outline'} onClick={() => handleRemakeImage()}>
+                Make Image
+              </Button>
+            </div>
           </div>
         </>
       )}

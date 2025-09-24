@@ -7,6 +7,10 @@ env:
   NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3000
   PG_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
   OPENAI_API_KEY: sk_proj_1234567890
+  AWS_REGION: region-123
+  AWS_ACCESS_KEY_ID: access-123
+  AWS_SECRET_ACCESS_KEY: secret-123
+  AWS_S3_FILES_BUCKET_NAME: bucket-123
 
 jobs:
   type_build_check:

@@ -22,15 +22,18 @@ import {
   LANG_SCRIPT_MAP
 } from '~/state/lang_list';
 import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
-
+import Cookie from 'js-cookie';
 import { useQuery } from '@tanstack/react-query';
+import { LESSON_LANG_ID_COOKIE_KEY } from '~/state/cookie';
 
-type Props = {};
+type Props = {
+  init_lang_id: number;
+};
 
 const DEFAULT_LIMIT = 24;
-export default function ListLessons({}: Props) {
+export default function ListLessons({ init_lang_id }: Props) {
   const trpc = useTRPC();
-  const [langId, setLangId] = useState<number | undefined>(lang_list_obj['Sanskrit']);
+  const [langId, setLangId] = useState<number | undefined>(init_lang_id);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [page, setPage] = useState<number>(1);
@@ -83,7 +86,13 @@ export default function ListLessons({}: Props) {
     <div className="space-y-6">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3">
         <div className="min-w-56">
-          <Select value={langId?.toString()} onValueChange={(val) => setLangId(Number(val))}>
+          <Select
+            value={langId?.toString()}
+            onValueChange={(val) => {
+              setLangId(Number(val));
+              Cookie.set(LESSON_LANG_ID_COOKIE_KEY, val, { expires: 30 });
+            }}
+          >
             <SelectTrigger className="w-56">
               <SelectValue placeholder="Select a Language" />
             </SelectTrigger>

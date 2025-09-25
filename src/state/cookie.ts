@@ -1,4 +1,4 @@
-import { script_list_obj, SCRIPT_LIST_IDS } from './lang_list';
+import { script_list_obj, SCRIPT_LIST_IDS, lang_list_obj, LANG_LIST_IDS } from './lang_list';
 import { DEFAULT_FONT_FAMILY, FONT_FAMILIES, type FontFamily } from '~/state/font_list';
 
 export const get_script_id_from_cookie = (value?: string) => {
@@ -6,6 +6,14 @@ export const get_script_id_from_cookie = (value?: string) => {
     return parseInt(value);
   } else {
     return script_list_obj['Devanagari']!;
+  }
+};
+
+export const get_lesson_lang_id_from_cookie = (value?: string) => {
+  if (value && LANG_LIST_IDS.includes(parseInt(value))) {
+    return parseInt(value);
+  } else {
+    return lang_list_obj['Sanskrit']!;
   }
 };
 
@@ -19,3 +27,4 @@ export const get_font_family_from_cookie = (value?: string) => {
 
 export const SCRIPT_ID_COOKIE_KEY = 'script_id';
 export const FONT_FAMILY_COOKIE_KEY = 'font_family';
+export const LESSON_LANG_ID_COOKIE_KEY = 'lesson_lang_id';

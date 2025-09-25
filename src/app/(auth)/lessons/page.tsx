@@ -5,11 +5,16 @@ import { IoMdAdd, IoMdArrowRoundBack } from 'react-icons/io';
 import { Button } from '~/components/ui/button';
 import { getCachedSession } from '~/lib/cache_server_route_data';
 import ListLessons from './ListLessons';
+import { cookies } from 'next/headers';
+import { get_lesson_lang_id_from_cookie, LESSON_LANG_ID_COOKIE_KEY } from '~/state/cookie';
 
 const List = async () => {
   const session = await getCachedSession();
   if (!session || session.user.role !== 'admin')
     redirect(`${process.env.NEXT_PUBLIC_BETTER_AUTH_URL}/login`);
+
+  const cookie = await cookies();
+  const lang_id = get_lesson_lang_id_from_cookie(cookie.get(LESSON_LANG_ID_COOKIE_KEY)?.value);
 
   return (
     <div className="container mx-auto p-4">
@@ -26,7 +31,7 @@ const List = async () => {
           </Button>
         </Link>
       </div>
-      <ListLessons />
+      <ListLessons init_lang_id={lang_id} />
     </div>
   );
 };

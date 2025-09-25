@@ -17,15 +17,18 @@ import { Button } from '~/components/ui/button';
 import { FONT_SCRIPTS } from '~/state/font_list';
 import { script_list_obj, type script_list_type, get_script_from_id } from '~/state/lang_list';
 import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
-
+import Cookie from 'js-cookie';
 import { useQuery } from '@tanstack/react-query';
+import { SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
 
-type Props = {};
+type Props = {
+  init_script_id: number;
+};
 
 const DEFAULT_LIMIT = 24;
-export default function ListGestures({}: Props) {
+export default function ListGestures({ init_script_id }: Props) {
   const trpc = useTRPC();
-  const [scriptId, setScriptId] = useState<number | undefined>(script_list_obj['Devanagari']);
+  const [scriptId, setScriptId] = useState<number | undefined>(init_script_id);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [page, setPage] = useState<number>(1);
@@ -72,7 +75,13 @@ export default function ListGestures({}: Props) {
     <div className="space-y-6">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3">
         <div className="min-w-56">
-          <Select value={scriptId?.toString()} onValueChange={(val) => setScriptId(Number(val))}>
+          <Select
+            value={scriptId?.toString()}
+            onValueChange={(val) => {
+              setScriptId(Number(val));
+              Cookie.set(SCRIPT_ID_COOKIE_KEY, val, { expires: 30 });
+            }}
+          >
             <SelectTrigger className="w-56">
               <SelectValue placeholder="Select a Script" />
             </SelectTrigger>

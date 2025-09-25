@@ -7,6 +7,8 @@ import {
   S3Client,
   StorageClass
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import ms from 'ms';
 
 const envs_parsed = z
   .object({
@@ -59,4 +61,20 @@ export const deleteAssetFile = async (key: string) => {
     })
   );
   return data;
+};
+
+export const getAudioAssetUploadUrl = async (key: `audio_assets/${string}.webm`) => {
+  // Generate presigned URL for upload
+  const command = new PutObjectCommand({
+    Bucket: envs.AWS_S3_FILES_BUCKET_NAME,
+    Key: key,
+    ContentType: mime.lookup(key) || 'application/octet-stream',
+    // ContentLength: fileBuffer.length,
+    StorageClass: StorageClass.STANDARD
+  });
+
+  const uploadUrl = await getSignedUrl(s3, command, {
+    expiresIn: ms('30secs') / 1000
+  });
+  return uploadUrl;
 };

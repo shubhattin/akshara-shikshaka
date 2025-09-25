@@ -5,7 +5,11 @@ import { and, asc, count, desc, eq, ilike } from 'drizzle-orm';
 import { db } from '~/db/db';
 import { audio_assets } from '~/db/schema';
 import { generateGpt4oMiniTtsSpeech, VoiceTypeEnum } from '~/utils/ai/text_to_speech.server';
-import { uploadAssetFile, deleteAssetFile } from '~/utils/s3/upload_file.server';
+import {
+  uploadAssetFile,
+  deleteAssetFile,
+  getAudioAssetUploadUrl
+} from '~/utils/s3/upload_file.server';
 import { get_lang_from_id } from '~/state/lang_list';
 
 const list_audio_assets_route = protectedAdminProcedure
@@ -30,7 +34,7 @@ const list_audio_assets_route = protectedAdminProcedure
       if (whereClause) {
         conds.push(whereClause);
       }
-      if (input.lang_id) {
+      if (input.lang_id !== null && input.lang_id !== undefined) {
         conds.push(eq(audio_assets.lang_id, input.lang_id));
       }
       return and(...conds);
@@ -101,7 +105,7 @@ const make_upload_audio_asset_route = protectedAdminProcedure
     console.log('audio generated');
 
     const s3_key =
-      `audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : '' + crypto.randomUUID()}.webm` as const;
+      `audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
     await uploadAssetFile(s3_key, audioBuffer.fileBuffer);
     console.log('audio uploaded');
 
@@ -150,6 +154,62 @@ const delete_audio_asset_route = protectedAdminProcedure
     };
   });
 
+// Delete an uploaded audio file in S3 when no DB row exists (cleanup by s3_key)
+const delete_uploaded_audio_file_route = protectedAdminProcedure
+  .input(z.object({ s3_key: z.string() }))
+  .mutation(async ({ input }) => {
+    await deleteAssetFile(input.s3_key);
+    return { deleted: true };
+  });
+
+const get_upload_audio_asset_url_route = protectedAdminProcedure
+  .input(
+    z.object({
+      lang_id: z.number().int().optional().nullable(),
+      text: z.string(),
+      text_key: z.string()
+    })
+  )
+  .query(async ({ input }) => {
+    const s3_key =
+      `audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
+    const upload_url = await getAudioAssetUploadUrl(s3_key);
+    return {
+      upload_url,
+      s3_key
+    };
+  });
+
+const complete_upload_audio_asset_route = protectedAdminProcedure
+  .input(
+    z.object({
+      lang_id: z.number().int().optional().nullable(),
+      text: z.string(),
+      text_key: z.string(),
+      s3_key: z.string()
+    })
+  )
+  .mutation(async ({ input }) => {
+    const description = `${input.text_key} (${input.text})`;
+    const [result] = await db
+      .insert(audio_assets)
+      .values({
+        description: description,
+        lang_id: input.lang_id,
+        s3_key: input.s3_key,
+        type: 'recorded'
+      })
+      .returning();
+
+    return {
+      completed: true,
+      id: result.id,
+      s3_key: input.s3_key,
+      description: description,
+      type: 'recorded' as const
+    };
+  });
+
 const update_audio_asset_route = protectedAdminProcedure
   .input(
     z.object({
@@ -172,5 +232,8 @@ export const audio_assets_router = t.router({
   list_audio_assets: list_audio_assets_route,
   upload_audio_asset: make_upload_audio_asset_route,
   delete_audio_asset: delete_audio_asset_route,
-  update_audio_asset: update_audio_asset_route
+  delete_uploaded_audio_file: delete_uploaded_audio_file_route,
+  update_audio_asset: update_audio_asset_route,
+  get_upload_audio_asset_url: get_upload_audio_asset_url_route,
+  complete_upload_audio_asset: complete_upload_audio_asset_route
 });

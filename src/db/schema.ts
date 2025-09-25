@@ -12,7 +12,7 @@ import {
   primaryKey,
   unique,
   varchar,
-  vector
+  pgEnum
 } from 'drizzle-orm/pg-core';
 import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
 import type { Gesture } from '~/tools/stroke_data/types';
@@ -104,16 +104,22 @@ export const image_assets = pgTable('image_assets', {
     .$onUpdate(() => new Date())
 });
 
-export const audio_assets = pgTable('audio_assets', {
-  id: serial().primaryKey(),
-  description: varchar('description', { length: 150 }).notNull().default(''),
-  lang_id: smallint(), // optional language id for the audio like for words and pronunciation specific to a language
-  s3_key: text().notNull(),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
-    .notNull()
-    .$onUpdate(() => new Date())
-});
+export const image_asset_type_enum = pgEnum('image_asset_type_enum', ['ai_generated', 'recorded']);
+export const audio_assets = pgTable(
+  'audio_assets',
+  {
+    id: serial().primaryKey(),
+    description: varchar('description', { length: 150 }).notNull().default(''),
+    lang_id: smallint(), // optional language id for the audio like for words and pronunciation specific to a language
+    s3_key: text().notNull(),
+    type: image_asset_type_enum().notNull().default('ai_generated'),
+    created_at: timestamp().notNull().defaultNow(),
+    updated_at: timestamp()
+      .notNull()
+      .$onUpdate(() => new Date())
+  },
+  (table) => [index('audio_assets_type_idx').on(table.type)]
+);
 
 // relations
 

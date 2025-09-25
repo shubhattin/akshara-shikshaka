@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogAction
 } from '~/components/ui/alert-dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -464,7 +465,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
     setWords((prev) =>
       prev.map((w) => (w.order === wordItem.order ? { ...w, image_id: null } : w))
     );
-    setToSaveImageInfo(null);
+    // setToSaveImageInfo(null);
     setDeleteImageInfoStatus(true);
   };
 
@@ -472,8 +473,8 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
     setWords((prev) =>
       prev.map((w) => (w.order === wordItem.order ? { ...w, audio_id: null } : w))
     );
+    // setToSaveAudioInfo(null);
     setDeleteAudioInfoStatus(true);
-    setToSaveAudioInfo(null);
   };
 
   const togglePlay = () => {
@@ -582,6 +583,9 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
             <Dialog open={imageViewDialogOpen} onOpenChange={setImageViewDialogOpen}>
               {/* <DialogTrigger asChild className="cursor-pointer"></DialogTrigger> */}
               <DialogContent className="flex items-center justify-center px-8 py-6">
+                <VisuallyHidden>
+                  <DialogTitle>View Image</DialogTitle>
+                </VisuallyHidden>
                 <div className="flex flex-col items-center justify-center space-y-4">
                   <span className="text-sm font-semibold text-muted-foreground">
                     {image_asset.description}

@@ -172,20 +172,18 @@ const AudioList = () => {
         </div>
       </div>
 
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {isLoading
           ? Array.from({ length: limit }).map((_, i) => (
-              <li key={`skeleton-${i}`}>
-                <Card className="p-2">
-                  <CardContent className="flex items-start gap-3 p-2">
-                    <Skeleton className="h-14 w-14 rounded" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-5/6" />
-                      <Skeleton className="h-4 w-3/5" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </li>
+              <Card className="p-2">
+                <CardContent className="flex items-start gap-3 p-2">
+                  <Skeleton className="h-14 w-14 rounded" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-5/6" />
+                    <Skeleton className="h-4 w-3/5" />
+                  </div>
+                </CardContent>
+              </Card>
             ))
           : items.map((item) => {
               const selected = selectedAudio?.id === item.id;
@@ -209,13 +207,6 @@ const AudioList = () => {
                   )}
                 >
                   <CardContent className="flex items-center gap-3 p-2">
-                    <div className="flex size-14 items-center justify-center rounded bg-muted">
-                      {item.type === 'ai_generated' ? (
-                        <FaRobot className="size-6 text-purple-600 dark:text-purple-400" />
-                      ) : (
-                        <MdMic className="size-6 text-emerald-600 dark:text-emerald-400" />
-                      )}
-                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-2 text-xs">{item.description}</p>
                       {langFilter === null && item.lang_id != null && (
@@ -242,11 +233,18 @@ const AudioList = () => {
                         )}
                       </Button>
                     </div>
+                    <div className="flex size-4 items-center justify-center rounded bg-muted">
+                      {item.type === 'ai_generated' ? (
+                        <FaRobot className="size-4 text-yellow-600" />
+                      ) : (
+                        <MdMic className="size-4 text-emerald-600 dark:text-emerald-400" />
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               );
             })}
-      </ul>
+      </div>
 
       <div className="mx-auto flex w-full items-center justify-between gap-2">
         <div className="text-xs text-muted-foreground">

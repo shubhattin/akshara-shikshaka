@@ -150,8 +150,27 @@ const delete_audio_asset_route = protectedAdminProcedure
     };
   });
 
+const update_audio_asset_route = protectedAdminProcedure
+  .input(
+    z.object({
+      id: z.number().int(),
+      description: z.string(),
+      lang_id: z.number().int().optional().nullable()
+    })
+  )
+  .mutation(async ({ input: { id, description, lang_id } }) => {
+    await db
+      .update(audio_assets)
+      .set({ description: description, lang_id: lang_id })
+      .where(eq(audio_assets.id, id));
+    return {
+      updated: true
+    };
+  });
+
 export const audio_assets_router = t.router({
   list_audio_assets: list_audio_assets_route,
   upload_audio_asset: make_upload_audio_asset_route,
-  delete_audio_asset: delete_audio_asset_route
+  delete_audio_asset: delete_audio_asset_route,
+  update_audio_asset: update_audio_asset_route
 });

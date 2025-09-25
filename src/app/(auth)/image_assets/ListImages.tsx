@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { client_q } from '~/api/client';
+import { useTRPC } from '~/api/client';
 import { Input } from '~/components/ui/input';
 import {
   Select,
@@ -37,6 +37,9 @@ import { MdDeleteOutline } from 'react-icons/md';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
+import { useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
+
 dayjs.extend(relativeTime);
 
 const DEFAULT_LIMIT = 24;
@@ -50,6 +53,7 @@ type ImageItem = {
 };
 
 export default function ListImages() {
+  const trpc = useTRPC();
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [sortBy, setSortBy] = useState<'created_at' | 'updated_at'>('created_at');
@@ -68,31 +72,34 @@ export default function ListImages() {
     setPage(1);
   }, [debouncedSearch, sortBy, orderBy, limit]);
 
-  const list_q = client_q.image_assets?.list_image_assets.useQuery(
-    {
-      search_text: debouncedSearch || undefined,
-      sort_by: sortBy,
-      order_by: orderBy,
-      page,
-      limit
-    },
-    {
-      enabled: true
-    }
+  const list_q = useQuery(
+    trpc.image_assets.list_image_assets.queryOptions(
+      {
+        search_text: debouncedSearch || undefined,
+        sort_by: sortBy,
+        order_by: orderBy,
+        page,
+        limit
+      },
+      {
+        enabled: true
+      }
+    )
   ) as any;
 
   const isLoading = list_q?.isLoading || list_q?.isFetching;
   const data = list_q?.data;
   const items = useMemo(() => data?.list ?? [], [data]);
 
-  const delete_image_mut = client_q.image_assets.delete_image_asset.useMutation({
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [['image_assets', 'list_image_assets']]
-      });
-      setDeleteImageId(null);
-    }
-  });
+  const delete_image_mut = useMutation(
+    trpc.image_assets.delete_image_asset.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.image_assets.list_image_assets.pathFilter());
+        // invalidate all
+        setDeleteImageId(null);
+      }
+    })
+  );
 
   return (
     <div className="space-y-6">

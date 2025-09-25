@@ -1,9 +1,8 @@
 'use client';
-
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { IoMdSearch, IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
-import { client_q } from '~/api/client';
+import { useTRPC } from '~/api/client';
 import { Card, CardHeader, CardTitle } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
 import {
@@ -19,10 +18,13 @@ import { FONT_SCRIPTS } from '~/state/font_list';
 import { script_list_obj, type script_list_type, get_script_from_id } from '~/state/lang_list';
 import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
 
+import { useQuery } from '@tanstack/react-query';
+
 type Props = {};
 
 const DEFAULT_LIMIT = 24;
 export default function ListGestures({}: Props) {
+  const trpc = useTRPC();
   const [scriptId, setScriptId] = useState<number | undefined>(script_list_obj['Devanagari']);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -39,16 +41,18 @@ export default function ListGestures({}: Props) {
     setPage(1);
   }, [scriptId, debouncedSearch, limit]);
 
-  const list_q = client_q.text_gestures.list_text_gesture_data.useQuery(
-    {
-      script_id: scriptId!,
-      search_text: debouncedSearch || undefined,
-      page,
-      limit
-    },
-    {
-      enabled: !!scriptId
-    }
+  const list_q = useQuery(
+    trpc.text_gestures.list_text_gesture_data.queryOptions(
+      {
+        script_id: scriptId!,
+        search_text: debouncedSearch || undefined,
+        page,
+        limit
+      },
+      {
+        enabled: !!scriptId
+      }
+    )
   );
   const isLoading = !!scriptId && (list_q.isLoading || list_q.isFetching);
   const data = list_q.data;

@@ -1,6 +1,5 @@
 'use client';
-
-import { client_q } from '~/api/client';
+import { useTRPC } from '~/api/client';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '~/components/ui/tabs';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '~/components/ui/button';
@@ -23,6 +22,9 @@ import { atom, useAtom, useAtomValue } from 'jotai';
 import { useQueryClient } from '@tanstack/react-query';
 import ms from 'ms';
 import { Label } from '~/components/ui/label';
+
+import { useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 
 type Props = {
   onImageSelect: (image: image_type) => void;
@@ -68,6 +70,7 @@ export default function ImageSelect(props: Props) {
 const IMAGE_AVERAGE_TIME_MS = ms('28secs');
 
 const ImageList = () => {
+  const trpc = useTRPC();
   const [selectedImage, setSelectedImage] = useAtom(selected_image_atom);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -83,13 +86,15 @@ const ImageList = () => {
     setPage(1);
   }, [debouncedSearch]);
 
-  const list_q = client_q.image_assets.list_image_assets.useQuery({
-    search_text: debouncedSearch || undefined,
-    sort_by: 'created_at',
-    order_by: 'desc',
-    page,
-    limit
-  });
+  const list_q = useQuery(
+    trpc.image_assets.list_image_assets.queryOptions({
+      search_text: debouncedSearch || undefined,
+      sort_by: 'created_at',
+      order_by: 'desc',
+      page,
+      limit
+    })
+  );
 
   const isLoading = list_q.isLoading || list_q.isFetching;
   const data = list_q.data;
@@ -207,28 +212,29 @@ const ImageList = () => {
 };
 
 const ImageCreation = ({ wordItem }: Props) => {
+  const trpc = useTRPC();
   const [, setSelectedImage] = useAtom(selected_image_atom);
   const queryClient = useQueryClient();
   const [elapsedTime, setElapsedTime] = useState(0);
   const [imagePrompt, setImagePrompt] = useState('');
 
-  const create_image_mut = client_q.image_assets.make_upload_image_asset.useMutation({
-    onSuccess: (data) => {
-      if (data.success) {
-        setSelectedImage({
-          id: data.id,
-          description: data.description,
-          s3_key: data.s3_key,
-          height: 256,
-          width: 256
-        });
-        setImagePrompt(data.image_prompt);
-        queryClient.invalidateQueries({
-          queryKey: [['image_assets', 'list_image_assets']]
-        });
+  const create_image_mut = useMutation(
+    trpc.image_assets.make_upload_image_asset.mutationOptions({
+      onSuccess: (data) => {
+        if (data.success) {
+          setSelectedImage({
+            id: data.id,
+            description: data.description,
+            s3_key: data.s3_key,
+            height: 256,
+            width: 256
+          });
+          setImagePrompt(data.image_prompt);
+          queryClient.invalidateQueries(trpc.image_assets.list_image_assets.pathFilter());
+        }
       }
-    }
-  });
+    })
+  );
   const lang_id = useAtomValue(lang_id_atom);
   const word_script_id = useAtomValue(base_word_script_id_atom);
 
@@ -241,14 +247,14 @@ const ImageCreation = ({ wordItem }: Props) => {
     });
   };
 
-  const delete_image_mut = client_q.image_assets.delete_image_asset.useMutation({
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [['image_assets', 'list_image_assets']]
-      });
-      setSelectedImage(null);
-    }
-  });
+  const delete_image_mut = useMutation(
+    trpc.image_assets.delete_image_asset.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.image_assets.list_image_assets.pathFilter());
+        setSelectedImage(null);
+      }
+    })
+  );
 
   const handleDeleteImage = async (image_id: number) => {
     await delete_image_mut.mutateAsync({

@@ -1,9 +1,8 @@
 'use client';
-
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { IoMdSearch, IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
-import { client_q } from '~/api/client';
+import { useTRPC } from '~/api/client';
 import { Card, CardHeader, CardTitle } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
 import {
@@ -24,10 +23,13 @@ import {
 } from '~/state/lang_list';
 import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
 
+import { useQuery } from '@tanstack/react-query';
+
 type Props = {};
 
 const DEFAULT_LIMIT = 24;
 export default function ListLessons({}: Props) {
+  const trpc = useTRPC();
   const [langId, setLangId] = useState<number | undefined>(lang_list_obj['Sanskrit']);
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -43,16 +45,18 @@ export default function ListLessons({}: Props) {
     setPage(1);
   }, [langId, debouncedSearch, limit]);
 
-  const list_q = client_q.text_lessons.list_text_lessons.useQuery(
-    {
-      lang_id: langId!,
-      search_text: debouncedSearch || undefined,
-      page,
-      limit
-    },
-    {
-      enabled: !!langId
-    }
+  const list_q = useQuery(
+    trpc.text_lessons.list_text_lessons.queryOptions(
+      {
+        lang_id: langId!,
+        search_text: debouncedSearch || undefined,
+        page,
+        limit
+      },
+      {
+        enabled: !!langId
+      }
+    )
   );
   const isLoading = !!langId && (list_q.isLoading || list_q.isFetching);
   const data = list_q.data;

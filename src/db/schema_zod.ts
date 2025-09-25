@@ -13,7 +13,8 @@ import { GestureSchema } from '~/tools/stroke_data/types';
 export const TextGesturesSchemaZod = createSelectSchema(text_gestures, {
   created_at: z.coerce.date(),
   updated_at: z.coerce.date(),
-  gestures: GestureSchema.array()
+  gestures: GestureSchema.array(),
+  text_center_offset: z.tuple([z.number(), z.number()]).default([0, 0])
 });
 
 export const TextLessonsSchemaZod = createSelectSchema(text_lessons, {

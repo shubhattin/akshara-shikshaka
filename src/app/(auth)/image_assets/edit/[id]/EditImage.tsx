@@ -1,11 +1,10 @@
 'use client';
-
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { client_q } from '~/api/client';
+import { useTRPC } from '~/api/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +27,8 @@ import { IoMdArrowRoundBack } from 'react-icons/io';
 import { MdDeleteOutline, MdEdit } from 'react-icons/md';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
+
+import { useMutation } from '@tanstack/react-query';
 
 // Atom for image data
 const image_data_atom = atom<{
@@ -140,20 +141,23 @@ const ImageInfo = () => {
 };
 
 const DescriptionEditor = () => {
+  const trpc = useTRPC();
   const [image_data, setImageData] = useAtom(image_data_atom);
   const [isEditing, setIsEditing] = useState(false);
   const [description, setDescription] = useState('');
 
-  const update_image_mut = client_q.image_assets.update_image_asset.useMutation({
-    onSuccess: () => {
-      toast.success('Image description updated successfully');
-      setImageData((prev) => (prev ? { ...prev, description } : null));
-      setIsEditing(false);
-    },
-    onError: (error) => {
-      toast.error('Failed to update image description: ' + error.message);
-    }
-  });
+  const update_image_mut = useMutation(
+    trpc.image_assets.update_image_asset.mutationOptions({
+      onSuccess: () => {
+        toast.success('Image description updated successfully');
+        setImageData((prev) => (prev ? { ...prev, description } : null));
+        setIsEditing(false);
+      },
+      onError: (error) => {
+        toast.error('Failed to update image description: ' + error.message);
+      }
+    })
+  );
 
   useEffect(() => {
     if (image_data) {
@@ -266,22 +270,23 @@ const AssociatedWords = ({ words }: { words: Props['words'] }) => {
 };
 
 const EditActions = ({ words }: { words: Props['words'] }) => {
+  const trpc = useTRPC();
   const router = useRouter();
   const image_data = useAtomValue(image_data_atom);
   const queryClient = useQueryClient();
 
-  const delete_image_mut = client_q.image_assets.delete_image_asset.useMutation({
-    onSuccess: () => {
-      toast.success('Image deleted successfully');
-      router.push('/image_assets');
-      queryClient.invalidateQueries({
-        queryKey: [['image_assets', 'list_image_assets']]
-      });
-    },
-    onError: (error) => {
-      toast.error('Failed to delete image: ' + error.message);
-    }
-  });
+  const delete_image_mut = useMutation(
+    trpc.image_assets.delete_image_asset.mutationOptions({
+      onSuccess: () => {
+        toast.success('Image deleted successfully');
+        router.push('/image_assets');
+        queryClient.invalidateQueries(trpc.image_assets.list_image_assets.pathFilter());
+      },
+      onError: (error) => {
+        toast.error('Failed to delete image: ' + error.message);
+      }
+    })
+  );
 
   const handleDelete = () => {
     if (!image_data) return;

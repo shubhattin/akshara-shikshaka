@@ -1,5 +1,4 @@
 'use client';
-
 import { useAtomValue, useAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { useRouter } from 'next/navigation';
@@ -9,7 +8,7 @@ import { IoMdAdd } from 'react-icons/io';
 import { MdClose, MdDeleteOutline, MdDragHandle } from 'react-icons/md';
 import { RiImageAddLine } from 'react-icons/ri';
 import { toast } from 'sonner';
-import { client_q } from '~/api/client';
+import { useTRPC } from '~/api/client';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -80,6 +79,9 @@ import {
 } from '~/components/ui/dialog';
 import ImageSelect from './ImageSelect';
 
+import { useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
+
 type Props =
   | {
       location: 'add';
@@ -117,6 +119,7 @@ export default function TextLessonAddEditComponent(props: Props) {
 }
 
 const LessonInfo = (props: Props) => {
+  const trpc = useTRPC();
   const [lang_id, setLangId] = useAtom(lang_id_atom);
   const [base_word_script_id, setBaseWordScriptId] = useAtom(base_word_script_id_atom);
   const [gesture_ids, setGestureIds] = useAtom(gesture_ids_atom);
@@ -141,13 +144,15 @@ const LessonInfo = (props: Props) => {
     load_parivartak_lang_data(get_script_from_id(base_word_script_id));
   }, [lang_id, base_word_script_id]);
 
-  const searched_gestures_q = client_q.text_lessons.get_gestures_from_text_key.useQuery(
-    {
-      text_key: textKey!
-    },
-    {
-      enabled: !!textKey
-    }
+  const searched_gestures_q = useQuery(
+    trpc.text_lessons.get_gestures_from_text_key.queryOptions(
+      {
+        text_key: textKey!
+      },
+      {
+        enabled: !!textKey
+      }
+    )
   );
 
   return (
@@ -358,6 +363,7 @@ type SortableWordItemProps = {
 };
 
 function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableWordItemProps) {
+  const trpc = useTRPC();
   const base_word_script_id = useAtomValue(base_word_script_id_atom);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: wordItem.order.toString()
@@ -371,8 +377,8 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
     opacity: isDragging ? 0.5 : 1
   } as React.CSSProperties;
 
-  const get_text_lesson_word_media_data_q =
-    client_q.text_lessons.get_text_lesson_word_media_data.useQuery(
+  const get_text_lesson_word_media_data_q = useQuery(
+    trpc.text_lessons.get_text_lesson_word_media_data.queryOptions(
       {
         word_id: wordItem.id!,
         lesson_id: lesson_id
@@ -380,7 +386,8 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
       {
         enabled: !!wordItem.id && !!lesson_id
       }
-    );
+    )
+  );
 
   const [toSaveImageInfo, setToSaveImageInfo] = useState<image_type | null>(null);
   const [toSaveAudioInfo, setToSaveAudioInfo] = useState<audio_type | null>(null);
@@ -518,6 +525,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
 }
 
 const AddEditSave = (props: Props) => {
+  const trpc = useTRPC();
   const router = useRouter();
   const text = useAtomValue(text_atom);
   const lang_id = useAtomValue(lang_id_atom);
@@ -525,59 +533,63 @@ const AddEditSave = (props: Props) => {
   const gesture_ids = useAtomValue(gesture_ids_atom);
   const [words, setWords] = useAtom(words_atom);
 
-  const add_text_data_mut = client_q.text_lessons.add_text_lesson.useMutation({
-    onSuccess(data) {
-      toast.success('Text Lesson Added');
-      router.push(`/lessons/edit/${data.id}`);
-    },
-    onError(error) {
-      toast.error('Failed to Add Text Lesson ' + error.message);
-    }
-  });
-
-  const update_text_data_mut = client_q.text_lessons.update_text_lesson.useMutation({
-    onSuccess(data) {
-      // find indexes or words that were to be added, they will have no id
-      const to_be_added_word_indexes = words
-        .map((w, idx) => [w, idx] as [text_lesson_word_type, number])
-        .filter(([w]) => w.id === undefined || w.id === null)
-        .map(([w, idx]) => idx);
-
-      if (to_be_added_word_indexes.length !== data.inserted_words_ids.length) {
-        toast.error('Failed to Add Text Lesson');
-        return;
+  const add_text_data_mut = useMutation(
+    trpc.text_lessons.add_text_lesson.mutationOptions({
+      onSuccess(data) {
+        toast.success('Text Lesson Added');
+        router.push(`/lessons/edit/${data.id}`);
+      },
+      onError(error) {
+        toast.error('Failed to Add Text Lesson ' + error.message);
       }
+    })
+  );
 
-      // update the words with the added ids
-      setWords((prev) =>
-        prev.map((w, idx) =>
-          to_be_added_word_indexes.includes(idx)
-            ? { ...w, id: data.inserted_words_ids[to_be_added_word_indexes.indexOf(idx)] }
-            : w
-        )
-      );
+  const update_text_data_mut = useMutation(
+    trpc.text_lessons.update_text_lesson.mutationOptions({
+      onSuccess(data) {
+        // find indexes or words that were to be added, they will have no id
+        const to_be_added_word_indexes = words
+          .map((w, idx) => [w, idx] as [text_lesson_word_type, number])
+          .filter(([w]) => w.id === undefined || w.id === null)
+          .map(([w, idx]) => idx);
 
-      toast.success('Text Lesson Information Updated');
-    },
-    onError(error) {
-      toast.error('Failed to Update Text Lesson ' + error.message);
-    }
-  });
+        if (to_be_added_word_indexes.length !== data.inserted_words_ids.length) {
+          toast.error('Failed to Add Text Lesson');
+          return;
+        }
+
+        // update the words with the added ids
+        setWords((prev) =>
+          prev.map((w, idx) =>
+            to_be_added_word_indexes.includes(idx)
+              ? { ...w, id: data.inserted_words_ids[to_be_added_word_indexes.indexOf(idx)] }
+              : w
+          )
+        );
+
+        toast.success('Text Lesson Information Updated');
+      },
+      onError(error) {
+        toast.error('Failed to Update Text Lesson ' + error.message);
+      }
+    })
+  );
 
   const queryClient = useQueryClient();
 
-  const delete_text_data_mut = client_q.text_lessons.delete_text_lesson.useMutation({
-    async onSuccess(data) {
-      toast.success('Text Lesson Deleted');
-      await queryClient.invalidateQueries({
-        queryKey: [['text_lessons', 'list_text_lessons']]
-      });
-      router.push('/lessons');
-    },
-    onError(error) {
-      toast.error('Failed to delete text');
-    }
-  });
+  const delete_text_data_mut = useMutation(
+    trpc.text_lessons.delete_text_lesson.mutationOptions({
+      async onSuccess(data) {
+        toast.success('Text Lesson Deleted');
+        await queryClient.invalidateQueries(trpc.text_lessons.list_text_lessons.pathFilter());
+        router.push('/lessons');
+      },
+      onError(error) {
+        toast.error('Failed to delete text');
+      }
+    })
+  );
 
   const handleSave = () => {
     if (text.trim().length === 0) {

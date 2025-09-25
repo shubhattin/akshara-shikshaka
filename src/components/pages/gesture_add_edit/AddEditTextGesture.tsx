@@ -1,5 +1,4 @@
 'use client';
-
 import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '~/components/ui/button';
@@ -14,7 +13,7 @@ import {
   SelectValue
 } from '~/components/ui/select';
 import type Konva from 'konva';
-import { client_q } from '~/api/client';
+import { useTRPC } from '~/api/client';
 import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
@@ -98,6 +97,8 @@ import type { text_gestures } from '~/db/schema';
 import { useQueryClient } from '@tanstack/react-query';
 import Cookie from 'js-cookie';
 import { FONT_FAMILY_COOKIE_KEY, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
+
+import { useMutation } from '@tanstack/react-query';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
 const KonvaCanvas = dynamic(() => import('./AddEditGestureCanvas'), {
@@ -1060,6 +1061,7 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
 }
 
 const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
+  const trpc = useTRPC();
   const text = useAtomValue(text_atom);
   const gestureData = useAtomValue(gesture_data_atom);
   const script = useAtomValue(script_atom);
@@ -1072,47 +1074,51 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const is_addition = text_data.id === undefined && text_data.uuid === undefined;
 
   const router = useRouter();
-  const add_text_data_mut = client_q.text_gestures.add_text_gesture_data.useMutation({
-    onSuccess(data) {
-      if (data.success) {
-        toast.success('Text Added');
-        router.push(`/gestures/edit/${data.id}`);
-      } else {
-        if (data.err_code === 'text_already_exists') {
-          toast.error('Text already exists');
+  const add_text_data_mut = useMutation(
+    trpc.text_gestures.add_text_gesture_data.mutationOptions({
+      onSuccess(data) {
+        if (data.success) {
+          toast.success('Text Added');
+          router.push(`/gestures/edit/${data.id}`);
         } else {
-          toast.error('Failed to add text');
+          if (data.err_code === 'text_already_exists') {
+            toast.error('Text already exists');
+          } else {
+            toast.error('Failed to add text');
+          }
         }
+      },
+      onError(error) {
+        toast.error('Failed to add text');
       }
-    },
-    onError(error) {
-      toast.error('Failed to add text');
-    }
-  });
+    })
+  );
 
-  const update_text_data_mut = client_q.text_gestures.edit_text_gesture_data.useMutation({
-    onSuccess(data) {
-      toast.success('Text Updated');
-    },
-    onError(error) {
-      toast.error('Failed to update text');
-    }
-  });
+  const update_text_data_mut = useMutation(
+    trpc.text_gestures.edit_text_gesture_data.mutationOptions({
+      onSuccess(data) {
+        toast.success('Text Updated');
+      },
+      onError(error) {
+        toast.error('Failed to update text');
+      }
+    })
+  );
 
   const queryClient = useQueryClient();
 
-  const delete_text_data_mut = client_q.text_gestures.delete_text_gesture_data.useMutation({
-    async onSuccess(data) {
-      toast.success('Text Deleted');
-      await queryClient.invalidateQueries({
-        queryKey: [['text_gestures', 'list_text_gesture_data']]
-      });
-      router.push('/gestures');
-    },
-    onError(error) {
-      toast.error('Failed to delete text');
-    }
-  });
+  const delete_text_data_mut = useMutation(
+    trpc.text_gestures.delete_text_gesture_data.mutationOptions({
+      async onSuccess(data) {
+        toast.success('Text Deleted');
+        await queryClient.invalidateQueries(trpc.text_gestures.list_text_gesture_data.pathFilter());
+        router.push('/gestures');
+      },
+      onError(error) {
+        toast.error('Failed to delete text');
+      }
+    })
+  );
 
   const handle_save = async () => {
     if (text.trim().length === 0) return;

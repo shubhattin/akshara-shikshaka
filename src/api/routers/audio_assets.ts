@@ -45,6 +45,7 @@ const list_audio_assets_route = protectedAdminProcedure
         id: audio_assets.id,
         description: audio_assets.description,
         type: audio_assets.type,
+        lang_id: audio_assets.lang_id,
         s3_key: audio_assets.s3_key,
         created_at: audio_assets.created_at,
         updated_at: audio_assets.updated_at
@@ -88,6 +89,7 @@ const make_upload_audio_asset_route = protectedAdminProcedure
   )
   .mutation(async ({ input }) => {
     await dev_delay(400);
+    const start_time = Date.now(); // ^ for tracking the time taken to generate the audio
 
     const audioBuffer = await generateGpt4oMiniTtsSpeech({
       text: input.text,
@@ -103,7 +105,7 @@ const make_upload_audio_asset_route = protectedAdminProcedure
     await uploadAssetFile(s3_key, audioBuffer.fileBuffer);
     console.log('audio uploaded');
 
-    const description = `${input.text_key} (${input.text}`;
+    const description = `${input.text_key} (${input.text})`;
     const [result] = await db
       .insert(audio_assets)
       .values({
@@ -116,11 +118,40 @@ const make_upload_audio_asset_route = protectedAdminProcedure
 
     return {
       id: result.id,
-      description
+      description,
+      s3_key,
+      type: 'ai_generated' as const,
+      time_ms: Date.now() - start_time
+    };
+  });
+
+const delete_audio_asset_route = protectedAdminProcedure
+  .input(z.object({ id: z.number().int() }))
+  .mutation(async ({ input }) => {
+    const result = await db.query.audio_assets.findFirst({
+      columns: {
+        s3_key: true,
+        id: true
+      },
+      where: (tbl) => eq(tbl.id, input.id)
+    });
+    if (!result) {
+      return {
+        deleted: false,
+        err_code: 'audio_asset_not_found' as const
+      };
+    }
+
+    await deleteAssetFile(result.s3_key);
+    await db.delete(audio_assets).where(eq(audio_assets.id, input.id));
+
+    return {
+      deleted: true
     };
   });
 
 export const audio_assets_router = t.router({
   list_audio_assets: list_audio_assets_route,
-  upload_audio_asset: make_upload_audio_asset_route
+  upload_audio_asset: make_upload_audio_asset_route,
+  delete_audio_asset: delete_audio_asset_route
 });

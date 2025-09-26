@@ -43,6 +43,13 @@
       "when": 1758722211634,
       "tag": "0005_narrow_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1758868074956,
+      "tag": "0006_fair_prodigy",
+      "breakpoints": true
     }
   ]
 }

@@ -80,7 +80,7 @@ export default function AudioSelect(props: Props) {
   );
 }
 
-const AUDIO_AVERAGE_TIME_MS = ms('7secs');
+const AUDIO_AVERAGE_TIME_MS = ms('6s');
 
 const AudioList = () => {
   const trpc = useTRPC();

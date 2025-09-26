@@ -239,7 +239,7 @@ const AudioInfo = () => {
                 <div>
                   <Label className="text-xs font-medium text-muted-foreground">Language</Label>
                   <p className="text-sm">
-                    {langId == null ? 'All' : get_lang_from_id(Number(langId))}
+                    {langId == 'all' ? 'All' : get_lang_from_id(Number(langId))}
                   </p>
                 </div>
               </div>

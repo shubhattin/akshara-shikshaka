@@ -67,7 +67,7 @@ export default function ImageSelect(props: Props) {
   );
 }
 
-const IMAGE_AVERAGE_TIME_MS = ms('28secs');
+const IMAGE_AVERAGE_TIME_MS = ms('28s');
 
 const ImageList = () => {
   const trpc = useTRPC();

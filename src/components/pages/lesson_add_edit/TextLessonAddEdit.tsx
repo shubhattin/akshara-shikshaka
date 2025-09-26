@@ -2,7 +2,7 @@
 import { useAtomValue, useAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FiSave } from 'react-icons/fi';
 import { IoMdAdd } from 'react-icons/io';
 import { MdClose, MdDeleteOutline, MdDragHandle } from 'react-icons/md';
@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogAction
 } from '~/components/ui/alert-dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -78,9 +79,12 @@ import {
   DialogTitle
 } from '~/components/ui/dialog';
 import ImageSelect from './ImageSelect';
+import AudioSelect from './AudioSelect';
+import { MdPlayArrow, MdStop } from 'react-icons/md';
 
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
+import { AiOutlineAudio } from 'react-icons/ai';
 
 type Props =
   | {
@@ -282,10 +286,15 @@ const LessonInfo = (props: Props) => {
 
 const LessonWords = (props: Props) => {
   const [words, setWords] = useAtom(words_atom);
+  const [isClient, setIsClient] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -329,24 +338,52 @@ const LessonWords = (props: Props) => {
 
   return (
     <div className="space-y-3">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext
-          items={words.map((w) => w.order.toString())}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="flex flex-col gap-2">
-            {words.map((w) => (
-              <SortableWordItem
-                key={w.order}
-                wordItem={w}
-                onChange={handleWordChange}
-                onDelete={handleDelete}
-                lesson_id={props.text_lesson_info.id!}
+      {isClient ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={words.map((w) => w.order.toString())}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="flex flex-col gap-2">
+              {words.map((w) => (
+                <SortableWordItem
+                  key={w.order}
+                  wordItem={w}
+                  onChange={handleWordChange}
+                  onDelete={handleDelete}
+                  lesson_id={props.text_lesson_info.id!}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {words.map((w) => (
+            <div
+              key={w.order}
+              className={cn('w-full rounded-md px-3 py-2', 'flex items-center gap-2')}
+            >
+              <div className="cursor-grab rounded p-1 hover:bg-muted">
+                <MdDragHandle className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <Input
+                value={w.word}
+                onInput={(e) => handleWordChange(w.order, e.currentTarget.value)}
+                className="w-32"
               />
-            ))}
-          </div>
-        </SortableContext>
-      </DndContext>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0"
+                onClick={() => handleDelete(w.order)}
+              >
+                <MdDeleteOutline className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <Button size="sm" variant="outline" onClick={handleAddNew}>
         <IoMdAdd className="mr-1" /> Add Word
@@ -370,6 +407,9 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
   });
 
   const [, setWords] = useAtom(words_atom);
+  const [audioDialogOpen, setAudioDialogOpen] = useState(false);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -392,11 +432,14 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
   const [toSaveImageInfo, setToSaveImageInfo] = useState<image_type | null>(null);
   const [toSaveAudioInfo, setToSaveAudioInfo] = useState<audio_type | null>(null);
   const [deleteImageInfoStatus, setDeleteImageInfoStatus] = useState(false);
+  const [deleteAudioInfoStatus, setDeleteAudioInfoStatus] = useState(false);
 
   const image_asset = !deleteImageInfoStatus
     ? (toSaveImageInfo ?? get_text_lesson_word_media_data_q.data?.image_asset)
     : null;
-  const audio_asset = toSaveAudioInfo ?? get_text_lesson_word_media_data_q.data?.audio_asset;
+  const audio_asset = !deleteAudioInfoStatus
+    ? (toSaveAudioInfo ?? get_text_lesson_word_media_data_q.data?.audio_asset)
+    : null;
 
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageViewDialogOpen, setImageViewDialogOpen] = useState(false);
@@ -410,11 +453,47 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
     setImageDialogOpen(false);
   };
 
+  const onAudioSelect = (audio: audio_type) => {
+    setWords((prev) =>
+      prev.map((w) => (w.order === wordItem.order ? { ...w, audio_id: audio.id! } : w))
+    );
+    setToSaveAudioInfo(audio);
+    setAudioDialogOpen(false);
+  };
+
   const onRemoveImage = () => {
     setWords((prev) =>
       prev.map((w) => (w.order === wordItem.order ? { ...w, image_id: null } : w))
     );
+    // setToSaveImageInfo(null);
     setDeleteImageInfoStatus(true);
+  };
+
+  const onRemoveAudio = () => {
+    setWords((prev) =>
+      prev.map((w) => (w.order === wordItem.order ? { ...w, audio_id: null } : w))
+    );
+    // setToSaveAudioInfo(null);
+    setDeleteAudioInfoStatus(true);
+  };
+
+  const togglePlay = () => {
+    const asset = audio_asset;
+    if (!asset) return;
+    if (playingId === wordItem.order) {
+      if (audioRef.current) audioRef.current.pause();
+      setPlayingId(null);
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    const audio = new Audio(`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${asset.s3_key}`);
+    audioRef.current = audio as any;
+    audio.onended = () => setPlayingId(null);
+    audio.play();
+    setPlayingId(wordItem.order);
   };
 
   return (
@@ -504,6 +583,9 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
             <Dialog open={imageViewDialogOpen} onOpenChange={setImageViewDialogOpen}>
               {/* <DialogTrigger asChild className="cursor-pointer"></DialogTrigger> */}
               <DialogContent className="flex items-center justify-center px-8 py-6">
+                <VisuallyHidden>
+                  <DialogTitle>View Image</DialogTitle>
+                </VisuallyHidden>
                 <div className="flex flex-col items-center justify-center space-y-4">
                   <span className="text-sm font-semibold text-muted-foreground">
                     {image_asset.description}
@@ -518,6 +600,51 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
               </DialogContent>
             </Dialog>
           </>
+        )}
+        {/* Audio selection */}
+        {/* {get_text_lesson_word_media_data_q.isLoading && (
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-6 w-24" />
+          </div>
+        )} */}
+        {!audio_asset &&
+          wordItem.word.trim().length > 0 &&
+          !get_text_lesson_word_media_data_q.isLoading && (
+            <Dialog open={audioDialogOpen} onOpenChange={setAudioDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <AiOutlineAudio className="size-6 text-emerald-400" />
+                  Add Audio
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="h-[70vh] w-full overflow-y-scroll px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
+                <DialogHeader className="sr-only">
+                  <DialogTitle>Add Audio</DialogTitle>
+                </DialogHeader>
+                <AudioSelect wordItem={wordItem} onAudioSelect={onAudioSelect} />
+              </DialogContent>
+            </Dialog>
+          )}
+        {audio_asset && wordItem.word.trim().length > 0 && (
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" className="h-7 px-2 text-xs" onClick={togglePlay}>
+              {playingId === wordItem.order ? (
+                <span className="flex items-center gap-1">
+                  <MdStop /> Stop
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <MdPlayArrow /> Play
+                </span>
+              )}
+            </Button>
+            <button
+              onClick={onRemoveAudio}
+              className="rounded-full p-1 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500/50 dark:hover:bg-gray-800"
+            >
+              <MdClose className="size-4" />
+            </button>
+          </div>
         )}
       </div>
     </div>

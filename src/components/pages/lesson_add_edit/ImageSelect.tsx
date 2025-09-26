@@ -39,7 +39,7 @@ export default function ImageSelect(props: Props) {
 
   useEffect(() => {
     setSelectedImage(null);
-  }, [props.wordItem]);
+  }, [tab, props.wordItem]);
 
   return (
     <div className="space-y-4">
@@ -67,7 +67,7 @@ export default function ImageSelect(props: Props) {
   );
 }
 
-const IMAGE_AVERAGE_TIME_MS = ms('28secs');
+const IMAGE_AVERAGE_TIME_MS = ms('28s');
 
 const ImageList = () => {
   const trpc = useTRPC();

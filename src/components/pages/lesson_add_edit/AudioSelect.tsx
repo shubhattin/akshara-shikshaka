@@ -305,6 +305,10 @@ const AudioCreation = ({ wordItem }: Props) => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [tab, setTab] = useState<'ai' | 'record'>('ai');
 
+  useEffect(() => {
+    setSelectedAudio(null);
+  }, [tab, wordItem]);
+
   const [langId, setLangId] = useState<number | null>(null);
 
   const [voice, setVoice] = useState<voice_types>(DEFAULT_VOICE);
@@ -770,7 +774,7 @@ const AudioCreation = ({ wordItem }: Props) => {
                 {recError && <div className="text-center text-xs text-red-500">{recError}</div>}
 
                 <div className="flex items-center justify-center gap-3">
-                  {recStatus !== 'recording' && (
+                  {recStatus !== 'recording' && !recordedBlob && (
                     <Button
                       className="gap-2"
                       variant="outline"
@@ -813,7 +817,12 @@ const AudioCreation = ({ wordItem }: Props) => {
                     <div className="text-sm text-muted-foreground">Uploading...</div>
                   )}
                   {recStatus === 'uploaded' && (
-                    <div className="text-sm text-emerald-600">Uploaded</div>
+                    <>
+                      <div className="text-sm text-emerald-600">Uploaded</div>
+                      <Button className="gap-2" variant="outline" onClick={reRecord}>
+                        <MdRefresh /> Re-record Another Audio
+                      </Button>
+                    </>
                   )}
                 </div>
 

@@ -39,7 +39,7 @@ export default function ImageSelect(props: Props) {
 
   useEffect(() => {
     setSelectedImage(null);
-  }, [props.wordItem]);
+  }, [tab, props.wordItem]);
 
   return (
     <div className="space-y-4">

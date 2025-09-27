@@ -839,8 +839,134 @@ const AudioRecord = ({ wordItem }: Props) => {
   );
 };
 
-// Recording visualization component using audiomotion-analyzer
-const RecordingVisualization = ({
+// Live waveform visualization component
+const LiveWaveform = ({
+  stream,
+  isRecording
+}: {
+  stream: MediaStream | null;
+  isRecording: boolean;
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    if (!stream || !isRecording) {
+      // Stop visualization
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+      return;
+    }
+
+    try {
+      // Set up audio context and analyser for time-domain data
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+
+      // Configure for waveform (time-domain) analysis
+      analyser.fftSize = 2048; // Higher resolution for smoother waveform
+      analyser.smoothingTimeConstant = 0.8;
+
+      source.connect(analyser);
+
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
+      const bufferLength = analyser.fftSize;
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const draw = () => {
+        if (!isRecording || !analyserRef.current) return;
+
+        animationRef.current = requestAnimationFrame(draw);
+
+        // Create new data array each frame to avoid TypeScript issues
+        const dataArray = new Uint8Array(bufferLength);
+
+        // Get time-domain data (waveform)
+        analyserRef.current.getByteTimeDomainData(dataArray);
+
+        // Clear canvas with dark background
+        ctx.fillStyle = 'rgb(17, 24, 39)'; // bg-gray-900 equivalent
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw waveform
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#06b6d4'; // cyan-500 for the waveform line
+        ctx.beginPath();
+
+        const sliceWidth = canvas.width / bufferLength;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          // Convert from 0-255 to -1 to 1, then scale to canvas height
+          const v = (dataArray[i] - 128) / 128;
+          const y = (v * canvas.height) / 2 + canvas.height / 2;
+
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+
+          x += sliceWidth;
+        }
+
+        ctx.stroke();
+
+        // Draw center line for reference
+        ctx.strokeStyle = 'rgba(156, 163, 175, 0.3)'; // gray-400 with opacity
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height / 2);
+        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.stroke();
+      };
+
+      draw();
+    } catch (error) {
+      console.error('Error setting up waveform visualization:', error);
+    }
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, [stream, isRecording]);
+
+  return (
+    <div className="space-y-2">
+      <div className="text-center text-xs text-muted-foreground">Live Waveform</div>
+      <canvas
+        ref={canvasRef}
+        width={280}
+        height={80}
+        className="h-20 w-full overflow-hidden rounded border border-gray-300 bg-gray-900"
+      />
+    </div>
+  );
+};
+
+// Spectrum analyzer visualization component
+const SpectrumAnalyzer = ({
   stream,
   isRecording
 }: {
@@ -879,7 +1005,7 @@ const RecordingVisualization = ({
         barSpace: 0.2,
         bgAlpha: 0.7,
         gradient: 'rainbow',
-        height: 100,
+        height: 80,
         lumiBars: true,
         reflexRatio: 0.3,
         showBgColor: true,
@@ -891,7 +1017,7 @@ const RecordingVisualization = ({
 
       analyzerRef.current = analyzer;
     } catch (error) {
-      console.error('Error setting up audio visualization:', error);
+      console.error('Error setting up spectrum analyzer:', error);
     }
 
     return () => {
@@ -905,12 +1031,31 @@ const RecordingVisualization = ({
   }, [stream, isRecording]);
 
   return (
-    <div className="flex items-center justify-center">
+    <div className="space-y-2">
+      <div className="text-center text-xs text-muted-foreground">Spectrum Analyzer</div>
       <div
         ref={containerRef}
-        className="h-24 w-80 overflow-hidden rounded border border-gray-300 bg-gray-900"
-        style={{ width: '320px', height: '100px' }}
+        className="h-20 w-full overflow-hidden rounded border border-gray-300 bg-gray-900"
+        style={{ height: '80px' }}
       />
+    </div>
+  );
+};
+
+// Combined recording visualization with both waveform and spectrum
+const RecordingVisualization = ({
+  stream,
+  isRecording
+}: {
+  stream: MediaStream | null;
+  isRecording: boolean;
+}) => {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <LiveWaveform stream={stream} isRecording={isRecording} />
+        <SpectrumAnalyzer stream={stream} isRecording={isRecording} />
+      </div>
     </div>
   );
 };

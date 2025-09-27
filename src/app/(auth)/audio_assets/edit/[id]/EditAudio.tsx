@@ -1,10 +1,12 @@
 'use client';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useTRPC } from '~/api/client';
+import type WaveSurfer from 'wavesurfer.js';
+import WaveSurferPlayer from '@wavesurfer/react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +43,69 @@ const audio_data_atom = atom<{
   created_at: Date;
   updated_at: Date;
 } | null>(null);
+
+// Waveform player component for audio preview
+const WaveformPlayer = ({
+  audioUrl,
+  isPlaying,
+  onPlay,
+  onPause
+}: {
+  audioUrl: string;
+  isPlaying: boolean;
+  onPlay: () => void;
+  onPause: () => void;
+}) => {
+  const [wavesurfer, setWavesurfer] = useState<WaveSurfer | null>(null);
+
+  const onReady = useCallback((ws: WaveSurfer) => {
+    setWavesurfer(ws);
+  }, []);
+
+  const onPlayPause = useCallback(() => {
+    if (wavesurfer) {
+      if (isPlaying) {
+        wavesurfer.pause();
+        onPause();
+      } else {
+        wavesurfer.play();
+        onPlay();
+      }
+    }
+  }, [wavesurfer, isPlaying, onPlay, onPause]);
+
+  return (
+    <div className="space-y-3">
+      <div className="w-full">
+        <WaveSurferPlayer
+          height={60}
+          waveColor="#4f46e5"
+          progressColor="#06b6d4"
+          cursorColor="#ef4444"
+          barWidth={2}
+          barRadius={1}
+          url={audioUrl}
+          onReady={onReady}
+          onPlay={onPlay}
+          onPause={onPause}
+        />
+      </div>
+      <div className="flex justify-center">
+        <Button variant="secondary" onClick={onPlayPause} className="gap-2" size="sm">
+          {isPlaying ? (
+            <span className="flex items-center gap-1">
+              <MdStop /> Stop
+            </span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <MdPlayArrow /> Play
+            </span>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+};
 
 type Props = {
   audio_data: {
@@ -104,31 +169,7 @@ const AudioInfo = () => {
     update_audio_mut.mutate({ id: audio_data.id, description: description.trim(), lang_id: lid });
   };
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
-  useEffect(
-    () => () => {
-      if (audioRef.current) audioRef.current.pause();
-    },
-    []
-  );
-  const togglePlay = () => {
-    if (!audio_data) return;
-    if (playing) {
-      if (audioRef.current) audioRef.current.pause();
-      setPlaying(false);
-      return;
-    }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    const audio = new Audio(`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${audio_data.s3_key}`);
-    audioRef.current = audio as any;
-    audio.onended = () => setPlaying(false);
-    audio.play();
-    setPlaying(true);
-  };
 
   if (!audio_data) return <Skeleton className="h-64 w-full" />;
 
@@ -142,18 +183,13 @@ const AudioInfo = () => {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Audio Preview</Label>
-              <div className="flex items-center gap-2">
-                <Button size="sm" variant="secondary" onClick={togglePlay}>
-                  {playing ? (
-                    <span className="flex items-center gap-1">
-                      <MdStop /> Stop
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <MdPlayArrow /> Play
-                    </span>
-                  )}
-                </Button>
+              <WaveformPlayer
+                audioUrl={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${audio_data.s3_key}`}
+                isPlaying={playing}
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+              />
+              <div className="text-center">
                 <span className="text-sm text-muted-foreground">{audio_data.description}</span>
               </div>
             </div>

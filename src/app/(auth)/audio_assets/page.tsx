@@ -25,5 +25,5 @@ const List = async () => {
 export default List;
 
 export const metadata: Metadata = {
-  title: 'Image List'
+  title: 'Audio List'
 };

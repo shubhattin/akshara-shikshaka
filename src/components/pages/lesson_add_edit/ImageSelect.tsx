@@ -17,7 +17,7 @@ import {
   type image_type,
   type text_lesson_word_type
 } from './lesson_add_edit_state';
-import { FaImage } from 'react-icons/fa';
+import { FaExternalLinkAlt, FaImage } from 'react-icons/fa';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useQueryClient } from '@tanstack/react-query';
 import ms from 'ms';
@@ -25,6 +25,7 @@ import { Label } from '~/components/ui/label';
 
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
+import Link from 'next/link';
 
 type Props = {
   onImageSelect: (image: image_type) => void;
@@ -102,13 +103,17 @@ const ImageList = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-center gap-2">
+      <div className="flex items-center justify-center gap-4 md:gap-6 lg:gap-8">
         <Input
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           placeholder="Search description..."
           className="max-w-md"
         />
+        <Link href="/image_assets" target="_blank" className="group flex items-center gap-2">
+          <FaExternalLinkAlt className="size-4 text-yellow-300 group-hover:text-blue-400" />
+          <span className="text-sm text-teal-300 group-hover:text-sky-400">Manage Images</span>
+        </Link>
       </div>
 
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">

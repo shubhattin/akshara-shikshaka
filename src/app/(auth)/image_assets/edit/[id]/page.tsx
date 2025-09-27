@@ -84,7 +84,7 @@ const MainEdit = async ({ params }: Props) => {
           className="flex items-center gap-1 text-lg font-semibold text-muted-foreground hover:text-foreground"
         >
           <IoMdArrowRoundBack className="inline-block text-xl" />
-          Image Asset List
+          Image List
         </Link>
       </div>
 

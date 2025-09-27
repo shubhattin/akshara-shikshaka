@@ -20,7 +20,7 @@ import {
 import { IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
 import { IoAddOutline } from 'react-icons/io5';
 import { MdMic, MdPlayArrow, MdStop, MdCloudUpload, MdRefresh } from 'react-icons/md';
-import { FaRobot } from 'react-icons/fa';
+import { FaExternalLinkAlt, FaRobot } from 'react-icons/fa';
 import { HiOutlineSparkles } from 'react-icons/hi';
 import ms from 'ms';
 import { cn } from '~/lib/utils';
@@ -38,6 +38,7 @@ import {
   type lang_list_type
 } from '~/state/lang_list';
 import { lipi_parivartak } from '~/tools/lipi_lekhika';
+import Link from 'next/link';
 
 type Props = {
   onAudioSelect: (audio: audio_type) => void;
@@ -167,7 +168,7 @@ const AudioList = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-center gap-4">
+      <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 lg:gap-8">
         <Input
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
@@ -193,6 +194,10 @@ const AudioList = () => {
             </SelectContent>
           </Select>
         </div>
+        <Link href="/audio_assets" target="_blank" className="group flex items-center gap-2">
+          <FaExternalLinkAlt className="size-4 text-yellow-300 group-hover:text-blue-400" />
+          <span className="text-sm text-teal-300 group-hover:text-sky-400">Manage Audio</span>
+        </Link>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -532,7 +537,7 @@ const AudioCreation = ({ wordItem }: Props) => {
 };
 
 const AudioRecord = ({ wordItem }: Props) => {
-  const trpcClient = useTRPCClient();
+  // const trpcClient = useTRPCClient();
   const [langId, setLangId] = useState<number | null>(null);
   const word_script_id = useAtomValue(base_word_script_id_atom);
   const queryClient = useQueryClient();
@@ -546,9 +551,7 @@ const AudioRecord = ({ wordItem }: Props) => {
     MediaRecorder.isTypeSupported('audio/webm; codecs=opus');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-  const [recStatus, setRecStatus] = useState<
-    'idle' | 'recording' | 'recorded' | 'uploading' | 'uploaded' | 'error'
-  >('idle');
+  const [recStatus, setRecStatus] = useState<'idle' | 'recording' | 'recorded'>('idle');
   const [recError, setRecError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -559,6 +562,50 @@ const AudioRecord = ({ wordItem }: Props) => {
   const [reviewPlaying, setReviewPlaying] = useState(false);
   const [recordElapsedMs, setRecordElapsedMs] = useState(0);
   const [recordedDurationSec, setRecordedDurationSec] = useState<number | null>(null);
+
+  const get_upload_url_mut = useMutation(
+    trpc.audio_assets.get_upload_audio_asset_url.mutationOptions({
+      async onSuccess(data) {
+        // Ensure Content-Type matches presigned expectations (video/webm for .webm)
+        const putRes = await fetch(data.upload_url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'video/webm' },
+          body: recordedBlob
+        });
+        if (!putRes.ok) throw new Error('Upload failed');
+
+        const text_key = await lipi_parivartak(
+          wordItem.word,
+          get_script_from_id(word_script_id),
+          'Normal'
+        );
+        complete_upload_mut.mutateAsync({
+          lang_id: langId,
+          text: wordItem.word,
+          text_key,
+          s3_key: data.s3_key
+        });
+      }
+    })
+  );
+
+  const complete_upload_mut = useMutation(
+    trpc.audio_assets.complete_upload_audio_asset.mutationOptions({
+      async onSuccess(data) {
+        setSelectedAudio({
+          id: data.id,
+          description: data.description,
+          s3_key: data.s3_key
+        });
+        queryClient.invalidateQueries(trpc.audio_assets.list_audio_assets.pathFilter());
+      },
+      onError: (error) => {
+        // delete_uploaded_audio_file_mut.mutateAsync({
+        //   s3_key: error.data.
+        // });
+      }
+    })
+  );
 
   const formatDuration = (seconds: number | null | undefined) => {
     if (seconds == null || !isFinite(seconds)) return '...';
@@ -602,6 +649,11 @@ const AudioRecord = ({ wordItem }: Props) => {
     }
   };
 
+  useEffect(() => {
+    enumerateAudioDevices();
+    // on Mount fetch the devices
+  }, []);
+
   const startRecording = async () => {
     if (!isBrowserSupported) return;
     try {
@@ -637,7 +689,6 @@ const AudioRecord = ({ wordItem }: Props) => {
       setRecStatus('recording');
     } catch (e: any) {
       setRecError('Failed to start recording');
-      setRecStatus('error');
     }
   };
 
@@ -675,6 +726,8 @@ const AudioRecord = ({ wordItem }: Props) => {
   const reRecord = () => {
     setRecError(null);
     setRecStatus('idle');
+    get_upload_url_mut.reset();
+    complete_upload_mut.reset();
     if (reviewAudioRef.current) reviewAudioRef.current.pause();
     setReviewPlaying(false);
     if (recordedUrl) URL.revokeObjectURL(recordedUrl);
@@ -683,60 +736,22 @@ const AudioRecord = ({ wordItem }: Props) => {
     chunksRef.current = [];
   };
 
-  const uploadRecorded = async () => {
+  const upload_recorded_func = async () => {
     if (!recordedBlob) return;
     setRecError(null);
-    setRecStatus('uploading');
-    let s3KeyForCleanup: string | null = null;
-    try {
-      const text_key = await lipi_parivartak(
-        wordItem.word,
-        get_script_from_id(word_script_id),
-        'Normal'
-      );
-      const { upload_url, s3_key } = await trpcClient.audio_assets.get_upload_audio_asset_url.query(
-        {
-          lang_id: langId,
-          text: wordItem.word,
-          text_key
-        }
-      );
-      s3KeyForCleanup = s3_key;
-
-      // Ensure Content-Type matches presigned expectations (video/webm for .webm)
-      const putRes = await fetch(upload_url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'video/webm' },
-        body: recordedBlob
-      });
-      if (!putRes.ok) throw new Error('Upload failed');
-
-      const completed = await trpcClient.audio_assets.complete_upload_audio_asset.mutate({
-        lang_id: langId,
-        text: wordItem.word,
-        text_key,
-        s3_key
-      });
-
-      setSelectedAudio({
-        id: completed.id,
-        description: completed.description,
-        s3_key: completed.s3_key
-      });
-      queryClient.invalidateQueries(trpc.audio_assets.list_audio_assets.pathFilter());
-      setRecStatus('uploaded');
-    } catch (e: any) {
-      try {
-        if (s3KeyForCleanup) {
-          await trpcClient.audio_assets.delete_uploaded_audio_file.mutate({
-            s3_key: s3KeyForCleanup
-          });
-        }
-      } catch {}
-      setRecError('Upload failed');
-      setRecStatus('recorded');
-    }
+    const text_key = await lipi_parivartak(
+      wordItem.word,
+      get_script_from_id(word_script_id),
+      'Normal'
+    );
+    await get_upload_url_mut.mutateAsync({
+      lang_id: langId,
+      text: wordItem.word,
+      text_key
+    });
   };
+
+  const uploading_status = get_upload_url_mut.isPending || complete_upload_mut.isPending;
 
   return (
     <div className="space-y-4 py-2">
@@ -824,7 +839,7 @@ const AudioRecord = ({ wordItem }: Props) => {
                 <Button className="gap-2" variant="outline" onClick={reRecord}>
                   <MdRefresh /> Re-record
                 </Button>
-                <Button className="gap-2" variant="default" onClick={uploadRecorded}>
+                <Button className="gap-2" variant="default" onClick={upload_recorded_func}>
                   <MdCloudUpload /> Upload
                 </Button>
                 <div className="text-xs text-muted-foreground">
@@ -832,10 +847,8 @@ const AudioRecord = ({ wordItem }: Props) => {
                 </div>
               </>
             )}
-            {recStatus === 'uploading' && (
-              <div className="text-sm text-muted-foreground">Uploading...</div>
-            )}
-            {recStatus === 'uploaded' && (
+            {uploading_status && <div className="text-sm text-muted-foreground">Uploading...</div>}
+            {complete_upload_mut.isSuccess && (
               <>
                 <div className="text-sm text-emerald-600">Uploaded</div>
                 <Button className="gap-2" variant="outline" onClick={reRecord}>

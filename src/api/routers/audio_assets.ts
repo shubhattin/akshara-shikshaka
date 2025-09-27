@@ -154,14 +154,6 @@ const delete_audio_asset_route = protectedAdminProcedure
     };
   });
 
-// Delete an uploaded audio file in S3 when no DB row exists (cleanup by s3_key)
-const delete_uploaded_audio_file_route = protectedAdminProcedure
-  .input(z.object({ s3_key: z.string() }))
-  .mutation(async ({ input }) => {
-    await deleteAssetFile(input.s3_key);
-    return { deleted: true };
-  });
-
 const get_upload_audio_asset_url_route = protectedAdminProcedure
   .input(
     z.object({
@@ -170,7 +162,7 @@ const get_upload_audio_asset_url_route = protectedAdminProcedure
       text_key: z.string()
     })
   )
-  .query(async ({ input }) => {
+  .mutation(async ({ input }) => {
     const s3_key =
       `audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
     const upload_url = await getAudioAssetUploadUrl(s3_key);
@@ -232,7 +224,6 @@ export const audio_assets_router = t.router({
   list_audio_assets: list_audio_assets_route,
   upload_audio_asset: make_upload_audio_asset_route,
   delete_audio_asset: delete_audio_asset_route,
-  delete_uploaded_audio_file: delete_uploaded_audio_file_route,
   update_audio_asset: update_audio_asset_route,
   get_upload_audio_asset_url: get_upload_audio_asset_url_route,
   complete_upload_audio_asset: complete_upload_audio_asset_route

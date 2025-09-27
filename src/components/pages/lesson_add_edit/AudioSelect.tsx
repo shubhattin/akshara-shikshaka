@@ -54,6 +54,12 @@ export default function AudioSelect(props: Props) {
     setSelectedAudio(null);
   }, [props.wordItem]);
 
+  const [createTab, setCreateTab] = useState<'ai' | 'record'>('ai');
+
+  useEffect(() => {
+    setSelectedAudio(null);
+  }, [createTab, props.wordItem]);
+
   return (
     <div className="space-y-4">
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
@@ -65,7 +71,24 @@ export default function AudioSelect(props: Props) {
           <AudioList />
         </TabsContent>
         <TabsContent value="make">
-          <AudioCreation {...props} />
+          <div className="my-6 space-y-4">
+            <Tabs
+              value={createTab}
+              onValueChange={(v) => setCreateTab(v as typeof createTab)}
+              className="w-full"
+            >
+              <TabsList className="flex items-center justify-center">
+                <TabsTrigger value="ai">AI Generate Audio</TabsTrigger>
+                <TabsTrigger value="record">Record Audio</TabsTrigger>
+              </TabsList>
+              <TabsContent value="ai" className="space-y-4 pt-1">
+                <AudioCreation {...props} />
+              </TabsContent>
+              <TabsContent value="record">
+                <AudioRecord {...props} />
+              </TabsContent>
+            </Tabs>
+          </div>
         </TabsContent>
       </Tabs>
       <Button
@@ -293,21 +316,15 @@ const VOICE_TYPE_LIST = [
   'sage',
   'shimmer'
 ] as const;
-const DEFAULT_VOICE = 'alloy';
 
 type voice_types = (typeof VOICE_TYPE_LIST)[number];
+const DEFAULT_VOICE = 'alloy' satisfies voice_types;
 
 const AudioCreation = ({ wordItem }: Props) => {
   const trpc = useTRPC();
-  const trpcClient = useTRPCClient();
   const [, setSelectedAudio] = useAtom(selected_audio_atom);
   const queryClient = useQueryClient();
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [tab, setTab] = useState<'ai' | 'record'>('ai');
-
-  useEffect(() => {
-    setSelectedAudio(null);
-  }, [tab, wordItem]);
 
   const [langId, setLangId] = useState<number | null>(null);
 
@@ -394,6 +411,133 @@ const AudioCreation = ({ wordItem }: Props) => {
       setElapsedTime(0);
     }
   }, [create_audio_mut.isSuccess, create_audio_mut.isError, create_audio_mut.isPending]);
+
+  return (
+    <>
+      <div className="flex w-full items-center justify-center gap-6">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-semibold">Language</Label>
+          <Select
+            value={langId === null ? 'all' : String(langId)}
+            onValueChange={(v) => setLangId(v === 'all' ? null : Number(v))}
+          >
+            <SelectTrigger size="sm" className="w-28">
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              {LANG_LIST.map((lang) => (
+                <SelectItem key={lang} value={String(lang_list_obj[lang as lang_list_type])}>
+                  {lang}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-semibold">Voice</Label>
+          <Select value={voice} onValueChange={(v) => setVoice(v as voice_types)}>
+            <SelectTrigger size="sm" className="w-28">
+              <SelectValue placeholder={DEFAULT_VOICE} />
+            </SelectTrigger>
+            <SelectContent>
+              {VOICE_TYPE_LIST.map((voice) => (
+                <SelectItem key={voice} value={voice}>
+                  {voice}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="flex flex-col items-center justify-center space-y-4">
+        {!create_audio_mut.isSuccess && (
+          <Button
+            className="gap-4 text-lg font-semibold text-amber-600 dark:text-amber-400"
+            variant={'outline'}
+            disabled={create_audio_mut.isPending}
+            onClick={handleCreateAudio}
+          >
+            <HiOutlineSparkles className="size-6 text-sky-400" />
+            Create Audio for "{wordItem.word}"
+          </Button>
+        )}
+
+        {create_audio_mut.isPending && (
+          <div className="flex w-64 flex-col items-center justify-center space-y-3">
+            <Skeleton className="h-14 w-14 rounded" />
+            <div className="h-2 w-64 overflow-hidden rounded bg-muted">
+              <div
+                className="h-2 bg-primary"
+                style={{
+                  width: `${Math.min((elapsedTime / AUDIO_AVERAGE_TIME_MS) * 100, 100)}%`
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {create_audio_mut.isSuccess && (
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="flex size-14 items-center justify-center rounded bg-muted">
+                <FaRobot className="size-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <span className="text-sm text-muted-foreground">
+                {create_audio_mut.data.description}
+              </span>
+            </div>
+            <div className="space-x-4">
+              <Button
+                variant={'destructive'}
+                onClick={async () => {
+                  if (!create_audio_mut.data) return;
+                  await delete_audio_mut.mutateAsync({ id: create_audio_mut.data.id });
+                  create_audio_mut.reset();
+                }}
+                disabled={delete_audio_mut.isPending}
+              >
+                Delete Audio
+              </Button>
+              <Button
+                variant={'secondary'}
+                onClick={() => handlePlayCreated(create_audio_mut.data.s3_key)}
+                className="ml-2"
+              >
+                {createdPlaying ? (
+                  <span className="flex items-center gap-1">
+                    <MdStop /> Stop
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <MdPlayArrow /> Play
+                  </span>
+                )}
+              </Button>
+              <Button
+                variant={'outline'}
+                onClick={() => {
+                  create_audio_mut.reset();
+                  handleCreateAudio();
+                }}
+              >
+                Remake Audio
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+const AudioRecord = ({ wordItem }: Props) => {
+  const trpcClient = useTRPCClient();
+  const [langId, setLangId] = useState<number | null>(null);
+  const word_script_id = useAtomValue(base_word_script_id_atom);
+  const queryClient = useQueryClient();
+  const trpc = useTRPC();
+  const [, setSelectedAudio] = useAtom(selected_audio_atom);
 
   // Recording states
   const isBrowserSupported =
@@ -595,14 +739,14 @@ const AudioCreation = ({ wordItem }: Props) => {
   };
 
   return (
-    <div className="my-6 space-y-4">
-      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
-        <TabsList className="flex items-center justify-center">
-          <TabsTrigger value="ai">AI Generate Audio</TabsTrigger>
-          <TabsTrigger value="record">Record Audio</TabsTrigger>
-        </TabsList>
-        <TabsContent value="ai" className="space-y-4 pt-1">
-          <div className="flex w-full items-center justify-center gap-6">
+    <div className="space-y-4 py-2">
+      {!isBrowserSupported ? (
+        <div className="py-6 text-center text-sm text-muted-foreground">
+          Your browser does not support WebM/Opus recording.
+        </div>
+      ) : (
+        <>
+          <div className="flex w-full flex-wrap items-center justify-center gap-6">
             <div className="flex items-center gap-2">
               <Label className="text-sm font-semibold">Language</Label>
               <Select
@@ -623,219 +767,91 @@ const AudioCreation = ({ wordItem }: Props) => {
               </Select>
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-sm font-semibold">Voice</Label>
-              <Select value={voice} onValueChange={(v) => setVoice(v as voice_types)}>
-                <SelectTrigger size="sm" className="w-28">
-                  <SelectValue placeholder={DEFAULT_VOICE} />
+              <Label className="text-sm font-semibold">Mic</Label>
+              <Select
+                value={selectedDeviceId || 'none'}
+                onValueChange={(v) => setSelectedDeviceId(v === 'none' ? '' : v)}
+              >
+                <SelectTrigger size="sm" className="w-64">
+                  <SelectValue placeholder="Select input" />
                 </SelectTrigger>
                 <SelectContent>
-                  {VOICE_TYPE_LIST.map((voice) => (
-                    <SelectItem key={voice} value={voice}>
-                      {voice}
+                  <SelectItem value="none">Select input</SelectItem>
+                  {devices.map((d) => (
+                    <SelectItem key={d.deviceId} value={d.deviceId}>
+                      {d.label || 'Microphone'}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <Button variant="secondary" size="sm" onClick={enumerateAudioDevices}>
+                <MdMic className="mr-1" /> Detect
+              </Button>
             </div>
           </div>
-          <div className="flex flex-col items-center justify-center space-y-4">
-            {!create_audio_mut.isSuccess && (
+
+          {recError && <div className="text-center text-xs text-red-500">{recError}</div>}
+
+          <div className="flex items-center justify-center gap-3">
+            {recStatus !== 'recording' && !recordedBlob && (
               <Button
-                className="gap-4 text-lg font-semibold text-amber-600 dark:text-amber-400"
-                variant={'outline'}
-                disabled={create_audio_mut.isPending}
-                onClick={handleCreateAudio}
+                className="gap-2"
+                variant="outline"
+                disabled={!selectedDeviceId}
+                onClick={startRecording}
               >
-                <HiOutlineSparkles className="size-6 text-sky-400" />
-                Create Audio for "{wordItem.word}"
+                <MdMic className="text-emerald-600" /> Record
               </Button>
             )}
-
-            {create_audio_mut.isPending && (
-              <div className="flex w-64 flex-col items-center justify-center space-y-3">
-                <Skeleton className="h-14 w-14 rounded" />
-                <div className="h-2 w-64 overflow-hidden rounded bg-muted">
-                  <div
-                    className="h-2 bg-primary"
-                    style={{
-                      width: `${Math.min((elapsedTime / AUDIO_AVERAGE_TIME_MS) * 100, 100)}%`
-                    }}
-                  />
-                </div>
-              </div>
+            {recStatus === 'recording' && (
+              <Button className="gap-2" variant="destructive" onClick={stopRecording}>
+                <MdStop /> Stop
+              </Button>
             )}
-
-            {create_audio_mut.isSuccess && (
-              <div className="flex flex-col items-center justify-center space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex size-14 items-center justify-center rounded bg-muted">
-                    <FaRobot className="size-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <span className="text-sm text-muted-foreground">
-                    {create_audio_mut.data.description}
-                  </span>
-                </div>
-                <div className="space-x-4">
-                  <Button
-                    variant={'destructive'}
-                    onClick={async () => {
-                      if (!create_audio_mut.data) return;
-                      await delete_audio_mut.mutateAsync({ id: create_audio_mut.data.id });
-                      create_audio_mut.reset();
-                    }}
-                    disabled={delete_audio_mut.isPending}
-                  >
-                    Delete Audio
-                  </Button>
-                  <Button
-                    variant={'secondary'}
-                    onClick={() => handlePlayCreated(create_audio_mut.data.s3_key)}
-                    className="ml-2"
-                  >
-                    {createdPlaying ? (
-                      <span className="flex items-center gap-1">
-                        <MdStop /> Stop
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        <MdPlayArrow /> Play
-                      </span>
-                    )}
-                  </Button>
-                  <Button
-                    variant={'outline'}
-                    onClick={() => {
-                      create_audio_mut.reset();
-                      handleCreateAudio();
-                    }}
-                  >
-                    Remake Audio
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </TabsContent>
-        <TabsContent value="record">
-          <div className="space-y-4 py-2">
-            {!isBrowserSupported ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                Your browser does not support WebM/Opus recording.
-              </div>
-            ) : (
+            {recStatus === 'recorded' && (
               <>
-                <div className="flex w-full flex-wrap items-center justify-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm font-semibold">Language</Label>
-                    <Select
-                      value={langId === null ? 'all' : String(langId)}
-                      onValueChange={(v) => setLangId(v === 'all' ? null : Number(v))}
-                    >
-                      <SelectTrigger size="sm" className="w-28">
-                        <SelectValue placeholder="All" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All</SelectItem>
-                        {LANG_LIST.map((lang) => (
-                          <SelectItem
-                            key={lang}
-                            value={String(lang_list_obj[lang as lang_list_type])}
-                          >
-                            {lang}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm font-semibold">Mic</Label>
-                    <Select
-                      value={selectedDeviceId || 'none'}
-                      onValueChange={(v) => setSelectedDeviceId(v === 'none' ? '' : v)}
-                    >
-                      <SelectTrigger size="sm" className="w-64">
-                        <SelectValue placeholder="Select input" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Select input</SelectItem>
-                        {devices.map((d) => (
-                          <SelectItem key={d.deviceId} value={d.deviceId}>
-                            {d.label || 'Microphone'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button variant="secondary" size="sm" onClick={enumerateAudioDevices}>
-                      <MdMic className="mr-1" /> Detect
-                    </Button>
-                  </div>
-                </div>
-
-                {recError && <div className="text-center text-xs text-red-500">{recError}</div>}
-
-                <div className="flex items-center justify-center gap-3">
-                  {recStatus !== 'recording' && !recordedBlob && (
-                    <Button
-                      className="gap-2"
-                      variant="outline"
-                      disabled={!selectedDeviceId}
-                      onClick={startRecording}
-                    >
-                      <MdMic className="text-emerald-600" /> Record
-                    </Button>
-                  )}
-                  {recStatus === 'recording' && (
-                    <Button className="gap-2" variant="destructive" onClick={stopRecording}>
+                <Button className="gap-2" variant="secondary" onClick={playRecorded}>
+                  {reviewPlaying ? (
+                    <span className="flex items-center gap-1">
                       <MdStop /> Stop
-                    </Button>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <MdPlayArrow /> Play
+                    </span>
                   )}
-                  {recStatus === 'recorded' && (
-                    <>
-                      <Button className="gap-2" variant="secondary" onClick={playRecorded}>
-                        {reviewPlaying ? (
-                          <span className="flex items-center gap-1">
-                            <MdStop /> Stop
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1">
-                            <MdPlayArrow /> Play
-                          </span>
-                        )}
-                      </Button>
-                      <Button className="gap-2" variant="outline" onClick={reRecord}>
-                        <MdRefresh /> Re-record
-                      </Button>
-                      <Button className="gap-2" variant="default" onClick={uploadRecorded}>
-                        <MdCloudUpload /> Upload
-                      </Button>
-                      <div className="text-xs text-muted-foreground">
-                        Length: {formatDuration(recordedDurationSec)}
-                      </div>
-                    </>
-                  )}
-                  {recStatus === 'uploading' && (
-                    <div className="text-sm text-muted-foreground">Uploading...</div>
-                  )}
-                  {recStatus === 'uploaded' && (
-                    <>
-                      <div className="text-sm text-emerald-600">Uploaded</div>
-                      <Button className="gap-2" variant="outline" onClick={reRecord}>
-                        <MdRefresh /> Re-record Another Audio
-                      </Button>
-                    </>
-                  )}
+                </Button>
+                <Button className="gap-2" variant="outline" onClick={reRecord}>
+                  <MdRefresh /> Re-record
+                </Button>
+                <Button className="gap-2" variant="default" onClick={uploadRecorded}>
+                  <MdCloudUpload /> Upload
+                </Button>
+                <div className="text-xs text-muted-foreground">
+                  Length: {formatDuration(recordedDurationSec)}
                 </div>
-
-                {recStatus === 'recording' && (
-                  <div className="text-center text-xs text-muted-foreground">
-                    Recording... {Math.floor(recordElapsedMs / 1000)}s
-                  </div>
-                )}
+              </>
+            )}
+            {recStatus === 'uploading' && (
+              <div className="text-sm text-muted-foreground">Uploading...</div>
+            )}
+            {recStatus === 'uploaded' && (
+              <>
+                <div className="text-sm text-emerald-600">Uploaded</div>
+                <Button className="gap-2" variant="outline" onClick={reRecord}>
+                  <MdRefresh /> Re-record Another Audio
+                </Button>
               </>
             )}
           </div>
-        </TabsContent>
-      </Tabs>
+
+          {recStatus === 'recording' && (
+            <div className="text-center text-xs text-muted-foreground">
+              Recording... {Math.floor(recordElapsedMs / 1000)}s
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

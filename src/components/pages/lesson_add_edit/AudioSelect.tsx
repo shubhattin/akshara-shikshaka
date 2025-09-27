@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useTRPC, useTRPCClient } from '~/api/client';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -22,6 +22,9 @@ import { IoAddOutline } from 'react-icons/io5';
 import { MdMic, MdPlayArrow, MdStop, MdCloudUpload, MdRefresh } from 'react-icons/md';
 import { FaExternalLinkAlt, FaRobot } from 'react-icons/fa';
 import { HiOutlineSparkles } from 'react-icons/hi';
+import type WaveSurfer from 'wavesurfer.js';
+import WaveSurferPlayer from '@wavesurfer/react';
+import AudioMotionAnalyzer from 'audiomotion-analyzer';
 import ms from 'ms';
 import { cn } from '~/lib/utils';
 import {
@@ -354,34 +357,7 @@ const AudioCreation = ({ wordItem }: Props) => {
     })
   );
 
-  const createdAudioRef = useRef<HTMLAudioElement | null>(null);
   const [createdPlaying, setCreatedPlaying] = useState(false);
-
-  useEffect(() => {
-    return () => {
-      if (createdAudioRef.current) {
-        createdAudioRef.current.pause();
-        createdAudioRef.current = null;
-      }
-    };
-  }, []);
-
-  const handlePlayCreated = (s3_key: string) => {
-    if (createdPlaying) {
-      if (createdAudioRef.current) createdAudioRef.current.pause();
-      setCreatedPlaying(false);
-      return;
-    }
-    if (createdAudioRef.current) {
-      createdAudioRef.current.pause();
-      createdAudioRef.current = null;
-    }
-    const audio = new Audio(`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${s3_key}`);
-    createdAudioRef.current = audio as any;
-    audio.onended = () => setCreatedPlaying(false);
-    audio.play();
-    setCreatedPlaying(true);
-  };
 
   const lesson_lang_id = useAtomValue(lang_id_atom);
   const handleCreateAudio = async () => {
@@ -492,7 +468,24 @@ const AudioCreation = ({ wordItem }: Props) => {
                 {create_audio_mut.data.description}
               </span>
             </div>
+            <div className="ml-2 w-full max-w-md">
+              <WaveformPlayer
+                audioUrl={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${create_audio_mut.data.s3_key}`}
+                isPlaying={createdPlaying}
+                onPlay={() => setCreatedPlaying(true)}
+                onPause={() => setCreatedPlaying(false)}
+              />
+            </div>
             <div className="space-x-4">
+              <Button
+                variant={'outline'}
+                onClick={() => {
+                  create_audio_mut.reset();
+                  handleCreateAudio();
+                }}
+              >
+                Remake Audio
+              </Button>
               <Button
                 variant={'destructive'}
                 onClick={async () => {
@@ -503,30 +496,6 @@ const AudioCreation = ({ wordItem }: Props) => {
                 disabled={delete_audio_mut.isPending}
               >
                 Delete Audio
-              </Button>
-              <Button
-                variant={'secondary'}
-                onClick={() => handlePlayCreated(create_audio_mut.data.s3_key)}
-                className="ml-2"
-              >
-                {createdPlaying ? (
-                  <span className="flex items-center gap-1">
-                    <MdStop /> Stop
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    <MdPlayArrow /> Play
-                  </span>
-                )}
-              </Button>
-              <Button
-                variant={'outline'}
-                onClick={() => {
-                  create_audio_mut.reset();
-                  handleCreateAudio();
-                }}
-              >
-                Remake Audio
               </Button>
             </div>
           </div>
@@ -558,7 +527,6 @@ const AudioRecord = ({ wordItem }: Props) => {
   const chunksRef = useRef<Blob[]>([]);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
-  const reviewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [reviewPlaying, setReviewPlaying] = useState(false);
   const [recordElapsedMs, setRecordElapsedMs] = useState(0);
   const [recordedDurationSec, setRecordedDurationSec] = useState<number | null>(null);
@@ -628,7 +596,6 @@ const AudioRecord = ({ wordItem }: Props) => {
 
   useEffect(() => {
     return () => {
-      if (reviewAudioRef.current) reviewAudioRef.current.pause();
       if (recordedUrl) URL.revokeObjectURL(recordedUrl);
       if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
     };
@@ -706,21 +673,11 @@ const AudioRecord = ({ wordItem }: Props) => {
   };
 
   const playRecorded = () => {
-    if (!recordedUrl) return;
-    if (reviewPlaying) {
-      if (reviewAudioRef.current) reviewAudioRef.current.pause();
-      setReviewPlaying(false);
-      return;
-    }
-    if (reviewAudioRef.current) {
-      reviewAudioRef.current.pause();
-      reviewAudioRef.current = null;
-    }
-    const audio = new Audio(recordedUrl);
-    reviewAudioRef.current = audio as any;
-    audio.onended = () => setReviewPlaying(false);
-    audio.play();
     setReviewPlaying(true);
+  };
+
+  const pauseRecorded = () => {
+    setReviewPlaying(false);
   };
 
   const reRecord = () => {
@@ -728,7 +685,6 @@ const AudioRecord = ({ wordItem }: Props) => {
     setRecStatus('idle');
     get_upload_url_mut.reset();
     complete_upload_mut.reset();
-    if (reviewAudioRef.current) reviewAudioRef.current.pause();
     setReviewPlaying(false);
     if (recordedUrl) URL.revokeObjectURL(recordedUrl);
     setRecordedUrl(null);
@@ -765,6 +721,7 @@ const AudioRecord = ({ wordItem }: Props) => {
             <div className="flex items-center gap-2">
               <Label className="text-sm font-semibold">Language</Label>
               <Select
+                disabled={recStatus === 'recording' || recStatus === 'recorded'}
                 value={langId === null ? 'all' : String(langId)}
                 onValueChange={(v) => setLangId(v === 'all' ? null : Number(v))}
               >
@@ -784,6 +741,7 @@ const AudioRecord = ({ wordItem }: Props) => {
             <div className="flex items-center gap-2">
               <Label className="text-sm font-semibold">Mic</Label>
               <Select
+                disabled={recStatus === 'recording' || recStatus === 'recorded'}
                 value={selectedDeviceId || 'none'}
                 onValueChange={(v) => setSelectedDeviceId(v === 'none' ? '' : v)}
               >
@@ -799,13 +757,45 @@ const AudioRecord = ({ wordItem }: Props) => {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="secondary" size="sm" onClick={enumerateAudioDevices}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={enumerateAudioDevices}
+                disabled={recStatus === 'recording' || recStatus === 'recorded'}
+              >
                 <MdMic className="mr-1" /> Detect
               </Button>
             </div>
           </div>
 
           {recError && <div className="text-center text-xs text-red-500">{recError}</div>}
+
+          {/* Recording Visualization */}
+          {recStatus === 'recording' && (
+            <div className="space-y-4">
+              <RecordingVisualization stream={streamRef.current} isRecording={true} />
+              <div className="text-center text-xs text-muted-foreground">
+                Recording... {Math.floor(recordElapsedMs / 1000)}s
+              </div>
+            </div>
+          )}
+
+          {/* Recorded Audio Waveform Player */}
+          {recStatus === 'recorded' && recordedUrl && (
+            <div className="flex flex-col items-center space-y-4">
+              <div className="text-xs text-muted-foreground">
+                Length: {formatDuration(recordedDurationSec)}
+              </div>
+              <div className="w-full max-w-md">
+                <WaveformPlayer
+                  audioUrl={recordedUrl}
+                  isPlaying={reviewPlaying}
+                  onPlay={playRecorded}
+                  onPause={pauseRecorded}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-center gap-3">
             {recStatus !== 'recording' && !recordedBlob && (
@@ -825,26 +815,12 @@ const AudioRecord = ({ wordItem }: Props) => {
             )}
             {recStatus === 'recorded' && (
               <>
-                <Button className="gap-2" variant="secondary" onClick={playRecorded}>
-                  {reviewPlaying ? (
-                    <span className="flex items-center gap-1">
-                      <MdStop /> Stop
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <MdPlayArrow /> Play
-                    </span>
-                  )}
-                </Button>
                 <Button className="gap-2" variant="outline" onClick={reRecord}>
                   <MdRefresh /> Re-record
                 </Button>
                 <Button className="gap-2" variant="default" onClick={upload_recorded_func}>
                   <MdCloudUpload /> Upload
                 </Button>
-                <div className="text-xs text-muted-foreground">
-                  Length: {formatDuration(recordedDurationSec)}
-                </div>
               </>
             )}
             {uploading_status && <div className="text-sm text-muted-foreground">Uploading...</div>}
@@ -857,14 +833,147 @@ const AudioRecord = ({ wordItem }: Props) => {
               </>
             )}
           </div>
-
-          {recStatus === 'recording' && (
-            <div className="text-center text-xs text-muted-foreground">
-              Recording... {Math.floor(recordElapsedMs / 1000)}s
-            </div>
-          )}
         </>
       )}
+    </div>
+  );
+};
+
+// Recording visualization component using audiomotion-analyzer
+const RecordingVisualization = ({
+  stream,
+  isRecording
+}: {
+  stream: MediaStream | null;
+  isRecording: boolean;
+}) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const analyzerRef = useRef<AudioMotionAnalyzer | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    if (!stream || !isRecording || !containerRef.current) {
+      // Stop visualization
+      if (analyzerRef.current) {
+        analyzerRef.current.destroy();
+        analyzerRef.current = null;
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+      return;
+    }
+
+    try {
+      // Set up audio context and analyzer
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+
+      audioContextRef.current = audioContext;
+
+      // Create AudioMotion analyzer (spectrum analyzer visualization)
+      const analyzer = new AudioMotionAnalyzer(containerRef.current, {
+        source,
+        mode: 6, // 1/6 octave bands
+        barSpace: 0.2,
+        bgAlpha: 0.7,
+        gradient: 'rainbow',
+        height: 100,
+        lumiBars: true,
+        reflexRatio: 0.3,
+        showBgColor: true,
+        showPeaks: true,
+        smoothing: 0.7,
+        volume: 0, // Disable speaker output while keeping visualization
+        colorMode: 'bar-level'
+      });
+
+      analyzerRef.current = analyzer;
+    } catch (error) {
+      console.error('Error setting up audio visualization:', error);
+    }
+
+    return () => {
+      if (analyzerRef.current) {
+        analyzerRef.current.destroy();
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, [stream, isRecording]);
+
+  return (
+    <div className="flex items-center justify-center">
+      <div
+        ref={containerRef}
+        className="h-24 w-80 overflow-hidden rounded border border-gray-300 bg-gray-900"
+        style={{ width: '320px', height: '100px' }}
+      />
+    </div>
+  );
+};
+
+// Waveform player component for playback
+const WaveformPlayer = ({
+  audioUrl,
+  isPlaying,
+  onPlay,
+  onPause
+}: {
+  audioUrl: string;
+  isPlaying: boolean;
+  onPlay: () => void;
+  onPause: () => void;
+}) => {
+  const [wavesurfer, setWavesurfer] = useState<WaveSurfer | null>(null);
+
+  const onReady = useCallback((ws: WaveSurfer) => {
+    setWavesurfer(ws);
+  }, []);
+
+  const onPlayPause = useCallback(() => {
+    if (wavesurfer) {
+      if (isPlaying) {
+        wavesurfer.pause();
+        onPause();
+      } else {
+        wavesurfer.play();
+        onPlay();
+      }
+    }
+  }, [wavesurfer, isPlaying, onPlay, onPause]);
+
+  return (
+    <div className="flex flex-col items-center space-y-3">
+      <div className="w-96 max-w-full">
+        <WaveSurferPlayer
+          height={60}
+          waveColor="#4f46e5"
+          progressColor="#06b6d4"
+          cursorColor="#ef4444"
+          barWidth={2}
+          barRadius={1}
+          url={audioUrl}
+          onReady={onReady}
+          onPlay={onPlay}
+          onPause={onPause}
+        />
+      </div>
+      <div className="flex justify-center">
+        <Button variant="secondary" onClick={onPlayPause} className="gap-2">
+          {isPlaying ? (
+            <span className="flex items-center gap-1">
+              <MdStop /> Stop
+            </span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <MdPlayArrow /> Play
+            </span>
+          )}
+        </Button>
+      </div>
     </div>
   );
 };

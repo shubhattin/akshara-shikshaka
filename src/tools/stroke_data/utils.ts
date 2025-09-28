@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { type Gesture, type GesturePoints } from './types';
+import {
+  type Gesture,
+  type GesturePoints,
+  type GestureMatchOptions,
+  type GestureEvaluationResult,
+  type DetailedMetrics,
+  type StrokeComplexityMetrics,
+  INDIC_SCRIPT_CONFIG
+} from './types';
 import { getStroke, type StrokeOptions } from 'perfect-freehand';
 
 // Framework-agnostic gesture animation data generator
@@ -403,6 +411,494 @@ export const evaluateGestureAccuracy = (
   const finalScore = Math.max(directScore, reversedScore);
 
   return Math.max(0, Math.min(1, finalScore));
+};
+
+// Enhanced HanziWriter-inspired functions
+
+/**
+ * Calculate stroke complexity based on curvature and direction changes
+ */
+export const calculateStrokeComplexity = (points: GesturePoints[]): StrokeComplexityMetrics => {
+  if (points.length < 3) {
+    return {
+      curvatureVariation: 0,
+      directionChanges: 0,
+      pathLength: 0,
+      normalizedComplexity: 0
+    };
+  }
+
+  // Calculate path length
+  let pathLength = 0;
+  for (let i = 1; i < points.length; i++) {
+    pathLength += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+  }
+
+  // Calculate direction changes
+  const angles: number[] = [];
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i][0] - points[i - 1][0];
+    const dy = points[i][1] - points[i - 1][1];
+    angles.push(Math.atan2(dy, dx));
+  }
+
+  let directionChanges = 0;
+  let curvatureSum = 0;
+  for (let i = 1; i < angles.length; i++) {
+    let angleDiff = angles[i] - angles[i - 1];
+    // Normalize to [-π, π]
+    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+    const absDiff = Math.abs(angleDiff);
+    curvatureSum += absDiff;
+
+    // Count significant direction changes (> 30 degrees)
+    if (absDiff > Math.PI / 6) {
+      directionChanges++;
+    }
+  }
+
+  const curvatureVariation = angles.length > 1 ? curvatureSum / (angles.length - 1) : 0;
+
+  // Normalize complexity to [0, 1] range
+  const normalizedComplexity = Math.min(
+    1,
+    (curvatureVariation / Math.PI + directionChanges / Math.max(1, angles.length)) / 2
+  );
+
+  return {
+    curvatureVariation,
+    directionChanges,
+    pathLength,
+    normalizedComplexity
+  };
+};
+
+/**
+ * Calculate adaptive threshold based on stroke context and complexity
+ */
+export const getAdaptiveThreshold = (gesture: Gesture, options: GestureMatchOptions): number => {
+  const scriptConfig = options.scriptType
+    ? INDIC_SCRIPT_CONFIG[options.scriptType]
+    : INDIC_SCRIPT_CONFIG.DEVANAGARI;
+  let baseThreshold = scriptConfig.baseThreshold;
+
+  // First stroke is often more critical (like shirorekha in Devanagari)
+  if (gesture.index === 0) {
+    baseThreshold = Math.min(0.85, baseThreshold + 0.05);
+  }
+
+  // If outline is visible, be more lenient (user has visual guide)
+  if (options.isOutlineVisible) {
+    baseThreshold *= 0.85;
+  }
+
+  // Adjust for stroke complexity
+  const complexity = calculateStrokeComplexity(gesture.points);
+  if (complexity.normalizedComplexity > 0.7) {
+    baseThreshold *= 0.9; // More lenient for complex strokes
+  }
+
+  // Apply script-specific curve complexity weighting
+  if (complexity.curvatureVariation > Math.PI / 3) {
+    baseThreshold *= scriptConfig.curveComplexityWeight;
+  }
+
+  // Apply general leniency setting
+  baseThreshold *= options.leniency || 1.0;
+
+  return Math.max(0.4, Math.min(0.95, baseThreshold));
+};
+
+/**
+ * Validate start and end points are within acceptable threshold
+ */
+export const hasValidStartEnd = (
+  userPoints: GesturePoints[],
+  targetPoints: GesturePoints[],
+  threshold: number = 50 // Adjust for your coordinate system
+): boolean => {
+  if (userPoints.length < 2 || targetPoints.length < 2) return false;
+
+  const startDist = Math.hypot(
+    userPoints[0][0] - targetPoints[0][0],
+    userPoints[0][1] - targetPoints[0][1]
+  );
+  const endDist = Math.hypot(
+    userPoints[userPoints.length - 1][0] - targetPoints[targetPoints.length - 1][0],
+    userPoints[userPoints.length - 1][1] - targetPoints[targetPoints.length - 1][1]
+  );
+
+  return startDist <= threshold && endDist <= threshold;
+};
+
+/**
+ * Validate overall stroke direction is correct
+ */
+export const hasValidDirection = (
+  userPoints: GesturePoints[],
+  targetPoints: GesturePoints[]
+): boolean => {
+  if (userPoints.length < 2 || targetPoints.length < 2) return false;
+
+  // Calculate overall direction vectors
+  const userDir = {
+    x: userPoints[userPoints.length - 1][0] - userPoints[0][0],
+    y: userPoints[userPoints.length - 1][1] - userPoints[0][1]
+  };
+  const targetDir = {
+    x: targetPoints[targetPoints.length - 1][0] - targetPoints[0][0],
+    y: targetPoints[targetPoints.length - 1][1] - targetPoints[0][1]
+  };
+
+  // Cosine similarity
+  const dot = userDir.x * targetDir.x + userDir.y * targetDir.y;
+  const magUser = Math.hypot(userDir.x, userDir.y);
+  const magTarget = Math.hypot(targetDir.x, targetDir.y);
+
+  if (magUser === 0 || magTarget === 0) return true; // Allow stationary points
+
+  return dot / (magUser * magTarget) > 0.1; // More lenient than HW's 0
+};
+
+/**
+ * Validate stroke order - ensure strokes are drawn in sequence
+ */
+export const validateStrokeOrder = (
+  completedGestures: number[],
+  attemptedIndex: number
+): boolean => {
+  if (completedGestures.length === 0) {
+    return attemptedIndex === 0; // First stroke should be index 0
+  }
+
+  // Ensure strokes are drawn in sequence
+  const expectedNext = Math.max(...completedGestures) + 1;
+  return attemptedIndex === expectedNext;
+};
+
+/**
+ * Extract detailed metrics from the existing evaluation algorithm
+ */
+export const getDetailedMetrics = (
+  userPoints: GesturePoints[],
+  targetPoints: GesturePoints[]
+): DetailedMetrics => {
+  if (userPoints.length < 2 || targetPoints.length < 2) {
+    return {
+      dtw: 0,
+      hausdorff: 0,
+      mse: 0,
+      curvature: 0,
+      direction: 0,
+      endpoints: 0,
+      length: 0
+    };
+  }
+
+  // Use similar preprocessing as the main algorithm
+  const SAMPLE_SIZE = 96;
+  const CURV_SIZE = 48;
+  const DTW_WINDOW_FRAC = 0.15;
+
+  type EvalPoint = { x: number; y: number; timestamp: number };
+
+  const toEval = (pts: GesturePoints[]): EvalPoint[] =>
+    pts.map(([x, y], i) => ({ x, y, timestamp: i }));
+
+  const normalizeUnitSquare = (pts: EvalPoint[]) => {
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const w = Math.max(1e-6, maxX - minX);
+    const h = Math.max(1e-6, maxY - minY);
+    const scale = 1 / Math.max(w, h);
+    return pts.map((p, i) => ({ x: (p.x - minX) * scale, y: (p.y - minY) * scale, timestamp: i }));
+  };
+
+  const resample = (pts: EvalPoint[], n: number) => {
+    if (pts.length === n) return pts;
+    const dists: number[] = [0];
+    for (let i = 1; i < pts.length; i++) {
+      const dx = pts[i].x - pts[i - 1].x;
+      const dy = pts[i].y - pts[i - 1].y;
+      dists[i] = dists[i - 1] + Math.hypot(dx, dy);
+    }
+    const total = dists[dists.length - 1] || 1e-6;
+    const step = total / (n - 1);
+    const out: EvalPoint[] = [];
+    let target = 0;
+    let j = 0;
+    for (let i = 0; i < n; i++) {
+      while (j < dists.length - 1 && dists[j] < target) j++;
+      const prev = Math.max(0, j - 1);
+      const denom = dists[j] - dists[prev];
+      const t = denom === 0 ? 0 : (target - dists[prev]) / denom;
+      const x = pts[prev].x + (pts[j].x - pts[prev].x) * t;
+      const y = pts[prev].y + (pts[j].y - pts[prev].y) * t;
+      out.push({ x, y, timestamp: i });
+      target = i * step;
+    }
+    return out;
+  };
+
+  // Simplified metrics extraction
+  const baseUser = resample(normalizeUnitSquare(toEval(userPoints)), SAMPLE_SIZE);
+  const baseTarget = resample(normalizeUnitSquare(toEval(targetPoints)), SAMPLE_SIZE);
+
+  // DTW score (simplified)
+  let dtwSum = 0;
+  for (let i = 0; i < Math.min(baseUser.length, baseTarget.length); i++) {
+    dtwSum += Math.hypot(baseUser[i].x - baseTarget[i].x, baseUser[i].y - baseTarget[i].y);
+  }
+  const dtwScore = Math.max(0, 1 - dtwSum / baseUser.length);
+
+  // Hausdorff distance (simplified)
+  let maxDist = 0;
+  for (const userPt of baseUser) {
+    let minDist = Infinity;
+    for (const targetPt of baseTarget) {
+      const dist = Math.hypot(userPt.x - targetPt.x, userPt.y - targetPt.y);
+      minDist = Math.min(minDist, dist);
+    }
+    maxDist = Math.max(maxDist, minDist);
+  }
+  const hausdorffScore = Math.max(0, 1 - maxDist);
+
+  // MSE
+  let mse = 0;
+  for (let i = 0; i < baseUser.length; i++) {
+    const dx = baseUser[i].x - baseTarget[i].x;
+    const dy = baseUser[i].y - baseTarget[i].y;
+    mse += dx * dx + dy * dy;
+  }
+  mse /= baseUser.length;
+  const mseScore = Math.max(0, 1 - Math.sqrt(mse));
+
+  // Direction score
+  const userDir = {
+    x: userPoints[userPoints.length - 1][0] - userPoints[0][0],
+    y: userPoints[userPoints.length - 1][1] - userPoints[0][1]
+  };
+  const targetDir = {
+    x: targetPoints[targetPoints.length - 1][0] - targetPoints[0][0],
+    y: targetPoints[targetPoints.length - 1][1] - targetPoints[0][1]
+  };
+  const dot = userDir.x * targetDir.x + userDir.y * targetDir.y;
+  const magUser = Math.hypot(userDir.x, userDir.y);
+  const magTarget = Math.hypot(targetDir.x, targetDir.y);
+  const directionScore =
+    magUser > 0 && magTarget > 0 ? Math.max(0, dot / (magUser * magTarget)) : 0;
+
+  // Endpoint score
+  const startDist = Math.hypot(baseUser[0].x - baseTarget[0].x, baseUser[0].y - baseTarget[0].y);
+  const endDist = Math.hypot(
+    baseUser[baseUser.length - 1].x - baseTarget[baseTarget.length - 1].x,
+    baseUser[baseUser.length - 1].y - baseTarget[baseTarget.length - 1].y
+  );
+  const endpointScore = Math.max(0, 1 - (startDist + endDist) / 2);
+
+  // Length ratio
+  const pathLength = (pts: EvalPoint[]) =>
+    pts.reduce(
+      (acc, p, i) => (i === 0 ? 0 : acc + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y)),
+      0
+    );
+  const lenU = pathLength(baseUser);
+  const lenT = pathLength(baseTarget);
+  const lengthScore = lenT > 0 ? Math.min(lenU, lenT) / Math.max(lenU, lenT) : 0;
+
+  // Curvature score (simplified)
+  const complexity = calculateStrokeComplexity(userPoints);
+  const targetComplexity = calculateStrokeComplexity(targetPoints);
+  const curvatureScore = Math.max(
+    0,
+    1 - Math.abs(complexity.curvatureVariation - targetComplexity.curvatureVariation) / Math.PI
+  );
+
+  return {
+    dtw: dtwScore,
+    hausdorff: hausdorffScore,
+    mse: mseScore,
+    curvature: curvatureScore,
+    direction: directionScore,
+    endpoints: endpointScore,
+    length: lengthScore
+  };
+};
+
+/**
+ * Enhanced gesture evaluation with multi-stroke context awareness
+ */
+export const evaluateGestureAccuracyWithContext = (
+  userPoints: GesturePoints[],
+  options: GestureMatchOptions
+): GestureEvaluationResult => {
+  const { targetGestures, currentGestureIndex } = options;
+
+  if (currentGestureIndex >= targetGestures.length) {
+    return {
+      accuracy: 0,
+      isCorrectStroke: false,
+      isValid: false,
+      feedback: ['Invalid gesture index'],
+      suggestedIndex: undefined
+    };
+  }
+
+  const currentTarget = targetGestures[currentGestureIndex];
+  const feedback: string[] = [];
+
+  // Hard gates for pedagogy (if strict mode enabled)
+  if (options.strictPedagogy) {
+    if (!hasValidStartEnd(userPoints, currentTarget.points)) {
+      return {
+        accuracy: 0,
+        isCorrectStroke: false,
+        isValid: false,
+        feedback: ['Incorrect start or end point'],
+        suggestedIndex: undefined
+      };
+    }
+
+    if (!hasValidDirection(userPoints, currentTarget.points)) {
+      return {
+        accuracy: 0,
+        isCorrectStroke: false,
+        isValid: false,
+        feedback: ['Wrong stroke direction'],
+        suggestedIndex: undefined
+      };
+    }
+  }
+
+  // Your current sophisticated algorithm
+  const directScore = evaluateGestureAccuracy(userPoints, currentTarget.points);
+
+  // Check if later strokes match better (HW's key insight)
+  const laterGestures = targetGestures.slice(currentGestureIndex + 1);
+  let bestLaterMatch = { score: 0, index: -1 };
+
+  for (let i = 0; i < Math.min(laterGestures.length, 3); i++) {
+    // Only check next 3 strokes
+    const laterScore = evaluateGestureAccuracy(userPoints, laterGestures[i].points);
+    if (laterScore > bestLaterMatch.score) {
+      bestLaterMatch = { score: laterScore, index: currentGestureIndex + 1 + i };
+    }
+  }
+
+  // If a later stroke matches significantly better, either reject or reduce threshold
+  let finalAccuracy = directScore;
+  let suggestedIndex: number | undefined = undefined;
+
+  if (bestLaterMatch.score > directScore + 0.15) {
+    finalAccuracy = directScore * 0.7; // Penalize early acceptance
+    suggestedIndex = bestLaterMatch.index;
+    feedback.push(`This stroke looks more like stroke ${bestLaterMatch.index + 1}`);
+  }
+
+  // Get detailed metrics for feedback
+  const metrics = getDetailedMetrics(userPoints, currentTarget.points);
+
+  // Provide granular feedback based on sub-scores
+  if (metrics.dtw < 0.6) feedback.push('Shape needs improvement');
+  if (metrics.direction < 0.7) feedback.push('Check stroke direction');
+  if (metrics.endpoints < 0.8) feedback.push('Start/end points are off');
+  if (metrics.curvature < 0.6) feedback.push("Curvature doesn't match");
+  if (metrics.length < 0.7) feedback.push('Stroke length is incorrect');
+
+  const threshold = getAdaptiveThreshold(currentTarget, options);
+  const isCorrectStroke = finalAccuracy >= threshold;
+  const isValid = isCorrectStroke && suggestedIndex === undefined;
+
+  if (isCorrectStroke && feedback.length === 0) {
+    feedback.push('Good stroke!');
+  }
+
+  return {
+    accuracy: finalAccuracy,
+    isCorrectStroke,
+    isValid,
+    suggestedIndex,
+    feedback,
+    metrics
+  };
+};
+
+/**
+ * Enhanced single gesture evaluation with detailed feedback
+ */
+export const evaluateGestureAccuracyEnhanced = (
+  userPoints: GesturePoints[],
+  targetGesture: Gesture,
+  options: {
+    leniency?: number;
+    strictPedagogy?: boolean;
+    scriptType?: keyof typeof INDIC_SCRIPT_CONFIG;
+  } = {}
+): GestureEvaluationResult => {
+  const feedback: string[] = [];
+
+  // Hard gates for pedagogy
+  if (options.strictPedagogy) {
+    if (!hasValidStartEnd(userPoints, targetGesture.points)) {
+      return {
+        accuracy: 0,
+        isCorrectStroke: false,
+        isValid: false,
+        feedback: ['Incorrect start or end point'],
+        suggestedIndex: undefined
+      };
+    }
+
+    if (!hasValidDirection(userPoints, targetGesture.points)) {
+      return {
+        accuracy: 0,
+        isCorrectStroke: false,
+        isValid: false,
+        feedback: ['Wrong direction'],
+        suggestedIndex: undefined
+      };
+    }
+  }
+
+  // Your sophisticated continuous scoring
+  const accuracy = evaluateGestureAccuracy(userPoints, targetGesture.points);
+
+  // Provide granular feedback based on sub-scores
+  const metrics = getDetailedMetrics(userPoints, targetGesture.points);
+  if (metrics.dtw < 0.6) feedback.push('Shape needs improvement');
+  if (metrics.direction < 0.7) feedback.push('Check stroke direction');
+  if (metrics.endpoints < 0.8) feedback.push('Start/end points off');
+  if (metrics.curvature < 0.6) feedback.push("Curvature doesn't match");
+
+  // Create mock options for threshold calculation
+  const mockOptions: GestureMatchOptions = {
+    targetGestures: [targetGesture],
+    currentGestureIndex: 0,
+    leniency: options.leniency,
+    scriptType: options.scriptType
+  };
+
+  const threshold = getAdaptiveThreshold(targetGesture, mockOptions);
+  const isCorrectStroke = accuracy >= threshold;
+
+  if (isCorrectStroke && feedback.length === 0) {
+    feedback.push('Excellent stroke!');
+  }
+
+  return {
+    accuracy,
+    isCorrectStroke,
+    isValid: isCorrectStroke,
+    feedback,
+    metrics,
+    suggestedIndex: undefined
+  };
 };
 
 /**

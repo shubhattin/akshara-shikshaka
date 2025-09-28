@@ -55,8 +55,12 @@ export const text_lessons = pgTable('text_lessons', {
   updated_at: timestamp()
     .notNull()
     .$onUpdate(() => new Date()),
-  audio_id: integer().references(() => audio_assets.id, { onDelete: 'set null' })
-  // optional audio for the lesson, eg :- when no words for the "text"
+  audio_id: integer().references(() => audio_assets.id, { onDelete: 'set null' }),
+  // optional audio for the lesson, eg :- when no words for the "text",
+  category_id: integer().references(() => lesson_categories.id, { onDelete: 'set null' }),
+  order: smallint()
+  // order is "nullable" for text lessons
+  // and should be handled accordingly in the UI and backend
 });
 
 // A text lesson will have multiple gestures connected to it. But as other text lessons can alsp access the same gestures
@@ -75,6 +79,17 @@ export const lesson_gestures = pgTable(
   },
   (table) => [primaryKey({ columns: [table.text_gesture_id, table.text_lesson_id] })]
 );
+
+export const lesson_categories = pgTable('lesson_categories', {
+  id: serial().primaryKey(),
+  name: text().notNull(),
+  lang_id: smallint().notNull(),
+  order: smallint().notNull(), // order is not nullable for lesson categories
+  created_at: timestamp().notNull().defaultNow(),
+  updated_at: timestamp()
+    .notNull()
+    .$onUpdate(() => new Date())
+});
 
 export const text_lesson_words = pgTable('text_lesson_words', {
   id: serial().primaryKey(),

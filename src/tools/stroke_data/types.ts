@@ -53,3 +53,70 @@ export const CANVAS_DIMS = {
 } as const;
 
 export const GESTURE_GAP_DURATION = 100;
+
+// Enhanced types for HanziWriter-inspired approach
+export interface GestureMatchOptions {
+  targetGestures: Gesture[];
+  currentGestureIndex: number;
+  leniency?: number;
+  isOutlineVisible?: boolean;
+  strictPedagogy?: boolean;
+  scriptType?: keyof typeof INDIC_SCRIPT_CONFIG;
+}
+
+export interface GestureEvaluationResult {
+  accuracy: number;
+  isCorrectStroke: boolean;
+  isValid: boolean;
+  suggestedIndex?: number;
+  feedback: string[];
+  metrics?: DetailedMetrics;
+}
+
+export interface DetailedMetrics {
+  dtw: number;
+  hausdorff: number;
+  mse: number;
+  curvature: number;
+  direction: number;
+  endpoints: number;
+  length: number;
+}
+
+export interface StrokeComplexityMetrics {
+  curvatureVariation: number;
+  directionChanges: number;
+  pathLength: number;
+  normalizedComplexity: number;
+}
+
+// Indian script specific configurations
+export const INDIC_SCRIPT_CONFIG = {
+  DEVANAGARI: {
+    horizontalStrokeBonus: 1.1,
+    curveComplexityWeight: 0.8,
+    conjunctLeniency: 1.2,
+    baseThreshold: 0.7 as number
+  },
+  TAMIL: {
+    curveComplexityWeight: 1.2,
+    endpointWeight: 0.9,
+    baseThreshold: 0.65 as number
+  },
+  TELUGU: {
+    curveComplexityWeight: 1.1,
+    baseThreshold: 0.68 as number
+  },
+  KANNADA: {
+    curveComplexityWeight: 1.0,
+    baseThreshold: 0.7 as number
+  },
+  MALAYALAM: {
+    curveComplexityWeight: 1.15,
+    baseThreshold: 0.66 as number
+  },
+  ODIA: {
+    curveComplexityWeight: 1.05,
+    baseThreshold: 0.69 as number
+  }
+} as const;

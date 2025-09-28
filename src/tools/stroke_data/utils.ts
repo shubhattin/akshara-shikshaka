@@ -431,26 +431,60 @@ export function getSmoothenedPoints(
   return stroke as GesturePoints[];
 }
 
-/**
- * Convert perfect-freehand stroke outline points to SVG path string
- */
-export function pointsToSvgPath(points: GesturePoints[]): string {
-  if (!points || points.length === 0) return '';
+// /**
+//  * Convert perfect-freehand stroke outline points to SVG path string
+//  */
+// export function pointsToSvgPath(points: GesturePoints[]): string {
+//   if (!points || points.length === 0) return '';
 
-  const pathCommands: string[] = [];
+//   const pathCommands: string[] = [];
 
-  // Move to the first point
-  const [x0, y0] = points[0];
-  pathCommands.push(`M ${x0.toFixed(2)} ${y0.toFixed(2)}`);
+//   // Move to the first point
+//   const [x0, y0] = points[0];
+//   pathCommands.push(`M ${x0.toFixed(2)} ${y0.toFixed(2)}`);
 
-  // Draw lines to all subsequent points
-  for (let i = 1; i < points.length; i++) {
-    const [x, y] = points[i];
-    pathCommands.push(`L ${x.toFixed(2)} ${y.toFixed(2)}`);
+//   // Draw lines to all subsequent points
+//   for (let i = 1; i < points.length; i++) {
+//     const [x, y] = points[i];
+//     pathCommands.push(`L ${x.toFixed(2)} ${y.toFixed(2)}`);
+//   }
+
+//   // Close the path (perfect-freehand returns a closed polygon)
+//   pathCommands.push('Z');
+
+//   return pathCommands.join(' ');
+// }
+
+const average = (a: number, b: number) => (a + b) / 2;
+
+export function pointsToSvgPath(points: GesturePoints[], closed = true) {
+  const len = points.length;
+
+  if (len < 4) {
+    return ``;
   }
 
-  // Close the path (perfect-freehand returns a closed polygon)
-  pathCommands.push('Z');
+  let a = points[0];
+  let b = points[1];
+  const c = points[2];
 
-  return pathCommands.join(' ');
+  let result = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(
+    2
+  )},${b[1].toFixed(2)} ${average(b[0], c[0]).toFixed(2)},${average(b[1], c[1]).toFixed(2)} T`;
+
+  for (let i = 2, max = len - 1; i < max; i++) {
+    a = points[i];
+    b = points[i + 1];
+    result += `${average(a[0], b[0]).toFixed(2)},${average(a[1], b[1]).toFixed(2)} `;
+  }
+
+  if (closed) {
+    result += 'Z';
+  }
+
+  return result;
 }
+
+/*
+The simulate pressure option works by making a boundary and a complete polygon around the stroke.
+*/

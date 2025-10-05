@@ -109,7 +109,7 @@ const make_upload_audio_asset_route = protectedAdminProcedure
     await uploadAssetFile(s3_key, audioBuffer.fileBuffer);
     console.log('audio uploaded');
 
-    const description = `${input.text_key} (${input.text})`;
+    const description = `${input.text} (${input.text_key})`;
     const [result] = await db
       .insert(audio_assets)
       .values({
@@ -182,7 +182,7 @@ const complete_upload_audio_asset_route = protectedAdminProcedure
     })
   )
   .mutation(async ({ input }) => {
-    const description = `${input.text_key} (${input.text})`;
+    const description = `${input.text} (${input.text_key})`;
     const [result] = await db
       .insert(audio_assets)
       .values({

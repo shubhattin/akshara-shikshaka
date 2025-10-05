@@ -35,7 +35,7 @@ type Props = {
 const selected_image_atom = atom<image_type | null>(null);
 
 export default function ImageSelect(props: Props) {
-  const [tab, setTab] = useState<'add' | 'make'>('add');
+  const [tab, setTab] = useState<'add' | 'make'>('make');
   const [selectedImage, setSelectedImage] = useAtom(selected_image_atom);
 
   useEffect(() => {

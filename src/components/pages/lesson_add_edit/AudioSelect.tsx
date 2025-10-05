@@ -51,14 +51,14 @@ type Props = {
 const selected_audio_atom = atom<audio_type | null>(null);
 
 export default function AudioSelect(props: Props) {
-  const [tab, setTab] = useState<'add' | 'make'>('add');
+  const [tab, setTab] = useState<'add' | 'make'>('make');
   const [selectedAudio, setSelectedAudio] = useAtom(selected_audio_atom);
 
   useEffect(() => {
     setSelectedAudio(null);
   }, [props.wordItem]);
 
-  const [createTab, setCreateTab] = useState<'ai' | 'record'>('ai');
+  const [createTab, setCreateTab] = useState<'ai' | 'record'>('record');
 
   useEffect(() => {
     setSelectedAudio(null);
@@ -798,32 +798,43 @@ const AudioRecord = ({ wordItem }: Props) => {
           )}
 
           <div className="flex items-center justify-center gap-3">
-            {recStatus !== 'recording' && !recordedBlob && (
-              <Button
-                className="gap-2"
-                variant="outline"
-                disabled={!selectedDeviceId}
-                onClick={startRecording}
-              >
-                <MdMic className="text-emerald-600" /> Record
-              </Button>
-            )}
-            {recStatus === 'recording' && (
-              <Button className="gap-2" variant="destructive" onClick={stopRecording}>
-                <MdStop /> Stop
-              </Button>
-            )}
-            {recStatus === 'recorded' && (
+            {!complete_upload_mut.isSuccess && (
               <>
-                <Button className="gap-2" variant="outline" onClick={reRecord}>
-                  <MdRefresh /> Re-record
-                </Button>
-                <Button className="gap-2" variant="default" onClick={upload_recorded_func}>
-                  <MdCloudUpload /> Upload
-                </Button>
+                {recStatus !== 'recording' && !recordedBlob && (
+                  <Button
+                    className="gap-2"
+                    variant="outline"
+                    disabled={!selectedDeviceId}
+                    onClick={startRecording}
+                  >
+                    <MdMic className="text-emerald-600" /> Record
+                  </Button>
+                )}
+                {recStatus === 'recording' && (
+                  <Button className="gap-2" variant="destructive" onClick={stopRecording}>
+                    <MdStop /> Stop
+                  </Button>
+                )}
+                {recStatus === 'recorded' && (
+                  <>
+                    <Button
+                      className="gap-2"
+                      variant="outline"
+                      onClick={reRecord}
+                      disabled={uploading_status}
+                    >
+                      <MdRefresh /> Re-record
+                    </Button>
+                    <Button className="gap-2" variant="default" onClick={upload_recorded_func}>
+                      <MdCloudUpload /> Upload
+                    </Button>
+                  </>
+                )}
+                {uploading_status && (
+                  <div className="text-sm text-muted-foreground">Uploading...</div>
+                )}
               </>
             )}
-            {uploading_status && <div className="text-sm text-muted-foreground">Uploading...</div>}
             {complete_upload_mut.isSuccess && (
               <>
                 <div className="text-sm text-emerald-600">Uploaded</div>

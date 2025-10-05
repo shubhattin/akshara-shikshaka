@@ -235,7 +235,7 @@ const ImageCreation = ({ wordItem }: Props) => {
             width: 256
           });
           setImagePrompt(data.image_prompt);
-          queryClient.invalidateQueries(trpc.image_assets.list_image_assets.pathFilter());
+          queryClient.invalidateQueries(trpc.image_assets.list_image_assets.queryFilter());
         }
       }
     })

@@ -91,6 +91,17 @@ export const lesson_categories = pgTable('lesson_categories', {
     .$onUpdate(() => new Date())
 });
 
+export const gesture_categories = pgTable('gesture_categories', {
+  id: serial().primaryKey(),
+  name: text().notNull(),
+  script_id: smallint().notNull(),
+  order: smallint().notNull(),
+  created_at: timestamp().notNull().defaultNow(),
+  updated_at: timestamp()
+    .notNull()
+    .$onUpdate(() => new Date())
+});
+
 export const text_lesson_words = pgTable('text_lesson_words', {
   id: serial().primaryKey(),
   text_lesson_id: integer()

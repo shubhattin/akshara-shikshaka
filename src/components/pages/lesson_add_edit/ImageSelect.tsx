@@ -244,6 +244,8 @@ const ImageCreation = ({ wordItem }: Props) => {
   const word_script_id = useAtomValue(base_word_script_id_atom);
 
   const handleCreateImage = (existingPrompt?: string) => {
+    setSelectedImage(null);
+    create_image_mut.reset();
     create_image_mut.mutate({
       word: wordItem.word,
       lang_id: lang_id,
@@ -361,9 +363,10 @@ const ImageCreation = ({ wordItem }: Props) => {
           <div className="space-x-4">
             <Button
               variant={'destructive'}
-              onClick={() => {
+              onClick={async () => {
                 if (!create_image_mut.data.success) return;
-                handleDeleteImage(create_image_mut.data.id);
+                await handleDeleteImage(create_image_mut.data.id);
+                setSelectedImage(null);
                 create_image_mut.reset();
               }}
               disabled={delete_image_mut.isPending}
@@ -373,10 +376,9 @@ const ImageCreation = ({ wordItem }: Props) => {
             <Button
               variant={'outline'}
               onClick={() => {
-                setSelectedImage(null);
-                create_image_mut.reset();
                 handleCreateImage();
               }}
+              disabled={delete_image_mut.isPending}
             >
               Remake Image
             </Button>

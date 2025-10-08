@@ -361,6 +361,8 @@ const AudioCreation = ({ wordItem }: Props) => {
 
   const lesson_lang_id = useAtomValue(lang_id_atom);
   const handleCreateAudio = async () => {
+    setSelectedAudio(null);
+    create_audio_mut.reset();
     const text_key = await lipi_parivartak(
       wordItem.word,
       get_script_from_id(word_script_id),
@@ -480,7 +482,6 @@ const AudioCreation = ({ wordItem }: Props) => {
               <Button
                 variant={'outline'}
                 onClick={() => {
-                  create_audio_mut.reset();
                   handleCreateAudio();
                 }}
               >
@@ -490,6 +491,7 @@ const AudioCreation = ({ wordItem }: Props) => {
                 variant={'destructive'}
                 onClick={async () => {
                   if (!create_audio_mut.data) return;
+                  setSelectedAudio(null);
                   await delete_audio_mut.mutateAsync({ id: create_audio_mut.data.id });
                   create_audio_mut.reset();
                 }}
@@ -681,6 +683,7 @@ const AudioRecord = ({ wordItem }: Props) => {
   };
 
   const reRecord = () => {
+    setSelectedAudio(null);
     setRecError(null);
     setRecStatus('idle');
     get_upload_url_mut.reset();

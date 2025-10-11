@@ -1081,7 +1081,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
         if (data.success) {
           toast.success('Text Added');
           queryClient.invalidateQueries(trpc.text_gestures.list_text_gesture_data.pathFilter());
-          queryClient.invalidateQueries(trpc.text_lessons.list_text_lessons.pathFilter());
+          queryClient.invalidateQueries(trpc.text_lessons.get_gestures_from_text_key.pathFilter());
           router.push(`/gestures/edit/${data.id}`);
         } else {
           if (data.err_code === 'text_already_exists') {
@@ -1100,7 +1100,6 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const update_text_data_mut = useMutation(
     trpc.text_gestures.edit_text_gesture_data.mutationOptions({
       onSuccess(data) {
-        queryClient.invalidateQueries(trpc.text_lessons.list_text_lessons.pathFilter());
         toast.success('Text Updated');
       },
       onError(error) {

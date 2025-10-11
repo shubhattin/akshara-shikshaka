@@ -31,6 +31,7 @@ export const text_gestures = pgTable(
       .notNull()
       .$onUpdate(() => new Date()),
     script_id: smallint().notNull(),
+    category_id: integer().references(() => gesture_categories.id, { onDelete: 'set null' }),
     font_family: text().notNull().default(DEFAULT_FONT_FAMILY).$type<FontFamily>(),
     font_size: smallint().notNull().default(DEFAULT_FONT_SIZE),
     text_center_offset: jsonb().$type<[number, number]>().notNull().default([0, 0])
@@ -41,6 +42,17 @@ export const text_gestures = pgTable(
     unique('text_gestures_text_key_script_id_unique').on(table.text_key, table.script_id)
   ]
 );
+
+export const gesture_categories = pgTable('gesture_categories', {
+  id: serial().primaryKey(),
+  name: text().notNull(),
+  script_id: smallint().notNull(),
+  order: smallint().notNull(),
+  created_at: timestamp().notNull().defaultNow(),
+  updated_at: timestamp()
+    .notNull()
+    .$onUpdate(() => new Date())
+});
 
 export const text_lessons = pgTable('text_lessons', {
   id: serial().primaryKey(),
@@ -85,17 +97,6 @@ export const lesson_categories = pgTable('lesson_categories', {
   name: text().notNull(),
   lang_id: smallint().notNull(),
   order: smallint().notNull(), // order is not nullable for lesson categories
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
-    .notNull()
-    .$onUpdate(() => new Date())
-});
-
-export const gesture_categories = pgTable('gesture_categories', {
-  id: serial().primaryKey(),
-  name: text().notNull(),
-  script_id: smallint().notNull(),
-  order: smallint().notNull(),
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
     .notNull()
@@ -160,8 +161,20 @@ export const lesssonGesturesRelations = relations(lesson_gestures, ({ one }) => 
   })
 }));
 
-export const textGesturesRelations = relations(text_gestures, ({ many }) => ({
-  lessons: many(lesson_gestures) // via join table
+export const gestureCategoriesRelations = relations(gesture_categories, ({ many }) => ({
+  gestures: many(text_gestures)
+}));
+
+export const textGesturesRelations = relations(text_gestures, ({ many, one }) => ({
+  lessons: many(lesson_gestures), // via join table
+  category: one(gesture_categories, {
+    fields: [text_gestures.category_id],
+    references: [gesture_categories.id]
+  })
+}));
+
+export const lessonCategoriesRelations = relations(lesson_categories, ({ many }) => ({
+  lessons: many(text_lessons)
 }));
 
 export const textLessonsRelations = relations(text_lessons, ({ many, one }) => ({
@@ -170,6 +183,10 @@ export const textLessonsRelations = relations(text_lessons, ({ many, one }) => (
   optional_audio: one(audio_assets, {
     fields: [text_lessons.audio_id],
     references: [audio_assets.id]
+  }),
+  category: one(lesson_categories, {
+    fields: [text_lessons.category_id],
+    references: [lesson_categories.id]
   })
 }));
 

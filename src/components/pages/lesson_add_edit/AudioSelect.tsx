@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useTRPC, useTRPCClient } from '~/api/client';
+import { useTRPC } from '~/api/client';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
@@ -507,6 +507,9 @@ const AudioCreation = ({ wordItem }: Props) => {
   );
 };
 
+const selected_device_id_atom = atom<string | null>(null);
+const SELECTED_DEVICE_ID_STORAGE_KEY = 'selected_device_id';
+
 const AudioRecord = ({ wordItem }: Props) => {
   // const trpcClient = useTRPCClient();
   const [langId, setLangId] = useState<number | null>(null);
@@ -521,7 +524,7 @@ const AudioRecord = ({ wordItem }: Props) => {
     typeof MediaRecorder !== 'undefined' &&
     MediaRecorder.isTypeSupported('audio/webm; codecs=opus');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [selectedDeviceId, setSelectedDeviceId] = useAtom(selected_device_id_atom);
   const [recStatus, setRecStatus] = useState<'idle' | 'recording' | 'recorded'>('idle');
   const [recError, setRecError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -611,7 +614,18 @@ const AudioRecord = ({ wordItem }: Props) => {
       const all = await navigator.mediaDevices.enumerateDevices();
       const inputs = all.filter((d) => d.kind === 'audioinput');
       setDevices(inputs);
-      if (!selectedDeviceId && inputs.length > 0) setSelectedDeviceId(inputs[0].deviceId);
+      const previousSelectedDeviceId = JSON.parse(
+        localStorage.getItem(SELECTED_DEVICE_ID_STORAGE_KEY) ?? 'null'
+      );
+      const prevSelectedDeviceInList = inputs.some((d) => d.deviceId === previousSelectedDeviceId);
+      if (prevSelectedDeviceInList) {
+        setSelectedDeviceId(previousSelectedDeviceId);
+      } else if (!prevSelectedDeviceInList || (!selectedDeviceId && inputs.length > 0)) {
+        setSelectedDeviceId(inputs[0].deviceId);
+        localStorage.setItem(SELECTED_DEVICE_ID_STORAGE_KEY, JSON.stringify(inputs[0].deviceId));
+      } else {
+        setSelectedDeviceId(null);
+      }
       tmpStream.getTracks().forEach((t) => t.stop());
     } catch (e: any) {
       setRecError('Microphone permission denied or unavailable');
@@ -746,7 +760,10 @@ const AudioRecord = ({ wordItem }: Props) => {
               <Select
                 disabled={recStatus === 'recording' || recStatus === 'recorded'}
                 value={selectedDeviceId || 'none'}
-                onValueChange={(v) => setSelectedDeviceId(v === 'none' ? '' : v)}
+                onValueChange={(v) => {
+                  setSelectedDeviceId(v === 'none' ? null : v);
+                  localStorage.setItem(SELECTED_DEVICE_ID_STORAGE_KEY, JSON.stringify(v));
+                }}
               >
                 <SelectTrigger size="sm" className="w-64">
                   <SelectValue placeholder="Select input" />

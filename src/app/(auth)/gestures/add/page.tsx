@@ -33,7 +33,8 @@ const List = async () => {
     font_size: DEFAULT_FONT_SIZE,
     text_center_offset: [0, 0] as [number, number],
     font_family: font_family,
-    script_id: script_id
+    script_id: script_id,
+    category_id: null
   };
   return (
     <div>

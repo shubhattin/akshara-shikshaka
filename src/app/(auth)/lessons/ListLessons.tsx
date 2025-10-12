@@ -1,10 +1,10 @@
 'use client';
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { IoMdSearch, IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
 import { useTRPC } from '~/api/client';
 import { Card, CardHeader, CardTitle } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -14,197 +14,136 @@ import {
 } from '~/components/ui/select';
 import { Input } from '~/components/ui/input';
 import { Button } from '~/components/ui/button';
-import {
-  LANG_LIST,
-  lang_list_obj,
-  type lang_list_type,
-  get_lang_from_id,
-  LANG_SCRIPT_MAP
-} from '~/state/lang_list';
-import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
+import { LANG_LIST, lang_list_obj, type lang_list_type } from '~/state/lang_list';
 import Cookie from 'js-cookie';
 import { useQuery } from '@tanstack/react-query';
 import { LESSON_LANG_ID_COOKIE_KEY } from '~/state/cookie';
+import type { lesson_categories } from '~/db/schema';
+import type { InferSelectModel } from 'drizzle-orm';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '~/lib/utils';
+import { TiEdit } from 'react-icons/ti';
 
 type Props = {
   init_lang_id: number;
+  init_lesson_categories: Pick<
+    InferSelectModel<typeof lesson_categories>,
+    'id' | 'name' | 'order'
+  >[];
 };
 
-const DEFAULT_LIMIT = 24;
-export default function ListLessons({ init_lang_id }: Props) {
+export default function ListLessons({ init_lang_id, init_lesson_categories }: Props) {
   const trpc = useTRPC();
   const [langId, setLangId] = useState<number | undefined>(init_lang_id);
-  const [searchText, setSearchText] = useState<string>('');
-  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
-  const [page, setPage] = useState<number>(1);
-  const [limit, setLimit] = useState<number>(DEFAULT_LIMIT);
-
-  useEffect(() => {
-    const handle = setTimeout(() => setDebouncedSearch(searchText.trim()), 300);
-    return () => clearTimeout(handle);
-  }, [searchText]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [langId, debouncedSearch, limit]);
-
-  const list_q = useQuery(
-    trpc.text_lessons.list_text_lessons.queryOptions(
-      {
-        lang_id: langId!,
-        search_text: debouncedSearch || undefined,
-        page,
-        limit
-      },
-      {
-        enabled: !!langId
-      }
-    )
-  );
-  const isLoading = !!langId && (list_q.isLoading || list_q.isFetching);
-  const data = list_q.data;
 
   const langOptions = LANG_LIST.map((name) => ({
     name,
     id: lang_list_obj[name as lang_list_type]
   }));
 
-  const items = useMemo(() => data?.list ?? [], [data]);
+  const categories_q = useQuery(
+    trpc.text_lessons.categories.get_text_lesson_categories.queryOptions(
+      { lang_id: langId! },
+      { enabled: !!langId, placeholderData: init_lesson_categories }
+    )
+  );
 
-  const currentScriptForLang = useMemo(() => {
-    if (!langId) return undefined;
-    const langName = get_lang_from_id(langId);
-    return LANG_SCRIPT_MAP[langName];
-  }, [langId]);
+  const categories = categories_q.data ?? [];
 
-  useEffect(() => {
-    if (!currentScriptForLang) return;
-    load_parivartak_lang_data(currentScriptForLang);
-  }, [currentScriptForLang]);
+  const [open, setOpen] = useState(false);
+  // 0 will be for uncategorized
+  const [selectedCategoryID, setSelectedCategoryID] = useState<number | null>(null);
 
   return (
     <div className="space-y-6">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3">
-        <div className="min-w-56">
-          <Select
-            value={langId?.toString()}
-            onValueChange={(val) => {
-              setLangId(Number(val));
-              Cookie.set(LESSON_LANG_ID_COOKIE_KEY, val, { expires: 30 });
-            }}
-          >
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="Select a Language" />
-            </SelectTrigger>
-            <SelectContent>
-              {langOptions.map((opt) => (
-                <SelectItem key={opt.id} value={opt.id.toString()}>
-                  {opt.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="relative">
-          <IoMdSearch className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="w-64 pl-9"
-            placeholder="Search text..."
-            value={searchText}
-            onInput={(e) => {
-              setSearchText(e.currentTarget.value);
-              if (!currentScriptForLang) return;
-              lekhika_typing_tool(
-                e.nativeEvent.target,
-                // @ts-ignore
-                e.nativeEvent.data,
-                currentScriptForLang,
-                true,
-                // @ts-ignore
-                (val) => {
-                  setSearchText(val);
-                }
-              );
-            }}
-            disabled={!langId}
-            aria-label="Search text"
-          />
-        </div>
-
-        <div>
-          <Select value={String(limit)} onValueChange={(val) => setLimit(Number(val))}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Page size" />
-            </SelectTrigger>
-            <SelectContent>
-              {[12, 24, 32, 48].map((sz) => (
-                <SelectItem key={sz} value={String(sz)}>
-                  {sz} / page
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select
+          value={langId?.toString()}
+          onValueChange={(val) => {
+            setLangId(Number(val));
+            Cookie.set(LESSON_LANG_ID_COOKIE_KEY, val, { expires: 30 });
+          }}
+        >
+          <SelectTrigger className="w-56">
+            <SelectValue placeholder="Select a Language" />
+          </SelectTrigger>
+          <SelectContent>
+            {langOptions.map((opt) => (
+              <SelectItem key={opt.id} value={opt.id.toString()}>
+                {opt.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <ul className="grid grid-cols-4 gap-4 sm:grid-cols-6 md:grid-cols-8">
-        {isLoading ? (
-          Array.from({ length: limit }).map((_, i) => (
-            <li key={`skeleton-${i}`}>
-              <Card className="p-2">
-                <CardHeader>
-                  <Skeleton className="mx-auto h-6 w-16" />
-                </CardHeader>
-              </Card>
-            </li>
-          ))
-        ) : items.length > 0 ? (
-          items.map((item: any) => (
-            <li key={item.id}>
-              <Link href={`/lessons/edit/${item.id}`}>
-                <Card className="p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800">
-                  <CardHeader>
-                    <CardTitle className="text-center">{item.text}</CardTitle>
-                  </CardHeader>
-                </Card>
-              </Link>
-            </li>
-          ))
-        ) : (
-          <></>
-        )}
-      </ul>
-      {!!langId && (
-        <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 sm:flex-row">
-          <div className="text-sm text-muted-foreground">
-            {data ? (
-              <span>
-                Page {data.page} of {data.pageCount} • Total {data.total}
-              </span>
-            ) : (
-              <span className="text-sm text-muted-foreground">Loading...</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center space-x-4">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
             <Button
-              variant="secondary"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={!data?.hasPrev || isLoading}
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className="w-[200px] justify-between"
             >
-              <IoMdArrowDropleft className="mr-1" />
-              <span className="sr-only sm:not-sr-only">Prev</span>
+              {selectedCategoryID !== null
+                ? categories.find((category) => category.id === selectedCategoryID)?.name ||
+                  (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
+                : 'Select category...'}
+              <ChevronsUpDown className="opacity-50" />
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={!data?.hasNext || isLoading}
-            >
-              <span className="sr-only sm:not-sr-only">Next</span>
-              <IoMdArrowDropright className="ml-1" />
-            </Button>
-          </div>
-        </div>
-      )}
+          </PopoverTrigger>
+          <PopoverContent className="w-[200px] p-0">
+            <Command>
+              <CommandInput placeholder="Search category..." className="h-9" />
+              <CommandList>
+                <CommandEmpty>No category found.</CommandEmpty>
+                <CommandGroup>
+                  {categories.map((category) => (
+                    <CommandItem
+                      key={category.id}
+                      value={category.id.toString()}
+                      onSelect={(currentValue) => {
+                        setSelectedCategoryID(
+                          Number(currentValue) === selectedCategoryID ? null : Number(currentValue)
+                        );
+                        setOpen(false);
+                      }}
+                    >
+                      {category.name}
+                      <Check
+                        className={cn(
+                          'ml-auto',
+                          selectedCategoryID === category.id ? 'opacity-100' : 'opacity-0'
+                        )}
+                      />
+                    </CommandItem>
+                  ))}
+                  <CommandItem
+                    value="0"
+                    onSelect={() => {
+                      setSelectedCategoryID(0);
+                      setOpen(false);
+                    }}
+                  >
+                    Uncategorized
+                  </CommandItem>
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        <Button variant="ghost" size="icon">
+          <TiEdit className="size-5" />
+        </Button>
+      </div>
     </div>
   );
 }

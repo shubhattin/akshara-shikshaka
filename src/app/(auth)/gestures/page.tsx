@@ -27,7 +27,7 @@ const List = async () => {
       <div className="mt-2 mb-5 flex items-center justify-center gap-4 px-2">
         <Link href="/gestures/add">
           <Button variant={'blue'} className="gap-2 text-lg font-semibold">
-            <IoMdAdd className="size-5.5" /> नवाक्षरं युञ्जतु
+            <IoMdAdd className="size-5.5" /> Add Gesture
           </Button>
         </Link>
       </div>

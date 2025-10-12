@@ -7,6 +7,7 @@ import { getCachedSession } from '~/lib/cache_server_route_data';
 import ListLessons from './ListLessons';
 import { cookies } from 'next/headers';
 import { get_lesson_lang_id_from_cookie, LESSON_LANG_ID_COOKIE_KEY } from '~/state/cookie';
+import { db } from '~/db/db';
 
 const List = async () => {
   const session = await getCachedSession();
@@ -15,6 +16,16 @@ const List = async () => {
 
   const cookie = await cookies();
   const lang_id = get_lesson_lang_id_from_cookie(cookie.get(LESSON_LANG_ID_COOKIE_KEY)?.value);
+
+  const lesson_categories = await db.query.lesson_categories.findMany({
+    where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
+    columns: {
+      id: true,
+      name: true,
+      order: true
+    },
+    orderBy: (tbl, { asc }) => [asc(tbl.order)]
+  });
 
   return (
     <div className="container mx-auto p-4">
@@ -27,11 +38,11 @@ const List = async () => {
       <div className="mt-2 mb-5 flex items-center justify-center gap-4 px-2">
         <Link href="/lessons/add">
           <Button variant={'blue'} className="gap-2 text-lg font-semibold">
-            <IoMdAdd className="size-5.5" /> पाठयुञ्जतु
+            <IoMdAdd className="size-5.5" /> Add Lesson
           </Button>
         </Link>
       </div>
-      <ListLessons init_lang_id={lang_id} />
+      <ListLessons init_lang_id={lang_id} init_lesson_categories={lesson_categories} />
     </div>
   );
 };

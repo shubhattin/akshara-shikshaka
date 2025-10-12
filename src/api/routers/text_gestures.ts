@@ -155,9 +155,29 @@ const list_text_gesture_data_route = protectedAdminProcedure
     };
   });
 
+export const get_text_gesture_categories_func = async (script_id: number) => {
+  const categories = await db.query.gesture_categories.findMany({
+    where: (tbl, { eq }) => eq(tbl.script_id, script_id),
+    columns: {
+      id: true,
+      name: true
+    }
+  });
+  return categories;
+};
+
+const get_text_gesture_categories_route = protectedAdminProcedure
+  .input(z.object({ script_id: z.number().int() }))
+  .query(async ({ input: { script_id } }) => {
+    return await get_text_gesture_categories_func(script_id);
+  });
+
 export const text_gestures_router = t.router({
   add_text_gesture_data: add_text_gesture_data_route,
   edit_text_gesture_data: edit_text_gesture_data_route,
   delete_text_gesture_data: delete_text_gesture_data_route,
-  list_text_gesture_data: list_text_gesture_data_route
+  list_text_gesture_data: list_text_gesture_data_route,
+  categories: t.router({
+    get_text_gesture_categories: get_text_gesture_categories_route
+  })
 });

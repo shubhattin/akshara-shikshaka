@@ -324,11 +324,31 @@ const get_text_lesson_word_media_data_route = protectedAdminProcedure
     };
   });
 
+export const get_text_lesson_categories_func = async (lang_id: number) => {
+  const categories = await db.query.lesson_categories.findMany({
+    where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
+    columns: {
+      id: true,
+      name: true
+    }
+  });
+  return categories;
+};
+
+const get_text_lesson_categories_route = protectedAdminProcedure
+  .input(z.object({ lang_id: z.number().int() }))
+  .query(async ({ input: { lang_id } }) => {
+    return await get_text_lesson_categories_func(lang_id);
+  });
+
 export const text_lessons_router = t.router({
   add_text_lesson: add_text_lesson_route,
   update_text_lesson: update_text_lesson_route,
   delete_text_lesson: delete_text_lesson_route,
   list_text_lessons: list_text_lessons_route,
   get_gestures_from_text_key: get_gestures_from_text_key_route,
-  get_text_lesson_word_media_data: get_text_lesson_word_media_data_route
+  get_text_lesson_word_media_data: get_text_lesson_word_media_data_route,
+  categories: t.router({
+    get_text_lesson_categories: get_text_lesson_categories_route
+  })
 });

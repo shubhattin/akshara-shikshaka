@@ -34,7 +34,8 @@ const List = async () => {
     text_center_offset: [0, 0] as [number, number],
     font_family: font_family,
     script_id: script_id,
-    category_id: null
+    category_id: null,
+    order: null
   };
   return (
     <div>

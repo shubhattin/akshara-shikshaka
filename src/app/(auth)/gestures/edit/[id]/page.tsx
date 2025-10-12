@@ -22,7 +22,8 @@ const get_cached_text_data = cache(async (id: number) => {
       text_center_offset: true,
       script_id: true,
       text_key: true,
-      category_id: true
+      category_id: true,
+      order: true
     }
   });
   return text_data;

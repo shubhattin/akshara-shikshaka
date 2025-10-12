@@ -1,9 +1,13 @@
 import { t, protectedAdminProcedure } from '../trpc_init';
 import { z } from 'zod';
-import { lesson_gestures, text_lesson_words, text_lessons } from '~/db/schema';
+import { lesson_categories, lesson_gestures, text_lesson_words, text_lessons } from '~/db/schema';
 import { db } from '~/db/db';
-import { and, count, eq, ilike, inArray } from 'drizzle-orm';
-import { TextLessonsSchemaZod, TextLessonWordsSchemaZod } from '~/db/schema_zod';
+import { and, count, eq, ilike, inArray, max, sql } from 'drizzle-orm';
+import {
+  LessonCategoriesSchemaZod,
+  TextLessonsSchemaZod,
+  TextLessonWordsSchemaZod
+} from '~/db/schema_zod';
 import { dev_delay } from '~/tools/delay';
 import { TRPCError } from '@trpc/server';
 
@@ -196,13 +200,38 @@ const update_text_lesson_route = protectedAdminProcedure
     }
   );
 
+const reorder_text_lesson_in_category_func = async (category_id: number) => {
+  const categories = await db.query.lesson_categories.findMany({
+    columns: {
+      id: true,
+      order: true
+    },
+    where: eq(lesson_categories.id, category_id),
+    orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
+  });
+  const reordered_categories = categories.map((category, index) => ({
+    ...category,
+    order: index + 1
+  }));
+
+  await Promise.allSettled(
+    reordered_categories.map((category) =>
+      db
+        .update(lesson_categories)
+        .set({ order: category.order })
+        .where(eq(lesson_categories.id, category.id))
+    )
+  );
+};
+
 const delete_text_lesson_route = protectedAdminProcedure
   .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
   .mutation(async ({ input: { id, uuid } }) => {
     // verify the id, uuid combination
     const text_lesson_ = await db.query.text_lessons.findFirst({
       columns: {
-        id: true
+        id: true,
+        category_id: true
       },
       where: and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid))
     });
@@ -217,63 +246,15 @@ const delete_text_lesson_route = protectedAdminProcedure
     // ^ The above records will be deleted automatically due to the cascade delete constraint
     // but we are doing it explicitly to be sure
 
+    // reordering the catoegory id after deletion if needed
+    if (text_lesson_.category_id) {
+      await reorder_text_lesson_in_category_func(text_lesson_.category_id);
+    }
+
     await db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
 
     return {
       deleted: true
-    };
-  });
-
-const list_text_lessons_route = protectedAdminProcedure
-  .input(
-    z.object({
-      lang_id: z.number().int(),
-      search_text: z.string().optional(),
-      page: z.number().int().min(1),
-      limit: z.number().int().min(1)
-    })
-  )
-  .query(async ({ input: { page, limit, lang_id, search_text } }) => {
-    await dev_delay(500);
-
-    const baseWhereClause = eq(text_lessons.lang_id, lang_id);
-    const [{ count: totalCount }] = await db
-      .select({ count: count() })
-      .from(text_lessons)
-      .where(baseWhereClause);
-
-    const offset = (page - 1) * limit;
-
-    const list = await db.query.text_lessons.findMany({
-      where: () => {
-        if (search_text && search_text.trim().length > 0) {
-          return and(baseWhereClause, ilike(text_lessons.text, `%${search_text.trim()}%`))!;
-        }
-        return baseWhereClause;
-      },
-      orderBy: (text_lessons, { asc }) => [asc(text_lessons.text)],
-      limit: limit,
-      offset,
-      columns: {
-        id: true,
-        text: true,
-        created_at: true,
-        updated_at: true
-      }
-    });
-
-    const total = Number(totalCount ?? 0);
-    const pageCount = Math.max(1, Math.ceil(total / limit));
-    const hasPrev = page > 1;
-    const hasNext = page < pageCount;
-
-    return {
-      list,
-      total,
-      page: page,
-      pageCount,
-      hasPrev,
-      hasNext
     };
   });
 
@@ -329,8 +310,10 @@ export const get_text_lesson_categories_func = async (lang_id: number) => {
     where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
     columns: {
       id: true,
-      name: true
-    }
+      name: true,
+      order: true
+    },
+    orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
   });
   return categories;
 };
@@ -341,14 +324,165 @@ const get_text_lesson_categories_route = protectedAdminProcedure
     return await get_text_lesson_categories_func(lang_id);
   });
 
+const add_text_lesson_category_route = protectedAdminProcedure
+  .input(LessonCategoriesSchemaZod.pick({ lang_id: true, name: true }))
+  .mutation(async ({ input: { lang_id, name } }) => {
+    const last_order = await db
+      .select({ max_order: max(lesson_categories.order) })
+      .from(lesson_categories)
+      .where(eq(lesson_categories.lang_id, lang_id));
+    const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
+    const result = await db.insert(lesson_categories).values({ lang_id, name, order }).returning();
+
+    return {
+      id: result[0].id,
+      order: result[0].order
+    };
+  });
+
+const update_text_lesson_category_list_route = protectedAdminProcedure
+  .input(
+    z.object({
+      categories: LessonCategoriesSchemaZod.pick({ id: true, name: true, order: true }).array()
+    })
+  )
+  .mutation(async ({ input: { categories } }) => {
+    await Promise.all(
+      categories.map(async (category) => {
+        await db
+          .update(lesson_categories)
+          .set({ name: category.name, order: category.order })
+          .where(eq(lesson_categories.id, category.id));
+      })
+    );
+
+    return {
+      updated: true
+    };
+  });
+
+const delete_text_lesson_category_route = protectedAdminProcedure
+  .input(z.object({ lesson_id: z.number().int(), lang_id: z.number().int() }))
+  .mutation(async ({ input: { lesson_id, lang_id } }) => {
+    await db
+      .delete(lesson_categories)
+      .where(and(eq(lesson_categories.id, lesson_id), eq(lesson_categories.lang_id, lang_id)));
+
+    const categories = await db.query.lesson_categories.findMany({
+      where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
+      columns: {
+        id: true,
+        order: true
+      },
+      orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
+    });
+
+    const reordered_categories = categories.map((category, index) => ({
+      ...category,
+      order: index + 1
+    }));
+    // Update the order of the categories
+    await Promise.allSettled(
+      reordered_categories.map((category) =>
+        db
+          .update(lesson_categories)
+          .set({ order: category.order })
+          .where(eq(lesson_categories.id, category.id))
+      )
+    );
+
+    return {
+      deleted: true
+    };
+  });
+
+const get_category_text_lessons_route = protectedAdminProcedure
+  .input(z.object({ category_id: z.number().int().min(0) }))
+  .query(async ({ input: { category_id } }) => {
+    if (category_id > 0) {
+      const lessons = await db.query.text_lessons.findMany({
+        columns: {
+          id: true,
+          text: true,
+          order: true
+        },
+        where: (tbl, { eq }) => eq(tbl.category_id, category_id),
+        orderBy: (text_lessons, { asc }) => [asc(text_lessons.order)]
+      });
+      return {
+        lessons,
+        type: 'categorized'
+      };
+    }
+    // uncategorized -> 0, null in DB
+    const lessons = await db.query.text_lessons.findMany({
+      columns: {
+        id: true,
+        text: true,
+        order: true
+      },
+      where: (tbl, { isNull }) => isNull(tbl.category_id),
+      orderBy: (text_lessons, { asc }) => [asc(text_lessons.text)]
+    });
+    return {
+      lessons,
+      type: 'uncategorized'
+    };
+  });
+
+const update_text_lessons_order_route = protectedAdminProcedure
+  .input(
+    z.object({
+      lesson: TextLessonsSchemaZod.pick({ id: true, order: true }).array()
+    })
+  )
+  .mutation(async ({ input: { lesson } }) => {
+    await Promise.allSettled(
+      lesson.map((lesson) =>
+        db.update(text_lessons).set({ order: lesson.order }).where(eq(text_lessons.id, lesson.id))
+      )
+    );
+    return {
+      updated: true
+    };
+  });
+
+const add_update_lesson_category_route = protectedAdminProcedure
+  .input(
+    z.object({
+      category_id: z.number().int(),
+      prev_category_id: z.number().int().optional(),
+      lesson_id: z.number().int()
+    })
+  )
+  .mutation(async ({ input: { category_id, prev_category_id, lesson_id } }) => {
+    await db
+      .update(text_lessons)
+      .set({ category_id, order: null })
+      // reset the order to null on add/update to a category
+      .where(eq(text_lessons.id, lesson_id));
+
+    if (prev_category_id) await reorder_text_lesson_in_category_func(category_id);
+    // no need to reorder the current category as order is set to null which does not affect the concerned order
+
+    return {
+      added: true
+    };
+  });
+
 export const text_lessons_router = t.router({
   add_text_lesson: add_text_lesson_route,
   update_text_lesson: update_text_lesson_route,
   delete_text_lesson: delete_text_lesson_route,
-  list_text_lessons: list_text_lessons_route,
   get_gestures_from_text_key: get_gestures_from_text_key_route,
   get_text_lesson_word_media_data: get_text_lesson_word_media_data_route,
   categories: t.router({
-    get_text_lesson_categories: get_text_lesson_categories_route
+    get_text_lesson_categories: get_text_lesson_categories_route,
+    add_text_lesson_category: add_text_lesson_category_route,
+    update_text_lesson_category_list: update_text_lesson_category_list_route,
+    delete_text_lesson_category: delete_text_lesson_category_route,
+    get_category_text_lessons: get_category_text_lessons_route,
+    update_text_lessons_order: update_text_lessons_order_route,
+    add_update_lesson_category: add_update_lesson_category_route
   })
 });

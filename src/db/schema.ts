@@ -34,7 +34,10 @@ export const text_gestures = pgTable(
     category_id: integer().references(() => gesture_categories.id, { onDelete: 'set null' }),
     font_family: text().notNull().default(DEFAULT_FONT_FAMILY).$type<FontFamily>(),
     font_size: smallint().notNull().default(DEFAULT_FONT_SIZE),
-    text_center_offset: jsonb().$type<[number, number]>().notNull().default([0, 0])
+    text_center_offset: jsonb().$type<[number, number]>().notNull().default([0, 0]),
+    order: smallint()
+    // order is "nullable" for text lessons
+    // and should be handled accordingly in the UI and backend
   },
   (table) => [
     index('text_gestures_script_text_id_idx').on(table.script_id, table.text),

@@ -709,7 +709,9 @@ const AddEditSave = (props: Props) => {
     trpc.text_lessons.delete_text_lesson.mutationOptions({
       async onSuccess(data) {
         toast.success('Text Lesson Deleted');
-        await queryClient.invalidateQueries(trpc.text_lessons.list_text_lessons.pathFilter());
+        await queryClient.invalidateQueries(
+          trpc.text_lessons.categories.get_category_text_lessons.pathFilter()
+        );
         router.push('/lessons');
       },
       onError(error) {

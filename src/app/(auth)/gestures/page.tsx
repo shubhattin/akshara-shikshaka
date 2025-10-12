@@ -7,6 +7,7 @@ import { getCachedSession } from '~/lib/cache_server_route_data';
 import ListGestures from './ListGestures';
 import { get_script_id_from_cookie, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
 import { cookies } from 'next/headers';
+import { db } from '~/db/db';
 
 const List = async () => {
   const session = await getCachedSession();
@@ -16,12 +17,22 @@ const List = async () => {
   const cookie = await cookies();
   const script_id = get_script_id_from_cookie(cookie.get(SCRIPT_ID_COOKIE_KEY)?.value);
 
+  const gesture_categories = await db.query.gesture_categories.findMany({
+    where: (tbl, { eq }) => eq(tbl.script_id, script_id),
+    columns: {
+      id: true,
+      name: true,
+      order: true
+    },
+    orderBy: (tbl, { asc }) => [asc(tbl.order)]
+  });
+
   return (
     <div className="container mx-auto p-4">
       <div className="my-2 mb-4 px-2">
         <Link href="/" className="flex items-center gap-1 text-lg font-semibold">
           <IoMdArrowRoundBack className="inline-block text-xl" />
-          मुख्यपृष्ठं
+          Home Page
         </Link>
       </div>
       <div className="mt-2 mb-5 flex items-center justify-center gap-4 px-2">
@@ -31,7 +42,7 @@ const List = async () => {
           </Button>
         </Link>
       </div>
-      <ListGestures init_script_id={script_id} />
+      <ListGestures init_script_id={script_id} init_gesture_categories={gesture_categories} />
     </div>
   );
 };

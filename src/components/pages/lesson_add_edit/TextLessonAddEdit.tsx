@@ -712,6 +712,9 @@ const AddEditSave = (props: Props) => {
         await queryClient.invalidateQueries(
           trpc.text_lessons.categories.get_category_text_lessons.pathFilter()
         );
+        await queryClient.invalidateQueries(
+          trpc.text_lessons.categories.get_text_lesson_categories.pathFilter()
+        );
         router.push('/lessons');
       },
       onError(error) {

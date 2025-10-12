@@ -546,12 +546,11 @@ function AddToCategoryDialog({
             category_id: selectedCategory!
           })
         );
-        if (prev_category_id)
-          await queryClient.invalidateQueries(
-            trpc.text_lessons.categories.get_category_text_lessons.queryFilter({
-              category_id: prev_category_id
-            })
-          );
+        await queryClient.invalidateQueries(
+          trpc.text_lessons.categories.get_category_text_lessons.queryFilter({
+            category_id: prev_category_id ?? 0
+          })
+        );
         setOpen(false);
         setSelectedCategory(null);
         onAdded?.();
@@ -722,11 +721,16 @@ function CategorizedLessonsList({
           <h3 className="text-base font-semibold">Ordered</h3>
           <Button
             size="sm"
-            onClick={() =>
+            onClick={() => {
+              const all_lessons = [...ordered, ...unordered];
               save_order_mut.mutate({
-                lesson: [...ordered, ...unordered].map((l) => ({ id: l.id, order: l.order! }))
-              })
-            }
+                category_id: category_id,
+                lesson: all_lessons.map((l) => ({
+                  id: l.id,
+                  order: l.order!
+                }))
+              });
+            }}
             disabled={save_order_mut.isPending}
           >
             {save_order_mut.isPending ? 'Saving…' : 'Save Current Order'}

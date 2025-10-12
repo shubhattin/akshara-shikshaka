@@ -1,7 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { IoMdSearch, IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
+import { useEffect, useState } from 'react';
 import { useTRPC } from '~/api/client';
 import { Card, CardHeader, CardTitle } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
@@ -15,197 +14,69 @@ import {
 import { Input } from '~/components/ui/input';
 import { Button } from '~/components/ui/button';
 import { FONT_SCRIPTS } from '~/state/font_list';
-import { script_list_obj, type script_list_type, get_script_from_id } from '~/state/lang_list';
-import { lekhika_typing_tool, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
+import { script_list_obj, type script_list_type } from '~/state/lang_list';
 import Cookie from 'js-cookie';
 import { useQuery } from '@tanstack/react-query';
 import { SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
+import type { gesture_categories } from '~/db/schema';
+import type { InferSelectModel } from 'drizzle-orm';
+import { useHydrateAtoms } from 'jotai/react/utils';
+import { atom } from 'jotai';
 
 type Props = {
   init_script_id: number;
+  init_gesture_categories: Pick<
+    InferSelectModel<typeof gesture_categories>,
+    'id' | 'name' | 'order'
+  >[];
 };
 
-const DEFAULT_LIMIT = 24;
-export default function ListGestures({ init_script_id }: Props) {
+const script_id_atom = atom<number | undefined>(undefined);
+
+export default function ListGesturesWrapper(props: Props) {
+  useHydrateAtoms([[script_id_atom, props.init_script_id]]);
+  return <ListGestures {...props} />;
+}
+
+function ListGestures({ init_script_id, init_gesture_categories }: Props) {
   const trpc = useTRPC();
   const [scriptId, setScriptId] = useState<number | undefined>(init_script_id);
-  const [searchText, setSearchText] = useState<string>('');
-  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
-  const [page, setPage] = useState<number>(1);
-  const [limit, setLimit] = useState<number>(DEFAULT_LIMIT);
 
-  useEffect(() => {
-    const handle = setTimeout(() => setDebouncedSearch(searchText.trim()), 300);
-    return () => clearTimeout(handle);
-  }, [searchText]);
-
-  useEffect(() => {
-    // reset page when script or search changes
-    setPage(1);
-  }, [scriptId, debouncedSearch, limit]);
-
-  const list_q = useQuery(
-    trpc.text_gestures.list_text_gesture_data.queryOptions(
-      {
-        script_id: scriptId!,
-        search_text: debouncedSearch || undefined,
-        page,
-        limit
-      },
-      {
-        enabled: !!scriptId
-      }
-    )
-  );
-  const isLoading = !!scriptId && (list_q.isLoading || list_q.isFetching);
-  const data = list_q.data;
   const scriptOptions = FONT_SCRIPTS.map((name) => ({
     name,
     id: script_list_obj[name as script_list_type]
   }));
 
-  const items = useMemo(() => data?.list ?? [], [data]);
-
-  useEffect(() => {
-    if (!scriptId) return;
-    load_parivartak_lang_data(get_script_from_id(scriptId));
-  }, [scriptId]);
+  const categories_q = useQuery(
+    trpc.text_gestures.categories.get_text_gesture_categories.queryOptions(
+      { script_id: scriptId! },
+      { enabled: !!scriptId, placeholderData: init_gesture_categories }
+    )
+  );
+  const categories = categories_q.data ?? [];
 
   return (
     <div className="space-y-6">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3">
-        <div className="min-w-56">
-          <Select
-            value={scriptId?.toString()}
-            onValueChange={(val) => {
-              setScriptId(Number(val));
-              Cookie.set(SCRIPT_ID_COOKIE_KEY, val, { expires: 30 });
-            }}
-          >
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="Select a Script" />
-            </SelectTrigger>
-            <SelectContent>
-              {scriptOptions.map((opt) => (
-                <SelectItem key={opt.id} value={opt.id.toString()}>
-                  {opt.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="relative">
-          <IoMdSearch className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="w-64 pl-9"
-            placeholder="Search text..."
-            value={searchText}
-            onInput={(e) => {
-              setSearchText(e.currentTarget.value);
-              if (!scriptId) return;
-              lekhika_typing_tool(
-                e.nativeEvent.target,
-                // @ts-ignore
-                e.nativeEvent.data,
-                get_script_from_id(scriptId),
-                true,
-                // @ts-ignore
-                (val) => {
-                  setSearchText(val);
-                }
-              );
-            }}
-            disabled={!scriptId}
-            aria-label="Search text"
-          />
-        </div>
-
-        <div>
-          <Select value={String(limit)} onValueChange={(val) => setLimit(Number(val))}>
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Page size" />
-            </SelectTrigger>
-            <SelectContent>
-              {[12, 24, 32, 48].map((sz) => (
-                <SelectItem key={sz} value={String(sz)}>
-                  {sz} / page
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select
+          value={scriptId?.toString()}
+          onValueChange={(val) => {
+            setScriptId(Number(val));
+            Cookie.set(SCRIPT_ID_COOKIE_KEY, val, { expires: 30 });
+          }}
+        >
+          <SelectTrigger className="w-56">
+            <SelectValue placeholder="Select a Script" />
+          </SelectTrigger>
+          <SelectContent>
+            {scriptOptions.map((opt) => (
+              <SelectItem key={opt.id} value={opt.id.toString()}>
+                {opt.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <ul className="grid grid-cols-4 gap-4 sm:grid-cols-6 md:grid-cols-8">
-        {
-          isLoading ? (
-            Array.from({ length: limit }).map((_, i) => (
-              <li key={`skeleton-${i}`}>
-                <Card className="p-2">
-                  <CardHeader>
-                    <Skeleton className="mx-auto h-6 w-16" />
-                  </CardHeader>
-                </Card>
-              </li>
-            ))
-          ) : items.length > 0 ? (
-            items.map((item) => (
-              <li key={item.id}>
-                <Link href={`/gestures/edit/${item.id}`}>
-                  <Card className="p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800">
-                    <CardHeader>
-                      <CardTitle className="text-center">{item.text}</CardTitle>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              </li>
-            ))
-          ) : (
-            <></>
-          )
-          // (
-          //   <li className="col-span-full">
-          //     <Card className="py-10">
-          //       <CardHeader>
-          //         <CardTitle className="text-center text-base text-muted-foreground">
-          //           {debouncedSearch ? 'No results match your search.' : 'No items to display.'}
-          //         </CardTitle>
-          //       </CardHeader>
-          //     </Card>
-          //   </li>
-        }
-      </ul>
-      {!!scriptId && (
-        <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-3 sm:flex-row">
-          <div className="text-sm text-muted-foreground">
-            {data ? (
-              <span>
-                Page {data.page} of {data.pageCount} • Total {data.total}
-              </span>
-            ) : (
-              <span className="text-sm text-muted-foreground">Loading...</span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={!data?.hasPrev || isLoading}
-            >
-              <IoMdArrowDropleft className="mr-1" />
-              <span className="sr-only sm:not-sr-only">Prev</span>
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setPage((p) => p + 1)}
-              disabled={!data?.hasNext || isLoading}
-            >
-              <span className="sr-only sm:not-sr-only">Next</span>
-              <IoMdArrowDropright className="ml-1" />
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

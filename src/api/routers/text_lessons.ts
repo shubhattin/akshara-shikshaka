@@ -241,19 +241,14 @@ const delete_text_lesson_route = protectedAdminProcedure
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Text lesson not found' });
     }
 
-    await Promise.all([
-      db.delete(lesson_gestures).where(eq(lesson_gestures.text_lesson_id, id)),
-      db.delete(text_lesson_words).where(eq(text_lesson_words.text_lesson_id, id))
-    ]);
-    // ^ The above records will be deleted automatically due to the cascade delete constraint
-    // but we are doing it explicitly to be sure
-
     // reordering the catoegory id after deletion if needed
     if (text_lesson_.category_id) {
       await reorder_text_lesson_in_category_func(text_lesson_.category_id);
     }
 
     await db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
+    // deletes both the lesson gestures and associated words with it
+    // due to the cascade delete constraint
 
     return {
       deleted: true
@@ -435,13 +430,17 @@ const get_category_text_lessons_route = protectedAdminProcedure
 const update_text_lessons_order_route = protectedAdminProcedure
   .input(
     z.object({
-      lesson: TextLessonsSchemaZod.pick({ id: true, order: true }).array()
+      lesson: TextLessonsSchemaZod.pick({ id: true, order: true }).array(),
+      category_id: z.number().int()
     })
   )
-  .mutation(async ({ input: { lesson } }) => {
+  .mutation(async ({ input: { lesson, category_id } }) => {
     await Promise.allSettled(
       lesson.map((lesson) =>
-        db.update(text_lessons).set({ order: lesson.order }).where(eq(text_lessons.id, lesson.id))
+        db
+          .update(text_lessons)
+          .set({ order: lesson.order })
+          .where(and(eq(text_lessons.id, lesson.id), eq(text_lessons.category_id, category_id)))
       )
     );
     return {

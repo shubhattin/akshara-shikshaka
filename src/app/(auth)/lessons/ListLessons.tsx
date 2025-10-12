@@ -73,6 +73,7 @@ import {
   AccordionTrigger
 } from '~/components/ui/accordion';
 import { Label } from '~/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { useHydrateAtoms } from 'jotai/utils';
 import { atom, useAtomValue } from 'jotai';
 
@@ -615,14 +616,14 @@ function AddToCategoryDialog({
 
 function UncatLessonCard({ lesson }: { lesson: LessonItem }) {
   return (
-    <div className="rounded-md border p-2 text-center">
-      <div className="flex items-center justify-center gap-2">
-        <Link href={`/lessons/edit/${lesson.id}`} className="font-medium hover:underline">
+    <Card className="p-0">
+      <CardContent className="flex items-center justify-between gap-2 p-3">
+        <Link href={`/lessons/edit/${lesson.id}`} className="truncate font-medium hover:underline">
           {lesson.text}
         </Link>
         <AddToCategoryDialog lesson_id={lesson.id} prev_category_id={undefined} />
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -691,20 +692,22 @@ function CategorizedLessonsList({
           <AccordionContent>
             <div className="space-y-2">
               {unordered.map((l) => (
-                <div key={l.id} className="flex items-center justify-between rounded-md border p-3">
-                  <Link href={`/lessons/edit/${l.id}`} className="font-medium hover:underline">
-                    {l.text}
-                  </Link>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => sendToTop(l)}>
-                      <ArrowUpFromLine className="mr-1 size-4" /> To Top
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => sendToBottom(l)}>
-                      <ArrowDownToLine className="mr-1 size-4" /> To Bottom
-                    </Button>
-                    <AddToCategoryDialog lesson_id={l.id} prev_category_id={category_id} />
-                  </div>
-                </div>
+                <Card key={l.id} className="p-0">
+                  <CardContent className="flex items-center justify-between gap-3 p-3">
+                    <Link href={`/lessons/edit/${l.id}`} className="font-medium hover:underline">
+                      {l.text}
+                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => sendToTop(l)}>
+                        <ArrowUpFromLine className="mr-1 size-4" /> To Top
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => sendToBottom(l)}>
+                        <ArrowDownToLine className="mr-1 size-4" /> To Bottom
+                      </Button>
+                      <AddToCategoryDialog lesson_id={l.id} prev_category_id={category_id} />
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
               {unordered.length === 0 && (
                 <div className="text-sm text-muted-foreground">No unordered lessons.</div>
@@ -724,40 +727,36 @@ function CategorizedLessonsList({
                 lesson: [...ordered, ...unordered].map((l) => ({ id: l.id, order: l.order! }))
               })
             }
-            disabled={ordered.length === 0 || save_order_mut.isPending}
+            disabled={save_order_mut.isPending}
           >
             {save_order_mut.isPending ? 'Saving…' : 'Save Current Order'}
           </Button>
         </div>
         {ordered.length > 0 ? (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-            <SortableContext
-              items={ordered.map((l) => String(l.id))}
-              strategy={horizontalListSortingStrategy}
-            >
-              <ul className="flex flex-wrap gap-2">
-                {ordered.map((l) => (
-                  <li key={l.id} className="flex items-center gap-2">
-                    <OrderedLessonChip item={l} />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="-p-2"
-                      onClick={() => {
+          <div className="max-h-[50vh] overflow-y-auto pr-1">
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext
+                items={ordered.map((l) => String(l.id))}
+                strategy={verticalListSortingStrategy}
+              >
+                <ul className="flex flex-col gap-2">
+                  {ordered.map((l) => (
+                    <OrderedLessonCard
+                      key={l.id}
+                      item={l}
+                      onUnorder={() => {
                         setOrdered((prev) =>
                           prev.filter((x) => x.id !== l.id).map((x, i) => ({ ...x, order: i + 1 }))
                         );
                         setUnordered((prev) => [{ ...l, order: null }, ...prev]);
                       }}
-                    >
-                      <Minus className="size-4" />
-                    </Button>
-                    <AddToCategoryDialog lesson_id={l.id} prev_category_id={category_id} />
-                  </li>
-                ))}
-              </ul>
-            </SortableContext>
-          </DndContext>
+                      prev_category_id={category_id}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
+          </div>
         ) : (
           <div className="text-sm text-muted-foreground">No ordered lessons.</div>
         )}
@@ -766,26 +765,50 @@ function CategorizedLessonsList({
   );
 }
 
-function OrderedLessonChip({ item }: { item: LessonItem }) {
+function OrderedLessonCard({
+  item,
+  onUnorder,
+  prev_category_id
+}: {
+  item: LessonItem;
+  onUnorder: () => void;
+  prev_category_id: number;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(item.id)
   });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.75 : 1
+    opacity: isDragging ? 0.9 : 1
   } as React.CSSProperties;
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="group inline-flex cursor-grab items-center gap-2 rounded-md border px-12 py-2 hover:bg-muted"
-      {...attributes}
-      {...listeners}
-    >
-      <Link href={`/lessons/edit/${item.id}`} className="hover:underline">
-        {item.text}
-      </Link>
-    </div>
+    <li>
+      <Card
+        ref={setNodeRef}
+        style={style}
+        className={isDragging ? 'p-0 ring-2 ring-primary' : 'p-0'}
+      >
+        <CardContent className="flex items-center gap-3 p-2">
+          <button
+            aria-label="Drag"
+            className="inline-flex h-8 w-6 cursor-grab items-center justify-center rounded border bg-background active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="size-4" />
+          </button>
+          <Link href={`/lessons/edit/${item.id}`} className="truncate hover:underline">
+            {item.text}
+          </Link>
+          <div className="ml-auto flex items-center gap-1">
+            <Button size="icon" variant="ghost" className="-p-2" onClick={onUnorder}>
+              <Minus className="size-4" />
+            </Button>
+            <AddToCategoryDialog lesson_id={item.id} prev_category_id={prev_category_id} />
+          </div>
+        </CardContent>
+      </Card>
+    </li>
   );
 }

@@ -23,6 +23,8 @@ const add_text_lesson_route = protectedAdminProcedure
         base_word_script_id: true,
         audio_id: true,
         text: true
+      }).extend({
+        text: z.string().min(1)
       }),
       gesture_ids: z.array(z.number().int()),
       words: TextLessonWordsSchemaZod.omit({

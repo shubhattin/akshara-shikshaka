@@ -73,6 +73,7 @@ import {
   AccordionTrigger
 } from '~/components/ui/accordion';
 import { Label } from '~/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { useHydrateAtoms } from 'jotai/utils';
 import { atom, useAtomValue } from 'jotai';
@@ -568,21 +569,18 @@ function AddToCategoryDialog({
             <DialogTitle>Select Category</DialogTitle>
           </DialogHeader>
           {categories.length > 0 ? (
-            <div className="space-y-3">
+            <RadioGroup
+              value={selectedCategory?.toString() ?? ''}
+              onValueChange={(v) => setSelectedCategory(Number(v))}
+              className="space-y-2"
+            >
               {categories.map((cat) => (
-                <label key={cat.id} className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="radio"
-                    name={`cat-${lesson_id}`}
-                    value={cat.id}
-                    checked={selectedCategory === cat.id}
-                    onChange={() => setSelectedCategory(cat.id)}
-                    className="h-4 w-4"
-                  />
-                  <Label className="cursor-pointer">{cat.name}</Label>
-                </label>
+                <div key={cat.id} className="flex items-center gap-2">
+                  <RadioGroupItem id={`cat-${lesson_id}-${cat.id}`} value={String(cat.id)} />
+                  <Label htmlFor={`cat-${lesson_id}-${cat.id}`}>{cat.name}</Label>
+                </div>
               ))}
-            </div>
+            </RadioGroup>
           ) : (
             <div className="text-sm text-muted-foreground">No categories found.</div>
           )}

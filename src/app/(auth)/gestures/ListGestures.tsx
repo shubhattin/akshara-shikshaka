@@ -81,6 +81,7 @@ import {
 } from '~/components/ui/accordion';
 import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
+import { toast } from 'sonner';
 import { TiEdit } from 'react-icons/ti';
 
 type Props = {
@@ -279,6 +280,10 @@ function ManageCategoriesDialog({
           trpc.text_gestures.categories.get_text_gesture_categories.pathFilter()
         );
         setAddOpen(false);
+        toast.success('Category added');
+      },
+      onError: (err) => {
+        toast.error('Failed to add category' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );
@@ -290,6 +295,10 @@ function ManageCategoriesDialog({
         queryClient.invalidateQueries(
           trpc.text_gestures.categories.get_text_gesture_categories.queryFilter()
         );
+        toast.success('Category deleted');
+      },
+      onError: (err) => {
+        toast.error('Failed to delete category' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );
@@ -300,6 +309,10 @@ function ManageCategoriesDialog({
         queryClient.invalidateQueries(
           trpc.text_gestures.categories.get_text_gesture_categories.pathFilter()
         );
+        toast.success('Categories saved');
+      },
+      onError: (err) => {
+        toast.error('Failed to save categories' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );
@@ -671,6 +684,10 @@ function CategorizedGesturesList({
         queryClient.invalidateQueries(
           trpc.text_gestures.categories.get_category_text_gestures.queryFilter({ category_id })
         );
+        toast.success('Order saved');
+      },
+      onError: (err) => {
+        toast.error('Failed to save order' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );

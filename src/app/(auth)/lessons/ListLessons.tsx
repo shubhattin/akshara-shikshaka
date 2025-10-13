@@ -77,6 +77,7 @@ import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { useHydrateAtoms } from 'jotai/utils';
 import { atom, useAtom, useAtomValue } from 'jotai';
+import { toast } from 'sonner';
 
 type Props = {
   init_lang_id: number;
@@ -279,6 +280,10 @@ function ManageCategoriesDialog({
           trpc.text_lessons.categories.get_text_lesson_categories.pathFilter()
         );
         setAddOpen(false);
+        toast.success('Category added');
+      },
+      onError: (err) => {
+        toast.error('Failed to add category' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );
@@ -291,6 +296,10 @@ function ManageCategoriesDialog({
         queryClient.invalidateQueries(
           trpc.text_lessons.categories.get_text_lesson_categories.queryFilter()
         );
+        toast.success('Category deleted');
+      },
+      onError: (err) => {
+        toast.error('Failed to delete category' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );
@@ -301,6 +310,10 @@ function ManageCategoriesDialog({
         queryClient.invalidateQueries(
           trpc.text_lessons.categories.get_text_lesson_categories.pathFilter()
         );
+        toast.success('Categories saved');
+      },
+      onError: (err) => {
+        toast.error('Failed to save categories' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );
@@ -677,6 +690,10 @@ function CategorizedLessonsList({
             category_id: category_id
           })
         );
+        toast.success('Order saved');
+      },
+      onError: (err) => {
+        toast.error('Failed to save order' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );

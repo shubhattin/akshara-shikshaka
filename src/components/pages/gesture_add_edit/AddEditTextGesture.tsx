@@ -141,6 +141,10 @@ export type text_data_type = Omit<
   id?: number;
   uuid?: string;
   font_family: FontFamily;
+  category?: {
+    id: number;
+    name: string;
+  } | null;
 };
 
 type Props =
@@ -151,8 +155,8 @@ type Props =
   | {
       location: 'edit';
       text_data: text_data_type & {
-        id: number;
-        uuid: string;
+        id?: number;
+        uuid?: string;
       };
     };
 
@@ -487,6 +491,12 @@ function AddEditTextData({
               </option>
             ))}
           </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <Label className="font-bold">Category</Label>
+          <span className="text-sm font-semibold underline">
+            {text_data.category?.name ?? 'Uncategorized'}
+          </span>
         </div>
       </div>
       <div className="flex items-center gap-5">

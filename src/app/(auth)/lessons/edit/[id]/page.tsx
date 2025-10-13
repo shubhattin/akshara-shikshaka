@@ -21,10 +21,19 @@ const get_cached_text_lesson_info = cache(async (id: number) => {
       uuid: true,
       lang_id: true,
       text: true,
-      base_word_script_id: true
+      base_word_script_id: true,
+      order: true,
+      category_id: true,
+      audio_id: true
     },
     orderBy: (tbl, { asc }) => [asc(tbl.text)],
     with: {
+      category: {
+        columns: {
+          id: true,
+          name: true
+        }
+      },
       gestures: {
         columns: {
           text_gesture_id: true
@@ -94,7 +103,11 @@ const List = async ({ params }: Props) => {
             lang_id: text_lesson_info.lang_id,
             text: text_lesson_info.text,
             id: text_lesson_info.id,
-            uuid: text_lesson_info.uuid
+            uuid: text_lesson_info.uuid,
+            order: text_lesson_info.order,
+            category_id: text_lesson_info.category_id,
+            audio_id: text_lesson_info.audio_id,
+            category: text_lesson_info.category
           }}
         />
       </JotaiProvider>

@@ -89,16 +89,16 @@ import { AiOutlineAudio } from 'react-icons/ai';
 type Props =
   | {
       location: 'add';
-      text_lesson_info: text_lesson_info_type;
+      text_lesson_info: text_lesson_info_type & {
+        id?: number;
+        uuid?: string;
+      };
       gesture_ids: number[]; // []
       words: text_lesson_word_type[]; // []
     }
   | {
       location: 'edit';
-      text_lesson_info: text_lesson_info_type & {
-        id: number;
-        uuid: string;
-      };
+      text_lesson_info: text_lesson_info_type;
       gesture_ids: number[];
       words: text_lesson_word_type[];
     };
@@ -186,6 +186,12 @@ const LessonInfo = (props: Props) => {
           {props.location === 'edit' && (
             <span className="font-bold underline">{get_lang_from_id(lang_id)}</span>
           )}
+        </Label>
+        <Label className="flex items-center gap-2">
+          <span className="font-semibold">Category</span>
+          <span className="font-bold underline">
+            {props.text_lesson_info.category?.name ?? 'Uncategorized'}
+          </span>
         </Label>
         <Label className="flex items-center gap-2">
           <span className="font-semibold">Base Word Script</span>

@@ -35,7 +35,8 @@ const List = async () => {
     font_family: font_family,
     script_id: script_id,
     category_id: null,
-    order: null
+    order: null,
+    category: null
   };
   return (
     <div>

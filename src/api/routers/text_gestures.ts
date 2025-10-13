@@ -2,10 +2,15 @@ import { z } from 'zod';
 import { t, protectedAdminProcedure } from '~/api/trpc_init';
 import { db } from '~/db/db';
 import { text_gestures } from '~/db/schema';
-import { and, count, eq, ilike, type SQL } from 'drizzle-orm';
+import { and, count, eq, ilike } from 'drizzle-orm';
 import { GestureSchema } from '~/tools/stroke_data/types';
 import { type FontFamily } from '~/state/font_list';
 import { dev_delay } from '~/tools/delay';
+import { TRPCError } from '@trpc/server';
+import {
+  gesture_categories_router,
+  reorder_text_gesture_in_category_func
+} from './gesture_categories';
 
 const add_text_gesture_data_route = protectedAdminProcedure
   .input(
@@ -94,6 +99,21 @@ const edit_text_gesture_data_route = protectedAdminProcedure
 const delete_text_gesture_data_route = protectedAdminProcedure
   .input(z.object({ id: z.number(), uuid: z.string().uuid() }))
   .mutation(async ({ input }) => {
+    const text_gesture_ = await db.query.text_gestures.findFirst({
+      columns: {
+        id: true,
+        category_id: true
+      },
+      where: and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id))
+    });
+    if (!text_gesture_) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Text gesture not found' });
+    }
+
+    if (text_gesture_.category_id) {
+      await reorder_text_gesture_in_category_func(text_gesture_.category_id);
+    }
+
     await db
       .delete(text_gestures)
       .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)));
@@ -159,5 +179,6 @@ export const text_gestures_router = t.router({
   add_text_gesture_data: add_text_gesture_data_route,
   edit_text_gesture_data: edit_text_gesture_data_route,
   delete_text_gesture_data: delete_text_gesture_data_route,
-  list_text_gesture_data: list_text_gesture_data_route
+  list_text_gesture_data: list_text_gesture_data_route,
+  categories: gesture_categories_router
 });

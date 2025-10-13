@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { createSelectSchema } from 'drizzle-zod';
 import {
   text_gestures,
+  gesture_categories,
+  lesson_categories,
   text_lesson_words,
   audio_assets,
   image_assets,
@@ -25,6 +27,16 @@ export const TextLessonsSchemaZod = createSelectSchema(text_lessons, {
 export const LessonGesturesSchemaZod = createSelectSchema(lesson_gestures);
 
 export const TextLessonWordsSchemaZod = createSelectSchema(text_lesson_words, {
+  created_at: z.coerce.date(),
+  updated_at: z.coerce.date()
+});
+
+export const LessonCategoriesSchemaZod = createSelectSchema(lesson_categories, {
+  created_at: z.coerce.date(),
+  updated_at: z.coerce.date()
+});
+
+export const GestureCategoriesSchemaZod = createSelectSchema(gesture_categories, {
   created_at: z.coerce.date(),
   updated_at: z.coerce.date()
 });

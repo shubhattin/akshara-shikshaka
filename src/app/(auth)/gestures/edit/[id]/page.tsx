@@ -21,7 +21,17 @@ const get_cached_text_data = cache(async (id: number) => {
       font_size: true,
       text_center_offset: true,
       script_id: true,
-      text_key: true
+      text_key: true,
+      category_id: true,
+      order: true
+    },
+    with: {
+      category: {
+        columns: {
+          id: true,
+          name: true
+        }
+      }
     }
   });
   return text_data;

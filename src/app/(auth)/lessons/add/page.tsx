@@ -12,9 +12,15 @@ const List = async () => {
   if (!session || session.user.role !== 'admin') redirect('/');
 
   const text_lesson_info = {
+    id: undefined as number | undefined,
+    uuid: undefined as string | undefined,
     text: '',
     lang_id: lang_list_obj['Sanskrit'],
-    base_word_script_id: script_list_obj['Devanagari']
+    base_word_script_id: script_list_obj['Devanagari'],
+    order: null,
+    category_id: null,
+    audio_id: null,
+    category: undefined
   };
   return (
     <div>
@@ -29,7 +35,11 @@ const List = async () => {
           location="add"
           gesture_ids={[]}
           words={[]}
-          text_lesson_info={text_lesson_info}
+          text_lesson_info={{
+            ...text_lesson_info,
+            id: text_lesson_info.id!,
+            uuid: text_lesson_info.uuid!
+          }}
         />
       </JotaiProvider>
     </div>

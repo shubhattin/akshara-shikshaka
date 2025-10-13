@@ -2,10 +2,13 @@ import { t, protectedAdminProcedure } from '../trpc_init';
 import { z } from 'zod';
 import { lesson_gestures, text_lesson_words, text_lessons } from '~/db/schema';
 import { db } from '~/db/db';
-import { and, count, eq, ilike, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { TextLessonsSchemaZod, TextLessonWordsSchemaZod } from '~/db/schema_zod';
-import { dev_delay } from '~/tools/delay';
 import { TRPCError } from '@trpc/server';
+import {
+  reorder_text_lesson_in_category_func,
+  lesson_categories_router
+} from './lesson_categories';
 
 /**
  * Only for adding text lessons and not for adding words related\
@@ -19,6 +22,8 @@ const add_text_lesson_route = protectedAdminProcedure
         base_word_script_id: true,
         audio_id: true,
         text: true
+      }).extend({
+        text: z.string().min(1)
       }),
       gesture_ids: z.array(z.number().int()),
       words: TextLessonWordsSchemaZod.omit({
@@ -202,7 +207,8 @@ const delete_text_lesson_route = protectedAdminProcedure
     // verify the id, uuid combination
     const text_lesson_ = await db.query.text_lessons.findFirst({
       columns: {
-        id: true
+        id: true,
+        category_id: true
       },
       where: and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid))
     });
@@ -210,70 +216,18 @@ const delete_text_lesson_route = protectedAdminProcedure
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Text lesson not found' });
     }
 
-    await Promise.all([
-      db.delete(lesson_gestures).where(eq(lesson_gestures.text_lesson_id, id)),
-      db.delete(text_lesson_words).where(eq(text_lesson_words.text_lesson_id, id))
-    ]);
-    // ^ The above records will be deleted automatically due to the cascade delete constraint
-    // but we are doing it explicitly to be sure
-
     await db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
+    // deletes both the lesson gestures and associated words with it
+    // due to the cascade delete constraint
+
+    // run this after delete of lesson
+    // reordering the catoegory id after deletion if needed
+    if (text_lesson_.category_id) {
+      await reorder_text_lesson_in_category_func(text_lesson_.category_id);
+    }
 
     return {
       deleted: true
-    };
-  });
-
-const list_text_lessons_route = protectedAdminProcedure
-  .input(
-    z.object({
-      lang_id: z.number().int(),
-      search_text: z.string().optional(),
-      page: z.number().int().min(1),
-      limit: z.number().int().min(1)
-    })
-  )
-  .query(async ({ input: { page, limit, lang_id, search_text } }) => {
-    await dev_delay(500);
-
-    const baseWhereClause = eq(text_lessons.lang_id, lang_id);
-    const [{ count: totalCount }] = await db
-      .select({ count: count() })
-      .from(text_lessons)
-      .where(baseWhereClause);
-
-    const offset = (page - 1) * limit;
-
-    const list = await db.query.text_lessons.findMany({
-      where: () => {
-        if (search_text && search_text.trim().length > 0) {
-          return and(baseWhereClause, ilike(text_lessons.text, `%${search_text.trim()}%`))!;
-        }
-        return baseWhereClause;
-      },
-      orderBy: (text_lessons, { asc }) => [asc(text_lessons.text)],
-      limit: limit,
-      offset,
-      columns: {
-        id: true,
-        text: true,
-        created_at: true,
-        updated_at: true
-      }
-    });
-
-    const total = Number(totalCount ?? 0);
-    const pageCount = Math.max(1, Math.ceil(total / limit));
-    const hasPrev = page > 1;
-    const hasNext = page < pageCount;
-
-    return {
-      list,
-      total,
-      page: page,
-      pageCount,
-      hasPrev,
-      hasNext
     };
   });
 
@@ -328,7 +282,7 @@ export const text_lessons_router = t.router({
   add_text_lesson: add_text_lesson_route,
   update_text_lesson: update_text_lesson_route,
   delete_text_lesson: delete_text_lesson_route,
-  list_text_lessons: list_text_lessons_route,
   get_gestures_from_text_key: get_gestures_from_text_key_route,
-  get_text_lesson_word_media_data: get_text_lesson_word_media_data_route
+  get_text_lesson_word_media_data: get_text_lesson_word_media_data_route,
+  categories: lesson_categories_router
 });

@@ -21,7 +21,7 @@ import { SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
 import type { gesture_categories } from '~/db/schema';
 import type { InferSelectModel } from 'drizzle-orm';
 import { useHydrateAtoms } from 'jotai/react/utils';
-import { atom, useAtomValue } from 'jotai';
+import { atom, useAtom, useAtomValue } from 'jotai';
 import {
   ChevronsUpDown,
   Check,
@@ -91,16 +91,16 @@ type Props = {
   >[];
 };
 
-const script_id_atom = atom<number | undefined>(undefined);
+const script_id_atom = atom<number>(0);
 
 export default function ListGesturesWrapper(props: Props) {
   useHydrateAtoms([[script_id_atom, props.init_script_id]]);
   return <ListGestures {...props} />;
 }
 
-function ListGestures({ init_script_id, init_gesture_categories }: Props) {
+function ListGestures({ init_gesture_categories }: Props) {
   const trpc = useTRPC();
-  const [scriptId, setScriptId] = useState<number | undefined>(init_script_id);
+  const [scriptId, setScriptId] = useAtom(script_id_atom);
   const [manageOpen, setManageOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedCategoryID, setSelectedCategoryID] = useState<number | null>(null);
@@ -120,7 +120,7 @@ function ListGestures({ init_script_id, init_gesture_categories }: Props) {
 
   const category_gestures_q = useQuery(
     trpc.text_gestures.categories.get_category_text_gestures.queryOptions(
-      { category_id: selectedCategoryID! },
+      { category_id: selectedCategoryID!, script_id: scriptId },
       { enabled: selectedCategoryID !== null }
     )
   );

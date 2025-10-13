@@ -119,7 +119,7 @@ function ListLessons({ init_lesson_categories }: Props) {
 
   const category_lessons_q = useQuery(
     trpc.text_lessons.categories.get_category_text_lessons.queryOptions(
-      { category_id: selectedCategoryID! },
+      { category_id: selectedCategoryID!, lang_id: langId },
       { enabled: selectedCategoryID !== null }
     )
   );

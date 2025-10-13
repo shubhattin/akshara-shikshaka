@@ -94,7 +94,7 @@ const edit_text_gesture_data_route = protectedAdminProcedure
   });
 
 const reorder_text_gesture_in_category_func = async (category_id: number) => {
-  const categories = await db.query.text_gestures.findMany({
+  const gestures = await db.query.text_gestures.findMany({
     columns: {
       id: true,
       order: true
@@ -102,10 +102,12 @@ const reorder_text_gesture_in_category_func = async (category_id: number) => {
     where: (tbl, { eq }) => eq(tbl.category_id, category_id),
     orderBy: (tbl, { asc }) => [asc(tbl.order)]
   });
-  const reordered_gestures = categories.map((category, index) => ({
-    ...category,
-    order: index + 1
-  }));
+  const reordered_gestures = gestures
+    .filter((gesture) => gesture.order !== null)
+    .map((gesture, index) => ({
+      ...gesture,
+      order: index + 1
+    }));
 
   await Promise.allSettled(
     reordered_gestures.map((gesture) =>
@@ -293,8 +295,8 @@ const delete_text_gesture_category_route = protectedAdminProcedure
   });
 
 const get_category_text_gestures_route = protectedAdminProcedure
-  .input(z.object({ category_id: z.number().int().min(0) }))
-  .query(async ({ input: { category_id } }) => {
+  .input(z.object({ category_id: z.number().int().min(0), script_id: z.number().int() }))
+  .query(async ({ input: { category_id, script_id } }) => {
     if (category_id > 0) {
       const gestures = await db.query.text_gestures.findMany({
         columns: {
@@ -302,7 +304,8 @@ const get_category_text_gestures_route = protectedAdminProcedure
           text: true,
           order: true
         },
-        where: (tbl, { eq }) => eq(tbl.category_id, category_id),
+        where: (tbl, { eq, and }) =>
+          and(eq(tbl.category_id, category_id), eq(tbl.script_id, script_id)),
         orderBy: (text_gestures, { asc }) => [asc(text_gestures.order)]
       });
       return {
@@ -317,7 +320,7 @@ const get_category_text_gestures_route = protectedAdminProcedure
         text: true,
         order: true
       },
-      where: (tbl, { isNull }) => isNull(tbl.category_id),
+      where: (tbl, { isNull, and }) => and(isNull(tbl.category_id), eq(tbl.script_id, script_id)),
       orderBy: (text_gestures, { asc }) => [asc(text_gestures.text)]
     });
     return {
@@ -362,7 +365,7 @@ const add_update_gesture_category_route = protectedAdminProcedure
       // reset the order to null on add/update to a category
       .where(eq(text_gestures.id, gesture_id));
 
-    if (prev_category_id) await reorder_text_gesture_in_category_func(category_id);
+    if (prev_category_id) await reorder_text_gesture_in_category_func(prev_category_id);
     // no need to reorder the current category as order is set to null which does not affect the concerned order
 
     return {

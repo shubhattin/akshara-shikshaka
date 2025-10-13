@@ -203,7 +203,7 @@ const update_text_lesson_route = protectedAdminProcedure
   );
 
 const reorder_text_lesson_in_category_func = async (category_id: number) => {
-  const categories = await db.query.text_lessons.findMany({
+  const lessons = await db.query.text_lessons.findMany({
     columns: {
       id: true,
       order: true
@@ -211,10 +211,12 @@ const reorder_text_lesson_in_category_func = async (category_id: number) => {
     where: (tbl, { eq }) => eq(tbl.category_id, category_id),
     orderBy: (tbl, { asc }) => [asc(tbl.order)]
   });
-  const reordered_lessons = categories.map((category, index) => ({
-    ...category,
-    order: index + 1
-  }));
+  const reordered_lessons = lessons
+    .filter((lesson) => lesson.order !== null)
+    .map((lesson, index) => ({
+      ...lesson,
+      order: index + 1
+    }));
 
   await Promise.allSettled(
     reordered_lessons.map((lesson) =>
@@ -395,8 +397,8 @@ const delete_text_lesson_category_route = protectedAdminProcedure
   });
 
 const get_category_text_lessons_route = protectedAdminProcedure
-  .input(z.object({ category_id: z.number().int().min(0) }))
-  .query(async ({ input: { category_id } }) => {
+  .input(z.object({ category_id: z.number().int().min(0), lang_id: z.number().int() }))
+  .query(async ({ input: { category_id, lang_id } }) => {
     if (category_id > 0) {
       const lessons = await db.query.text_lessons.findMany({
         columns: {
@@ -404,7 +406,8 @@ const get_category_text_lessons_route = protectedAdminProcedure
           text: true,
           order: true
         },
-        where: (tbl, { eq }) => eq(tbl.category_id, category_id),
+        where: (tbl, { eq, and }) =>
+          and(eq(tbl.category_id, category_id), eq(tbl.lang_id, lang_id)),
         orderBy: (text_lessons, { asc }) => [asc(text_lessons.order)]
       });
       return {
@@ -419,7 +422,7 @@ const get_category_text_lessons_route = protectedAdminProcedure
         text: true,
         order: true
       },
-      where: (tbl, { isNull }) => isNull(tbl.category_id),
+      where: (tbl, { isNull, and }) => and(isNull(tbl.category_id), eq(tbl.lang_id, lang_id)),
       orderBy: (text_lessons, { asc }) => [asc(text_lessons.text)]
     });
     return {

@@ -112,7 +112,7 @@ function ListGestures({ init_gesture_categories }: Props) {
   }));
 
   const categories_q = useQuery(
-    trpc.text_gestures.categories.get_text_gesture_categories.queryOptions(
+    trpc.text_gestures.categories.get_categories.queryOptions(
       { script_id: scriptId! },
       { enabled: !!scriptId, placeholderData: init_gesture_categories }
     )
@@ -120,7 +120,7 @@ function ListGestures({ init_gesture_categories }: Props) {
   const categories = categories_q.data ?? [];
 
   const category_gestures_q = useQuery(
-    trpc.text_gestures.categories.get_category_text_gestures.queryOptions(
+    trpc.text_gestures.categories.get_gestures.queryOptions(
       { category_id: selectedCategoryID!, script_id: scriptId },
       { enabled: selectedCategoryID !== null }
     )
@@ -133,6 +133,7 @@ function ListGestures({ init_gesture_categories }: Props) {
           value={scriptId?.toString()}
           onValueChange={(val) => {
             setScriptId(Number(val));
+            setSelectedCategoryID(null);
             Cookie.set(SCRIPT_ID_COOKIE_KEY, val, { expires: 30 });
           }}
         >
@@ -274,11 +275,9 @@ function ManageCategoriesDialog({
   }, [categories]);
 
   const add_category_mut = useMutation(
-    trpc.text_gestures.categories.add_text_gesture_category.mutationOptions({
+    trpc.text_gestures.categories.add_category.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_text_gesture_categories.pathFilter()
-        );
+        queryClient.invalidateQueries(trpc.text_gestures.categories.get_categories.pathFilter());
         setAddOpen(false);
         toast.success('Category added');
       },
@@ -289,12 +288,10 @@ function ManageCategoriesDialog({
   );
 
   const delete_category_mut = useMutation(
-    trpc.text_gestures.categories.delete_text_gesture_category.mutationOptions({
+    trpc.text_gestures.categories.delete_category.mutationOptions({
       onSuccess: async () => {
         setDeleteId(null);
-        queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_text_gesture_categories.queryFilter()
-        );
+        queryClient.invalidateQueries(trpc.text_gestures.categories.get_categories.queryFilter());
         toast.success('Category deleted');
       },
       onError: (err) => {
@@ -304,11 +301,9 @@ function ManageCategoriesDialog({
   );
 
   const update_category_list_mut = useMutation(
-    trpc.text_gestures.categories.update_text_gesture_category_list.mutationOptions({
+    trpc.text_gestures.categories.update_list.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_text_gesture_categories.pathFilter()
-        );
+        queryClient.invalidateQueries(trpc.text_gestures.categories.get_categories.pathFilter());
         toast.success('Categories saved');
       },
       onError: (err) => {
@@ -537,7 +532,7 @@ function AddGestureToCategoryDialog({
   const trpc = useTRPC();
   const scriptId = useAtomValue(script_id_atom);
   const categories_q = useQuery(
-    trpc.text_gestures.categories.get_text_gesture_categories.queryOptions({ script_id: scriptId! })
+    trpc.text_gestures.categories.get_categories.queryOptions({ script_id: scriptId! })
   );
   const categories = categories_q.data
     ? categories_q.data.filter((c) => c.id !== prev_category_id)
@@ -550,12 +545,12 @@ function AddGestureToCategoryDialog({
     trpc.text_gestures.categories.add_update_gesture_category.mutationOptions({
       onSuccess: async () => {
         await queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_category_text_gestures.queryFilter({
+          trpc.text_gestures.categories.get_gestures.queryFilter({
             category_id: selectedCategory!
           })
         );
         await queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_category_text_gestures.queryFilter({
+          trpc.text_gestures.categories.get_gestures.queryFilter({
             category_id: prev_category_id ?? 0
           })
         );
@@ -679,10 +674,10 @@ function CategorizedGesturesList({
   }
 
   const save_order_mut = useMutation(
-    trpc.text_gestures.categories.update_text_gestures_order.mutationOptions({
+    trpc.text_gestures.categories.update_gestures_order.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_category_text_gestures.queryFilter({ category_id })
+          trpc.text_gestures.categories.get_gestures.queryFilter({ category_id })
         );
         toast.success('Order saved');
       },

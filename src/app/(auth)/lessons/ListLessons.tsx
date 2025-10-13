@@ -110,7 +110,7 @@ function ListLessons({ init_lesson_categories }: Props) {
   const [selectedCategoryID, setSelectedCategoryID] = useState<number | null>(null);
 
   const categories_q = useQuery(
-    trpc.text_lessons.categories.get_text_lesson_categories.queryOptions(
+    trpc.text_lessons.categories.get_categories.queryOptions(
       { lang_id: langId! },
       { enabled: !!langId, placeholderData: init_lesson_categories }
     )
@@ -119,7 +119,7 @@ function ListLessons({ init_lesson_categories }: Props) {
   const categories = categories_q.data ?? [];
 
   const category_lessons_q = useQuery(
-    trpc.text_lessons.categories.get_category_text_lessons.queryOptions(
+    trpc.text_lessons.categories.get_text_lessons.queryOptions(
       { category_id: selectedCategoryID!, lang_id: langId },
       { enabled: selectedCategoryID !== null }
     )
@@ -132,6 +132,7 @@ function ListLessons({ init_lesson_categories }: Props) {
           value={langId?.toString()}
           onValueChange={(val) => {
             setLangId(Number(val));
+            setSelectedCategoryID(null);
             Cookie.set(LESSON_LANG_ID_COOKIE_KEY, val, { expires: 30 });
           }}
         >
@@ -274,11 +275,9 @@ function ManageCategoriesDialog({
   }, [categories]);
 
   const add_category_mut = useMutation(
-    trpc.text_lessons.categories.add_text_lesson_category.mutationOptions({
+    trpc.text_lessons.categories.add_category.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_text_lesson_categories.pathFilter()
-        );
+        queryClient.invalidateQueries(trpc.text_lessons.categories.get_categories.pathFilter());
         setAddOpen(false);
         toast.success('Category added');
       },
@@ -289,13 +288,11 @@ function ManageCategoriesDialog({
   );
 
   const delete_category_mut = useMutation(
-    trpc.text_lessons.categories.delete_text_lesson_category.mutationOptions({
+    trpc.text_lessons.categories.delete_category.mutationOptions({
       onSuccess: async () => {
         setDeleteId(null);
         // reordering is done on server on delete
-        queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_text_lesson_categories.queryFilter()
-        );
+        queryClient.invalidateQueries(trpc.text_lessons.categories.get_categories.queryFilter());
         toast.success('Category deleted');
       },
       onError: (err) => {
@@ -305,11 +302,9 @@ function ManageCategoriesDialog({
   );
 
   const update_category_list_mut = useMutation(
-    trpc.text_lessons.categories.update_text_lesson_category_list.mutationOptions({
+    trpc.text_lessons.categories.update_category_list.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_text_lesson_categories.pathFilter()
-        );
+        queryClient.invalidateQueries(trpc.text_lessons.categories.get_categories.pathFilter());
         toast.success('Categories saved');
       },
       onError: (err) => {
@@ -543,7 +538,7 @@ function AddToCategoryDialog({
   const trpc = useTRPC();
   const langId = useAtomValue(lang_id_atom);
   const categories_q = useQuery(
-    trpc.text_lessons.categories.get_text_lesson_categories.queryOptions({ lang_id: langId })
+    trpc.text_lessons.categories.get_categories.queryOptions({ lang_id: langId })
   );
   const categories = categories_q.data
     ? categories_q.data.filter((c) => c.id !== prev_category_id)
@@ -556,12 +551,12 @@ function AddToCategoryDialog({
     trpc.text_lessons.categories.add_update_lesson_category.mutationOptions({
       onSuccess: async () => {
         await queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_category_text_lessons.queryFilter({
+          trpc.text_lessons.categories.get_text_lessons.queryFilter({
             category_id: selectedCategory!
           })
         );
         await queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_category_text_lessons.queryFilter({
+          trpc.text_lessons.categories.get_text_lessons.queryFilter({
             category_id: prev_category_id ?? 0
           })
         );
@@ -686,7 +681,7 @@ function CategorizedLessonsList({
     trpc.text_lessons.categories.update_text_lessons_order.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_category_text_lessons.queryFilter({
+          trpc.text_lessons.categories.get_text_lessons.queryFilter({
             category_id: category_id
           })
         );

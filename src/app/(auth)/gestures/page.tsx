@@ -7,7 +7,7 @@ import { getCachedSession } from '~/lib/cache_server_route_data';
 import ListGestures from './ListGestures';
 import { get_script_id_from_cookie, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
 import { cookies } from 'next/headers';
-import { db } from '~/db/db';
+import { get_text_gesture_categories_func } from '~/api/routers/gesture_categories';
 
 const List = async () => {
   const session = await getCachedSession();
@@ -17,15 +17,7 @@ const List = async () => {
   const cookie = await cookies();
   const script_id = get_script_id_from_cookie(cookie.get(SCRIPT_ID_COOKIE_KEY)?.value);
 
-  const gesture_categories = await db.query.gesture_categories.findMany({
-    where: (tbl, { eq }) => eq(tbl.script_id, script_id),
-    columns: {
-      id: true,
-      name: true,
-      order: true
-    },
-    orderBy: (tbl, { asc }) => [asc(tbl.order)]
-  });
+  const gesture_categories = await get_text_gesture_categories_func(script_id);
 
   return (
     <div className="container mx-auto p-4">

@@ -716,10 +716,10 @@ const AddEditSave = (props: Props) => {
       async onSuccess(data) {
         toast.success('Text Lesson Deleted');
         await queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_category_text_lessons.pathFilter()
+          trpc.text_lessons.categories.get_text_lessons.pathFilter()
         );
         await queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_text_lesson_categories.pathFilter()
+          trpc.text_lessons.categories.get_categories.pathFilter()
         );
         router.push('/lessons');
       },

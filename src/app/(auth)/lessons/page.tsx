@@ -7,7 +7,7 @@ import { getCachedSession } from '~/lib/cache_server_route_data';
 import ListLessons from './ListLessons';
 import { cookies } from 'next/headers';
 import { get_lesson_lang_id_from_cookie, LESSON_LANG_ID_COOKIE_KEY } from '~/state/cookie';
-import { db } from '~/db/db';
+import { get_text_lesson_categories_func } from '~/api/routers/lesson_categories';
 
 const List = async () => {
   const session = await getCachedSession();
@@ -17,15 +17,7 @@ const List = async () => {
   const cookie = await cookies();
   const lang_id = get_lesson_lang_id_from_cookie(cookie.get(LESSON_LANG_ID_COOKIE_KEY)?.value);
 
-  const lesson_categories = await db.query.lesson_categories.findMany({
-    where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
-    columns: {
-      id: true,
-      name: true,
-      order: true
-    },
-    orderBy: (tbl, { asc }) => [asc(tbl.order)]
-  });
+  const lesson_categories = await get_text_lesson_categories_func(lang_id);
 
   return (
     <div className="container mx-auto p-4">

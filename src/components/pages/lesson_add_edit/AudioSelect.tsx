@@ -618,13 +618,15 @@ const AudioRecord = ({ wordItem }: Props) => {
         localStorage.getItem(SELECTED_DEVICE_ID_STORAGE_KEY) ?? 'null'
       );
       const prevSelectedDeviceInList = inputs.some((d) => d.deviceId === previousSelectedDeviceId);
-      if (prevSelectedDeviceInList) {
-        setSelectedDeviceId(previousSelectedDeviceId);
-      } else if (!prevSelectedDeviceInList || (!selectedDeviceId && inputs.length > 0)) {
-        setSelectedDeviceId(inputs[0].deviceId);
-        localStorage.setItem(SELECTED_DEVICE_ID_STORAGE_KEY, JSON.stringify(inputs[0].deviceId));
-      } else {
+      if (inputs.length === 0) {
         setSelectedDeviceId(null);
+        localStorage.removeItem(SELECTED_DEVICE_ID_STORAGE_KEY);
+      } else if (prevSelectedDeviceInList && previousSelectedDeviceId) {
+        setSelectedDeviceId(previousSelectedDeviceId);
+      } else {
+        const fallbackDeviceId = inputs[0].deviceId;
+        setSelectedDeviceId(fallbackDeviceId);
+        localStorage.setItem(SELECTED_DEVICE_ID_STORAGE_KEY, JSON.stringify(fallbackDeviceId));
       }
       tmpStream.getTracks().forEach((t) => t.stop());
     } catch (e: any) {

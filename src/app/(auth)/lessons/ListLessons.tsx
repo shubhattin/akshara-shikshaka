@@ -76,7 +76,7 @@ import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { useHydrateAtoms } from 'jotai/utils';
-import { atom, useAtomValue } from 'jotai';
+import { atom, useAtom, useAtomValue } from 'jotai';
 
 type Props = {
   init_lang_id: number;
@@ -94,9 +94,9 @@ export default function ListLessonsWrapper(props: Props) {
   return <ListLessons {...props} />;
 }
 
-function ListLessons({ init_lang_id, init_lesson_categories }: Props) {
+function ListLessons({ init_lesson_categories }: Props) {
   const trpc = useTRPC();
-  const [langId, setLangId] = useState<number | undefined>(init_lang_id);
+  const [langId, setLangId] = useAtom(lang_id_atom);
   const [manageOpen, setManageOpen] = useState(false);
 
   const langOptions = LANG_LIST.map((name) => ({
@@ -217,7 +217,7 @@ function ListLessons({ init_lang_id, init_lesson_categories }: Props) {
           open={manageOpen}
           onOpenChange={setManageOpen}
           langId={langId}
-          categories={categories as any}
+          categories={categories}
           isLoading={!!categories_q.isLoading}
         />
       ) : null}

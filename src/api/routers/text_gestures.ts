@@ -94,25 +94,25 @@ const edit_text_gesture_data_route = protectedAdminProcedure
   });
 
 const reorder_text_gesture_in_category_func = async (category_id: number) => {
-  const categories = await db.query.gesture_categories.findMany({
+  const categories = await db.query.text_gestures.findMany({
     columns: {
       id: true,
       order: true
     },
-    where: eq(gesture_categories.id, category_id),
-    orderBy: (gesture_categories, { asc }) => [asc(gesture_categories.order)]
+    where: (tbl, { eq }) => eq(tbl.category_id, category_id),
+    orderBy: (tbl, { asc }) => [asc(tbl.order)]
   });
-  const reordered_categories = categories.map((category, index) => ({
+  const reordered_gestures = categories.map((category, index) => ({
     ...category,
     order: index + 1
   }));
 
   await Promise.allSettled(
-    reordered_categories.map((category) =>
+    reordered_gestures.map((gesture) =>
       db
-        .update(gesture_categories)
-        .set({ order: category.order })
-        .where(eq(gesture_categories.id, category.id))
+        .update(text_gestures)
+        .set({ order: gesture.order })
+        .where(and(eq(text_gestures.id, gesture.id), eq(text_gestures.category_id, category_id)))
     )
   );
 };
@@ -256,12 +256,12 @@ const update_text_gesture_category_list_route = protectedAdminProcedure
   });
 
 const delete_text_gesture_category_route = protectedAdminProcedure
-  .input(z.object({ gesture_id: z.number().int(), script_id: z.number().int() }))
-  .mutation(async ({ input: { gesture_id, script_id } }) => {
+  .input(z.object({ category_id: z.number().int(), script_id: z.number().int() }))
+  .mutation(async ({ input: { category_id, script_id } }) => {
     await db
       .delete(gesture_categories)
       .where(
-        and(eq(gesture_categories.id, gesture_id), eq(gesture_categories.script_id, script_id))
+        and(eq(gesture_categories.id, category_id), eq(gesture_categories.script_id, script_id))
       );
 
     const categories = await db.query.gesture_categories.findMany({

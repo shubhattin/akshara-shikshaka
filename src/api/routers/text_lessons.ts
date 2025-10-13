@@ -203,25 +203,25 @@ const update_text_lesson_route = protectedAdminProcedure
   );
 
 const reorder_text_lesson_in_category_func = async (category_id: number) => {
-  const categories = await db.query.lesson_categories.findMany({
+  const categories = await db.query.text_lessons.findMany({
     columns: {
       id: true,
       order: true
     },
-    where: eq(lesson_categories.id, category_id),
-    orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
+    where: (tbl, { eq }) => eq(tbl.category_id, category_id),
+    orderBy: (tbl, { asc }) => [asc(tbl.order)]
   });
-  const reordered_categories = categories.map((category, index) => ({
+  const reordered_lessons = categories.map((category, index) => ({
     ...category,
     order: index + 1
   }));
 
   await Promise.allSettled(
-    reordered_categories.map((category) =>
+    reordered_lessons.map((lesson) =>
       db
-        .update(lesson_categories)
-        .set({ order: category.order })
-        .where(eq(lesson_categories.id, category.id))
+        .update(text_lessons)
+        .set({ order: lesson.order })
+        .where(and(eq(text_lessons.id, lesson.id), eq(text_lessons.category_id, category_id)))
     )
   );
 };
@@ -241,14 +241,15 @@ const delete_text_lesson_route = protectedAdminProcedure
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Text lesson not found' });
     }
 
+    await db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
+    // deletes both the lesson gestures and associated words with it
+    // due to the cascade delete constraint
+
+    // run this after delete of lesson
     // reordering the catoegory id after deletion if needed
     if (text_lesson_.category_id) {
       await reorder_text_lesson_in_category_func(text_lesson_.category_id);
     }
-
-    await db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
-    // deletes both the lesson gestures and associated words with it
-    // due to the cascade delete constraint
 
     return {
       deleted: true
@@ -459,11 +460,11 @@ const add_update_lesson_category_route = protectedAdminProcedure
   .mutation(async ({ input: { category_id, prev_category_id, lesson_id } }) => {
     await db
       .update(text_lessons)
-      .set({ category_id, order: null })
+      .set({ category_id: category_id, order: null })
       // reset the order to null on add/update to a category
       .where(eq(text_lessons.id, lesson_id));
 
-    if (prev_category_id) await reorder_text_lesson_in_category_func(category_id);
+    if (prev_category_id) await reorder_text_lesson_in_category_func(prev_category_id);
     // no need to reorder the current category as order is set to null which does not affect the concerned order
 
     return {

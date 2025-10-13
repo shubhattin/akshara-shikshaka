@@ -412,7 +412,7 @@ function ManageCategoriesDialog({
                 onClick={async () => {
                   if (deleteId !== null) {
                     await delete_category_mut.mutateAsync({
-                      gesture_id: deleteId,
+                      category_id: deleteId,
                       script_id: scriptId
                     });
                   }
@@ -720,7 +720,7 @@ function CategorizedGesturesList({
               const all = [...ordered, ...unordered];
               save_order_mut.mutate({
                 category_id,
-                gesture: all.map((g) => ({ id: g.id, order: g.order! }))
+                gesture: all.map((g) => ({ id: g.id, order: g.order }))
               });
             }}
             disabled={save_order_mut.isPending}

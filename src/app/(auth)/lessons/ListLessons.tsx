@@ -61,8 +61,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
-  arrayMove,
-  horizontalListSortingStrategy
+  arrayMove
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
@@ -74,8 +73,8 @@ import {
 } from '~/components/ui/accordion';
 import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
-import { useHydrateAtoms } from 'jotai/utils';
+import { Card, CardContent } from '~/components/ui/card';
+import { atomWithStorage, useHydrateAtoms } from 'jotai/utils';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { toast } from 'sonner';
 
@@ -95,6 +94,11 @@ export default function ListLessonsWrapper(props: Props) {
   return <ListLessons {...props} />;
 }
 
+const selected_category_id_atom = atomWithStorage<number | null>(
+  'selected_lesson_category_id',
+  null
+);
+
 function ListLessons({ init_lesson_categories }: Props) {
   const trpc = useTRPC();
   const [langId, setLangId] = useAtom(lang_id_atom);
@@ -107,7 +111,7 @@ function ListLessons({ init_lesson_categories }: Props) {
 
   const [open, setOpen] = useState(false);
   // 0 will be for uncategorized
-  const [selectedCategoryID, setSelectedCategoryID] = useState<number | null>(null);
+  const [selectedCategoryID, setSelectedCategoryID] = useAtom(selected_category_id_atom);
 
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
@@ -132,7 +136,7 @@ function ListLessons({ init_lesson_categories }: Props) {
           value={langId?.toString()}
           onValueChange={(val) => {
             setLangId(Number(val));
-            setSelectedCategoryID(null);
+            setSelectedCategoryID(0);
             Cookie.set(LESSON_LANG_ID_COOKIE_KEY, val, { expires: 30 });
           }}
         >

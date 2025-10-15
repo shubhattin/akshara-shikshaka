@@ -83,6 +83,7 @@ import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import { toast } from 'sonner';
 import { TiEdit } from 'react-icons/ti';
+import { atomWithStorage } from 'jotai/utils';
 
 type Props = {
   init_script_id: number;
@@ -98,13 +99,17 @@ export default function ListGesturesWrapper(props: Props) {
   useHydrateAtoms([[script_id_atom, props.init_script_id]]);
   return <ListGestures {...props} />;
 }
+const selected_category_id_atom = atomWithStorage<number | null>(
+  'selected_gesture_category_id',
+  null
+);
 
 function ListGestures({ init_gesture_categories }: Props) {
   const trpc = useTRPC();
   const [scriptId, setScriptId] = useAtom(script_id_atom);
   const [manageOpen, setManageOpen] = useState(false);
   const [open, setOpen] = useState(false);
-  const [selectedCategoryID, setSelectedCategoryID] = useState<number | null>(null);
+  const [selectedCategoryID, setSelectedCategoryID] = useAtom(selected_category_id_atom);
 
   const scriptOptions = FONT_SCRIPTS.map((name) => ({
     name,
@@ -133,7 +138,6 @@ function ListGestures({ init_gesture_categories }: Props) {
           value={scriptId?.toString()}
           onValueChange={(val) => {
             setScriptId(Number(val));
-            setSelectedCategoryID(0);
             Cookie.set(SCRIPT_ID_COOKIE_KEY, val, { expires: 30 });
           }}
         >

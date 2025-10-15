@@ -1,5 +1,5 @@
 {
-  "id": "84bd9c2f-7f0d-4e8e-93bb-0ff81d6a45cc",
+  "id": "f9832231-7a4f-4f09-b877-8712e212f393",
   "prevId": "f8fc8c38-4745-4eb6-b5ab-5b8bf2435dfa",
   "version": "7",
   "dialect": "postgresql",
@@ -148,8 +148,8 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "gesture_text_key_category_join_category_id_gesture_categories_id_fk": {
-          "name": "gesture_text_key_category_join_category_id_gesture_categories_id_fk",
+        "text_key_category_id_fk": {
+          "name": "text_key_category_id_fk",
           "tableFrom": "gesture_text_key_category_join",
           "tableTo": "gesture_categories",
           "columnsFrom": [

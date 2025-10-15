@@ -12,7 +12,8 @@ import {
   primaryKey,
   unique,
   varchar,
-  pgEnum
+  pgEnum,
+  foreignKey
 } from 'drizzle-orm/pg-core';
 import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
 import type { Gesture } from '~/tools/stroke_data/types';
@@ -50,12 +51,15 @@ export const gesture_text_key_category_join = pgTable(
   {
     id: serial().primaryKey(),
     gesture_text_key: text().notNull(),
-    category_id: integer()
-      .notNull()
-      .references(() => gesture_categories.id, { onDelete: 'cascade' })
+    category_id: integer().notNull()
   },
   (table) => [
-    unique('gesture_text_key_category_join_unique').on(table.gesture_text_key, table.category_id)
+    unique('gesture_text_key_category_join_unique').on(table.gesture_text_key, table.category_id),
+    foreignKey({
+      name: 'text_key_category_id_fk',
+      columns: [table.category_id],
+      foreignColumns: [gesture_categories.id]
+    }).onDelete('cascade')
   ]
 );
 

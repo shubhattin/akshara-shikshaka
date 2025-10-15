@@ -136,6 +136,7 @@ const get_gestures_route = protectedAdminProcedure
         .select({
           id: text_gestures.id,
           text: text_gestures.text,
+          text_key: text_gestures.text_key,
           order: text_gestures.order
         })
         .from(text_gestures)
@@ -149,7 +150,7 @@ const get_gestures_route = protectedAdminProcedure
             eq(text_gestures.script_id, script_id)
           )
         )
-        .orderBy(asc(text_gestures.order));
+        .orderBy(asc(text_gestures.order), asc(text_gestures.text));
       return {
         gestures,
         type: 'categorized'
@@ -161,6 +162,7 @@ const get_gestures_route = protectedAdminProcedure
       .select({
         id: text_gestures.id,
         text: text_gestures.text,
+        text_key: text_gestures.text_key,
         order: text_gestures.order
       })
       .from(text_gestures)
@@ -174,7 +176,7 @@ const get_gestures_route = protectedAdminProcedure
           eq(text_gestures.script_id, script_id)
         )
       )
-      .orderBy(asc(text_gestures.order));
+      .orderBy(asc(text_gestures.order), asc(text_gestures.text));
     return {
       gestures,
       type: 'uncategorized'

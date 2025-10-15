@@ -133,7 +133,7 @@ function ListGestures({ init_gesture_categories }: Props) {
           value={scriptId?.toString()}
           onValueChange={(val) => {
             setScriptId(Number(val));
-            setSelectedCategoryID(null);
+            setSelectedCategoryID(0);
             Cookie.set(SCRIPT_ID_COOKIE_KEY, val, { expires: 30 });
           }}
         >
@@ -221,7 +221,7 @@ function ListGestures({ init_gesture_categories }: Props) {
           open={manageOpen}
           onOpenChange={setManageOpen}
           scriptId={scriptId}
-          categories={categories as any}
+          categories={categories}
           isLoading={!!categories_q.isLoading}
         />
       ) : null}
@@ -239,7 +239,7 @@ function ListGestures({ init_gesture_categories }: Props) {
             </div>
           ) : category_gestures_q.data ? (
             <CategoryGesturesSection
-              data={category_gestures_q.data as any}
+              data={category_gestures_q.data}
               category_id={selectedCategoryID!}
             />
           ) : null}

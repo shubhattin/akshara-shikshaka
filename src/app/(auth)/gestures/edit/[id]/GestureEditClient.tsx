@@ -7,7 +7,6 @@ import AddEditTextDataWrapper, {
   type text_data_type
 } from '~/components/pages/gesture_add_edit/AddEditTextGesture';
 import { Button } from '~/components/ui/button';
-import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,8 +26,6 @@ export default function GestureEditClient({
   id: number;
   text_data: text_data_type & { id: number; uuid: string };
 }) {
-  const router = useRouter();
-
   return (
     <div>
       <div className="my-2 mb-4 flex items-center gap-32 px-2">

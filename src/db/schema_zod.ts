@@ -8,7 +8,8 @@ import {
   audio_assets,
   image_assets,
   text_lessons,
-  lesson_gestures
+  lesson_gestures,
+  gesture_text_key_category_join
 } from './schema';
 import { GestureSchema } from '~/tools/stroke_data/types';
 
@@ -23,6 +24,10 @@ export const TextLessonsSchemaZod = createSelectSchema(text_lessons, {
   created_at: z.coerce.date(),
   updated_at: z.coerce.date()
 });
+
+export const GestureTextKeyCategoryJoinSchemaZod = createSelectSchema(
+  gesture_text_key_category_join
+);
 
 export const LessonGesturesSchemaZod = createSelectSchema(lesson_gestures);
 

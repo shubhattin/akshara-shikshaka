@@ -6,34 +6,34 @@ import { db } from '~/db/db';
 import { getCachedSession } from '~/lib/cache_server_route_data';
 import { notFound, redirect } from 'next/navigation';
 import GestureEditClient from './GestureEditClient';
+import { gesture_categories, gesture_text_key_category_join, text_gestures } from '~/db/schema';
+import { eq } from 'drizzle-orm';
 
 type Props = { params: Promise<{ id: string }> };
 
 const get_cached_text_data = cache(async (id: number) => {
-  const text_data = await db.query.text_gestures.findFirst({
-    where: (table, { eq }) => eq(table.id, id),
-    columns: {
-      id: true,
-      uuid: true,
-      text: true,
-      gestures: true,
-      font_family: true,
-      font_size: true,
-      text_center_offset: true,
-      script_id: true,
-      text_key: true,
-      category_id: true,
-      order: true
-    },
-    with: {
-      category: {
-        columns: {
-          id: true,
-          name: true
+  const [text_data_] = await db
+    .select()
+    .from(text_gestures)
+    .leftJoin(
+      gesture_text_key_category_join,
+      eq(text_gestures.text_key, gesture_text_key_category_join.gesture_text_key)
+    )
+    .leftJoin(
+      gesture_categories,
+      eq(gesture_text_key_category_join.category_id, gesture_categories.id)
+    )
+    .where(eq(text_gestures.id, id))
+    .limit(1);
+  const text_data = {
+    ...text_data_.text_gestures,
+    category: text_data_.gesture_categories
+      ? {
+          name: text_data_.gesture_categories.name,
+          id: text_data_.gesture_categories.id
         }
-      }
-    }
-  });
+      : null
+  };
   return text_data;
 });
 
@@ -62,7 +62,6 @@ const MainEdit = async ({ params }: Props) => {
   if (!text_data) {
     notFound();
   }
-
   return <GestureEditClient text_data={text_data} id={id} />;
 };
 

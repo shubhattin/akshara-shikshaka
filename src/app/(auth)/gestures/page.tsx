@@ -17,7 +17,7 @@ const List = async () => {
   const cookie = await cookies();
   const script_id = get_script_id_from_cookie(cookie.get(SCRIPT_ID_COOKIE_KEY)?.value);
 
-  const gesture_categories = await get_text_gesture_categories_func(script_id);
+  const gesture_categories = await get_text_gesture_categories_func();
 
   return (
     <div className="container mx-auto p-4">

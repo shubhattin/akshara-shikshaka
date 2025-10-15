@@ -176,7 +176,7 @@ const get_gestures_route = protectedAdminProcedure
           eq(text_gestures.script_id, script_id)
         )
       )
-      .orderBy(asc(text_gestures.order), asc(text_gestures.text));
+      .orderBy(asc(text_gestures.text));
     return {
       gestures,
       type: 'uncategorized'

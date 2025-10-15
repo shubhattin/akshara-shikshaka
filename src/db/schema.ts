@@ -31,7 +31,6 @@ export const text_gestures = pgTable(
       .notNull()
       .$onUpdate(() => new Date()),
     script_id: smallint().notNull(),
-    category_id: integer().references(() => gesture_categories.id, { onDelete: 'set null' }),
     font_family: text().notNull().default(DEFAULT_FONT_FAMILY).$type<FontFamily>(),
     font_size: smallint().notNull().default(DEFAULT_FONT_SIZE),
     text_center_offset: jsonb().$type<[number, number]>().notNull().default([0, 0]),
@@ -46,10 +45,25 @@ export const text_gestures = pgTable(
   ]
 );
 
+export const gesture_text_key_category_join = pgTable(
+  'gesture_text_key_category_join',
+  {
+    id: serial().primaryKey(),
+    gesture_text_key: text().notNull(),
+    category_id: integer()
+      .notNull()
+      .references(() => gesture_categories.id, { onDelete: 'cascade' })
+  },
+  (table) => [
+    unique('gesture_text_key_category_join_unique').on(table.gesture_text_key, table.category_id)
+  ]
+);
+
+// gesture categories are not specific to a script
+// rather they have 12M relation with gestures via the join table
 export const gesture_categories = pgTable('gesture_categories', {
   id: serial().primaryKey(),
   name: text().notNull(),
-  script_id: smallint().notNull(),
   order: smallint().notNull(),
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
@@ -168,11 +182,25 @@ export const gestureCategoriesRelations = relations(gesture_categories, ({ many 
   gestures: many(text_gestures)
 }));
 
+export const gestureTextKeyCategoryJoinRelations = relations(
+  gesture_text_key_category_join,
+  ({ one }) => ({
+    gesture: one(text_gestures, {
+      fields: [gesture_text_key_category_join.gesture_text_key],
+      references: [text_gestures.text_key]
+    }),
+    category: one(gesture_categories, {
+      fields: [gesture_text_key_category_join.category_id],
+      references: [gesture_categories.id]
+    })
+  })
+);
+
 export const textGesturesRelations = relations(text_gestures, ({ many, one }) => ({
   lessons: many(lesson_gestures), // via join table
-  category: one(gesture_categories, {
-    fields: [text_gestures.category_id],
-    references: [gesture_categories.id]
+  category_join: one(gesture_text_key_category_join, {
+    fields: [text_gestures.text_key],
+    references: [gesture_text_key_category_join.gesture_text_key]
   })
 }));
 

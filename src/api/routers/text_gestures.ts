@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { t, protectedAdminProcedure } from '~/api/trpc_init';
 import { db } from '~/db/db';
-import { text_gestures } from '~/db/schema';
+import { gesture_text_key_category_join, text_gestures } from '~/db/schema';
 import { and, count, eq, ilike } from 'drizzle-orm';
 import { GestureSchema } from '~/tools/stroke_data/types';
 import { type FontFamily } from '~/state/font_list';
@@ -97,21 +97,32 @@ const edit_text_gesture_data_route = protectedAdminProcedure
   });
 
 const delete_text_gesture_data_route = protectedAdminProcedure
-  .input(z.object({ id: z.number(), uuid: z.string().uuid() }))
+  .input(z.object({ id: z.number(), uuid: z.string().uuid(), script_id: z.number().int() }))
   .mutation(async ({ input }) => {
-    const text_gesture_ = await db.query.text_gestures.findFirst({
-      columns: {
-        id: true,
-        category_id: true
-      },
-      where: and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id))
-    });
+    const [text_gesture_] = await db
+      .select({
+        id: text_gestures.id,
+        category_id: gesture_text_key_category_join.category_id
+      })
+      .from(text_gestures)
+      .leftJoin(
+        gesture_text_key_category_join,
+        eq(text_gestures.text_key, gesture_text_key_category_join.gesture_text_key)
+      )
+      .where(
+        and(
+          eq(text_gestures.uuid, input.uuid),
+          eq(text_gestures.id, input.id),
+          eq(text_gestures.script_id, input.script_id)
+        )
+      )
+      .limit(1);
     if (!text_gesture_) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Text gesture not found' });
     }
 
     if (text_gesture_.category_id) {
-      await reorder_text_gesture_in_category_func(text_gesture_.category_id);
+      await reorder_text_gesture_in_category_func(text_gesture_.category_id, input.script_id);
     }
 
     await db

@@ -10,7 +10,7 @@ import GestureEditClient from './GestureEditClient';
 type Props = { params: Promise<{ id: string }> };
 
 const get_cached_text_data = cache(async (id: number) => {
-  const text_data = await db.query.text_gestures.findFirst({
+  const text_data_ = await db.query.text_gestures.findFirst({
     where: (table, { eq }) => eq(table.id, id),
     columns: {
       id: true,
@@ -22,18 +22,35 @@ const get_cached_text_data = cache(async (id: number) => {
       text_center_offset: true,
       script_id: true,
       text_key: true,
-      category_id: true,
       order: true
     },
     with: {
-      category: {
-        columns: {
-          id: true,
-          name: true
+      category_join: {
+        with: {
+          category: {
+            columns: {
+              id: true,
+              name: true
+            }
+          }
         }
       }
     }
   });
+  type category_type = NonNullable<typeof text_data_>['category_join']['category'] | null;
+  type text_data_type = Omit<NonNullable<typeof text_data_>, 'category_join'> & {
+    category: category_type;
+  };
+  const text_data: text_data_type | undefined = text_data_
+    ? ({
+        ...text_data_,
+        category: text_data_.category_join?.category ?? null
+      } as text_data_type)
+    : undefined;
+  if (!text_data) {
+    // @ts-ignore
+    delete text_data?.category_join;
+  }
   return text_data;
 });
 
@@ -62,7 +79,6 @@ const MainEdit = async ({ params }: Props) => {
   if (!text_data) {
     notFound();
   }
-
   return <GestureEditClient text_data={text_data} id={id} />;
 };
 

@@ -1164,7 +1164,8 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     if (!is_addition) {
       await delete_text_data_mut.mutateAsync({
         id: text_data.id!,
-        uuid: text_data.uuid!
+        uuid: text_data.uuid!,
+        script_id: scriptID
       });
     }
   };

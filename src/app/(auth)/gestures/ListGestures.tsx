@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useTRPC } from '~/api/client';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
+import { Card, CardContent } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
 import {
   Select,
@@ -14,7 +14,7 @@ import {
 import { Input } from '~/components/ui/input';
 import { Button } from '~/components/ui/button';
 import { FONT_SCRIPTS } from '~/state/font_list';
-import { script_list_obj, type script_list_type } from '~/state/lang_list';
+import { get_script_from_id, script_list_obj, type script_list_type } from '~/state/lang_list';
 import Cookie from 'js-cookie';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
@@ -112,10 +112,10 @@ function ListGestures({ init_gesture_categories }: Props) {
   }));
 
   const categories_q = useQuery(
-    trpc.text_gestures.categories.get_categories.queryOptions(
-      { script_id: scriptId! },
-      { enabled: !!scriptId, placeholderData: init_gesture_categories }
-    )
+    trpc.text_gestures.categories.get_categories.queryOptions(void 0, {
+      enabled: !!scriptId,
+      placeholderData: init_gesture_categories
+    })
   );
   const categories = categories_q.data ?? [];
 
@@ -400,7 +400,7 @@ function ManageCategoriesDialog({
               <DialogTitle>Add Category</DialogTitle>
             </DialogHeader>
             <AddCategoryForm
-              onSubmit={(name) => add_category_mut.mutate({ script_id: scriptId, name })}
+              onSubmit={(name) => add_category_mut.mutate({ name })}
               isSubmitting={add_category_mut.isPending}
             />
           </DialogContent>
@@ -420,8 +420,7 @@ function ManageCategoriesDialog({
                 onClick={async () => {
                   if (deleteId !== null) {
                     await delete_category_mut.mutateAsync({
-                      category_id: deleteId,
-                      script_id: scriptId
+                      category_id: deleteId
                     });
                   }
                 }}
@@ -496,7 +495,7 @@ function DraggableCategoryRow({
   );
 }
 
-type GestureItem = { id: number; text: string; order: number | null };
+type GestureItem = { id: number; text: string; text_key: string; order: number | null };
 
 function CategoryGesturesSection({
   data,
@@ -524,16 +523,16 @@ function UncatGesturesList({ gestures }: { gestures: GestureItem[] }) {
 
 function AddGestureToCategoryDialog({
   gesture_id,
-  prev_category_id
+  prev_category_id,
+  gesture_text_key
 }: {
   gesture_id: number;
+  gesture_text_key: string;
   prev_category_id?: number;
 }) {
   const trpc = useTRPC();
   const scriptId = useAtomValue(script_id_atom);
-  const categories_q = useQuery(
-    trpc.text_gestures.categories.get_categories.queryOptions({ script_id: scriptId! })
-  );
+  const categories_q = useQuery(trpc.text_gestures.categories.get_categories.queryOptions());
   const categories = categories_q.data
     ? categories_q.data.filter((c) => c.id !== prev_category_id)
     : [];
@@ -592,12 +591,14 @@ function AddGestureToCategoryDialog({
               Cancel
             </Button>
             <Button
-              onClick={() =>
+              onClick={async () =>
                 selectedCategory !== null &&
                 add_to_category_mut.mutate({
                   category_id: selectedCategory,
                   prev_category_id,
-                  gesture_id
+                  gesture_id,
+                  script_id: scriptId,
+                  gesture_text_key: gesture_text_key
                 })
               }
               disabled={!canAdd}
@@ -624,7 +625,11 @@ function UncatGestureCard({ gesture }: { gesture: GestureItem }) {
         >
           {gesture.text}
         </Link>
-        <AddGestureToCategoryDialog gesture_id={gesture.id} prev_category_id={undefined} />
+        <AddGestureToCategoryDialog
+          gesture_id={gesture.id}
+          prev_category_id={undefined}
+          gesture_text_key={gesture.text_key}
+        />
       </CardContent>
     </Card>
   );
@@ -710,6 +715,7 @@ function CategorizedGesturesList({
                       <AddGestureToCategoryDialog
                         gesture_id={g.id}
                         prev_category_id={category_id}
+                        gesture_text_key={g.text_key}
                       />
                     </div>
                   </CardContent>
@@ -813,7 +819,11 @@ function OrderedGestureCard({
             <Button size="icon" variant="ghost" className="-p-2" onClick={onUnorder}>
               <Minus className="size-4" />
             </Button>
-            <AddGestureToCategoryDialog gesture_id={item.id} prev_category_id={prev_category_id} />
+            <AddGestureToCategoryDialog
+              gesture_id={item.id}
+              prev_category_id={prev_category_id}
+              gesture_text_key={item.text_key}
+            />
           </div>
         </CardContent>
       </Card>

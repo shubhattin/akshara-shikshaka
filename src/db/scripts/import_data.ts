@@ -8,7 +8,10 @@ export const import_data = async (confirm_env = true) => {
   console.log(`Fetching Data from ${dbMode} Database...`);
 
   const text_gestures = await db.query.text_gestures.findMany();
+  const gesture_text_key_category_join = await db.query.gesture_text_key_category_join.findMany();
+  const gesture_categories = await db.query.gesture_categories.findMany();
   const text_lessons = await db.query.text_lessons.findMany();
+  const lesson_categories = await db.query.lesson_categories.findMany();
   const lesson_gestures = await db.query.lesson_gestures.findMany();
   const text_lesson_words = await db.query.text_lesson_words.findMany();
   const audio_assets = await db.query.audio_assets.findMany();
@@ -16,7 +19,10 @@ export const import_data = async (confirm_env = true) => {
 
   const json_data = {
     text_gestures,
+    gesture_text_key_category_join,
+    gesture_categories,
     text_lessons,
+    lesson_categories,
     lesson_gestures,
     text_lesson_words,
     audio_assets,

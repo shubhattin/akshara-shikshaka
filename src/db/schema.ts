@@ -185,10 +185,6 @@ export const gestureCategoriesRelations = relations(gesture_categories, ({ many 
 export const gestureTextKeyCategoryJoinRelations = relations(
   gesture_text_key_category_join,
   ({ one }) => ({
-    gesture: one(text_gestures, {
-      fields: [gesture_text_key_category_join.gesture_text_key],
-      references: [text_gestures.text_key]
-    }),
     category: one(gesture_categories, {
       fields: [gesture_text_key_category_join.category_id],
       references: [gesture_categories.id]
@@ -197,11 +193,7 @@ export const gestureTextKeyCategoryJoinRelations = relations(
 );
 
 export const textGesturesRelations = relations(text_gestures, ({ many, one }) => ({
-  lessons: many(lesson_gestures), // via join table
-  category_join: one(gesture_text_key_category_join, {
-    fields: [text_gestures.text_key],
-    references: [gesture_text_key_category_join.gesture_text_key]
-  })
+  lessons: many(lesson_gestures) // via join table
 }));
 
 export const lessonCategoriesRelations = relations(lesson_categories, ({ many }) => ({

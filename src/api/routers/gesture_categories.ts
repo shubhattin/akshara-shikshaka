@@ -233,7 +233,10 @@ const add_update_gesture_category_route = protectedAdminProcedure
       input: { category_id, prev_category_id, gesture_id, gesture_text_key, script_id }
     }) => {
       const prev_join = await db.query.gesture_text_key_category_join.findFirst({
-        where: (tbl, { and, eq }) => and(eq(tbl.gesture_text_key, gesture_text_key))
+        where: (tbl, { and, eq }) =>
+          prev_category_id
+            ? and(eq(tbl.gesture_text_key, gesture_text_key), eq(tbl.category_id, prev_category_id))
+            : and(eq(tbl.gesture_text_key, gesture_text_key))
       });
       await Promise.all([
         db
@@ -244,11 +247,11 @@ const add_update_gesture_category_route = protectedAdminProcedure
         prev_join
           ? db
               .update(gesture_text_key_category_join)
-              .set({ category_id: prev_category_id })
+              .set({ category_id: category_id })
               .where(eq(gesture_text_key_category_join.id, prev_join.id))
           : db.insert(gesture_text_key_category_join).values({ gesture_text_key, category_id })
       ]);
-      if (prev_category_id)
+      if (prev_category_id && prev_category_id !== category_id)
         await reorder_text_gesture_in_category_func(prev_category_id, script_id);
       // no need to reorder the current category as order is set to null which does not affect the concerned order
 

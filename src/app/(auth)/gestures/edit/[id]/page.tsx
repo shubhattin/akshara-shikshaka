@@ -47,7 +47,7 @@ const get_cached_text_data = cache(async (id: number) => {
         category: text_data_.category_join?.category ?? null
       } as text_data_type)
     : undefined;
-  if (!text_data) {
+  if (text_data) {
     // @ts-ignore
     delete text_data?.category_join;
   }

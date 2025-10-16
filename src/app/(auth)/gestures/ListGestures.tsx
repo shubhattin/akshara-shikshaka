@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useTRPC } from '~/api/client';
-import { Card, CardContent } from '~/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
 import {
   Select,
@@ -14,7 +14,7 @@ import {
 import { Input } from '~/components/ui/input';
 import { Button } from '~/components/ui/button';
 import { FONT_SCRIPTS } from '~/state/font_list';
-import { get_script_from_id, script_list_obj, type script_list_type } from '~/state/lang_list';
+import { script_list_obj, type script_list_type } from '~/state/lang_list';
 import Cookie from 'js-cookie';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
@@ -83,7 +83,6 @@ import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import { toast } from 'sonner';
 import { TiEdit } from 'react-icons/ti';
-import { atomWithStorage } from 'jotai/utils';
 
 type Props = {
   init_script_id: number;
@@ -95,21 +94,33 @@ type Props = {
 
 const script_id_atom = atom<number>(0);
 
+/**
+ * Hydrates the shared script_id atom with the provided initial script ID and renders the internal ListGestures component.
+ *
+ * @param props - Component props.
+ * @param props.init_script_id - Initial script ID used to hydrate the `script_id_atom`.
+ * @param props.init_gesture_categories - Optional initial list of gesture categories used to seed category data for the rendered ListGestures.
+ * @returns A React element that renders ListGestures with the atom hydrated from `props.init_script_id`.
+ */
 export default function ListGesturesWrapper(props: Props) {
   useHydrateAtoms([[script_id_atom, props.init_script_id]]);
   return <ListGestures {...props} />;
 }
-const selected_category_id_atom = atomWithStorage<number | null>(
-  'selected_gesture_category_id',
-  null
-);
 
+/**
+ * Renders a UI for selecting a script, choosing and managing gesture categories, and viewing gestures for the selected category.
+ *
+ * Renders script selection, a category picker with "Uncategorized", a dialog to manage categories, and the gestures view for the active category.
+ *
+ * @param init_gesture_categories - Optional initial list of gesture categories used as placeholder/seed data before remote categories load
+ * @returns A React element containing the script/category selectors, category management dialog, and category-specific gesture view
+ */
 function ListGestures({ init_gesture_categories }: Props) {
   const trpc = useTRPC();
   const [scriptId, setScriptId] = useAtom(script_id_atom);
   const [manageOpen, setManageOpen] = useState(false);
   const [open, setOpen] = useState(false);
-  const [selectedCategoryID, setSelectedCategoryID] = useAtom(selected_category_id_atom);
+  const [selectedCategoryID, setSelectedCategoryID] = useState<number | null>(null);
 
   const scriptOptions = FONT_SCRIPTS.map((name) => ({
     name,
@@ -117,10 +128,10 @@ function ListGestures({ init_gesture_categories }: Props) {
   }));
 
   const categories_q = useQuery(
-    trpc.text_gestures.categories.get_categories.queryOptions(void 0, {
-      enabled: !!scriptId,
-      placeholderData: init_gesture_categories
-    })
+    trpc.text_gestures.categories.get_categories.queryOptions(
+      { script_id: scriptId! },
+      { enabled: !!scriptId, placeholderData: init_gesture_categories }
+    )
   );
   const categories = categories_q.data ?? [];
 
@@ -138,6 +149,7 @@ function ListGestures({ init_gesture_categories }: Props) {
           value={scriptId?.toString()}
           onValueChange={(val) => {
             setScriptId(Number(val));
+            setSelectedCategoryID(null);
             Cookie.set(SCRIPT_ID_COOKIE_KEY, val, { expires: 30 });
           }}
         >
@@ -225,7 +237,7 @@ function ListGestures({ init_gesture_categories }: Props) {
           open={manageOpen}
           onOpenChange={setManageOpen}
           scriptId={scriptId}
-          categories={categories}
+          categories={categories as any}
           isLoading={!!categories_q.isLoading}
         />
       ) : null}
@@ -243,7 +255,7 @@ function ListGestures({ init_gesture_categories }: Props) {
             </div>
           ) : category_gestures_q.data ? (
             <CategoryGesturesSection
-              data={category_gestures_q.data}
+              data={category_gestures_q.data as any}
               category_id={selectedCategoryID!}
             />
           ) : null}
@@ -255,6 +267,18 @@ function ListGestures({ init_gesture_categories }: Props) {
 
 type CategoryModel = Pick<InferSelectModel<typeof gesture_categories>, 'id' | 'name' | 'order'>;
 
+/**
+ * Renders a dialog that lets the user add, rename, reorder, and delete gesture categories for a script.
+ *
+ * Displays a draggable list of categories, controls to add a new category, and a confirmation prompt for deletions.
+ *
+ * @param open - Whether the Manage Categories dialog is visible
+ * @param onOpenChange - Callback invoked when the dialog visibility should change
+ * @param scriptId - ID of the script whose categories are managed
+ * @param categories - Initial list of category models (id, name, order) to edit
+ * @param isLoading - Whether category data is currently loading (shows skeletons when true)
+ * @returns The dialog component for managing gesture categories
+ */
 function ManageCategoriesDialog({
   open,
   onOpenChange,
@@ -404,7 +428,7 @@ function ManageCategoriesDialog({
               <DialogTitle>Add Category</DialogTitle>
             </DialogHeader>
             <AddCategoryForm
-              onSubmit={(name) => add_category_mut.mutate({ name })}
+              onSubmit={(name) => add_category_mut.mutate({ script_id: scriptId, name })}
               isSubmitting={add_category_mut.isPending}
             />
           </DialogContent>
@@ -424,7 +448,8 @@ function ManageCategoriesDialog({
                 onClick={async () => {
                   if (deleteId !== null) {
                     await delete_category_mut.mutateAsync({
-                      category_id: deleteId
+                      category_id: deleteId,
+                      script_id: scriptId
                     });
                   }
                 }}
@@ -440,6 +465,15 @@ function ManageCategoriesDialog({
   );
 }
 
+/**
+ * Renders a compact form for entering a new gesture category name with Clear and Add actions.
+ *
+ * The Add button calls `onSubmit` with the trimmed category name; controls are disabled when `isSubmitting` is true.
+ *
+ * @param onSubmit - Callback invoked with the trimmed category name when the Add button is pressed
+ * @param isSubmitting - When true, disables controls and shows a submitting state for the Add button
+ * @returns A JSX element containing the input and action buttons for adding a category
+ */
 function AddCategoryForm({
   onSubmit,
   isSubmitting
@@ -463,6 +497,14 @@ function AddCategoryForm({
   );
 }
 
+/**
+ * Renders a draggable category row with an editable name field and a delete action.
+ *
+ * @param item - Category data (id, name, order) to display and edit.
+ * @param onChangeName - Called with the updated name when the input value changes.
+ * @param onDelete - Called when the delete button is pressed.
+ * @returns A list item element containing a drag handle, a text input for the category name, and a delete button.
+ */
 function DraggableCategoryRow({
   item,
   onChangeName,
@@ -499,8 +541,15 @@ function DraggableCategoryRow({
   );
 }
 
-type GestureItem = { id: number; text: string; text_key: string; order: number | null };
+type GestureItem = { id: number; text: string; order: number | null };
 
+/**
+ * Render gestures for a category, delegating to the uncategorized or categorized list based on `data.type`.
+ *
+ * @param data - Object with a `type` flag (`'uncategorized'` for uncategorized gestures) and a `gestures` array.
+ * @param category_id - The ID of the category to render when `data.type` is not `'uncategorized'`.
+ * @returns A JSX element that displays either the uncategorized gestures list or the categorized gestures list.
+ */
 function CategoryGesturesSection({
   data,
   category_id
@@ -514,6 +563,12 @@ function CategoryGesturesSection({
   return <CategorizedGesturesList gestures={data.gestures} category_id={category_id} />;
 }
 
+/**
+ * Render a responsive grid of uncategorized gesture cards or a placeholder when empty.
+ *
+ * @param gestures - Array of gestures to display as uncategorized items
+ * @returns A grid of UncatGestureCard elements for each gesture, or a "No gestures." message when the array is empty
+ */
 function UncatGesturesList({ gestures }: { gestures: GestureItem[] }) {
   return (
     <div className="grid grid-cols-3 gap-4 space-y-2 sm:grid-cols-4 md:grid-cols-6">
@@ -525,18 +580,28 @@ function UncatGesturesList({ gestures }: { gestures: GestureItem[] }) {
   );
 }
 
+/**
+ * Renders a dialog and trigger button that let the user select a category to assign a gesture to.
+ *
+ * Shows available categories for the current script (excluding `prev_category_id`), allows selecting one,
+ * and performs the category assignment when confirmed. The dialog invalidates relevant gesture queries on success.
+ *
+ * @param gesture_id - ID of the gesture to be assigned to a category
+ * @param prev_category_id - Optional ID of the gesture's current category; this category is excluded from the selection list
+ * @returns A React element containing the category selection dialog and an icon button that opens it
+ */
 function AddGestureToCategoryDialog({
   gesture_id,
-  prev_category_id,
-  gesture_text_key
+  prev_category_id
 }: {
   gesture_id: number;
-  gesture_text_key: string;
   prev_category_id?: number;
 }) {
   const trpc = useTRPC();
   const scriptId = useAtomValue(script_id_atom);
-  const categories_q = useQuery(trpc.text_gestures.categories.get_categories.queryOptions());
+  const categories_q = useQuery(
+    trpc.text_gestures.categories.get_categories.queryOptions({ script_id: scriptId! })
+  );
   const categories = categories_q.data
     ? categories_q.data.filter((c) => c.id !== prev_category_id)
     : [];
@@ -595,14 +660,12 @@ function AddGestureToCategoryDialog({
               Cancel
             </Button>
             <Button
-              onClick={async () =>
+              onClick={() =>
                 selectedCategory !== null &&
                 add_to_category_mut.mutate({
                   category_id: selectedCategory,
                   prev_category_id,
-                  gesture_id,
-                  script_id: scriptId,
-                  gesture_text_key: gesture_text_key
+                  gesture_id
                 })
               }
               disabled={!canAdd}
@@ -619,6 +682,12 @@ function AddGestureToCategoryDialog({
   );
 }
 
+/**
+ * Renders a card for an uncategorized gesture showing its text and a control to add it to a category.
+ *
+ * @param gesture - The gesture item to display (contains `id`, `text`, and `order`).
+ * @returns A JSX element containing a linked gesture label and a dialog button to assign the gesture to a category.
+ */
 function UncatGestureCard({ gesture }: { gesture: GestureItem }) {
   return (
     <Card className="p-0">
@@ -629,16 +698,21 @@ function UncatGestureCard({ gesture }: { gesture: GestureItem }) {
         >
           {gesture.text}
         </Link>
-        <AddGestureToCategoryDialog
-          gesture_id={gesture.id}
-          prev_category_id={undefined}
-          gesture_text_key={gesture.text_key}
-        />
+        <AddGestureToCategoryDialog gesture_id={gesture.id} prev_category_id={undefined} />
       </CardContent>
     </Card>
   );
 }
 
+/**
+ * Renders UI for managing a category's gestures, showing separate "Unordered" and "Ordered" sections.
+ *
+ * Provides controls to move gestures from unordered to the top or bottom of the ordered list, drag to reorder ordered gestures, and save the current ordered sequence for the category.
+ *
+ * @param gestures - Array of gesture items for the category; each item may have `order` set to a number or `null` for unordered gestures.
+ * @param category_id - The numeric ID of the category whose gestures are being managed.
+ * @returns The component view that displays unordered gestures, an ordered list with drag-and-drop reordering, and a SAVE action to persist the current order.
+ */
 function CategorizedGesturesList({
   gestures,
   category_id
@@ -719,7 +793,6 @@ function CategorizedGesturesList({
                       <AddGestureToCategoryDialog
                         gesture_id={g.id}
                         prev_category_id={category_id}
-                        gesture_text_key={g.text_key}
                       />
                     </div>
                   </CardContent>
@@ -783,6 +856,14 @@ function CategorizedGesturesList({
   );
 }
 
+/**
+ * Renders a draggable list item for an ordered gesture with controls to unorder it or move it to another category.
+ *
+ * @param item - The gesture to display; must include `id`, `text`, and `order`.
+ * @param onUnorder - Callback invoked when the gesture should be moved out of the ordered list.
+ * @param prev_category_id - The current category id the gesture belongs to; passed to the add-to-category dialog.
+ * @returns A list item containing a draggable card for the gesture with action controls.
+ */
 function OrderedGestureCard({
   item,
   onUnorder,
@@ -823,11 +904,7 @@ function OrderedGestureCard({
             <Button size="icon" variant="ghost" className="-p-2" onClick={onUnorder}>
               <Minus className="size-4" />
             </Button>
-            <AddGestureToCategoryDialog
-              gesture_id={item.id}
-              prev_category_id={prev_category_id}
-              gesture_text_key={item.text_key}
-            />
+            <AddGestureToCategoryDialog gesture_id={item.id} prev_category_id={prev_category_id} />
           </div>
         </CardContent>
       </Card>

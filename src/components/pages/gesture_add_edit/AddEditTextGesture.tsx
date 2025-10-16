@@ -188,6 +188,15 @@ export default function AddEditTextDataWrapper(props: Props) {
   );
 }
 
+/**
+ * Renders the add/edit interface for a text-with-gestures item, including script and font controls,
+ * text editing, gesture list and reordering, gesture recording/playback controls, and a Konva canvas.
+ *
+ * @param text_data - The initial text data object (font, script, gestures, optional id/uuid, optional category) to display or edit.
+ * @param location - Mode of the component: 'add' to create a new item or 'edit' to modify an existing one.
+ * @param stageRef - Ref object for the Konva Stage used by the embedded canvas.
+ * @returns The component's rendered React element tree.
+ */
 function AddEditTextData({
   text_data,
   location,
@@ -1164,8 +1173,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     if (!is_addition) {
       await delete_text_data_mut.mutateAsync({
         id: text_data.id!,
-        uuid: text_data.uuid!,
-        script_id: scriptID
+        uuid: text_data.uuid!
       });
     }
   };

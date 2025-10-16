@@ -34,6 +34,16 @@ type Props = {
 
 const selected_image_atom = atom<image_type | null>(null);
 
+/**
+ * Renders UI for selecting an existing image or creating a new image for a word.
+ *
+ * When the active tab or the provided `wordItem` changes, any current image selection is cleared.
+ *
+ * @param props - Component props
+ * @param props.onImageSelect - Callback invoked with the selected image when the user confirms selection
+ * @param props.wordItem - Word context used when creating a new image
+ * @returns The rendered ImageSelect component JSX
+ */
 export default function ImageSelect(props: Props) {
   const [tab, setTab] = useState<'add' | 'make'>('make');
   const [selectedImage, setSelectedImage] = useAtom(selected_image_atom);

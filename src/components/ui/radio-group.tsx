@@ -6,6 +6,12 @@ import { CircleIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * Renders a Radix UI RadioGroup root element with a default grid layout and merged classes.
+ *
+ * @param className - Optional additional class names to append to the default layout classes
+ * @returns A RadioGroup root element with `data-slot="radio-group"`, default grid spacing, and the provided classes applied
+ */
 function RadioGroup({
   className,
   ...props
@@ -19,6 +25,12 @@ function RadioGroup({
   );
 }
 
+/**
+ * Renders a styled radio group item with a centered circular selection indicator.
+ *
+ * @param className - Additional CSS classes to apply to the item container
+ * @returns The radio group item element
+ */
 function RadioGroupItem({
   className,
   ...props

@@ -61,7 +61,8 @@ import {
   SortableContext,
   verticalListSortingStrategy,
   useSortable,
-  arrayMove
+  arrayMove,
+  horizontalListSortingStrategy
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
@@ -73,8 +74,8 @@ import {
 } from '~/components/ui/accordion';
 import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
-import { Card, CardContent } from '~/components/ui/card';
-import { atomWithStorage, useHydrateAtoms } from 'jotai/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
+import { useHydrateAtoms } from 'jotai/utils';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { toast } from 'sonner';
 
@@ -88,17 +89,26 @@ type Props = {
 
 const lang_id_atom = atom(0);
 
+/**
+ * Initialize the language atom with the provided initial language id and render the ListLessons component.
+ *
+ * @param props - Props forwarded to ListLessons; `init_lang_id` is used to hydrate the language atom before rendering.
+ * @returns The rendered ListLessons React element.
+ */
 export default function ListLessonsWrapper(props: Props) {
   useHydrateAtoms([[lang_id_atom, props.init_lang_id]]);
 
   return <ListLessons {...props} />;
 }
 
-const selected_category_id_atom = atomWithStorage<number | null>(
-  'selected_lesson_category_id',
-  null
-);
-
+/**
+ * Render the lessons management UI: language selector, category picker, category management, and the lessons list for the selected category.
+ *
+ * Renders a language dropdown, a category popover (including "Uncategorized"), a Manage Categories dialog, and the lessons area which shows a loading skeleton, uncategorized or categorized lessons, and supports reordering and category actions.
+ *
+ * @param init_lesson_categories - Placeholder category data used while the categories query for the current language is loading.
+ * @returns The React element tree for the lessons management interface scoped to the current language and selected category.
+ */
 function ListLessons({ init_lesson_categories }: Props) {
   const trpc = useTRPC();
   const [langId, setLangId] = useAtom(lang_id_atom);
@@ -111,7 +121,7 @@ function ListLessons({ init_lesson_categories }: Props) {
 
   const [open, setOpen] = useState(false);
   // 0 will be for uncategorized
-  const [selectedCategoryID, setSelectedCategoryID] = useAtom(selected_category_id_atom);
+  const [selectedCategoryID, setSelectedCategoryID] = useState<number | null>(null);
 
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
@@ -136,7 +146,7 @@ function ListLessons({ init_lesson_categories }: Props) {
           value={langId?.toString()}
           onValueChange={(val) => {
             setLangId(Number(val));
-            setSelectedCategoryID(0);
+            setSelectedCategoryID(null);
             Cookie.set(LESSON_LANG_ID_COOKIE_KEY, val, { expires: 30 });
           }}
         >
@@ -254,6 +264,16 @@ function ListLessons({ init_lesson_categories }: Props) {
 
 type CategoryModel = Pick<InferSelectModel<typeof lesson_categories>, 'id' | 'name' | 'order'>;
 
+/**
+ * Render a dialog for adding, renaming, reordering, and deleting lesson categories for a language.
+ *
+ * @param open - Whether the dialog is open
+ * @param onOpenChange - Callback invoked with the new open state
+ * @param langId - Current language id used for category mutations
+ * @param categories - Category models to display and edit; the list is kept locally for reordering and renaming
+ * @param isLoading - When true, shows loading placeholders and disables save actions
+ * @returns The dialog element for managing lesson categories
+ */
 function ManageCategoriesDialog({
   open,
   onOpenChange,
@@ -445,6 +465,12 @@ function ManageCategoriesDialog({
   );
 }
 
+/**
+ * A small form UI for entering a new category name and submitting it.
+ *
+ * @param onSubmit - Callback invoked with the trimmed category name when the Add button is pressed.
+ * @param isSubmitting - When `true`, disables inputs and shows a submitting state.
+ */
 function AddCategoryForm({
   onSubmit,
   isSubmitting
@@ -468,6 +494,14 @@ function AddCategoryForm({
   );
 }
 
+/**
+ * Renders a draggable category row with an editable name and a delete action.
+ *
+ * @param item - The category model to display (id, name, order).
+ * @param onChangeName - Invoked with the new name when the user edits the input.
+ * @param onDelete - Invoked when the delete button is pressed.
+ * @returns A list item element containing a drag handle, an editable name input, and a delete button.
+ */
 function DraggableCategoryRow({
   item,
   onChangeName,
@@ -506,6 +540,13 @@ function DraggableCategoryRow({
 
 type LessonItem = { id: number; text: string; order: number | null };
 
+/**
+ * Render lessons either as an uncategorized list or as a categorized list depending on `data.type`.
+ *
+ * @param data - Object with a `type` discriminator and a `lessons` array. When `data.type` is `'uncategorized'`, an uncategorized lessons view is rendered; otherwise the categorized view is used.
+ * @param category_id - The category id to pass to the categorized lessons view when `data.type` is not `'uncategorized'`.
+ * @returns A React element: `UncatLessonsList` when `data.type` is `'uncategorized'`, otherwise `CategorizedLessonsList` for the provided `category_id`.
+ */
 function CategoryLessonsSection({
   data,
   category_id
@@ -519,6 +560,15 @@ function CategoryLessonsSection({
   return <CategorizedLessonsList lessons={data.lessons} category_id={category_id} />;
 }
 
+/**
+ * Render a responsive grid of uncategorized lesson cards.
+ *
+ * Renders an UncatLessonCard for each lesson in `lessons`. If `lessons` is empty,
+ * displays a "No lessons." placeholder.
+ *
+ * @param lessons - Array of lesson items to render as uncategorized cards
+ * @returns A React element containing the grid of lesson cards or a placeholder
+ */
 function UncatLessonsList({ lessons }: { lessons: LessonItem[] }) {
   return (
     <div className="grid grid-cols-3 gap-4 space-y-2 sm:grid-cols-4 md:grid-cols-6">
@@ -530,6 +580,17 @@ function UncatLessonsList({ lessons }: { lessons: LessonItem[] }) {
   );
 }
 
+/**
+ * Presents a button that opens a dialog allowing the user to assign a lesson to another category.
+ *
+ * When a category is selected and confirmed, the lesson is moved into that category and the optional
+ * `onAdded` callback is invoked after the change succeeds.
+ *
+ * @param lesson_id - ID of the lesson to assign
+ * @param prev_category_id - Optional current category ID to exclude from the selection list
+ * @param onAdded - Optional callback invoked after the lesson is successfully assigned
+ * @returns The component's JSX element
+ */
 function AddToCategoryDialog({
   lesson_id,
   prev_category_id,
@@ -623,6 +684,11 @@ function AddToCategoryDialog({
   );
 }
 
+/**
+ * Render a card for an uncategorized lesson that links to the lesson editor and provides a control to assign it to a category.
+ *
+ * @param lesson - The lesson item to display; its `id` is used for the edit link and category-assignment dialog, and its `text` is shown as the card label.
+ */
 function UncatLessonCard({ lesson }: { lesson: LessonItem }) {
   return (
     <Card className="p-0">
@@ -636,6 +702,13 @@ function UncatLessonCard({ lesson }: { lesson: LessonItem }) {
   );
 }
 
+/**
+ * Render editable ordered and unordered lesson lists for a category, with drag-and-drop ordering and actions to move or reassign lessons.
+ *
+ * @param lessons - Array of lesson items for the category; items with `order === null` are treated as unordered, others are ordered and rendered by ascending `order`.
+ * @param category_id - The id of the current category whose lessons are being managed.
+ * @returns The UI for viewing and modifying the category's lessons, including an unordered accordion, a draggable ordered list, and a control to persist the current order.
+ */
 function CategorizedLessonsList({
   lessons,
   category_id
@@ -783,6 +856,14 @@ function CategorizedLessonsList({
   );
 }
 
+/**
+ * Render a draggable list item for an ordered lesson, providing controls to move it back to unordered and to reassign its category.
+ *
+ * @param item - The lesson data (id, text, order) to display.
+ * @param onUnorder - Callback invoked when the user requests to move the lesson back to the unordered section.
+ * @param prev_category_id - The lesson's current category id used as the "previous" category when opening the reassignment dialog.
+ * @returns A list item element containing a draggable lesson card with edit link, unorder button, and category reassignment dialog.
+ */
 function OrderedLessonCard({
   item,
   onUnorder,

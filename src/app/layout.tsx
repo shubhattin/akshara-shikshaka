@@ -7,6 +7,8 @@ import { Metadata, Viewport } from 'next';
 import TRPCProvider from '~/api/TRPCProvider';
 import { getCachedSession } from '~/lib/cache_server_route_data';
 import { AppContextProvider } from '~/components/AppDataContext';
+import { robotoSans } from '~/components/fonts';
+import AppBar from '~/components/app-bar/AppBar';
 
 export default async function RootLayout({
   children
@@ -17,7 +19,13 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning className="dark" style={{ colorScheme: 'dark' }}>
-      <body className={cn('antialiased', 'overflow-y-scroll sm:px-2 lg:px-3 xl:px-4 2xl:px-4')}>
+      <body
+        className={cn(
+          robotoSans.className,
+          'antialiased',
+          'overflow-y-scroll sm:px-2 lg:px-3 xl:px-4 2xl:px-4'
+        )}
+      >
         <ThemeProvider
           attribute={['class']}
           defaultTheme="system"
@@ -28,6 +36,7 @@ export default async function RootLayout({
             <AppContextProvider initialSession={session}>
               <div className="container mx-auto mb-1">
                 <Toaster richColors={true} />
+                <AppBar title="Akshara Shikshaka" />
                 {children}
               </div>
             </AppContextProvider>

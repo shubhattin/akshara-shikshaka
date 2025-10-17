@@ -8,6 +8,7 @@ import { FaBookOpen, FaVolumeUp, FaRegHandPaper, FaPencilAlt } from 'react-icons
 import { IoLanguage } from 'react-icons/io5';
 import { MdRecordVoiceOver, MdDraw } from 'react-icons/md';
 import { BsStars } from 'react-icons/bs';
+import { lazy, Suspense } from 'react';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -28,7 +29,22 @@ const itemVariants = {
   }
 };
 
+const ManageMenuList = lazy(() => import('./ManageMenuList'));
+
 export default function Home() {
+  const StartLearningButton = (
+    <Button
+      size="lg"
+      className="bg-gradient-to-r from-amber-500 to-orange-500 text-lg font-semibold text-white shadow-lg hover:from-amber-600 hover:to-orange-600"
+      asChild
+    >
+      <Link href="/lessons">
+        <FaBookOpen className="mr-2" />
+        Start Learning
+      </Link>
+    </Button>
+  );
+
   return (
     <div className="min-h-screen overflow-hidden">
       {/* Hero Section */}
@@ -69,28 +85,9 @@ export default function Home() {
               transition={{ delay: 0.5, duration: 0.5 }}
               className="flex flex-wrap justify-center gap-4"
             >
-              <Button
-                size="lg"
-                className="bg-gradient-to-r from-amber-500 to-orange-500 text-lg font-semibold text-white shadow-lg hover:from-amber-600 hover:to-orange-600"
-                asChild
-              >
-                <Link href="/lessons">
-                  <FaBookOpen className="mr-2" />
-                  Start Learning
-                </Link>
-              </Button>
-              {/* 
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-2 border-slate-300 text-lg font-semibold dark:border-slate-600"
-                asChild
-              >
-                <Link href="/gestures">
-                  <FaRegHandPaper className="mr-2" />
-                  Explore Gestures
-                </Link>
-              </Button> */}
+              <Suspense fallback={StartLearningButton}>
+                <ManageMenuList>{StartLearningButton}</ManageMenuList>
+              </Suspense>
             </motion.div>
           </motion.div>
         </div>

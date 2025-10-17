@@ -16,7 +16,7 @@ export default function AppBar({ title }: { title: string }) {
               backgroundPosition: 'center'
             }}
           ></div>
-          <div>
+          <div className="select-none">
             <h1
               className={`bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-xl font-bold text-transparent dark:from-slate-100 dark:to-slate-300 ${robotoSans.className}`}
             >

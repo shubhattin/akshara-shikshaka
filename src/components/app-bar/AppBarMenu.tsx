@@ -166,7 +166,7 @@ export function MenuButton() {
 
             <div className="flex justify-center gap-8">
               <a
-                href="https://github.com/shubhattin/padavali/"
+                href="https://github.com/shubhattin/akshara-shikshaka"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setOpen(false)}

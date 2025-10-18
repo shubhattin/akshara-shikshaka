@@ -26,6 +26,7 @@ import { cn } from '~/lib/utils';
 import Practice from '~/components/pages/practice/Practice';
 import { Provider as JotaiProvider } from 'jotai';
 import { MdPlayArrow, MdStop } from 'react-icons/md';
+import { lipi_parivartak } from '~/tools/lipi_lekhika';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
@@ -152,6 +153,21 @@ const LessonList = ({ lesson_id }: { lesson_id: number }) => {
     )
   );
   const lesson = lesson_info_q.data;
+  const [wordsTransliterated, setWordsTransliterated] = useState<string[]>([]);
+  useEffect(() => {
+    if (lesson?.words && scriptId) {
+      Promise.all(
+        lesson.words.map(
+          async (w) =>
+            await lipi_parivartak(
+              w.word,
+              get_script_from_id(lesson.base_word_script_id),
+              get_script_from_id(scriptId)
+            )
+        )
+      ).then((transliterated_words) => setWordsTransliterated(transliterated_words));
+    }
+  }, [lesson?.words, scriptId]);
 
   const availableScriptIds = (lesson?.gestures ?? [])
     .map((g) => g.text_gesture.script_id)
@@ -224,7 +240,9 @@ const LessonList = ({ lesson_id }: { lesson_id: number }) => {
             const audioKey = w.audio?.s3_key as string | undefined;
             return (
               <div key={w.id} className="shrink-0 rounded-md border p-3 text-center shadow-sm">
-                <div className="mb-2 text-base font-semibold">{w.word}</div>
+                <div className="mb-2 text-base font-semibold">
+                  {wordsTransliterated[idx] ?? w.word}
+                </div>
                 {imageKey && (
                   <img
                     src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${imageKey}`}

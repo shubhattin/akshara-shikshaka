@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Card } from '~/components/ui/card';
 import dynamic from 'next/dynamic';
 import type Konva from 'konva';
 import { cn } from '~/lib/utils';
@@ -246,11 +245,9 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
 
   if (!gestureData.length) {
     return (
-      <Card className="p-6">
-        <div className="text-center text-muted-foreground">
-          No gesture data available for practice.
-        </div>
-      </Card>
+      <div className="text text-center text-muted-foreground">
+        No gesture data available for practice.
+      </div>
     );
   }
 

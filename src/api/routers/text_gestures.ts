@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { t, protectedAdminProcedure } from '~/api/trpc_init';
+import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
 import { db } from '~/db/db';
 import { gesture_text_key_category_join, text_gestures } from '~/db/schema';
 import { and, count, eq, ilike } from 'drizzle-orm';
@@ -186,10 +186,26 @@ const list_text_gesture_data_route = protectedAdminProcedure
     };
   });
 
+const get_text_gesture_data_route = publicProcedure
+  .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
+  .query(async ({ input: { id, uuid } }) => {
+    const text_data = await db.query.text_gestures.findFirst({
+      where: (table, { eq }) => and(eq(table.id, id), eq(table.uuid, uuid)),
+      columns: {
+        id: true,
+        uuid: true,
+        text: true,
+        gestures: true
+      }
+    });
+    return text_data;
+  });
+
 export const text_gestures_router = t.router({
   add_text_gesture_data: add_text_gesture_data_route,
   edit_text_gesture_data: edit_text_gesture_data_route,
   delete_text_gesture_data: delete_text_gesture_data_route,
   list_text_gesture_data: list_text_gesture_data_route,
-  categories: gesture_categories_router
+  categories: gesture_categories_router,
+  get_text_gesture_data: get_text_gesture_data_route
 });

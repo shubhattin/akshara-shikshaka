@@ -1,4 +1,4 @@
-import { t, protectedAdminProcedure } from '../trpc_init';
+import { t, protectedAdminProcedure, publicProcedure } from '../trpc_init';
 import { z } from 'zod';
 import { lesson_gestures, text_lesson_words, text_lessons } from '~/db/schema';
 import { db } from '~/db/db';
@@ -278,11 +278,62 @@ const get_text_lesson_word_media_data_route = protectedAdminProcedure
     };
   });
 
+const get_text_lesson_info_route = publicProcedure
+  .input(z.object({ lesson_id: z.number().int() }))
+  .query(async ({ input: { lesson_id } }) => {
+    const lesson = await db.query.text_lessons.findFirst({
+      where: eq(text_lessons.id, lesson_id),
+      columns: {
+        id: true,
+        base_word_script_id: true,
+        text: true
+      },
+      with: {
+        gestures: {
+          columns: {
+            text_gesture_id: true
+          },
+          with: {
+            text_gesture: {
+              columns: {
+                id: true,
+                uuid: true,
+                script_id: true
+              }
+            }
+          }
+        },
+        words: {
+          columns: {
+            id: true,
+            word: true,
+            order: true
+          },
+          orderBy: (tbl, { asc }) => [asc(tbl.order)],
+          with: {
+            image: {
+              columns: {
+                s3_key: true
+              }
+            },
+            audio: {
+              columns: {
+                s3_key: true
+              }
+            }
+          }
+        }
+      }
+    });
+    return lesson;
+  });
+
 export const text_lessons_router = t.router({
   add_text_lesson: add_text_lesson_route,
   update_text_lesson: update_text_lesson_route,
   delete_text_lesson: delete_text_lesson_route,
   get_gestures_from_text_key: get_gestures_from_text_key_route,
   get_text_lesson_word_media_data: get_text_lesson_word_media_data_route,
-  categories: lesson_categories_router
+  categories: lesson_categories_router,
+  get_text_lesson_info: get_text_lesson_info_route
 });

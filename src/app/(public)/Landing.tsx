@@ -38,7 +38,7 @@ export default function Home() {
       className="bg-gradient-to-r from-amber-500 to-orange-500 text-lg font-semibold text-white shadow-lg hover:from-amber-600 hover:to-orange-600"
       asChild
     >
-      <Link href="/lessons">
+      <Link href="/learn">
         <FaBookOpen className="mr-2" />
         Start Learning
       </Link>
@@ -386,7 +386,7 @@ export default function Home() {
                 className="bg-white text-lg font-semibold text-orange-600 shadow-xl hover:bg-slate-50"
                 asChild
               >
-                <Link href="/lessons">
+                <Link href="/learn">
                   <FaBookOpen className="mr-2" />
                   Get Started Now
                 </Link>

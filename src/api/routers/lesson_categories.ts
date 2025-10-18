@@ -1,4 +1,4 @@
-import { t, protectedAdminProcedure } from '../trpc_init';
+import { t, protectedAdminProcedure, publicProcedure } from '../trpc_init';
 import { z } from 'zod';
 import { lesson_categories, text_lessons } from '~/db/schema';
 import { db } from '~/db/db';
@@ -44,7 +44,7 @@ export const get_text_lesson_categories_func = async (lang_id: number) => {
   return categories;
 };
 
-const get_categories_route = protectedAdminProcedure
+const get_categories_route = publicProcedure
   .input(z.object({ lang_id: z.number().int() }))
   .query(async ({ input: { lang_id } }) => {
     return await get_text_lesson_categories_func(lang_id);
@@ -201,6 +201,22 @@ const add_update_lesson_category_route = protectedAdminProcedure
     };
   });
 
+const get_category_text_lesson_list_route = publicProcedure
+  .input(z.object({ category_id: z.number().int() }))
+  .query(async ({ input: { category_id } }) => {
+    const lessons = await db.query.text_lessons.findMany({
+      columns: {
+        id: true,
+        text: true,
+        order: true,
+        uuid: true
+      },
+      orderBy: (tbl, { asc }) => [asc(tbl.order)],
+      where: (tbl, { eq }) => eq(tbl.category_id, category_id)
+    });
+    return lessons;
+  });
+
 export const lesson_categories_router = t.router({
   get_categories: get_categories_route,
   add_category: add_category_route,
@@ -208,5 +224,6 @@ export const lesson_categories_router = t.router({
   delete_category: delete_category_route,
   get_text_lessons: get_text_lessons_route,
   update_text_lessons_order: update_text_lessons_order_route,
-  add_update_lesson_category: add_update_lesson_category_route
+  add_update_lesson_category: add_update_lesson_category_route,
+  get_category_text_lesson_list: get_category_text_lesson_list_route
 });

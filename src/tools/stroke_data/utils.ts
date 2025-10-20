@@ -123,8 +123,10 @@ export const evaluateGestureAccuracy = (
   // Parameters
   const SAMPLE_SIZE = 96; // more detail than 64
   const CURV_SIZE = 48;
-  const DTW_WINDOW_FRAC = 0.15; // restrict warping for stricter matching
-  const REVERSE_PENALTY = 0.9; // allow reverse with penalty to reduce false negatives
+  // Loosen DTW band to better handle variable draw speeds on device
+  const DTW_WINDOW_FRAC = 0.28;
+  // Allow reverse with softer penalty to avoid harsh direction bias
+  const REVERSE_PENALTY = 0.95;
 
   // Helpers - convert GesturePoints to EvalPoints
   const toEval = (pts: GesturePoints[]): EvalPoint[] =>
@@ -147,6 +149,27 @@ export const evaluateGestureAccuracy = (
     const h = Math.max(1e-6, maxY - minY);
     const scale = 1 / Math.max(w, h);
     return pts.map((p, i) => ({ x: (p.x - minX) * scale, y: (p.y - minY) * scale, timestamp: i }));
+  };
+
+  // Light smoothing to reduce jitter before normalization/resampling
+  const smoothEval = (pts: EvalPoint[], windowSize = 3) => {
+    if (pts.length <= 2 || windowSize <= 1) return pts;
+    const half = Math.floor(windowSize / 2);
+    const out: EvalPoint[] = new Array(pts.length);
+    for (let i = 0; i < pts.length; i++) {
+      const start = Math.max(0, i - half);
+      const end = Math.min(pts.length - 1, i + half);
+      let sx = 0;
+      let sy = 0;
+      let cnt = 0;
+      for (let j = start; j <= end; j++) {
+        sx += pts[j].x;
+        sy += pts[j].y;
+        cnt++;
+      }
+      out[i] = { x: sx / cnt, y: sy / cnt, timestamp: i };
+    }
+    return out;
   };
 
   const resample = (pts: EvalPoint[], n: number) => {
@@ -251,10 +274,12 @@ export const evaluateGestureAccuracy = (
     return dp[n][m] / (n + m);
   };
 
-  const hausdorff = (a: EvalPoint[], b: EvalPoint[]) => {
+  // Blended (modified) Hausdorff distance: average nearest-neighbor and max-min
+  const hausdorffBlended = (a: EvalPoint[], b: EvalPoint[]) => {
     const d = (p: EvalPoint, q: EvalPoint) => Math.hypot(p.x - q.x, p.y - q.y);
-    const h = (p: EvalPoint[], q: EvalPoint[]) => {
+    const stats = (p: EvalPoint[], q: EvalPoint[]) => {
       let maxMin = 0;
+      let sumMin = 0;
       for (let i = 0; i < p.length; i++) {
         let minD = Infinity;
         for (let j = 0; j < q.length; j++) {
@@ -262,19 +287,23 @@ export const evaluateGestureAccuracy = (
           if (dd < minD) minD = dd;
         }
         if (minD > maxMin) maxMin = minD;
+        sumMin += minD;
       }
-      return maxMin;
+      const meanMin = sumMin / Math.max(1, p.length);
+      return { maxMin, meanMin };
     };
-    const hAB = h(a, b);
-    const hBA = h(b, a);
-    return Math.max(hAB, hBA);
+    const sAB = stats(a, b);
+    const sBA = stats(b, a);
+    const maxH = Math.max(sAB.maxMin, sBA.maxMin);
+    const meanH = Math.max(sAB.meanMin, sBA.meanMin);
+    return 0.5 * maxH + 0.5 * meanH;
   };
 
   // Heuristic: detect whether a stroke is essentially a straight line. We look at the
   // maximum perpendicular distance of any point from the line joining the first and
   // last points.  After normalisation into the unit square this threshold can be made
   // small – e.g. 1 %–2 % of the unit length.
-  const isMostlyStraight = (pts: EvalPoint[], tol = 0.02) => {
+  const isMostlyStraight = (pts: EvalPoint[], tol = 0.035) => {
     if (pts.length < 3) return true;
     const p0 = pts[0];
     const p1 = pts[pts.length - 1];
@@ -305,9 +334,12 @@ export const evaluateGestureAccuracy = (
     return { ux, uy };
   };
 
-  // Prepare normalized, resampled sequences
-  const baseUser = resample(normalizeUnitSquare(toEval(userPoints)), SAMPLE_SIZE);
-  const baseTarget = resample(normalizeUnitSquare(toEval(targetPoints)), SAMPLE_SIZE);
+  // Prepare normalized, resampled sequences (with light smoothing)
+  const baseUser = resample(normalizeUnitSquare(smoothEval(toEval(userPoints), 3)), SAMPLE_SIZE);
+  const baseTarget = resample(
+    normalizeUnitSquare(smoothEval(toEval(targetPoints), 3)),
+    SAMPLE_SIZE
+  );
 
   // Reject degenerate strokes
   if (pathLength(baseUser) < 1e-3 || pathLength(baseTarget) < 1e-3) return 0;
@@ -324,7 +356,7 @@ export const evaluateGestureAccuracy = (
     const dtwDist = dtwWindowed(uAligned, tC, DTW_WINDOW_FRAC);
     const dtwScore = Math.max(0, 1 - dtwDist);
 
-    const hDist = hausdorff(uAligned, tC); // both centered and within ~unit square
+    const hDist = hausdorffBlended(uAligned, tC); // both centered and within ~unit square
     const hausdorffScore = Math.max(0, 1 - hDist);
 
     // MSE between corresponding points
@@ -345,14 +377,14 @@ export const evaluateGestureAccuracy = (
     curDiff /= CURV_SIZE;
     const curvatureScore = Math.max(0, 1 - Math.min(1, curDiff));
 
-    // Direction and endpoint gating
-    const uDir = directionCosine(userSeq);
-    const tDir = directionCosine(baseTarget);
+    // Direction and endpoint checks AFTER alignment to avoid frame mismatch
+    const uDir = directionCosine(uAligned);
+    const tDir = directionCosine(tC);
     const dirCos = Math.max(0, Math.min(1, uDir.ux * tDir.ux + uDir.uy * tDir.uy));
-    const startDist = Math.hypot(userSeq[0].x - baseTarget[0].x, userSeq[0].y - baseTarget[0].y);
+    const startDist = Math.hypot(uAligned[0].x - tC[0].x, uAligned[0].y - tC[0].y);
     const endDist = Math.hypot(
-      userSeq[userSeq.length - 1].x - baseTarget[baseTarget.length - 1].x,
-      userSeq[userSeq.length - 1].y - baseTarget[baseTarget.length - 1].y
+      uAligned[uAligned.length - 1].x - tC[tC.length - 1].x,
+      uAligned[uAligned.length - 1].y - tC[tC.length - 1].y
     );
     const endpointScore = Math.max(0, 1 - (startDist + endDist) / 2);
 
@@ -361,40 +393,31 @@ export const evaluateGestureAccuracy = (
     const lenT = pathLength(baseTarget);
     const lenRatio = lenT > 0 ? Math.min(lenU, lenT) / Math.max(lenU, lenT) : 0;
 
-    // Hard gates to reduce false positives.  For essentially straight strokes we
-    // relax the gating criteria that depend on curvature as it carries little
-    // information in that case.
-    if (!straightShape) {
-      if (hausdorffScore < 0.2) return 0;
-      if (curvatureScore < 0.2) return 0;
-    } else {
-      // For a straight gesture we only enforce a looser Hausdorff requirement.
-      if (hausdorffScore < 0.35) return 0;
-    }
+    // Replace hard gates with a minimal sanity check only
+    if (hausdorffScore < 0.05) return 0;
 
     // Weighted aggregate – rebalanced for straight vs non-straight gestures.
     let score: number;
     if (straightShape) {
-      // For a straight line curvature is uninformative, instead we emphasise
-      // endpoint alignment and DTW.
+      // For a straight line curvature is less informative
       score =
-        0.4 * dtwScore +
+        0.45 * dtwScore +
         0.25 * endpointScore +
         0.2 * hausdorffScore +
-        0.1 * mseScore +
-        0.05 * lenRatio;
+        0.07 * mseScore +
+        0.03 * lenRatio;
     } else {
       score =
-        0.3 * dtwScore +
+        0.35 * dtwScore +
         0.25 * hausdorffScore +
-        0.2 * mseScore +
-        0.15 * curvatureScore +
+        0.18 * mseScore +
+        0.12 * curvatureScore +
         0.07 * endpointScore +
         0.03 * lenRatio;
     }
 
-    // Direction acts as soft gate multiplier
-    const gated = score * (0.6 + 0.4 * dirCos);
+    // Direction acts as a softer multiplier
+    const gated = score * (0.8 + 0.2 * dirCos);
     return Math.max(0, Math.min(1, gated));
   };
 

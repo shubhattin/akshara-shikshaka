@@ -5,7 +5,8 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-  ContextMenuLabel
+  ContextMenuLabel,
+  ContextMenuSeparator
 } from '@/components/ui/context-menu';
 import Link from 'next/link';
 import { FaRegHandPaper, FaBookOpen, FaVolumeUp, FaRegImage, FaSignInAlt } from 'react-icons/fa';
@@ -41,7 +42,6 @@ export default function ManageMenuList({ children }: { children: React.ReactNode
         {user_info?.role === 'admin' && (
           <>
             {/* <ContextMenuLabel>Manage</ContextMenuLabel> */}
-            {/* <ContextMenuSeparator /> */}
             <ContextMenuItem className="font-bold">
               <Link href="/lessons" className="flex items-center gap-2">
                 <FaBookOpen className="h-4 w-4" />
@@ -54,13 +54,14 @@ export default function ManageMenuList({ children }: { children: React.ReactNode
                 Gestures
               </Link>
             </ContextMenuItem>
-            <ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem className="text-xs">
               <Link href="/image_assets" className="flex items-center gap-2">
                 <FaRegImage className="h-4 w-4" />
                 Images
               </Link>
             </ContextMenuItem>
-            <ContextMenuItem>
+            <ContextMenuItem className="text-xs">
               <Link href="/audio_assets" className="flex items-center gap-2">
                 <FaVolumeUp className="h-4 w-4" />
                 Audio

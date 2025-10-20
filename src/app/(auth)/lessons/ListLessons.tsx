@@ -12,7 +12,7 @@ import {
 } from '~/components/ui/select';
 import { Input } from '~/components/ui/input';
 import { Button } from '~/components/ui/button';
-import { LANG_LIST, lang_list_obj, type lang_list_type } from '~/state/lang_list';
+import { lang_list_obj, type lang_list_type } from '~/state/lang_list';
 import Cookie from 'js-cookie';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -87,6 +87,7 @@ type Props = {
 };
 
 const lang_id_atom = atom(0);
+const LANGUAGES_ADDED = ['Sanskrit'] as const;
 
 export default function ListLessonsWrapper(props: Props) {
   useHydrateAtoms([[lang_id_atom, props.init_lang_id]]);
@@ -104,7 +105,7 @@ function ListLessons({ init_lesson_categories }: Props) {
   const [langId, setLangId] = useAtom(lang_id_atom);
   const [manageOpen, setManageOpen] = useState(false);
 
-  const langOptions = LANG_LIST.map((name) => ({
+  const langOptions = LANGUAGES_ADDED.map((name) => ({
     name,
     id: lang_list_obj[name as lang_list_type]
   }));

@@ -74,6 +74,34 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     }
   }, [text, fontSize, fontFamily, currentFontLoaded, mainTextPathVisible]);
 
+  // Container ref used to keep the canvas within the viewport
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  // Track scroll position when locking body to avoid jump-to-top
+  const lockedScrollYRef = useRef<number>(0);
+
+  const lockScroll = () => {
+    lockedScrollYRef.current = window.scrollY || window.pageYOffset || 0;
+    // Preserve current scroll position and prevent background scroll without jumping
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${lockedScrollYRef.current}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+  };
+
+  const unlockScroll = () => {
+    const top = document.body.style.top;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    document.body.style.overflow = '';
+    const y = top ? Math.abs(parseInt(top, 10)) : lockedScrollYRef.current;
+    window.scrollTo(0, y);
+  };
+
   // Handle text drag end to update offset
   const handleTextDragEnd = (e: any) => {
     const textNode = e.target;
@@ -128,22 +156,28 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
   // Prevent pull-to-refresh and other navigation gestures on mobile
   useEffect(() => {
-    // Set body overflow to prevent page scroll when recording
-    if (isRecording) {
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
-      document.body.style.height = '100%';
-    } else {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.height = '';
-    }
+    if (!isRecording) return;
 
-    if (!isRecording) {
-      return;
-    }
+    // Lock page scroll without jumping to top
+    lockScroll();
+
+    // Ensure the full canvas is brought into view when recording starts
+    requestAnimationFrame(() => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const fullyInView =
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+        rect.right <= (window.innerWidth || document.documentElement.clientWidth);
+      if (!fullyInView) {
+        containerRef.current.scrollIntoView({
+          block: 'center',
+          inline: 'center',
+          behavior: 'smooth'
+        });
+      }
+    });
 
     const isDrawingCanvas = (target: Element | null): boolean => {
       return !!(
@@ -195,11 +229,8 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     document.addEventListener('dblclick', preventDoubleClickZoom, { passive: false });
 
     return () => {
-      // Reset body styles
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.height = '';
+      // Unlock page scroll and restore previous position
+      unlockScroll();
 
       // Remove event listeners
       document.removeEventListener('touchstart', preventTouchNavigation);
@@ -215,6 +246,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
   return (
     <div
+      ref={containerRef}
       className={cn('inline-block touch-none select-none', isRecording && 'cursor-crosshair')}
       style={{
         // Critical: Prevent all browser touch gestures on this container

@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useEffect, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { Stage, Layer, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue } from 'jotai';
@@ -88,24 +88,59 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       }
     };
 
+    // Container ref used to keep the canvas within the viewport
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    // Track scroll position when locking body to avoid jump-to-top
+    const lockedScrollYRef = useRef<number>(0);
+
+    const lockScroll = () => {
+      lockedScrollYRef.current = window.scrollY || window.pageYOffset || 0;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${lockedScrollYRef.current}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+    };
+
+    const unlockScroll = () => {
+      const top = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      const y = top ? Math.abs(parseInt(top, 10)) : lockedScrollYRef.current;
+      window.scrollTo(0, y);
+    };
+
     // Prevent pull-to-refresh and other navigation gestures on mobile
     useEffect(() => {
-      // Set body overflow to prevent page scroll when in practice mode
-      if (canvasCurrentMode === 'practicing' && completedGesturesCount !== gestureData.length) {
-        document.body.style.overflow = 'hidden';
-        document.body.style.position = 'fixed';
-        document.body.style.width = '100%';
-        document.body.style.height = '100%';
-      } else {
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
-        document.body.style.height = '';
-      }
+      const shouldLock =
+        canvasCurrentMode === 'practicing' && completedGesturesCount !== gestureData.length;
+      if (!shouldLock) return;
 
-      if (canvasCurrentMode !== 'practicing' || completedGesturesCount === gestureData.length) {
-        return;
-      }
+      // Lock page scroll without jumping to top
+      lockScroll();
+
+      // Ensure the full canvas is brought into view when practice starts/continues
+      requestAnimationFrame(() => {
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const fullyInView =
+          rect.top >= 0 &&
+          rect.left >= 0 &&
+          rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+          rect.right <= (window.innerWidth || document.documentElement.clientWidth);
+        if (!fullyInView) {
+          containerRef.current.scrollIntoView({
+            block: 'center',
+            inline: 'center',
+            behavior: 'smooth'
+          });
+        }
+      });
 
       const isDrawingCanvas = (target: Element | null): boolean => {
         return !!(
@@ -157,11 +192,8 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       document.addEventListener('dblclick', preventDoubleClickZoom, { passive: false });
 
       return () => {
-        // Reset body styles
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
-        document.body.style.height = '';
+        // Unlock page scroll and restore previous position
+        unlockScroll();
 
         // Remove event listeners
         document.removeEventListener('touchstart', preventTouchNavigation);
@@ -177,6 +209,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
     return (
       <div
+        ref={containerRef}
         className={cn(
           'inline-block touch-none select-none',
           canvasCurrentMode === 'practicing' && 'cursor-crosshair'

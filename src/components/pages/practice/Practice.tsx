@@ -342,53 +342,57 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
         )}
       </div>
       {canvasCurrentMode === 'practicing' && completedGesturesCount !== gestureData.length && (
-        <ProgressDisplay
-          currentGesture={currentGestureIndex + 1}
-          totalGestures={totalGestures}
-          completedCount={completedGesturesCount}
-        />
+        <div className="flex justify-center">
+          <ProgressDisplay
+            currentGesture={currentGestureIndex + 1}
+            totalGestures={totalGestures}
+            completedCount={completedGesturesCount}
+          />
+        </div>
       )}
 
       {completedGesturesCount === gestureData.length && (
-        <motion.div
-          className={cn(
-            'space-y-4 rounded-xl border border-gray-200 bg-gradient-to-br from-white via-gray-50 to-gray-100 p-6 text-center shadow-lg',
-            'dark:border-gray-700 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-700'
-          )}
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.8, opacity: 0 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-        >
-          <div className="mb-2 text-3xl">🎉</div>
-          <div className="mb-1 text-xl font-bold text-yellow-800 dark:text-yellow-200">
-            Congratulations!
-          </div>
-          <div className="mb-3 text-yellow-700 dark:text-yellow-300">
-            You successfully completed all gestures!
-          </div>
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            whileHover={{ scale: 1.07 }}
-            onClick={() => {
-              resetPractice();
-              playAllGestures();
-            }}
+        <div className="flex justify-center">
+          <motion.div
             className={cn(
-              'relative inline-flex items-center rounded-lg px-4 py-2 font-semibold transition-all duration-200',
-              'bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 text-yellow-900 shadow-md',
-              'hover:scale-105 hover:from-yellow-500 hover:via-orange-500 hover:to-yellow-600 hover:shadow-lg',
-              'focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:outline-none',
-              'disabled:cursor-not-allowed disabled:opacity-60',
-              'dark:from-yellow-600 dark:via-orange-500 dark:to-yellow-700 dark:text-yellow-100',
-              'dark:hover:from-yellow-700 dark:hover:via-orange-600 dark:hover:to-yellow-800'
+              'space-y-4 rounded-xl border border-gray-200 bg-gradient-to-br from-white via-gray-50 to-gray-100 p-6 text-center shadow-lg',
+              'dark:border-gray-700 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-700'
             )}
-            style={{ fontSize: '0.95rem' }}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
           >
-            <MdArrowForward className="mr-2 text-lg drop-shadow" />
-            Play Again
-          </motion.button>
-        </motion.div>
+            <div className="mb-2 text-3xl">🎉</div>
+            <div className="mb-1 text-xl font-bold text-yellow-800 dark:text-yellow-200">
+              Congratulations!
+            </div>
+            <div className="mb-3 text-yellow-700 dark:text-yellow-300">
+              You successfully completed all gestures!
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.07 }}
+              onClick={() => {
+                resetPractice();
+                playAllGestures();
+              }}
+              className={cn(
+                'relative inline-flex items-center rounded-lg px-4 py-2 font-semibold transition-all duration-200',
+                'bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 text-yellow-900 shadow-md',
+                'hover:scale-105 hover:from-yellow-500 hover:via-orange-500 hover:to-yellow-600 hover:shadow-lg',
+                'focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:outline-none',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+                'dark:from-yellow-600 dark:via-orange-500 dark:to-yellow-700 dark:text-yellow-100',
+                'dark:hover:from-yellow-700 dark:hover:via-orange-600 dark:hover:to-yellow-800'
+              )}
+              style={{ fontSize: '0.95rem' }}
+            >
+              <MdArrowForward className="mr-2 text-lg drop-shadow" />
+              Play Again
+            </motion.button>
+          </motion.div>
+        </div>
       )}
 
       <AnimatePresence>
@@ -590,7 +594,7 @@ const ProgressDisplay = ({
 }) => {
   return (
     <motion.div
-      className="flex items-center justify-center space-x-6 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 shadow-lg dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30"
+      className="inline-flex items-center justify-center space-x-6 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 shadow-lg dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30"
       initial={{ y: -40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: -40, opacity: 0 }}

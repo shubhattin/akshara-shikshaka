@@ -61,9 +61,9 @@ import {
 import {
   audio_id_optional_atom,
   base_word_script_id_atom,
-  gesture_ids_atom,
   lang_id_atom,
   text_atom,
+  text_key_atom,
   words_atom,
   type audio_type,
   type image_type,
@@ -85,6 +85,7 @@ import { MdPlayArrow, MdStop } from 'react-icons/md';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { AiOutlineAudio } from 'react-icons/ai';
+import Link from 'next/link';
 
 type Props =
   | {
@@ -109,7 +110,6 @@ export default function TextLessonAddEditComponent(props: Props) {
     [base_word_script_id_atom, props.text_lesson_info.base_word_script_id],
     [audio_id_optional_atom, props.text_lesson_info.audio_id],
     [text_atom, props.text_lesson_info.text],
-    [gesture_ids_atom, new Set(props.gesture_ids)],
     [words_atom, props.words]
   ]);
 
@@ -126,10 +126,9 @@ const LessonInfo = (props: Props) => {
   const trpc = useTRPC();
   const [lang_id, setLangId] = useAtom(lang_id_atom);
   const [base_word_script_id, setBaseWordScriptId] = useAtom(base_word_script_id_atom);
-  const [gesture_ids, setGestureIds] = useAtom(gesture_ids_atom);
   const [text, setText] = useAtom(text_atom);
 
-  const [textKey, setTextKey] = useState<string | null>(null);
+  const [textKey, setTextKey] = useAtom(text_key_atom);
 
   useEffect(() => {
     if (text.trim().length === 0) {
@@ -148,7 +147,7 @@ const LessonInfo = (props: Props) => {
     load_parivartak_lang_data(get_script_from_id(base_word_script_id));
   }, [lang_id, base_word_script_id]);
 
-  const searched_gestures_q = useQuery(
+  const connected_gestures_q = useQuery(
     trpc.text_lessons.get_gestures_from_text_key.queryOptions(
       {
         text_key: textKey!
@@ -227,7 +226,6 @@ const LessonInfo = (props: Props) => {
               value={text}
               onInput={(e) => {
                 setText(e.currentTarget.value);
-                setGestureIds(new Set([]));
                 lekhika_typing_tool(
                   e.nativeEvent.target,
                   // @ts-ignore
@@ -237,7 +235,6 @@ const LessonInfo = (props: Props) => {
                   // @ts-ignore
                   (val) => {
                     setText(val);
-                    setGestureIds(new Set([]));
                   }
                 );
               }}
@@ -247,45 +244,40 @@ const LessonInfo = (props: Props) => {
           {props.location === 'edit' && <span className="text-base font-bold">{text}</span>}
         </Label>
       </div>
-      <div className="space-y-3">
-        {searched_gestures_q.isLoading && <Skeleton className="h-32 w-full" />}
-        {searched_gestures_q.isSuccess && !searched_gestures_q.isLoading && (
-          <div className="space-y-3">
-            <div className="grid max-h-52 grid-cols-4 gap-2 overflow-y-scroll rounded-md border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-6 lg:grid-cols-8 dark:border-gray-700 dark:bg-gray-800/50">
-              {searched_gestures_q.data.length > 0 ? (
-                searched_gestures_q.data.map((gesture) => (
-                  <button
-                    key={gesture.id}
-                    className={cn(
-                      'rounded-md border px-4 py-3 text-center text-base font-semibold transition-all duration-200 ease-in-out outline-none',
-                      gesture_ids.has(gesture.id)
-                        ? 'border-blue-500 bg-blue-100 text-blue-900 shadow-md dark:border-blue-500 dark:bg-blue-900/30 dark:text-blue-100'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:shadow-md focus:ring-2 focus:ring-blue-500/50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:border-blue-400 dark:hover:bg-blue-900/20'
+      {props.location === 'edit' && (
+        <div className="space-y-3 select-none">
+          {connected_gestures_q.isLoading && <Skeleton className="h-32 w-full" />}
+          {connected_gestures_q.isSuccess && !connected_gestures_q.isLoading && (
+            <div className="space-y-3">
+              <div className="grid max-h-52 grid-cols-4 gap-2 overflow-y-scroll rounded-md border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-6 lg:grid-cols-8 dark:border-gray-700 dark:bg-gray-800/50">
+                {connected_gestures_q.data.length > 0 ? (
+                  connected_gestures_q.data.map((gesture) => (
+                    <Link
+                      target="_blank"
+                      href={`/gestures/edit/${gesture.id}`}
+                      key={gesture.id}
+                      className={cn(
+                        'rounded-md border px-2 py-1 text-center text-base font-semibold transition-all duration-200 ease-in-out outline-none',
+                        'hover:bg-gray-100 hover:text-blue-500 dark:hover:bg-gray-700 dark:hover:text-blue-400'
+                      )}
+                    >
+                      {gesture.text}
+                    </Link>
+                  ))
+                ) : (
+                  <div className="flex items-center justify-center">
+                    {!connected_gestures_q.isFetching ? (
+                      <p className="text-sm text-gray-500">No gestures found</p>
+                    ) : (
+                      <p className="text-sm text-gray-500">Loading...</p>
                     )}
-                    disabled={searched_gestures_q.isLoading}
-                    onClick={() => {
-                      const newGestureIds = new Set(gesture_ids);
-                      if (gesture_ids.has(gesture.id)) newGestureIds.delete(gesture.id);
-                      else newGestureIds.add(gesture.id);
-                      setGestureIds(newGestureIds);
-                    }}
-                  >
-                    {gesture.text}
-                  </button>
-                ))
-              ) : (
-                <div className="flex items-center justify-center">
-                  {!searched_gestures_q.isFetching ? (
-                    <p className="text-sm text-gray-500">No gestures found</p>
-                  ) : (
-                    <p className="text-sm text-gray-500">Loading...</p>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -663,8 +655,8 @@ const AddEditSave = (props: Props) => {
   const text = useAtomValue(text_atom);
   const lang_id = useAtomValue(lang_id_atom);
   const base_word_script_id = useAtomValue(base_word_script_id_atom);
-  const gesture_ids = useAtomValue(gesture_ids_atom);
   const [words, setWords] = useAtom(words_atom);
+  const textKey = useAtomValue(text_key_atom);
 
   const add_text_data_mut = useMutation(
     trpc.text_lessons.add_text_lesson.mutationOptions({
@@ -751,7 +743,7 @@ const AddEditSave = (props: Props) => {
           base_word_script_id: base_word_script_id,
           audio_id: null
         },
-        gesture_ids: Array.from(gesture_ids),
+        text_key: textKey!,
         words
       });
     } else {
@@ -761,7 +753,6 @@ const AddEditSave = (props: Props) => {
           uuid: props.text_lesson_info.uuid!,
           audio_id: null
         },
-        gesture_ids: Array.from(gesture_ids),
         words
       });
     }

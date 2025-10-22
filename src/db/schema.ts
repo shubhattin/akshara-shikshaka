@@ -84,6 +84,7 @@ export const text_lessons = pgTable('text_lessons', {
   // it is the script used for writing those words
   text: text().notNull(),
   // ^ will be in the base_word_script_id script
+  text_key: text().notNull(),
   created_at: timestamp().notNull().defaultNow(),
   updated_at: timestamp()
     .notNull()

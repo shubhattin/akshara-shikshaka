@@ -19,6 +19,7 @@ const connect_gestures_to_text_lessons_func = async (textKey: string, text_gestu
     },
     where: (tbl, { eq }) => eq(tbl.text_key, textKey)
   });
+  if (lessons.length === 0) return;
   await db.insert(lesson_gestures).values(
     lessons.map((lesson) => ({
       text_gesture_id: text_gesture_id,
@@ -80,7 +81,7 @@ const add_text_gesture_data_route = protectedAdminProcedure
       .returning();
     // on text gesture creation scan for lessons associated with the text key
     // and connect them to the text gesture via the join table `lesson_gestures`
-    await connect_gestures_to_text_lessons_func(input.textKey, result[0].id);
+    await connect_gestures_to_text_lessons_func(input.textKey.trim(), result[0].id);
 
     return {
       success: true,

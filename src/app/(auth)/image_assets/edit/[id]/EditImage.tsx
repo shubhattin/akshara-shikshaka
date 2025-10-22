@@ -50,26 +50,39 @@ type Props = {
     width: number;
     created_at: Date;
     updated_at: Date;
+    words: {
+      id: number;
+      word: string;
+      text_lesson_id: number;
+      order: number;
+      lesson: {
+        text: string;
+      };
+    }[];
   };
-  words: {
-    id: number;
-    word: string;
-    text_lesson_id: number;
-    order: number;
-    lesson: {
-      text: string;
-    };
-  }[];
 };
 
-export default function EditImage({ image_data, words }: Props) {
-  useHydrateAtoms([[image_data_atom, image_data]]);
+export default function EditImage({ image_data }: Props) {
+  useHydrateAtoms([
+    [
+      image_data_atom,
+      {
+        id: image_data.id,
+        description: image_data.description,
+        s3_key: image_data.s3_key,
+        height: image_data.height,
+        width: image_data.width,
+        created_at: image_data.created_at,
+        updated_at: image_data.updated_at
+      }
+    ]
+  ]);
 
   return (
     <div className="space-y-6">
       <ImageInfo />
-      <AssociatedWords words={words} />
-      <EditActions words={words} />
+      <AssociatedWords words={image_data.words} />
+      <EditActions words={image_data.words} />
     </div>
   );
 }
@@ -225,7 +238,7 @@ const DescriptionEditor = () => {
   );
 };
 
-const AssociatedWords = ({ words }: { words: Props['words'] }) => {
+const AssociatedWords = ({ words }: { words: Props['image_data']['words'] }) => {
   if (words.length === 0) {
     return (
       <Card>
@@ -269,7 +282,7 @@ const AssociatedWords = ({ words }: { words: Props['words'] }) => {
   );
 };
 
-const EditActions = ({ words }: { words: Props['words'] }) => {
+const EditActions = ({ words }: { words: Props['image_data']['words'] }) => {
   const trpc = useTRPC();
   const router = useRouter();
   const image_data = useAtomValue(image_data_atom);

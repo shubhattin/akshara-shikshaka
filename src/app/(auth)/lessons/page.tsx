@@ -11,8 +11,7 @@ import { get_text_lesson_categories_func } from '~/api/routers/lesson_categories
 
 const List = async () => {
   const session = await getCachedSession();
-  if (!session || session.user.role !== 'admin')
-    redirect(`${process.env.NEXT_PUBLIC_BETTER_AUTH_URL}/login`);
+  if (!session || session.user.role !== 'admin') redirect(`/`);
 
   const cookie = await cookies();
   const lang_id = get_lesson_lang_id_from_cookie(cookie.get(LESSON_LANG_ID_COOKIE_KEY)?.value);
@@ -31,7 +30,7 @@ const List = async () => {
         <Link href="/lessons/add">
           <Button variant={'outline'} className="gap-2 text-lg font-semibold">
             <IoMdAdd className="size-5.5" /> Add
-            <span className="font-bold text-yellow-400">Lesson</span>
+            <span className="font-bold text-yellow-600 dark:text-yellow-400">Lesson</span>
           </Button>
         </Link>
       </div>

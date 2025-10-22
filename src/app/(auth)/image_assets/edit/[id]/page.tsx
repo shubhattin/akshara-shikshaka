@@ -25,36 +25,35 @@ const get_cached_image_data = cache(async (id: number) => {
       width: true,
       created_at: true,
       updated_at: true
+    },
+    with: {
+      words: {
+        columns: {
+          id: true,
+          word: true,
+          text_lesson_id: true,
+          order: true
+        },
+        with: {
+          lesson: {
+            columns: {
+              text: true
+            }
+          }
+        },
+        orderBy: (tbl, { asc }) => [asc(tbl.text_lesson_id), asc(tbl.order)]
+      }
     }
   });
 
-  // Get associated words separately for better structure
-  const associated_words = await db.query.text_lesson_words.findMany({
-    where: (table, { eq }) => eq(table.image_id, id),
-    columns: {
-      id: true,
-      word: true,
-      text_lesson_id: true,
-      order: true
-    },
-    with: {
-      lesson: {
-        columns: {
-          text: true
-        }
-      }
-    },
-    orderBy: (tbl, { asc }) => [asc(tbl.text_lesson_id), asc(tbl.order)]
-  });
-
-  return { image_data, associated_words };
+  return image_data;
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [id_str] = decodeURIComponent((await params).id).split(':');
   const id = z.coerce.number().int().parse(id_str);
 
-  const { image_data } = await get_cached_image_data(id);
+  const image_data = await get_cached_image_data(id);
 
   return {
     ...getMetadata({
@@ -71,7 +70,7 @@ const MainEdit = async ({ params }: Props) => {
   const [id_str] = decodeURIComponent((await params).id).split(':');
   const id = z.coerce.number().int().parse(id_str);
 
-  const { image_data, associated_words } = await get_cached_image_data(id);
+  const image_data = await get_cached_image_data(id);
   if (!image_data) {
     notFound();
   }
@@ -89,7 +88,7 @@ const MainEdit = async ({ params }: Props) => {
       </div>
 
       <JotaiProvider key={`edit_image_asset_page-${id}`}>
-        <EditImage image_data={image_data} words={associated_words} />
+        <EditImage image_data={image_data} />
       </JotaiProvider>
     </div>
   );

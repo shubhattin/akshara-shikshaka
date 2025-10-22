@@ -3,8 +3,6 @@ import { type Metadata } from 'next';
 import { cache } from 'react';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 import { db } from '~/db/db';
-import { text_lesson_words, text_lessons } from '~/db/schema';
-import { eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { getCachedSession } from '~/lib/cache_server_route_data';
@@ -25,36 +23,35 @@ const get_cached_audio_data = cache(async (id: number) => {
       lang_id: true,
       created_at: true,
       updated_at: true
+    },
+    with: {
+      words: {
+        columns: {
+          id: true,
+          word: true,
+          text_lesson_id: true,
+          order: true
+        },
+        with: {
+          lesson: {
+            columns: {
+              text: true
+            }
+          }
+        },
+        orderBy: (tbl, { asc }) => [asc(tbl.text_lesson_id), asc(tbl.order)]
+      }
     }
   });
 
-  // Get associated words separately for better structure
-  const associated_words = await db.query.text_lesson_words.findMany({
-    where: (table, { eq }) => eq(table.audio_id, id),
-    columns: {
-      id: true,
-      word: true,
-      text_lesson_id: true,
-      order: true
-    },
-    with: {
-      lesson: {
-        columns: {
-          text: true
-        }
-      }
-    },
-    orderBy: (tbl, { asc }) => [asc(tbl.text_lesson_id), asc(tbl.order)]
-  });
-
-  return { audio_data, associated_words };
+  return audio_data;
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const [id_str] = decodeURIComponent((await params).id).split(':');
   const id = z.coerce.number().int().parse(id_str);
 
-  const { audio_data } = await get_cached_audio_data(id);
+  const audio_data = await get_cached_audio_data(id);
 
   return {
     ...getMetadata({
@@ -71,7 +68,7 @@ const MainEdit = async ({ params }: Props) => {
   const [id_str] = decodeURIComponent((await params).id).split(':');
   const id = z.coerce.number().int().parse(id_str);
 
-  const { audio_data, associated_words } = await get_cached_audio_data(id);
+  const audio_data = await get_cached_audio_data(id);
   if (!audio_data) {
     notFound();
   }
@@ -89,7 +86,7 @@ const MainEdit = async ({ params }: Props) => {
       </div>
 
       <JotaiProvider key={`edit_audio_asset_page-${id}`}>
-        <EditAudio audio_data={audio_data} words={associated_words} />
+        <EditAudio audio_data={audio_data} />
       </JotaiProvider>
     </div>
   );

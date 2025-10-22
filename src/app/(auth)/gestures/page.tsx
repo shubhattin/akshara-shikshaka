@@ -11,8 +11,7 @@ import { get_text_gesture_categories_func } from '~/api/routers/gesture_categori
 
 const List = async () => {
   const session = await getCachedSession();
-  if (!session || session.user.role !== 'admin')
-    redirect(`${process.env.NEXT_PUBLIC_BETTER_AUTH_URL}/login`);
+  if (!session || session.user.role !== 'admin') redirect(`/`);
 
   const cookie = await cookies();
   const script_id = get_script_id_from_cookie(cookie.get(SCRIPT_ID_COOKIE_KEY)?.value);
@@ -31,7 +30,7 @@ const List = async () => {
         <Link href="/gestures/add">
           <Button variant={'outline'} className="gap-2 text-lg font-semibold">
             <IoMdAdd className="size-5.5" /> Add
-            <span className="font-bold text-yellow-400">Gesture</span>
+            <span className="font-bold text-yellow-600 dark:text-yellow-400">Gesture</span>
           </Button>
         </Link>
       </div>

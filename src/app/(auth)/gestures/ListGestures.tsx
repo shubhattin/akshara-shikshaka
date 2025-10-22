@@ -14,7 +14,7 @@ import {
 import { Input } from '~/components/ui/input';
 import { Button } from '~/components/ui/button';
 import { FONT_SCRIPTS } from '~/state/font_list';
-import { get_script_from_id, script_list_obj, type script_list_type } from '~/state/lang_list';
+import { script_list_obj, type script_list_type } from '~/state/lang_list';
 import Cookie from 'js-cookie';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
@@ -29,7 +29,8 @@ import {
   Plus,
   ArrowUpFromLine,
   ArrowDownToLine,
-  Minus
+  Minus,
+  ArrowRightLeft
 } from 'lucide-react';
 import {
   Command,
@@ -84,6 +85,7 @@ import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import { toast } from 'sonner';
 import { TiEdit } from 'react-icons/ti';
 import { atomWithStorage } from 'jotai/utils';
+import { cn } from '~/lib/utils';
 
 type Props = {
   init_script_id: number;
@@ -537,9 +539,10 @@ function AddGestureToCategoryDialog({
   const trpc = useTRPC();
   const scriptId = useAtomValue(script_id_atom);
   const categories_q = useQuery(trpc.text_gestures.categories.get_categories.queryOptions());
-  const categories = categories_q.data
-    ? categories_q.data.filter((c) => c.id !== prev_category_id)
-    : [];
+  const categories = [
+    ...(categories_q.data ? categories_q.data.filter((c) => c.id !== prev_category_id) : []),
+    ...(prev_category_id ? [{ id: 0, name: 'Uncategorized', order: 0 }] : [])
+  ];
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -583,7 +586,12 @@ function AddGestureToCategoryDialog({
                     id={`cat-gesture-${gesture_id}-${cat.id}`}
                     value={String(cat.id)}
                   />
-                  <Label htmlFor={`cat-gesture-${gesture_id}-${cat.id}`}>{cat.name}</Label>
+                  <Label
+                    htmlFor={`cat-gesture-${gesture_id}-${cat.id}`}
+                    className={cn(cat.id === 0 && 'text-muted-foreground')}
+                  >
+                    {cat.name}
+                  </Label>
                 </div>
               ))}
             </RadioGroup>
@@ -598,7 +606,7 @@ function AddGestureToCategoryDialog({
               onClick={async () =>
                 selectedCategory !== null &&
                 add_to_category_mut.mutate({
-                  category_id: selectedCategory,
+                  category_id: selectedCategory === 0 ? null : selectedCategory,
                   prev_category_id,
                   gesture_id,
                   script_id: scriptId,
@@ -613,7 +621,7 @@ function AddGestureToCategoryDialog({
         </DialogContent>
       </Dialog>
       <Button size="icon" variant="ghost" onClick={() => setOpen(true)} className="-p-2">
-        <Plus className="size-4" />
+        {prev_category_id ? <ArrowRightLeft className="size-4" /> : <Plus className="size-4" />}
       </Button>
     </>
   );

@@ -10,6 +10,21 @@ import {
   lesson_categories_router
 } from './lesson_categories';
 
+const connect_gestures_to_text_lessons_func = async (textKey: string, text_lesson_id: number) => {
+  const gestures = await db.query.text_gestures.findMany({
+    columns: {
+      id: true
+    },
+    where: (tbl, { eq }) => eq(tbl.text_key, textKey)
+  });
+  await db.insert(lesson_gestures).values(
+    gestures.map((gesture) => ({
+      text_gesture_id: gesture.id,
+      text_lesson_id: text_lesson_id
+    }))
+  );
+};
+
 /**
  * Only for adding text lessons and not for adding words related\
  * Along with the text gestures data associated with it
@@ -25,7 +40,7 @@ const add_text_lesson_route = protectedAdminProcedure
       }).extend({
         text: z.string().min(1)
       }),
-      gesture_ids: z.array(z.number().int()),
+      text_key: z.string().min(1),
       words: TextLessonWordsSchemaZod.omit({
         id: true,
         created_at: true,
@@ -45,24 +60,19 @@ const add_text_lesson_route = protectedAdminProcedure
     async ({
       input: {
         lesson_info: { lang_id, base_word_script_id, audio_id, text },
-        gesture_ids: gestures_ids,
+        text_key,
         words
       }
     }) => {
       const result = await db
         .insert(text_lessons)
-        .values({ lang_id, base_word_script_id, audio_id, text })
+        .values({ lang_id, base_word_script_id, audio_id, text, text_key: text_key.trim() })
         .returning();
 
       const [, added_word_ids] = await Promise.all([
-        // insert values in the join table
-        gestures_ids.length > 0 &&
-          db.insert(lesson_gestures).values(
-            gestures_ids.map((gesture_id) => ({
-              text_lesson_id: result[0].id,
-              text_gesture_id: gesture_id
-            }))
-          ),
+        // on text lesson creation scan for gestures associated with the text key
+        // and connect them to the text lesson via the join table `lesson_gestures`
+        connect_gestures_to_text_lessons_func(text_key, result[0].id),
         // insert values in the text lesson words table
         words.length > 0
           ? db
@@ -96,7 +106,6 @@ const update_text_lesson_route = protectedAdminProcedure
         audio_id: true,
         uuid: true
       }),
-      gesture_ids: z.array(z.number().int()),
       words: TextLessonWordsSchemaZod.omit({
         created_at: true,
         updated_at: true,
@@ -112,7 +121,6 @@ const update_text_lesson_route = protectedAdminProcedure
     async ({
       input: {
         lesson_info: { id, audio_id, uuid },
-        gesture_ids,
         words
       }
     }) => {
@@ -125,37 +133,6 @@ const update_text_lesson_route = protectedAdminProcedure
       if (res.length === 0) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Text lesson not found' });
       }
-
-      // updating lesson gestures
-      const existing_gesture_ids = (
-        await db.query.lesson_gestures.findMany({
-          where: eq(lesson_gestures.text_lesson_id, id)
-        })
-      ).map((gesture) => gesture.text_gesture_id);
-
-      const to_add_gesture_ids = gesture_ids.filter(
-        (gesture_id) => !existing_gesture_ids.includes(gesture_id)
-      );
-      const deleted_gesture_ids = existing_gesture_ids.filter(
-        (gesture_id) => !gesture_ids.includes(gesture_id)
-      );
-      await Promise.allSettled([
-        db
-          .delete(lesson_gestures)
-          .where(
-            and(
-              inArray(lesson_gestures.text_gesture_id, deleted_gesture_ids),
-              eq(lesson_gestures.text_lesson_id, id)
-            )
-          ),
-        to_add_gesture_ids.length > 0 &&
-          db.insert(lesson_gestures).values(
-            to_add_gesture_ids.map((gesture_id) => ({
-              text_lesson_id: id,
-              text_gesture_id: gesture_id
-            }))
-          )
-      ]);
 
       // updating lesson words
       const existing_word_ids = (
@@ -216,15 +193,15 @@ const delete_text_lesson_route = protectedAdminProcedure
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Text lesson not found' });
     }
 
-    await db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
-    // deletes both the lesson gestures and associated words with it
-    // due to the cascade delete constraint
+    await Promise.all([
+      db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid))),
+      // deletes both the lesson gestures and associated words with it
+      // due to the cascade delete constraint
 
-    // run this after delete of lesson
-    // reordering the catoegory id after deletion if needed
-    if (text_lesson_.category_id) {
-      await reorder_text_lesson_in_category_func(text_lesson_.category_id);
-    }
+      // run this after delete of lesson
+      // reordering the catoegory id after deletion if needed
+      text_lesson_.category_id && reorder_text_lesson_in_category_func(text_lesson_.category_id, id)
+    ]);
 
     return {
       deleted: true

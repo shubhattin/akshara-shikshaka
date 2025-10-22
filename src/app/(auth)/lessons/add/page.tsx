@@ -15,6 +15,7 @@ const List = async () => {
     id: undefined as number | undefined,
     uuid: undefined as string | undefined,
     text: '',
+    text_key: '',
     lang_id: lang_list_obj['Sanskrit'],
     base_word_script_id: script_list_obj['Devanagari'],
     order: null,

@@ -34,6 +34,27 @@ import { MdDeleteOutline, MdPlayArrow, MdStop, MdEdit } from 'react-icons/md';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { LANG_LIST, lang_list_obj, type lang_list_type, get_lang_from_id } from '~/state/lang_list';
 
+type Props = {
+  audio_data: {
+    id: number;
+    description: string;
+    s3_key: string;
+    type: 'ai_generated' | 'recorded';
+    lang_id: number | null;
+    created_at: Date;
+    updated_at: Date;
+    words: {
+      id: number;
+      order: number;
+      text_lesson_id: number;
+      word: string;
+      lesson: {
+        text: string;
+      };
+    }[];
+  };
+};
+
 const audio_data_atom = atom<{
   id: number;
   description: string;
@@ -107,33 +128,25 @@ const WaveformPlayer = ({
   );
 };
 
-type Props = {
-  audio_data: {
-    id: number;
-    description: string;
-    s3_key: string;
-    type: 'ai_generated' | 'recorded';
-    lang_id: number | null;
-    created_at: Date;
-    updated_at: Date;
-  };
-  words: {
-    id: number;
-    word: string;
-    text_lesson_id: number;
-    order: number;
-    lesson: {
-      text: string;
-    };
-  }[];
-};
-
-export default function EditAudio({ audio_data, words }: Props) {
-  useHydrateAtoms([[audio_data_atom, audio_data]]);
+export default function EditAudio({ audio_data }: Props) {
+  useHydrateAtoms([
+    [
+      audio_data_atom,
+      {
+        id: audio_data.id,
+        description: audio_data.description,
+        s3_key: audio_data.s3_key,
+        type: audio_data.type,
+        lang_id: audio_data.lang_id,
+        created_at: audio_data.created_at,
+        updated_at: audio_data.updated_at
+      }
+    ]
+  ]);
   return (
     <div className="space-y-6">
       <AudioInfo />
-      <AssociatedWords words={words} />
+      <AssociatedWords words={audio_data.words} />
       <EditActions />
     </div>
   );
@@ -287,7 +300,7 @@ const AudioInfo = () => {
   );
 };
 
-const AssociatedWords = ({ words }: { words: Props['words'] }) => {
+const AssociatedWords = ({ words }: { words: Props['audio_data']['words'] }) => {
   if (words.length === 0) {
     return (
       <Card>

@@ -1,0 +1,1 @@
+ALTER TABLE "text_lessons" ADD COLUMN "text_key" text NOT NULL;

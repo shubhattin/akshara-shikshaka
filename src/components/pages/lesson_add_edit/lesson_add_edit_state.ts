@@ -6,8 +6,9 @@ export const lang_id_atom = atom<number>(0);
 export const base_word_script_id_atom = atom<number>(0);
 export const audio_id_optional_atom = atom<number | null | undefined>(undefined);
 export const text_atom = atom<string>('');
-export const gesture_ids_atom = atom<Set<number>>(new Set<number>([]));
 export const words_atom = atom<text_lesson_word_type[]>([]);
+export const text_key_atom = atom<string | null>(null);
+
 export type text_lesson_info_type = Omit<
   InferSelectModel<typeof text_lessons>,
   'created_at' | 'updated_at'

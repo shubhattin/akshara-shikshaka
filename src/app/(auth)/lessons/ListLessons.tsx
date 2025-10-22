@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useTRPC } from '~/api/client';
 import { Skeleton } from '~/components/ui/skeleton';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { ArrowRightLeft, Check, ChevronsUpDown } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -545,9 +545,10 @@ function AddToCategoryDialog({
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions({ lang_id: langId })
   );
-  const categories = categories_q.data
-    ? categories_q.data.filter((c) => c.id !== prev_category_id)
-    : [];
+  const categories = [
+    ...(categories_q.data ? categories_q.data.filter((c) => c.id !== prev_category_id) : []),
+    ...(prev_category_id ? [{ id: 0, name: 'Uncategorized', order: 0 }] : [])
+  ];
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -590,7 +591,12 @@ function AddToCategoryDialog({
               {categories.map((cat) => (
                 <div key={cat.id} className="flex items-center gap-2">
                   <RadioGroupItem id={`cat-${lesson_id}-${cat.id}`} value={String(cat.id)} />
-                  <Label htmlFor={`cat-${lesson_id}-${cat.id}`}>{cat.name}</Label>
+                  <Label
+                    htmlFor={`cat-${lesson_id}-${cat.id}`}
+                    className={cn(cat.id === 0 && 'text-muted-foreground')}
+                  >
+                    {cat.name}
+                  </Label>
                 </div>
               ))}
             </RadioGroup>
@@ -605,7 +611,7 @@ function AddToCategoryDialog({
               onClick={() =>
                 selectedCategory !== null &&
                 add_to_category_mut.mutate({
-                  category_id: selectedCategory,
+                  category_id: selectedCategory === 0 ? null : selectedCategory,
                   lesson_id: lesson_id,
                   prev_category_id
                 })
@@ -618,7 +624,7 @@ function AddToCategoryDialog({
         </DialogContent>
       </Dialog>
       <Button size="icon" variant="ghost" onClick={() => setOpen(true)} className="-p-2">
-        <Plus className="size-4" />
+        {prev_category_id ? <ArrowRightLeft className="size-4" /> : <Plus className="size-4" />}
       </Button>
     </>
   );

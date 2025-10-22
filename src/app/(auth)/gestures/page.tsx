@@ -11,8 +11,7 @@ import { get_text_gesture_categories_func } from '~/api/routers/gesture_categori
 
 const List = async () => {
   const session = await getCachedSession();
-  if (!session || session.user.role !== 'admin')
-    redirect(`${process.env.NEXT_PUBLIC_BETTER_AUTH_URL}/login`);
+  if (!session || session.user.role !== 'admin') redirect(`/`);
 
   const cookie = await cookies();
   const script_id = get_script_id_from_cookie(cookie.get(SCRIPT_ID_COOKIE_KEY)?.value);
@@ -21,7 +20,7 @@ const List = async () => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="my-2 mb-4 px-2">
+      <div className="my-2 mb-4 flex items-center justify-start space-x-4 px-2">
         <Link href="/" className="flex items-center gap-1 text-lg font-semibold">
           <IoMdArrowRoundBack className="inline-block text-xl" />
           Home Page
@@ -29,8 +28,9 @@ const List = async () => {
       </div>
       <div className="mt-2 mb-5 flex items-center justify-center gap-4 px-2">
         <Link href="/gestures/add">
-          <Button variant={'blue'} className="gap-2 text-lg font-semibold">
-            <IoMdAdd className="size-5.5" /> Add Gesture
+          <Button variant={'outline'} className="gap-2 text-lg font-semibold">
+            <IoMdAdd className="size-5.5" /> Add
+            <span className="font-bold text-yellow-600 dark:text-yellow-400">Gesture</span>
           </Button>
         </Link>
       </div>

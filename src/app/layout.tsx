@@ -36,7 +36,7 @@ export default async function RootLayout({
             <AppContextProvider initialSession={session}>
               <div className="container mx-auto mb-12">
                 <Toaster richColors={true} />
-                <AppBar title="Akshara Shikshaka" />
+                <AppBar title="Akshara" />
                 {children}
               </div>
             </AppContextProvider>

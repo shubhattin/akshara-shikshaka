@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
 import { db } from '~/db/db';
-import { gesture_text_key_category_join, text_gestures } from '~/db/schema';
+import { gesture_text_key_category_join, lesson_gestures, text_gestures } from '~/db/schema';
 import { and, count, eq, ilike } from 'drizzle-orm';
 import { GestureSchema } from '~/tools/stroke_data/types';
 import { type FontFamily } from '~/state/font_list';
@@ -11,6 +11,21 @@ import {
   gesture_categories_router,
   reorder_text_gesture_in_category_func
 } from './gesture_categories';
+
+const connect_gestures_to_text_lessons_func = async (textKey: string, text_gesture_id: number) => {
+  const lessons = await db.query.text_lessons.findMany({
+    columns: {
+      id: true
+    },
+    where: (tbl, { eq }) => eq(tbl.text_key, textKey)
+  });
+  await db.insert(lesson_gestures).values(
+    lessons.map((lesson) => ({
+      text_gesture_id: text_gesture_id,
+      text_lesson_id: lesson.id
+    }))
+  );
+};
 
 const add_text_gesture_data_route = protectedAdminProcedure
   .input(
@@ -63,6 +78,10 @@ const add_text_gesture_data_route = protectedAdminProcedure
         text_center_offset: input.textCenterOffset
       })
       .returning();
+    // on text gesture creation scan for lessons associated with the text key
+    // and connect them to the text gesture via the join table `lesson_gestures`
+    await connect_gestures_to_text_lessons_func(input.textKey, result[0].id);
+
     return {
       success: true,
       id: result[0].id,
@@ -121,13 +140,14 @@ const delete_text_gesture_data_route = protectedAdminProcedure
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Text gesture not found' });
     }
 
-    if (text_gesture_.category_id) {
-      await reorder_text_gesture_in_category_func(text_gesture_.category_id, input.script_id);
-    }
+    await Promise.all([
+      text_gesture_.category_id &&
+        reorder_text_gesture_in_category_func(text_gesture_.category_id, input.script_id, input.id),
+      db
+        .delete(text_gestures)
+        .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)))
+    ]);
 
-    await db
-      .delete(text_gestures)
-      .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)));
     return {
       deleted: true
     };

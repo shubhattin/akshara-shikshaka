@@ -21,6 +21,7 @@ const get_cached_text_lesson_info = cache(async (id: number) => {
       uuid: true,
       lang_id: true,
       text: true,
+      text_key: true,
       base_word_script_id: true,
       order: true,
       category_id: true,
@@ -99,6 +100,7 @@ const List = async ({ params }: Props) => {
           gesture_ids={gesture_ids}
           words={text_lesson_info.words}
           text_lesson_info={{
+            text_key: text_lesson_info.text_key,
             base_word_script_id: text_lesson_info.base_word_script_id,
             lang_id: text_lesson_info.lang_id,
             text: text_lesson_info.text,

@@ -43,31 +43,31 @@ export default function ManageMenuList({ children }: { children: React.ReactNode
         {user_info?.role === 'admin' && (
           <>
             {/* <ContextMenuLabel>Manage</ContextMenuLabel> */}
-            <ContextMenuItem className="font-bold">
-              <Link href="/lessons" className="flex items-center gap-2">
+            <Link href="/lessons" className="flex items-center gap-2">
+              <ContextMenuItem className="w-full font-bold">
                 <FaBookOpen className="h-4 w-4" />
                 Lessons
-              </Link>
-            </ContextMenuItem>
-            <ContextMenuItem>
-              <Link href="/gestures" className="flex items-center gap-2">
+              </ContextMenuItem>
+            </Link>
+            <Link href="/gestures" className="flex items-center gap-2">
+              <ContextMenuItem className="w-full">
                 <FaRegHandPaper className="h-4 w-4" />
                 Gestures
-              </Link>
-            </ContextMenuItem>
+              </ContextMenuItem>
+            </Link>
             <ContextMenuSeparator />
-            <ContextMenuItem className="text-xs">
-              <Link href="/image_assets" className="flex items-center gap-2">
+            <Link href="/image_assets" className="flex items-center gap-2">
+              <ContextMenuItem className="w-full text-xs">
                 <FaRegImage className="h-4 w-4" />
                 Images
-              </Link>
-            </ContextMenuItem>
-            <ContextMenuItem className="text-xs">
-              <Link href="/audio_assets" className="flex items-center gap-2">
+              </ContextMenuItem>
+            </Link>
+            <Link href="/audio_assets" className="flex items-center gap-2">
+              <ContextMenuItem className="w-full text-xs">
                 <FaVolumeUp className="h-4 w-4" />
                 Audio
-              </Link>
-            </ContextMenuItem>
+              </ContextMenuItem>
+            </Link>
           </>
         )}
       </ContextMenuContent>

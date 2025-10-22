@@ -2,12 +2,17 @@ import { z } from 'zod';
 import { t, protectedAdminProcedure } from '~/api/trpc_init';
 import { db } from '~/db/db';
 import { gesture_categories, gesture_text_key_category_join, text_gestures } from '~/db/schema';
-import { and, asc, eq, exists, isNull, max } from 'drizzle-orm';
+import { and, asc, eq, exists, isNull, max, ne } from 'drizzle-orm';
 import { GestureCategoriesSchemaZod, TextGesturesSchemaZod } from '~/db/schema_zod';
 
+/**
+ *
+ * @param gesture_id_to_ignore This is to allow this function to run in parallel with other operations
+ */
 export const reorder_text_gesture_in_category_func = async (
   category_id: number,
-  script_id: number
+  script_id: number,
+  gesture_id_to_ignore: number
 ) => {
   const gestures_ = await db
     .select()
@@ -20,7 +25,8 @@ export const reorder_text_gesture_in_category_func = async (
       and(
         eq(text_gestures.script_id, script_id),
         // script id to filter out common text keys shared accross multiple scripts
-        eq(gesture_text_key_category_join.category_id, category_id)
+        eq(gesture_text_key_category_join.category_id, category_id),
+        ne(text_gestures.id, gesture_id_to_ignore)
       )
     )
     .orderBy(asc(text_gestures.order));
@@ -223,7 +229,7 @@ const update_gestures_order_route = protectedAdminProcedure
 const add_update_gesture_category_route = protectedAdminProcedure
   .input(
     z.object({
-      category_id: z.number().int(),
+      category_id: z.number().int().min(1).nullable(),
       prev_category_id: z.number().int().optional(),
       gesture_text_key: z.string().min(1),
       gesture_id: z.number().int(),
@@ -246,16 +252,24 @@ const add_update_gesture_category_route = protectedAdminProcedure
           .set({ order: null })
           // reset the order to null on add/update to a category
           .where(and(eq(text_gestures.id, gesture_id), eq(text_gestures.script_id, script_id))),
-        prev_join
-          ? db
-              .update(gesture_text_key_category_join)
-              .set({ category_id: category_id })
-              .where(eq(gesture_text_key_category_join.id, prev_join.id))
-          : db.insert(gesture_text_key_category_join).values({ gesture_text_key, category_id })
+        category_id
+          ? prev_join
+            ? db
+                .update(gesture_text_key_category_join)
+                .set({ category_id: category_id })
+                .where(eq(gesture_text_key_category_join.id, prev_join.id))
+            : db
+                .insert(gesture_text_key_category_join)
+                .values({ gesture_text_key, category_id: category_id })
+          : db
+              .delete(gesture_text_key_category_join)
+              .where(and(eq(gesture_text_key_category_join.gesture_text_key, gesture_text_key))),
+        // removing the category join, thus making it uncategorized
+        prev_category_id &&
+          prev_category_id !== category_id &&
+          reorder_text_gesture_in_category_func(prev_category_id, script_id, gesture_id)
+        // no need to reorder the current category as order is set to null which does not affect the concerned order
       ]);
-      if (prev_category_id && prev_category_id !== category_id)
-        await reorder_text_gesture_in_category_func(prev_category_id, script_id);
-      // no need to reorder the current category as order is set to null which does not affect the concerned order
 
       return {
         added: true

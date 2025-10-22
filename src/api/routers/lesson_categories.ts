@@ -5,13 +5,20 @@ import { db } from '~/db/db';
 import { and, eq, max } from 'drizzle-orm';
 import { LessonCategoriesSchemaZod, TextLessonsSchemaZod } from '~/db/schema_zod';
 
-export const reorder_text_lesson_in_category_func = async (category_id: number) => {
+/**
+ * @param lesson_id_to_ignore This is to allow this function to run in parallel with other operations
+ */
+export const reorder_text_lesson_in_category_func = async (
+  category_id: number,
+  lesson_id_to_ignore: number
+) => {
   const lessons = await db.query.text_lessons.findMany({
     columns: {
       id: true,
       order: true
     },
-    where: (tbl, { eq }) => eq(tbl.category_id, category_id),
+    where: (tbl, { eq, ne, and }) =>
+      and(eq(tbl.category_id, category_id), ne(tbl.id, lesson_id_to_ignore)),
     orderBy: (tbl, { asc }) => [asc(tbl.order)]
   });
   const reordered_lessons = lessons
@@ -181,20 +188,21 @@ const update_text_lessons_order_route = protectedAdminProcedure
 const add_update_lesson_category_route = protectedAdminProcedure
   .input(
     z.object({
-      category_id: z.number().int(),
+      category_id: z.number().int().min(1).nullable(),
       prev_category_id: z.number().int().optional(),
       lesson_id: z.number().int()
     })
   )
   .mutation(async ({ input: { category_id, prev_category_id, lesson_id } }) => {
-    await db
-      .update(text_lessons)
-      .set({ category_id: category_id, order: null })
-      // reset the order to null on add/update to a category
-      .where(eq(text_lessons.id, lesson_id));
-
-    if (prev_category_id) await reorder_text_lesson_in_category_func(prev_category_id);
-    // no need to reorder the current category as order is set to null which does not affect the concerned order
+    await Promise.all([
+      db
+        .update(text_lessons)
+        .set({ category_id: category_id, order: null })
+        // reset the order to null on add/update to a category
+        .where(eq(text_lessons.id, lesson_id)),
+      prev_category_id && reorder_text_lesson_in_category_func(prev_category_id, lesson_id)
+      // no need to reorder the current category as order is set to null which does not affect the concerned order
+    ]);
 
     return {
       added: true

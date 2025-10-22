@@ -121,13 +121,14 @@ const delete_text_gesture_data_route = protectedAdminProcedure
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Text gesture not found' });
     }
 
-    if (text_gesture_.category_id) {
-      await reorder_text_gesture_in_category_func(text_gesture_.category_id, input.script_id);
-    }
+    await Promise.all([
+      text_gesture_.category_id &&
+        reorder_text_gesture_in_category_func(text_gesture_.category_id, input.script_id, input.id),
+      db
+        .delete(text_gestures)
+        .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)))
+    ]);
 
-    await db
-      .delete(text_gestures)
-      .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)));
     return {
       deleted: true
     };

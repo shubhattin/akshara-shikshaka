@@ -216,15 +216,15 @@ const delete_text_lesson_route = protectedAdminProcedure
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Text lesson not found' });
     }
 
-    await db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)));
-    // deletes both the lesson gestures and associated words with it
-    // due to the cascade delete constraint
+    await Promise.all([
+      db.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid))),
+      // deletes both the lesson gestures and associated words with it
+      // due to the cascade delete constraint
 
-    // run this after delete of lesson
-    // reordering the catoegory id after deletion if needed
-    if (text_lesson_.category_id) {
-      await reorder_text_lesson_in_category_func(text_lesson_.category_id);
-    }
+      // run this after delete of lesson
+      // reordering the catoegory id after deletion if needed
+      text_lesson_.category_id && reorder_text_lesson_in_category_func(text_lesson_.category_id, id)
+    ]);
 
     return {
       deleted: true

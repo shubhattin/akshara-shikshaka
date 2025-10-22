@@ -21,7 +21,7 @@ const List = async () => {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="my-2 mb-4 px-2">
+      <div className="my-2 mb-4 flex items-center justify-start space-x-4 px-2">
         <Link href="/" className="flex items-center gap-1 text-lg font-semibold">
           <IoMdArrowRoundBack className="inline-block text-xl" />
           Home Page
@@ -29,8 +29,9 @@ const List = async () => {
       </div>
       <div className="mt-2 mb-5 flex items-center justify-center gap-4 px-2">
         <Link href="/lessons/add">
-          <Button variant={'blue'} className="gap-2 text-lg font-semibold">
-            <IoMdAdd className="size-5.5" /> Add Lesson
+          <Button variant={'outline'} className="gap-2 text-lg font-semibold">
+            <IoMdAdd className="size-5.5" /> Add
+            <span className="font-bold text-yellow-400">Lesson</span>
           </Button>
         </Link>
       </div>

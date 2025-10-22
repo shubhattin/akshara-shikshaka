@@ -9,12 +9,13 @@ import {
   ContextMenuSeparator
 } from '@/components/ui/context-menu';
 import Link from 'next/link';
+import { useContext } from 'react';
 import { FaRegHandPaper, FaBookOpen, FaVolumeUp, FaRegImage, FaSignInAlt } from 'react-icons/fa';
-import { useSession, signIn } from '~/lib/auth-client';
+import { signIn } from '~/lib/auth-client';
+import { AppContext } from '~/components/AppDataContext';
 
 export default function ManageMenuList({ children }: { children: React.ReactNode }) {
-  const session = useSession();
-  const user_info = session.data?.user;
+  const { user_info } = useContext(AppContext);
 
   return (
     <ContextMenu>

@@ -1090,7 +1090,6 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
       onSuccess(data) {
         if (data.success) {
           toast.success('Text Added');
-          queryClient.invalidateQueries(trpc.text_gestures.list_text_gesture_data.pathFilter());
           router.push(`/gestures/edit/${data.id}`);
         } else {
           if (data.err_code === 'text_already_exists') {
@@ -1121,7 +1120,6 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     trpc.text_gestures.delete_text_gesture_data.mutationOptions({
       async onSuccess(data) {
         toast.success('Text Deleted');
-        await queryClient.invalidateQueries(trpc.text_gestures.list_text_gesture_data.pathFilter());
         router.push('/gestures');
       },
       onError(error) {

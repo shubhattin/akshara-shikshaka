@@ -39,35 +39,39 @@ const list_audio_assets_route = protectedAdminProcedure
       }
       return and(...conds);
     })();
-    const [{ count: totalCount }] = await db
-      .select({ count: count() })
-      .from(audio_assets)
-      .where(whereClause ?? undefined);
     const offset = (input.page - 1) * input.limit;
-    const list = await db
-      .select({
-        id: audio_assets.id,
-        description: audio_assets.description,
-        type: audio_assets.type,
-        lang_id: audio_assets.lang_id,
-        s3_key: audio_assets.s3_key,
-        created_at: audio_assets.created_at,
-        updated_at: audio_assets.updated_at
-      })
-      .from(audio_assets)
-      .where(whereClause ?? undefined)
-      .orderBy((t) => {
-        return [
-          (input.order_by === 'asc' ? asc : desc)(
-            (input.sort_by ?? 'created_at') === 'updated_at'
-              ? audio_assets.updated_at
-              : audio_assets.created_at
-          )
-        ];
-      })
-      .limit(input.limit)
-      .offset(offset);
-    const total = Number(totalCount ?? 0);
+
+    // Run count and list queries in parallel to reduce overall latency
+    const [countResult, list] = await Promise.all([
+      db
+        .select({ count: count() })
+        .from(audio_assets)
+        .where(whereClause ?? undefined),
+      db
+        .select({
+          id: audio_assets.id,
+          description: audio_assets.description,
+          type: audio_assets.type,
+          lang_id: audio_assets.lang_id,
+          s3_key: audio_assets.s3_key,
+          created_at: audio_assets.created_at,
+          updated_at: audio_assets.updated_at
+        })
+        .from(audio_assets)
+        .where(whereClause ?? undefined)
+        .orderBy((t) => {
+          return [
+            (input.order_by === 'asc' ? asc : desc)(
+              (input.sort_by ?? 'created_at') === 'updated_at'
+                ? audio_assets.updated_at
+                : audio_assets.created_at
+            )
+          ];
+        })
+        .limit(input.limit)
+        .offset(offset)
+    ]);
+    const total = Number(countResult[0]?.count ?? 0);
     const pageCount = Math.max(1, Math.ceil(total / input.limit));
     const hasPrev = input.page > 1;
     const hasNext = input.page < pageCount;
@@ -146,8 +150,10 @@ const delete_audio_asset_route = protectedAdminProcedure
       };
     }
 
-    await deleteAssetFile(result.s3_key);
-    await db.delete(audio_assets).where(eq(audio_assets.id, input.id));
+    await Promise.allSettled([
+      deleteAssetFile(result.s3_key),
+      db.delete(audio_assets).where(eq(audio_assets.id, input.id))
+    ]);
 
     return {
       deleted: true

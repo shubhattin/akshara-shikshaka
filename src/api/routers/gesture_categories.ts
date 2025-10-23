@@ -88,13 +88,14 @@ const update_list_route = protectedAdminProcedure
     })
   )
   .mutation(async ({ input: { categories } }) => {
+    // Run updates in parallel by returning the db promises directly
     await Promise.all(
-      categories.map(async (category) => {
-        await db
+      categories.map((category) =>
+        db
           .update(gesture_categories)
           .set({ name: category.name, order: category.order })
-          .where(eq(gesture_categories.id, category.id));
-      })
+          .where(eq(gesture_categories.id, category.id))
+      )
     );
 
     return {

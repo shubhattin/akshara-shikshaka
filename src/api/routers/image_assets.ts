@@ -63,38 +63,40 @@ const list_image_assets_route = protectedAdminProcedure
     const whereClause =
       trimmed && trimmed.length > 0 ? ilike(image_assets.description, `%${trimmed}%`) : undefined;
 
-    const [{ count: totalCount }] = await db
-      .select({ count: count() })
-      .from(image_assets)
-      .where(whereClause ?? undefined);
-
     const offset = (input.page - 1) * input.limit;
 
-    const list = await db
-      .select({
-        id: image_assets.id,
-        description: image_assets.description,
-        width: image_assets.width,
-        height: image_assets.height,
-        s3_key: image_assets.s3_key,
-        created_at: image_assets.created_at,
-        updated_at: image_assets.updated_at
-      })
-      .from(image_assets)
-      .where(whereClause ?? undefined)
-      .orderBy((t) => {
-        return [
-          (input.order_by === 'asc' ? asc : desc)(
-            (input.sort_by ?? 'created_at') === 'updated_at'
-              ? image_assets.updated_at
-              : image_assets.created_at
-          )
-        ];
-      })
-      .limit(input.limit)
-      .offset(offset);
+    // Run count and list queries in parallel to reduce overall latency
+    const [countResult, list] = await Promise.all([
+      db
+        .select({ count: count() })
+        .from(image_assets)
+        .where(whereClause ?? undefined),
+      db
+        .select({
+          id: image_assets.id,
+          description: image_assets.description,
+          width: image_assets.width,
+          height: image_assets.height,
+          s3_key: image_assets.s3_key,
+          created_at: image_assets.created_at,
+          updated_at: image_assets.updated_at
+        })
+        .from(image_assets)
+        .where(whereClause ?? undefined)
+        .orderBy((t) => {
+          return [
+            (input.order_by === 'asc' ? asc : desc)(
+              (input.sort_by ?? 'created_at') === 'updated_at'
+                ? image_assets.updated_at
+                : image_assets.created_at
+            )
+          ];
+        })
+        .limit(input.limit)
+        .offset(offset)
+    ]);
 
-    const total = Number(totalCount ?? 0);
+    const total = Number(countResult[0]?.count ?? 0);
     const pageCount = Math.max(1, Math.ceil(total / input.limit));
     const hasPrev = input.page > 1;
     const hasNext = input.page < pageCount;
@@ -228,8 +230,10 @@ const delete_image_asset_route = protectedAdminProcedure
       };
     }
 
-    await deleteAssetFile(result.s3_key);
-    await db.delete(image_assets).where(eq(image_assets.id, input.id));
+    await Promise.allSettled([
+      deleteAssetFile(result.s3_key),
+      db.delete(image_assets).where(eq(image_assets.id, input.id))
+    ]);
 
     return {
       deleted: true

@@ -2,10 +2,9 @@ import { z } from 'zod';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
 import { db } from '~/db/db';
 import { gesture_text_key_category_join, lesson_gestures, text_gestures } from '~/db/schema';
-import { and, count, eq, ilike } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { GestureSchema } from '~/tools/stroke_data/types';
 import { type FontFamily } from '~/state/font_list';
-import { dev_delay } from '~/tools/delay';
 import { TRPCError } from '@trpc/server';
 import {
   gesture_categories_router,
@@ -154,59 +153,6 @@ const delete_text_gesture_data_route = protectedAdminProcedure
     };
   });
 
-const list_text_gesture_data_route = protectedAdminProcedure
-  .input(
-    z.object({
-      script_id: z.number().int(),
-      search_text: z.string().optional(),
-      page: z.number().int().min(1),
-      limit: z.number().int().min(1)
-    })
-  )
-  .query(async ({ input }) => {
-    await dev_delay(500);
-
-    const baseWhereClause = eq(text_gestures.script_id, input.script_id);
-    const [{ count: totalCount }] = await db
-      .select({ count: count() })
-      .from(text_gestures)
-      .where(baseWhereClause);
-
-    const offset = (input.page - 1) * input.limit;
-
-    const list = await db.query.text_gestures.findMany({
-      where: () => {
-        if (input.search_text && input.search_text.trim().length > 0) {
-          return and(baseWhereClause, ilike(text_gestures.text, `%${input.search_text.trim()}%`))!;
-        }
-        return baseWhereClause;
-      },
-      orderBy: (text_gestures, { asc }) => [asc(text_gestures.text)],
-      limit: input.limit,
-      offset,
-      columns: {
-        id: true,
-        text: true,
-        created_at: true,
-        updated_at: true
-      }
-    });
-
-    const total = Number(totalCount ?? 0);
-    const pageCount = Math.max(1, Math.ceil(total / input.limit));
-    const hasPrev = input.page > 1;
-    const hasNext = input.page < pageCount;
-
-    return {
-      list,
-      total,
-      page: input.page,
-      pageCount,
-      hasPrev,
-      hasNext
-    };
-  });
-
 const get_text_gesture_data_route = publicProcedure
   .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
   .query(async ({ input: { id, uuid } }) => {
@@ -226,7 +172,6 @@ export const text_gestures_router = t.router({
   add_text_gesture_data: add_text_gesture_data_route,
   edit_text_gesture_data: edit_text_gesture_data_route,
   delete_text_gesture_data: delete_text_gesture_data_route,
-  list_text_gesture_data: list_text_gesture_data_route,
   categories: gesture_categories_router,
   get_text_gesture_data: get_text_gesture_data_route
 });

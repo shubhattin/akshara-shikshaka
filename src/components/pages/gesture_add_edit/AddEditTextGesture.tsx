@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
@@ -97,6 +97,7 @@ import type { text_gestures } from '~/db/schema';
 import { useQueryClient } from '@tanstack/react-query';
 import Cookie from 'js-cookie';
 import { FONT_FAMILY_COOKIE_KEY, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
+import { Provider as JotaiProvider } from 'jotai';
 
 import { useMutation } from '@tanstack/react-query';
 
@@ -160,7 +161,7 @@ type Props =
       };
     };
 
-// All atoms and constants are now imported from shared-state.ts
+const PracticeComponent = lazy(() => import('../practice/Practice'));
 
 export default function AddEditTextDataWrapper(props: Props) {
   useHydrateAtoms([
@@ -184,6 +185,7 @@ export default function AddEditTextDataWrapper(props: Props) {
     <>
       <AddEditTextData {...props} stageRef={stageRef} />
       <SaveEditMode text_data={props.text_data} />
+      <PracticeSection text_data={props.text_data} />
     </>
   );
 }
@@ -1223,6 +1225,37 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      )}
+    </div>
+  );
+};
+
+const PracticeSection = ({ text_data }: { text_data: text_data_type }) => {
+  const [displayPractice, setDisplayPractice] = useState(false);
+  const gestures = useAtomValue(gesture_data_atom);
+
+  return (
+    <div className="mt-8 space-y-4">
+      <div className="flex items-center justify-center">
+        <Button
+          className={cn('font-semibold', displayPractice ? 'text-yellow-400' : 'text-sky-300')}
+          variant={displayPractice ? 'ghost' : 'outline'}
+          onClick={() => setDisplayPractice(!displayPractice)}
+        >
+          {displayPractice ? 'Hide Gesture Practice' : 'Try Gesture Practice'}
+        </Button>
+      </div>
+      {displayPractice && (
+        <JotaiProvider key={`practice_section_edit_page-${text_data.id}`}>
+          <PracticeComponent
+            text_data={{
+              id: text_data.id!,
+              uuid: text_data.uuid!,
+              text: text_data.text,
+              gestures: gestures
+            }}
+          />
+        </JotaiProvider>
       )}
     </div>
   );

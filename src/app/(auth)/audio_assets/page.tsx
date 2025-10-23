@@ -7,8 +7,7 @@ import ListAudio from './ListAudio';
 
 const List = async () => {
   const session = await getCachedSession();
-  if (!session || session.user.role !== 'admin')
-    redirect(`${process.env.NEXT_PUBLIC_BETTER_AUTH_URL}/login`);
+  if (!session || session.user.role !== 'admin') redirect('/');
 
   return (
     <div className="container mx-auto p-4">

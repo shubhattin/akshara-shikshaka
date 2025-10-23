@@ -3,8 +3,6 @@ import { type Metadata } from 'next';
 import { cache } from 'react';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
 import { db } from '~/db/db';
-import { text_lesson_words, text_lessons } from '~/db/schema';
-import { eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { getCachedSession } from '~/lib/cache_server_route_data';

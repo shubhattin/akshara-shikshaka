@@ -209,20 +209,6 @@ const delete_text_lesson_route = protectedAdminProcedure
     };
   });
 
-const get_gestures_from_text_key_route = protectedAdminProcedure
-  .input(z.object({ text_key: z.string().min(1) }))
-  .query(async ({ input: { text_key } }) => {
-    const gestures = await db.query.text_gestures.findMany({
-      where: (tbl, { eq }) => eq(tbl.text_key, text_key),
-      columns: {
-        id: true,
-        text: true,
-        script_id: true
-      }
-    });
-    return gestures;
-  });
-
 const get_text_lesson_word_media_data_route = protectedAdminProcedure
   .input(z.object({ word_id: z.number().int(), lesson_id: z.number().int() }))
   .query(async ({ input: { word_id, lesson_id } }) => {
@@ -310,7 +296,6 @@ export const text_lessons_router = t.router({
   add_text_lesson: add_text_lesson_route,
   update_text_lesson: update_text_lesson_route,
   delete_text_lesson: delete_text_lesson_route,
-  get_gestures_from_text_key: get_gestures_from_text_key_route,
   get_text_lesson_word_media_data: get_text_lesson_word_media_data_route,
   categories: lesson_categories_router,
   get_text_lesson_info: get_text_lesson_info_route

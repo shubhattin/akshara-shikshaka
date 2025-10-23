@@ -34,7 +34,7 @@ const List = async () => {
       <JotaiProvider key={`add_lesson_page-${crypto.randomUUID()}`}>
         <TextLessonAddEdit
           location="add"
-          gesture_ids={[]}
+          gestures_list={[]}
           words={[]}
           text_lesson_info={{
             ...text_lesson_info,

@@ -38,6 +38,15 @@ const get_cached_text_lesson_info = cache(async (id: number) => {
       gestures: {
         columns: {
           text_gesture_id: true
+        },
+        with: {
+          text_gesture: {
+            columns: {
+              id: true,
+              text: true,
+              script_id: true
+            }
+          }
         }
       },
       words: {
@@ -84,7 +93,6 @@ const List = async ({ params }: Props) => {
   if (!text_lesson_info) {
     notFound();
   }
-  const gesture_ids = text_lesson_info.gestures.map((gesture) => gesture.text_gesture_id);
 
   return (
     <div>
@@ -97,7 +105,7 @@ const List = async ({ params }: Props) => {
       <JotaiProvider key={`edit_lesson_page-${id}`}>
         <TextLessonAddEdit
           location="edit"
-          gesture_ids={gesture_ids}
+          gestures_list={text_lesson_info.gestures.map((gesture) => gesture.text_gesture)}
           words={text_lesson_info.words}
           text_lesson_info={{
             text_key: text_lesson_info.text_key,

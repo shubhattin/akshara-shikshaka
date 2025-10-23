@@ -87,6 +87,12 @@ import { useMutation } from '@tanstack/react-query';
 import { AiOutlineAudio } from 'react-icons/ai';
 import Link from 'next/link';
 
+type gestures_list_type = {
+  id: number;
+  text: string;
+  script_id: number;
+};
+
 type Props =
   | {
       location: 'add';
@@ -94,13 +100,13 @@ type Props =
         id?: number;
         uuid?: string;
       };
-      gesture_ids: number[]; // []
+      gestures_list: gestures_list_type[]; // []
       words: text_lesson_word_type[]; // []
     }
   | {
       location: 'edit';
       text_lesson_info: text_lesson_info_type;
-      gesture_ids: number[];
+      gestures_list: gestures_list_type[];
       words: text_lesson_word_type[];
     };
 
@@ -128,7 +134,7 @@ const LessonInfo = (props: Props) => {
   const [base_word_script_id, setBaseWordScriptId] = useAtom(base_word_script_id_atom);
   const [text, setText] = useAtom(text_atom);
 
-  const [textKey, setTextKey] = useAtom(text_key_atom);
+  const [, setTextKey] = useAtom(text_key_atom);
 
   useEffect(() => {
     if (text.trim().length === 0) {
@@ -146,17 +152,6 @@ const LessonInfo = (props: Props) => {
     load_parivartak_lang_data(get_lang_from_id(lang_id));
     load_parivartak_lang_data(get_script_from_id(base_word_script_id));
   }, [lang_id, base_word_script_id]);
-
-  const connected_gestures_q = useQuery(
-    trpc.text_lessons.get_gestures_from_text_key.queryOptions(
-      {
-        text_key: textKey!
-      },
-      {
-        enabled: !!textKey
-      }
-    )
-  );
 
   return (
     <div className="space-y-6">
@@ -246,36 +241,27 @@ const LessonInfo = (props: Props) => {
       </div>
       {props.location === 'edit' && (
         <div className="space-y-3 select-none">
-          {connected_gestures_q.isLoading && <Skeleton className="h-32 w-full" />}
-          {connected_gestures_q.isSuccess && !connected_gestures_q.isLoading && (
-            <div className="space-y-3">
-              <div className="grid max-h-52 grid-cols-4 gap-2 overflow-y-scroll rounded-md border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-6 lg:grid-cols-8 dark:border-gray-700 dark:bg-gray-800/50">
-                {connected_gestures_q.data.length > 0 ? (
-                  connected_gestures_q.data.map((gesture) => (
-                    <Link
-                      target="_blank"
-                      href={`/gestures/edit/${gesture.id}`}
-                      key={gesture.id}
-                      className={cn(
-                        'rounded-md border px-2 py-1 text-center text-base font-semibold transition-all duration-200 ease-in-out outline-none',
-                        'hover:bg-gray-100 hover:text-blue-500 dark:hover:bg-gray-700 dark:hover:text-blue-400'
-                      )}
-                    >
-                      {gesture.text}
-                    </Link>
-                  ))
-                ) : (
-                  <div className="flex items-center justify-center">
-                    {!connected_gestures_q.isFetching ? (
-                      <p className="text-sm text-gray-500">No gestures found</p>
-                    ) : (
-                      <p className="text-sm text-gray-500">Loading...</p>
-                    )}
-                  </div>
-                )}
+          <div className="grid max-h-52 grid-cols-4 gap-2 overflow-y-scroll rounded-md border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-6 lg:grid-cols-8 dark:border-gray-700 dark:bg-gray-800/50">
+            {props.gestures_list.length > 0 ? (
+              props.gestures_list.map((gesture) => (
+                <Link
+                  target="_blank"
+                  href={`/gestures/edit/${gesture.id}`}
+                  key={gesture.id}
+                  className={cn(
+                    'rounded-md border px-2 py-1 text-center text-base font-semibold transition-all duration-200 ease-in-out outline-none',
+                    'hover:bg-gray-100 hover:text-blue-500 dark:hover:bg-gray-700 dark:hover:text-blue-400'
+                  )}
+                >
+                  {gesture.text}
+                </Link>
+              ))
+            ) : (
+              <div className="flex items-center justify-center">
+                <p className="text-sm text-gray-500">No connected gestures found</p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>

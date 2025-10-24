@@ -71,6 +71,13 @@
       "when": 1761142080160,
       "tag": "0009_brown_black_crow",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1761317780823,
+      "tag": "0010_dusty_paibok",
+      "breakpoints": true
     }
   ]
 }

@@ -80,10 +80,9 @@ const update_category_list_route = protectedAdminProcedure
     })
   )
   .mutation(async ({ input: { categories } }) => {
-    await Promise.all(
+    await Promise.allSettled(
       categories.map(async (category) => {
-        await db
-          .update(lesson_categories)
+        db.update(lesson_categories)
           .set({ name: category.name, order: category.order })
           .where(eq(lesson_categories.id, category.id));
       })
@@ -194,7 +193,7 @@ const add_update_lesson_category_route = protectedAdminProcedure
     })
   )
   .mutation(async ({ input: { category_id, prev_category_id, lesson_id } }) => {
-    await Promise.all([
+    await Promise.allSettled([
       db
         .update(text_lessons)
         .set({ category_id: category_id, order: null })

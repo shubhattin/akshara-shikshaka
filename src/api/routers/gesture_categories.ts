@@ -89,7 +89,7 @@ const update_list_route = protectedAdminProcedure
   )
   .mutation(async ({ input: { categories } }) => {
     // Run updates in parallel by returning the db promises directly
-    await Promise.all(
+    await Promise.allSettled(
       categories.map((category) =>
         db
           .update(gesture_categories)
@@ -247,7 +247,7 @@ const add_update_gesture_category_route = protectedAdminProcedure
             ? and(eq(tbl.gesture_text_key, gesture_text_key), eq(tbl.category_id, prev_category_id))
             : and(eq(tbl.gesture_text_key, gesture_text_key))
       });
-      await Promise.all([
+      await Promise.allSettled([
         db
           .update(text_gestures)
           .set({ order: null })

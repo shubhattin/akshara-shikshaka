@@ -5,17 +5,20 @@ type Props = {
   setToken: Dispatch<SetStateAction<string | null>>;
 };
 
+const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!;
+const PROD = process.env.NODE_ENV === 'production';
+
+export const TURNSTILE_ENABLED = SITE_KEY && PROD;
+// export const TURNSTILE_ENABLED = SITE_KEY && !PROD; // for dev mode testing
+
 export default function TurnstileWidget({ setToken }: Props) {
   const [mounted, setMounted] = useState(false);
-  const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!;
-  const PROD = process.env.NODE_ENV === 'production';
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted || !SITE_KEY || !PROD) return <></>;
-  // if (!mounted || !SITE_KEY || PROD) return <></>; // for dev mode testing
+  if (!mounted || !TURNSTILE_ENABLED) return <></>;
 
   return (
     <Turnstile

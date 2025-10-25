@@ -33,7 +33,7 @@ import {
 import { useTRPC } from '~/api/client';
 import { useMutation } from '@tanstack/react-query';
 import { useTurnstile } from 'react-turnstile';
-import TurnstileWidget from '~/components/Turnstile';
+import TurnstileWidget, { TURNSTILE_ENABLED } from '~/components/Turnstile';
 
 // Dynamic import for PracticeKonvaCanvas to avoid SSR issues
 const PracticeKonvaCanvas = dynamic(() => import('./PracticeCanvas'), {
@@ -152,26 +152,42 @@ function Practice({ text_data }: Props) {
   );
 
   const submit_user_gesture_recording_func = async (completed: boolean) => {
-    // In our current approach, we do not need to watch for changes in turnstile token
-    // as there would naturally enough gap for it to refresh and fetch the token
-
-    const vectors = userGestureVectorsRef.current;
-    // Submit on completion if we have any recorded attempts
-    if (
-      vectors.length > 0 &&
-      text_data.text &&
-      typeof text_data.script_id === 'number' &&
-      turnstileToken
-    ) {
-      submit_user_recording_mut.mutateAsync({
-        text: text_data.text,
-        script_id: text_data.script_id,
-        vectors,
-        completed: completed,
-        turnstile_token: turnstileToken
-      });
+    if (!TURNSTILE_ENABLED) {
+      userGestureVectorsRef.current = [];
+      return;
     }
-    userGestureVectorsRef.current = [];
+
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY = 700;
+    const submit = (retries: number = 0) => {
+      if (retries > MAX_RETRIES) {
+        return;
+      }
+      if (!turnstileToken || turnstileToken.length === 0) {
+        setTimeout(() => {
+          submit(retries + 1);
+        }, RETRY_DELAY);
+        return;
+      }
+      const vectors = userGestureVectorsRef.current;
+      // Submit on completion if we have any recorded attempts
+      if (
+        vectors.length > 0 &&
+        text_data.text &&
+        typeof text_data.script_id === 'number' &&
+        turnstileToken
+      ) {
+        submit_user_recording_mut.mutateAsync({
+          text: text_data.text,
+          script_id: text_data.script_id,
+          vectors,
+          completed: completed,
+          turnstile_token: turnstileToken
+        });
+      }
+      userGestureVectorsRef.current = [];
+    };
+    submit();
   };
 
   function updateScalingFactor() {

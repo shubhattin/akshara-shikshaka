@@ -1238,7 +1238,12 @@ const PracticeSection = ({ text_data }: { text_data: text_data_type }) => {
     <div className="mt-8 space-y-4">
       <div className="flex items-center justify-center">
         <Button
-          className={cn('font-semibold', displayPractice ? 'text-yellow-400' : 'text-sky-300')}
+          className={cn(
+            'font-semibold',
+            displayPractice
+              ? 'text-yellow-600 hover:text-yellow-700 dark:text-yellow-400 dark:hover:text-yellow-300'
+              : 'text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-400'
+          )}
           variant={displayPractice ? 'ghost' : 'outline'}
           onClick={() => setDisplayPractice(!displayPractice)}
         >

@@ -5,7 +5,7 @@ CREATE TABLE "user_gesture_recording_vectors" (
 	"recorded_vector" real[] NOT NULL,
 	"drawn_vector" real[] NOT NULL,
 	"recorded_accuracy" real NOT NULL,
-	"is_labelled" boolean
+	"match_label" boolean
 );
 --> statement-breakpoint
 CREATE TABLE "user_gesture_recordings" (

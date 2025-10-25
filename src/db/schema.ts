@@ -189,7 +189,7 @@ export const user_gesture_recording_vectors = pgTable(
     recorded_vector: real().array().notNull(),
     drawn_vector: real().array().notNull(),
     recorded_accuracy: real().notNull(),
-    is_labelled: boolean()
+    match_label: boolean()
   },
   (table) => [
     foreignKey({

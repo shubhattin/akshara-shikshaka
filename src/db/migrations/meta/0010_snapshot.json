@@ -1,5 +1,5 @@
 {
-  "id": "01888225-1d06-4da6-9213-69db8e1f486a",
+  "id": "e73b8916-5786-40d2-be87-4a25bd3c1b02",
   "prevId": "bb32197a-e7c2-4ac5-a22f-651d9b415827",
   "version": "7",
   "dialect": "postgresql",
@@ -733,8 +733,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "is_labelled": {
-          "name": "is_labelled",
+        "match_label": {
+          "name": "match_label",
           "type": "boolean",
           "primaryKey": false,
           "notNull": false

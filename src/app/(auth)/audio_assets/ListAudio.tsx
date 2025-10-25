@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTRPC } from '~/api/client';
 import { Input } from '~/components/ui/input';
 import {
@@ -34,16 +34,7 @@ import { FaRobot } from 'react-icons/fa';
 import { MdMic, MdPlayArrow, MdStop } from 'react-icons/md';
 import { get_lang_from_id, LANG_LIST, lang_list_obj, type lang_list_type } from '~/state/lang_list';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-
-type AudioItem = {
-  id: number;
-  description: string;
-  s3_key: string;
-  created_at: string;
-  updated_at: string;
-  type: 'ai_generated' | 'recorded';
-  lang_id: number | null;
-};
+import { toast } from 'sonner';
 
 export default function ListAudio() {
   const trpc = useTRPC();
@@ -80,16 +71,24 @@ export default function ListAudio() {
       limit,
       lang_id: langFilter
     })
-  ) as any;
+  );
 
-  const isLoading = list_q?.isLoading || list_q?.isFetching;
   const data = list_q?.data;
-  const items = useMemo(() => data?.list ?? [], [data]);
+  const items = data?.list ?? [];
 
   const delete_audio_mut = useMutation(
     trpc.audio_assets.delete_audio_asset.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.audio_assets.list_audio_assets.pathFilter());
+      onSuccess: (data, { id }) => {
+        if (data.deleted) {
+          queryClient.invalidateQueries(trpc.audio_assets.list_audio_assets.pathFilter());
+          toast.success(`Audio deleted successfully: ID: ${id}`);
+        } else {
+          toast.error(`Failed to delete audio: ID: ${id}`);
+        }
+      },
+      onError: (error, { id }) => {
+        console.error(error.message);
+        toast.error(`Failed to delete audio: ID: ${id}`);
       }
     })
   );
@@ -152,7 +151,10 @@ export default function ListAudio() {
             <AlertDialogTitle>Delete Audio</AlertDialogTitle>
           </AlertDialogHeader>
           <div className="p-4">
-            <p>Are you sure you want to delete this audio asset?</p>
+            <p>
+              Are you sure you want to delete this audio asset{' '}
+              <span className="text-sm font-semibold">(Id: {deleteAudioId})</span> ?
+            </p>
             <p className="mt-2 text-sm text-muted-foreground">This action cannot be undone.</p>
           </div>
           <AlertDialogFooter>
@@ -171,7 +173,7 @@ export default function ListAudio() {
       </AlertDialog>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {isLoading ? (
+        {list_q.isPending ? (
           Array.from({ length: limit }).map((_, i) => (
             <Card className="p-2" key={`skeleton-${i}`}>
               <CardContent className="flex items-start gap-3 p-2 pr-10">
@@ -185,7 +187,7 @@ export default function ListAudio() {
             </Card>
           ))
         ) : items.length > 0 ? (
-          items.map((item: AudioItem) => (
+          items.map((item) => (
             <Card
               key={item.id}
               className="relative p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800"
@@ -286,7 +288,7 @@ export default function ListAudio() {
           <Button
             variant="secondary"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={!data?.hasPrev || isLoading}
+            disabled={!data?.hasPrev || list_q.isLoading || list_q.isFetching}
           >
             <IoMdArrowDropleft className="mr-1" />
             <span className="sr-only sm:not-sr-only">Prev</span>
@@ -294,7 +296,7 @@ export default function ListAudio() {
           <Button
             variant="secondary"
             onClick={() => setPage((p) => p + 1)}
-            disabled={!data?.hasNext || isLoading}
+            disabled={!data?.hasNext || list_q.isLoading || list_q.isFetching}
           >
             <span className="sr-only sm:not-sr-only">Next</span>
             <IoMdArrowDropright className="ml-1" />

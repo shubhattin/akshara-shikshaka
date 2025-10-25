@@ -10,7 +10,9 @@ import {
   lesson_gestures,
   text_gestures,
   text_lesson_words,
-  text_lessons
+  text_lessons,
+  user_gesture_recordings,
+  user_gesture_recording_vectors
 } from '~/db/schema';
 import {
   AudioAssetsSchemaZod,
@@ -21,7 +23,9 @@ import {
   TextLessonWordsSchemaZod,
   GestureCategoriesSchemaZod,
   GestureTextKeyCategoryJoinSchemaZod,
-  LessonCategoriesSchemaZod
+  LessonCategoriesSchemaZod,
+  UserGestureRecordingsSchemaZod,
+  UserGestureRecordingVectorsSchemaZod
 } from '~/db/schema_zod';
 import { z } from 'zod';
 import { InferInsertModel, sql } from 'drizzle-orm';
@@ -53,7 +57,9 @@ const main = async () => {
       lesson_gestures: LessonGesturesSchemaZod.array(),
       text_lesson_words: TextLessonWordsSchemaZod.array(),
       audio_assets: AudioAssetsSchemaZod.array(),
-      image_assets: ImageAssetsSchemaZod.array()
+      image_assets: ImageAssetsSchemaZod.array(),
+      user_gesture_recordings: UserGestureRecordingsSchemaZod.array(),
+      user_gesture_recording_vectors: UserGestureRecordingVectorsSchemaZod.array()
     })
     .parse(JSON.parse((await readFile(`./out/${in_file_name}`)).toString()));
 
@@ -68,6 +74,8 @@ const main = async () => {
     await db.delete(text_lesson_words);
     await db.delete(audio_assets);
     await db.delete(image_assets);
+    await db.delete(user_gesture_recordings);
+    await db.delete(user_gesture_recording_vectors);
     console.log(chalk.green('✓ Deleted All Tables Successfully'));
   } catch (e) {
     console.log(chalk.red('✗ Error while deleting tables:'), chalk.yellow(e));
@@ -177,6 +185,31 @@ const main = async () => {
     console.log(chalk.red('✗ Error while inserting text lesson words:'), chalk.yellow(e));
   }
 
+  // inserting user gesture recordings
+  try {
+    await db.insert(user_gesture_recordings).values(data.user_gesture_recordings);
+    console.log(
+      chalk.green('✓ Successfully added values into table'),
+      chalk.blue('`user_gesture_recordings`')
+    );
+  } catch (e) {
+    console.log(chalk.red('✗ Error while inserting user gesture recordings:'), chalk.yellow(e));
+  }
+
+  // inserting user gesture recording vectors
+  try {
+    await db.insert(user_gesture_recording_vectors).values(data.user_gesture_recording_vectors);
+    console.log(
+      chalk.green('✓ Successfully added values into table'),
+      chalk.blue('`user_gesture_recording_vectors`')
+    );
+  } catch (e) {
+    console.log(
+      chalk.red('✗ Error while inserting user gesture recording vectors:'),
+      chalk.yellow(e)
+    );
+  }
+
   // resetting SERIAL
   try {
     await db.execute(
@@ -202,6 +235,12 @@ const main = async () => {
     );
     await db.execute(
       sql`SELECT setval('"image_assets_id_seq"', (select MAX(id) from "image_assets"))`
+    );
+    await db.execute(
+      sql`SELECT setval('"user_gesture_recordings_id_seq"', (select MAX(id) from "user_gesture_recordings"))`
+    );
+    await db.execute(
+      sql`SELECT setval('"user_gesture_recording_vectors_id_seq"', (select MAX(id) from "user_gesture_recording_vectors"))`
     );
     console.log(chalk.green('✓ Successfully resetted ALL SERIAL'));
   } catch (e) {

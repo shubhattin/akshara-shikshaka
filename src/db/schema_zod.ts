@@ -9,7 +9,9 @@ import {
   image_assets,
   text_lessons,
   lesson_gestures,
-  gesture_text_key_category_join
+  gesture_text_key_category_join,
+  user_gesture_recording_vectors,
+  user_gesture_recordings
 } from './schema';
 import { GestureSchema } from '~/tools/stroke_data/types';
 
@@ -55,3 +57,11 @@ export const ImageAssetsSchemaZod = createSelectSchema(image_assets, {
   created_at: z.coerce.date(),
   updated_at: z.coerce.date()
 });
+
+export const UserGestureRecordingsSchemaZod = createSelectSchema(user_gesture_recordings, {
+  created_at: z.coerce.date()
+});
+
+export const UserGestureRecordingVectorsSchemaZod = createSelectSchema(
+  user_gesture_recording_vectors
+);

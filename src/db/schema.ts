@@ -13,7 +13,9 @@ import {
   unique,
   varchar,
   pgEnum,
-  foreignKey
+  foreignKey,
+  real,
+  boolean
 } from 'drizzle-orm/pg-core';
 import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
 import type { Gesture } from '~/tools/stroke_data/types';
@@ -170,6 +172,34 @@ export const audio_assets = pgTable(
   (table) => [index('audio_assets_type_idx').on(table.type)]
 );
 
+export const user_gesture_recordings = pgTable('user_gesture_recordings', {
+  id: serial().primaryKey(),
+  text: text().notNull(),
+  script_id: smallint().notNull(),
+  completed: boolean().notNull().default(false),
+  created_at: timestamp().notNull().defaultNow()
+});
+
+export const user_gesture_recording_vectors = pgTable(
+  'user_gesture_recording_vectors',
+  {
+    id: serial().primaryKey(),
+    user_gesture_recording_id: integer().notNull(),
+    index: smallint().notNull(),
+    recorded_vector: real().array().notNull(),
+    drawn_vector: real().array().notNull(),
+    recorded_accuracy: real().notNull(),
+    match_label: boolean()
+  },
+  (table) => [
+    foreignKey({
+      name: 'user_gesture_recording_points_id_fk',
+      columns: [table.user_gesture_recording_id],
+      foreignColumns: [user_gesture_recordings.id]
+    }).onDelete('cascade')
+  ]
+);
+
 // relations
 
 export const lesssonGesturesRelations = relations(lesson_gestures, ({ one }) => ({
@@ -241,3 +271,17 @@ export const audioAssetsRelations = relations(audio_assets, ({ many }) => ({
   words: many(text_lesson_words),
   optional_lessons: many(text_lessons)
 }));
+
+export const userGestureRecordingsRelations = relations(user_gesture_recordings, ({ many }) => ({
+  vectors: many(user_gesture_recording_vectors)
+}));
+
+export const userGestureRecordingVectorsRelations = relations(
+  user_gesture_recording_vectors,
+  ({ one }) => ({
+    recording: one(user_gesture_recordings, {
+      fields: [user_gesture_recording_vectors.user_gesture_recording_id],
+      references: [user_gesture_recordings.id]
+    })
+  })
+);

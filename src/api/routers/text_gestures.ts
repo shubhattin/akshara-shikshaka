@@ -162,7 +162,8 @@ const get_text_gesture_data_route = publicProcedure
         id: true,
         uuid: true,
         text: true,
-        gestures: true
+        gestures: true,
+        script_id: true
       }
     });
     return text_data;

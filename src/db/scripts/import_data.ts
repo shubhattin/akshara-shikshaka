@@ -16,6 +16,8 @@ export const import_data = async (confirm_env = true) => {
   const text_lesson_words = await db.query.text_lesson_words.findMany();
   const audio_assets = await db.query.audio_assets.findMany();
   const image_assets = await db.query.image_assets.findMany();
+  const user_gesture_recordings = await db.query.user_gesture_recordings.findMany();
+  const user_gesture_recording_vectors = await db.query.user_gesture_recording_vectors.findMany();
 
   const json_data = {
     text_gestures,
@@ -26,7 +28,9 @@ export const import_data = async (confirm_env = true) => {
     lesson_gestures,
     text_lesson_words,
     audio_assets,
-    image_assets
+    image_assets,
+    user_gesture_recordings,
+    user_gesture_recording_vectors
   };
 
   await make_dir('./out');

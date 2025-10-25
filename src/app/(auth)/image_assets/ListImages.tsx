@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTRPC } from '~/api/client';
 import { Input } from '~/components/ui/input';
 import {
@@ -10,7 +10,7 @@ import {
   SelectValue
 } from '~/components/ui/select';
 import { Button } from '~/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
+import { Card, CardContent } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
 import { IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
 import { Filter, ArrowUpDown, MoreVertical, CalendarIcon } from 'lucide-react';
@@ -36,21 +36,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { MdDeleteOutline } from 'react-icons/md';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-
+import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 
 dayjs.extend(relativeTime);
 
 const DEFAULT_LIMIT = 24;
-
-type ImageItem = {
-  id: number;
-  description: string;
-  s3_key: string;
-  created_at: string;
-  updated_at: string;
-};
 
 export default function ListImages() {
   const trpc = useTRPC();
@@ -85,18 +77,24 @@ export default function ListImages() {
         enabled: true
       }
     )
-  ) as any;
+  );
 
-  const isLoading = list_q?.isLoading || list_q?.isFetching;
   const data = list_q?.data;
-  const items = useMemo(() => data?.list ?? [], [data]);
+  const items = data?.list ?? [];
 
   const delete_image_mut = useMutation(
     trpc.image_assets.delete_image_asset.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.image_assets.list_image_assets.pathFilter());
-        // invalidate all
-        setDeleteImageId(null);
+      onSuccess: (data, { id }) => {
+        if (data.deleted) {
+          queryClient.invalidateQueries(trpc.image_assets.list_image_assets.pathFilter());
+          toast.success(`Image deleted successfully: ID: ${id}`);
+        } else {
+          toast.error(`Failed to delete image: ID: ${id}`);
+        }
+      },
+      onError: (error, { id }) => {
+        console.error(error.message);
+        toast.error(`Failed to delete image: ID: ${id}`);
       }
     })
   );
@@ -158,7 +156,7 @@ export default function ListImages() {
       </div>
 
       <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {isLoading ? (
+        {list_q.isPending ? (
           Array.from({ length: limit }).map((_, i) => (
             <li key={`skeleton-${i}`}>
               <Card className="p-2">
@@ -173,7 +171,7 @@ export default function ListImages() {
             </li>
           ))
         ) : items.length > 0 ? (
-          items.map((item: ImageItem) => (
+          items.map((item) => (
             <li key={item.id}>
               <Card className="relative p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800">
                 <Link href={`/image_assets/edit/${item.id}`} className="block">
@@ -246,7 +244,7 @@ export default function ListImages() {
           <Button
             variant="secondary"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={!data?.hasPrev || isLoading}
+            disabled={!data?.hasPrev || list_q.isLoading || list_q.isFetching}
           >
             <IoMdArrowDropleft className="mr-1" />
             <span className="sr-only sm:not-sr-only">Prev</span>
@@ -254,7 +252,7 @@ export default function ListImages() {
           <Button
             variant="secondary"
             onClick={() => setPage((p) => p + 1)}
-            disabled={!data?.hasNext || isLoading}
+            disabled={!data?.hasNext || list_q.isLoading || list_q.isFetching}
           >
             <span className="sr-only sm:not-sr-only">Next</span>
             <IoMdArrowDropright className="ml-1" />
@@ -275,7 +273,7 @@ export default function ListImages() {
               <br />
               <div>
                 <span className="font-bold">Description:</span>{' '}
-                {items.find((item: ImageItem) => item.id === deleteImageId)?.description}
+                {items.find((item) => item.id === deleteImageId)?.description}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -283,9 +281,8 @@ export default function ListImages() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (deleteImageId) {
-                  delete_image_mut.mutate({ id: deleteImageId });
-                }
+                if (deleteImageId) delete_image_mut.mutate({ id: deleteImageId });
+                setDeleteImageId(null);
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

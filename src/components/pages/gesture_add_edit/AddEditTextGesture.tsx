@@ -1252,7 +1252,8 @@ const PracticeSection = ({ text_data }: { text_data: text_data_type }) => {
               id: text_data.id!,
               uuid: text_data.uuid!,
               text: text_data.text,
-              gestures: gestures
+              gestures: gestures,
+              script_id: text_data.script_id
             }}
           />
         </JotaiProvider>

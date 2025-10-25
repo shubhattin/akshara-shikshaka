@@ -4,6 +4,7 @@ CREATE TABLE "user_gesture_recording_vectors" (
 	"index" smallint NOT NULL,
 	"recorded_vector" real[] NOT NULL,
 	"drawn_vector" real[] NOT NULL,
+	"recorded_accuracy" real NOT NULL,
 	"is_labelled" boolean
 );
 --> statement-breakpoint
@@ -11,6 +12,7 @@ CREATE TABLE "user_gesture_recordings" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"text" text NOT NULL,
 	"script_id" smallint NOT NULL,
+	"completed" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

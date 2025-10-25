@@ -176,6 +176,7 @@ export const user_gesture_recordings = pgTable('user_gesture_recordings', {
   id: serial().primaryKey(),
   text: text().notNull(),
   script_id: smallint().notNull(),
+  completed: boolean().notNull().default(false),
   created_at: timestamp().notNull().defaultNow()
 });
 
@@ -187,6 +188,7 @@ export const user_gesture_recording_vectors = pgTable(
     index: smallint().notNull(),
     recorded_vector: real().array().notNull(),
     drawn_vector: real().array().notNull(),
+    recorded_accuracy: real().notNull(),
     is_labelled: boolean()
   },
   (table) => [

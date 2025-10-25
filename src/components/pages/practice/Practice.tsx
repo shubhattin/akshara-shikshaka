@@ -15,7 +15,7 @@ import {
 } from '~/tools/stroke_data/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AiOutlineSignature } from 'react-icons/ai';
-import { useAtom, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import {
   canvas_current_mode,
@@ -30,6 +30,8 @@ import {
   current_gesture_points_atom,
   TRY_AGAIN_WAIT_DURATION
 } from './practice_state';
+import { useTRPC } from '~/api/client';
+import { useMutation } from '@tanstack/react-query';
 
 // Dynamic import for PracticeKonvaCanvas to avoid SSR issues
 const PracticeKonvaCanvas = dynamic(() => import('./PracticeCanvas'), {
@@ -48,6 +50,7 @@ type text_data_type = {
   id: number;
   uuid: string;
   text: string;
+  script_id: number;
   gestures?: Gesture[] | null;
 };
 
@@ -57,6 +60,7 @@ type Props = {
 
 export default function PracticeCanvasComponent({ text_data }: Props) {
   const stageRef = useRef<Konva.Stage | null>(null);
+  const trpc = useTRPC();
 
   // Initialize atoms with default values
   useHydrateAtoms([
@@ -88,6 +92,58 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const setCurrentGesturePoints = useSetAtom(current_gesture_points_atom);
 
   const tryAgainTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const userGestureVectorsRef = useRef<
+    {
+      index: number;
+      recorded_vector: number[];
+      drawn_vector: number[];
+      recorded_accuracy: number;
+    }[]
+  >([]);
+
+  const flattenPoints = (pts: GesturePoints[]): number[] => pts.flatMap(([x, y]) => [x, y]);
+
+  const upsertUserVector = (
+    gestureIndex: number,
+    recorded: GesturePoints[],
+    drawn: GesturePoints[],
+    recorded_accuracy: number
+  ) => {
+    const vectors = userGestureVectorsRef.current;
+    const next = {
+      index: gestureIndex,
+      recorded_vector: flattenPoints(recorded),
+      drawn_vector: flattenPoints(drawn),
+      recorded_accuracy: recorded_accuracy
+    };
+    // we also record the failed attempts
+    vectors.push(next);
+  };
+
+  const submit_user_recording_mut = useMutation(
+    trpc.user_gesture_recordings.submit_user_gesture_recording.mutationOptions({
+      onSuccess: () => {
+        console.log('Successfully submitted user gestures');
+      },
+      onError: (e) => {
+        console.error('Failed to submit', e.message);
+      }
+    })
+  );
+
+  const submit_user_gesture_recording_func = async (completed: boolean) => {
+    const vectors = userGestureVectorsRef.current;
+    // Submit on completion if we have any recorded attempts
+    if (vectors.length > 0 && text_data.text && typeof text_data.script_id === 'number') {
+      submit_user_recording_mut.mutateAsync({
+        text: text_data.text,
+        script_id: text_data.script_id,
+        vectors,
+        completed: completed
+      });
+    }
+    userGestureVectorsRef.current = [];
+  };
 
   function updateScalingFactor() {
     if (typeof window === 'undefined') return;
@@ -180,6 +236,13 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       accuracy = 0;
     }
 
+    // Store/override latest attempt for this gesture
+    try {
+      upsertUserVector(currentGesture.index, currentGesture.points, userPoints, accuracy);
+    } catch (e) {
+      console.error('Error saving user stroke vectors:', e);
+    }
+
     if (accuracy > 0.7) {
       // completeCurrentGesture
       setShowTryAgain(false);
@@ -210,6 +273,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
       setIsDrawing(false);
     } else {
       setIsDrawing(false);
+      submit_user_gesture_recording_func(true);
     }
   };
 
@@ -234,7 +298,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     playNextGesture();
   };
 
-  const resetPractice = () => {
+  const resetPractice = async () => {
     setCanvasCurrentMode('none');
     setCurrentGestureIndex(0);
     setCompletedGesturesCount(0);
@@ -246,7 +310,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   if (!gestureData.length) {
     return (
       <div className="text text-center text-muted-foreground">
-        No gesture data available for practice.
+        No gesture data available to display
       </div>
     );
   }
@@ -286,6 +350,7 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
                 setShowTryAgain(false);
                 setAnimatedGestureLines([]);
                 clearCurrentAnimatedGesture();
+                userGestureVectorsRef.current = [];
                 playGestureIndex(currentGestureIndex);
               }}
               disabled={canvasCurrentMode === 'playing'}
@@ -324,7 +389,10 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
               Play Current Gesture
             </button>
             <button
-              onClick={resetPractice}
+              onClick={() => {
+                resetPractice();
+                submit_user_gesture_recording_func(false);
+              }}
               className={cn(
                 'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
                 'bg-gradient-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-lg',

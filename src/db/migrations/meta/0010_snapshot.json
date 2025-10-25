@@ -1,5 +1,5 @@
 {
-  "id": "3c424b50-dbd9-422d-a184-9104bb9cd64e",
+  "id": "01888225-1d06-4da6-9213-69db8e1f486a",
   "prevId": "bb32197a-e7c2-4ac5-a22f-651d9b415827",
   "version": "7",
   "dialect": "postgresql",
@@ -727,6 +727,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "recorded_accuracy": {
+          "name": "recorded_accuracy",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
         "is_labelled": {
           "name": "is_labelled",
           "type": "boolean",
@@ -777,6 +783,13 @@
           "type": "smallint",
           "primaryKey": false,
           "notNull": true
+        },
+        "completed": {
+          "name": "completed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "created_at": {
           "name": "created_at",

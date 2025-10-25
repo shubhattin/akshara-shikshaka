@@ -8,11 +8,13 @@ const submit_user_gesture_recording_route = publicProcedure
     z.object({
       text: z.string().min(1),
       script_id: z.number().int(),
+      completed: z.boolean().optional(),
       vectors: z.array(
         z.object({
           index: z.number().int(),
-          recorded_vector: z.array(z.number()),
-          drawn_vector: z.array(z.number())
+          recorded_vector: z.array(z.number()).min(2),
+          drawn_vector: z.array(z.number()).min(2),
+          recorded_accuracy: z.number().min(0).max(1)
         })
       )
     })
@@ -22,7 +24,8 @@ const submit_user_gesture_recording_route = publicProcedure
       .insert(user_gesture_recordings)
       .values({
         text: input.text,
-        script_id: input.script_id
+        script_id: input.script_id,
+        completed: input.completed
       })
       .returning();
 

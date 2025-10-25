@@ -15,7 +15,7 @@ import {
 } from '~/tools/stroke_data/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AiOutlineSignature } from 'react-icons/ai';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { atom, useAtom, useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import {
   canvas_current_mode,
@@ -32,6 +32,8 @@ import {
 } from './practice_state';
 import { useTRPC } from '~/api/client';
 import { useMutation } from '@tanstack/react-query';
+import { useTurnstile } from 'react-turnstile';
+import TurnstileWidget from '~/components/Turnstile';
 
 // Dynamic import for PracticeKonvaCanvas to avoid SSR issues
 const PracticeKonvaCanvas = dynamic(() => import('./PracticeCanvas'), {
@@ -58,10 +60,9 @@ type Props = {
   text_data: text_data_type;
 };
 
-export default function PracticeCanvasComponent({ text_data }: Props) {
-  const stageRef = useRef<Konva.Stage | null>(null);
-  const trpc = useTRPC();
+const turnstile_token_atom = atom<string | null>(null);
 
+export default function PracticeWrapper(props: Props) {
   // Initialize atoms with default values
   useHydrateAtoms([
     [canvas_current_mode, 'none' as const],
@@ -74,6 +75,23 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
     [scaling_factor_atom, 1],
     [animated_gesture_lines_atom, []]
   ]);
+
+  const setTurnstileToken = useSetAtom(turnstile_token_atom);
+
+  return (
+    <>
+      <Practice {...props} />
+      <TurnstileWidget setToken={setTurnstileToken} />
+    </>
+  );
+}
+
+function Practice({ text_data }: Props) {
+  const stageRef = useRef<Konva.Stage | null>(null);
+  const trpc = useTRPC();
+
+  const [turnstileToken, setTurnstileToken] = useAtom(turnstile_token_atom);
+  const turnstile = useTurnstile();
 
   // Practice state from atoms
   const [canvasCurrentMode, setCanvasCurrentMode] = useAtom(canvas_current_mode);
@@ -123,6 +141,8 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const submit_user_recording_mut = useMutation(
     trpc.user_gesture_recordings.submit_user_gesture_recording.mutationOptions({
       onSuccess: () => {
+        setTurnstileToken(null);
+        turnstile.reset();
         console.log('Successfully submitted user gestures');
       },
       onError: (e) => {
@@ -134,12 +154,18 @@ export default function PracticeCanvasComponent({ text_data }: Props) {
   const submit_user_gesture_recording_func = async (completed: boolean) => {
     const vectors = userGestureVectorsRef.current;
     // Submit on completion if we have any recorded attempts
-    if (vectors.length > 0 && text_data.text && typeof text_data.script_id === 'number') {
+    if (
+      vectors.length > 0 &&
+      text_data.text &&
+      typeof text_data.script_id === 'number' &&
+      turnstileToken
+    ) {
       submit_user_recording_mut.mutateAsync({
         text: text_data.text,
         script_id: text_data.script_id,
         vectors,
-        completed: completed
+        completed: completed,
+        turnstile_token: turnstileToken
       });
     }
     userGestureVectorsRef.current = [];

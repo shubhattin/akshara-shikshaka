@@ -1,11 +1,13 @@
 import z from 'zod';
-import { publicProcedure, t } from '../trpc_init';
+import { publicProcedure, t, verify_cloudflare_turnstile_token } from '../trpc_init';
 import { user_gesture_recording_vectors, user_gesture_recordings } from '~/db/schema';
 import { db } from '~/db/db';
+import { TRPCError } from '@trpc/server';
 
 const submit_user_gesture_recording_route = publicProcedure
   .input(
     z.object({
+      turnstile_token: z.string(),
       text: z.string().min(1),
       script_id: z.number().int(),
       completed: z.boolean().optional(),
@@ -20,6 +22,10 @@ const submit_user_gesture_recording_route = publicProcedure
     })
   )
   .mutation(async ({ input }) => {
+    const is_valid = await verify_cloudflare_turnstile_token(input.turnstile_token);
+    if (!is_valid) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid turnstile token' });
+    }
     const [{ id }] = await db
       .insert(user_gesture_recordings)
       .values({

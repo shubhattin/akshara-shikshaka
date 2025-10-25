@@ -152,6 +152,9 @@ function Practice({ text_data }: Props) {
   );
 
   const submit_user_gesture_recording_func = async (completed: boolean) => {
+    // In our current approach, we do not need to watch for changes in turnstile token
+    // as there would naturally enough gap for it to refresh and fetch the token
+
     const vectors = userGestureVectorsRef.current;
     // Submit on completion if we have any recorded attempts
     if (

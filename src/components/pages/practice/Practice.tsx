@@ -34,6 +34,7 @@ import { useTRPC } from '~/api/client';
 import { useMutation } from '@tanstack/react-query';
 import { useTurnstile } from 'react-turnstile';
 import TurnstileWidget, { TURNSTILE_ENABLED } from '~/components/Turnstile';
+import { deepCopy } from '~/tools/kry';
 
 // Dynamic import for PracticeKonvaCanvas to avoid SSR issues
 const PracticeKonvaCanvas = dynamic(() => import('./PracticeCanvas'), {
@@ -110,6 +111,15 @@ function Practice({ text_data }: Props) {
   const setCurrentGesturePoints = useSetAtom(current_gesture_points_atom);
 
   const tryAgainTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    return () => {
+      if (tryAgainTimeoutRef.current) {
+        clearTimeout(tryAgainTimeoutRef.current);
+        tryAgainTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const userGestureVectorsRef = useRef<
     {
       index: number;
@@ -157,19 +167,30 @@ function Practice({ text_data }: Props) {
       return;
     }
 
+    let retryTimeoutId: NodeJS.Timeout | null = null;
+
     const MAX_RETRIES = 2;
     const RETRY_DELAY = 700;
-    const submit = (retries: number = 0) => {
+    const vectors = deepCopy(userGestureVectorsRef.current);
+
+    const submit = async (retries: number = 0) => {
       if (retries > MAX_RETRIES) {
+        console.warn('Max retries reached for gesture submission');
         return;
       }
       if (!turnstileToken || turnstileToken.length === 0) {
-        setTimeout(() => {
+        retryTimeoutId = setTimeout(() => {
           submit(retries + 1);
         }, RETRY_DELAY);
         return;
       }
-      const vectors = userGestureVectorsRef.current;
+
+      // Clear any pending retry
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId);
+        retryTimeoutId = null;
+      }
+
       // Submit on completion if we have any recorded attempts
       if (
         vectors.length > 0 &&
@@ -177,7 +198,7 @@ function Practice({ text_data }: Props) {
         typeof text_data.script_id === 'number' &&
         turnstileToken
       ) {
-        submit_user_recording_mut.mutateAsync({
+        await submit_user_recording_mut.mutateAsync({
           text: text_data.text,
           script_id: text_data.script_id,
           vectors,
@@ -187,7 +208,7 @@ function Practice({ text_data }: Props) {
       }
       userGestureVectorsRef.current = [];
     };
-    submit();
+    await submit();
   };
 
   function updateScalingFactor() {
@@ -350,6 +371,7 @@ function Practice({ text_data }: Props) {
     setShowTryAgain(false);
     setIsDrawing(false);
     setAnimatedGestureLines([]);
+    userGestureVectorsRef.current = [];
   };
 
   if (!gestureData.length) {
@@ -434,9 +456,9 @@ function Practice({ text_data }: Props) {
               Play Current Gesture
             </button>
             <button
-              onClick={() => {
-                resetPractice();
+              onClick={async () => {
                 submit_user_gesture_recording_func(false);
+                resetPractice();
               }}
               className={cn(
                 'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',

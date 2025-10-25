@@ -91,6 +91,10 @@ export default function ListImages() {
         } else {
           toast.error(`Failed to delete image: ID: ${id}`);
         }
+      },
+      onError: (error, { id }) => {
+        console.error(error.message);
+        toast.error(`Failed to delete image: ID: ${id}`);
       }
     })
   );
@@ -152,7 +156,7 @@ export default function ListImages() {
       </div>
 
       <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {list_q.isLoading && !list_q.isSuccess ? (
+        {list_q.isPending ? (
           Array.from({ length: limit }).map((_, i) => (
             <li key={`skeleton-${i}`}>
               <Card className="p-2">

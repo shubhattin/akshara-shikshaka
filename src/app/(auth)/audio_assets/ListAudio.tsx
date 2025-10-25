@@ -85,6 +85,10 @@ export default function ListAudio() {
         } else {
           toast.error(`Failed to delete audio: ID: ${id}`);
         }
+      },
+      onError: (error, { id }) => {
+        console.error(error.message);
+        toast.error(`Failed to delete audio: ID: ${id}`);
       }
     })
   );
@@ -169,7 +173,7 @@ export default function ListAudio() {
       </AlertDialog>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {list_q.isLoading && !list_q.isSuccess ? (
+        {list_q.isPending ? (
           Array.from({ length: limit }).map((_, i) => (
             <Card className="p-2" key={`skeleton-${i}`}>
               <CardContent className="flex items-start gap-3 p-2 pr-10">

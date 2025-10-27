@@ -54,6 +54,7 @@
     "@trpc/tanstack-react-query": "^11.7.0",
     "@upstash/redis": "^1.35.6",
     "@use-gesture/react": "^10.3.1",
+    "@vercel/functions": "^3.1.4",
     "@wavesurfer/react": "^1.0.11",
     "ai": "^5.0.80",
     "audiomotion-analyzer": "^4.5.1",

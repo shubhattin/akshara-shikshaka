@@ -1,5 +1,5 @@
 'use client';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import {
   selected_language_id_atom,
   lesson_category_type,

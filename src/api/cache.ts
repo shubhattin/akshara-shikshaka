@@ -82,11 +82,10 @@ export const CACHE = {
     category_lesson_list: createCache(
       'text_lesson_category_lessons_list',
       z.object({
-        lang_id: z.number().int(),
         category_id: z.number().int()
       }),
-      ({ category_id, lang_id }) => `${lang_id}:${category_id}`,
-      async ({ category_id, lang_id }) => {
+      ({ category_id }) => `${category_id}`,
+      async ({ category_id }) => {
         const lessons = await db.query.text_lessons.findMany({
           columns: {
             id: true,
@@ -95,8 +94,7 @@ export const CACHE = {
             uuid: true
           },
           orderBy: (tbl, { asc }) => [asc(tbl.order)],
-          where: (tbl, { eq, and }) =>
-            and(eq(tbl.category_id, category_id), eq(tbl.lang_id, lang_id))
+          where: (tbl, { eq }) => eq(tbl.category_id, category_id)
         });
         return lessons;
       }

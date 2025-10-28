@@ -613,8 +613,7 @@ function AddToCategoryDialog({
                 add_to_category_mut.mutate({
                   category_id: selectedCategory === 0 ? null : selectedCategory,
                   lesson_id: lesson_id,
-                  prev_category_id,
-                  lang_id: langId
+                  prev_category_id
                 })
               }
               disabled={!canAdd}
@@ -748,7 +747,6 @@ function CategorizedLessonsList({
               const all_lessons = [...ordered, ...unordered];
               save_order_mut.mutate({
                 category_id: category_id,
-                lang_id: langId,
                 lesson: all_lessons.map((l) => ({
                   id: l.id,
                   order: l.order!

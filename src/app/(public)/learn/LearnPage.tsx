@@ -51,7 +51,6 @@ function LearnPage({ init_lesson_categories }: Props) {
   const [selectedCategoryId, setSelectedCategoryId] = useAtom(selected_category_id_atom);
   const [open, setOpen] = useState(false);
   const [selectedLessonId, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
-  const [langId] = useAtom(lang_id_atom);
 
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
@@ -62,7 +61,7 @@ function LearnPage({ init_lesson_categories }: Props) {
   const categories = categories_q.data ?? [];
   const lessons_q = useQuery(
     trpc.text_lessons.categories.get_category_text_lesson_list.queryOptions(
-      { category_id: selectedCategoryId!, lang_id: langId },
+      { category_id: selectedCategoryId! },
       { enabled: selectedCategoryId !== null }
     )
   );
@@ -160,6 +159,7 @@ function LearnPage({ init_lesson_categories }: Props) {
 const LessonList = ({ lesson_id }: { lesson_id: number }) => {
   const [scriptId, setScriptId] = useAtom(selected_script_id_atom);
   const trpc = useTRPC();
+
   const lesson_info_q = useQuery(
     trpc.text_lessons.get_text_lesson_info.queryOptions(
       { lesson_id: lesson_id },

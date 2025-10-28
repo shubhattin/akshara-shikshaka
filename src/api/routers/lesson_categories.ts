@@ -167,29 +167,22 @@ const update_text_lessons_order_route = protectedAdminProcedure
   .input(
     z.object({
       lesson: TextLessonsSchemaZod.pick({ id: true, order: true }).array(),
-      category_id: z.number().int(),
-      lang_id: z.number().int()
+      category_id: z.number().int()
     })
   )
-  .mutation(async ({ input: { lesson, category_id, lang_id } }) => {
+  .mutation(async ({ input: { lesson, category_id } }) => {
     await Promise.allSettled([
       ...lesson.map((lesson) =>
         db
           .update(text_lessons)
           .set({ order: lesson.order })
-          .where(
-            and(
-              eq(text_lessons.id, lesson.id),
-              eq(text_lessons.category_id, category_id),
-              eq(text_lessons.lang_id, lang_id)
-            )
-          )
+          .where(and(eq(text_lessons.id, lesson.id), eq(text_lessons.category_id, category_id)))
       )
     ]);
 
     // as this routes data invalidation does not depend on cached data so we revaidate the cache in background
     // invalidate category lesson list cache
-    waitUntil(CACHE.lessons.category_lesson_list.refresh({ lang_id, category_id }));
+    waitUntil(CACHE.lessons.category_lesson_list.refresh({ category_id }));
     return {
       updated: true
     };
@@ -200,11 +193,10 @@ const add_update_lesson_category_route = protectedAdminProcedure
     z.object({
       category_id: z.number().int().min(1).nullable(),
       prev_category_id: z.number().int().optional(),
-      lesson_id: z.number().int(),
-      lang_id: z.number().int()
+      lesson_id: z.number().int()
     })
   )
-  .mutation(async ({ input: { category_id, prev_category_id, lesson_id, lang_id } }) => {
+  .mutation(async ({ input: { category_id, prev_category_id, lesson_id } }) => {
     await Promise.allSettled([
       db
         .update(text_lessons)
@@ -217,11 +209,9 @@ const add_update_lesson_category_route = protectedAdminProcedure
 
     // as the category_id list is fetched directly from db on list lessons page
     // so we revalidate the cache in background
-    category_id && waitUntil(CACHE.lessons.category_lesson_list.refresh({ lang_id, category_id }));
+    category_id && waitUntil(CACHE.lessons.category_lesson_list.refresh({ category_id }));
     prev_category_id &&
-      waitUntil(
-        CACHE.lessons.category_lesson_list.refresh({ lang_id, category_id: prev_category_id })
-      );
+      waitUntil(CACHE.lessons.category_lesson_list.refresh({ category_id: prev_category_id }));
 
     return {
       added: true
@@ -229,9 +219,9 @@ const add_update_lesson_category_route = protectedAdminProcedure
   });
 
 const get_category_text_lesson_list_route = publicProcedure
-  .input(z.object({ category_id: z.number().int(), lang_id: z.number().int() }))
-  .query(async ({ input: { category_id, lang_id } }) => {
-    const lessons = await CACHE.lessons.category_lesson_list.get({ lang_id, category_id });
+  .input(z.object({ category_id: z.number().int() }))
+  .query(async ({ input: { category_id } }) => {
+    const lessons = await CACHE.lessons.category_lesson_list.get({ category_id });
     return lessons;
   });
 

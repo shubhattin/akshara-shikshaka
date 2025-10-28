@@ -182,8 +182,8 @@ const update_text_lesson_route = protectedAdminProcedure
   );
 
 const delete_text_lesson_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int(), uuid: z.string().uuid(), lang_id: z.number().int() }))
-  .mutation(async ({ input: { id, uuid, lang_id } }) => {
+  .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
+  .mutation(async ({ input: { id, uuid } }) => {
     // verify the id, uuid combination
     const text_lesson_ = await db.query.text_lessons.findFirst({
       columns: {
@@ -209,7 +209,6 @@ const delete_text_lesson_route = protectedAdminProcedure
     text_lesson_.category_id &&
       waitUntil(
         CACHE.lessons.category_lesson_list.refresh({
-          lang_id,
           category_id: text_lesson_.category_id
         })
       );

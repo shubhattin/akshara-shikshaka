@@ -9,6 +9,8 @@ import {
   reorder_text_lesson_in_category_func,
   lesson_categories_router
 } from './lesson_categories';
+import { waitUntil } from '@vercel/functions';
+import { CACHE } from '../cache';
 
 const connect_gestures_to_text_lessons_func = async (textKey: string, text_lesson_id: number) => {
   const gestures = await db.query.text_gestures.findMany({
@@ -180,8 +182,8 @@ const update_text_lesson_route = protectedAdminProcedure
   );
 
 const delete_text_lesson_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
-  .mutation(async ({ input: { id, uuid } }) => {
+  .input(z.object({ id: z.number().int(), uuid: z.string().uuid(), lang_id: z.number().int() }))
+  .mutation(async ({ input: { id, uuid, lang_id } }) => {
     // verify the id, uuid combination
     const text_lesson_ = await db.query.text_lessons.findFirst({
       columns: {
@@ -203,6 +205,14 @@ const delete_text_lesson_route = protectedAdminProcedure
       // reordering the catoegory id after deletion if needed
       text_lesson_.category_id && reorder_text_lesson_in_category_func(text_lesson_.category_id, id)
     ]);
+    // refreshing cache of the category it was part of
+    text_lesson_.category_id &&
+      waitUntil(
+        CACHE.lessons.category_lesson_list.refresh({
+          lang_id,
+          category_id: text_lesson_.category_id
+        })
+      );
 
     return {
       deleted: true

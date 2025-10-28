@@ -5,6 +5,7 @@ import { db } from '~/db/db';
 import { and, eq, max } from 'drizzle-orm';
 import { LessonCategoriesSchemaZod, TextLessonsSchemaZod } from '~/db/schema_zod';
 import { CACHE } from '../cache';
+import { waitUntil } from '@vercel/functions';
 
 /**
  * @param lesson_id_to_ignore This is to allow this function to run in parallel with other operations
@@ -55,6 +56,7 @@ const add_category_route = protectedAdminProcedure
     const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
     const result = await db.insert(lesson_categories).values({ lang_id, name, order }).returning();
 
+    // as this route refetches data from a cached route so we need to invalidate it
     // invalidate category_list cache
     await Promise.all([CACHE.lessons.category_list.delete({ lang_id })]);
 
@@ -80,6 +82,7 @@ const update_category_list_route = protectedAdminProcedure
           .where(and(eq(lesson_categories.id, category.id), eq(lesson_categories.lang_id, lang_id)))
       ),
       // invalidate category list cache
+      // as being referched onSuccess
       CACHE.lessons.category_list.delete({ lang_id })
     ]);
 
@@ -116,7 +119,7 @@ const delete_category_route = protectedAdminProcedure
           .set({ order: category.order })
           .where(eq(lesson_categories.id, category.id))
       ),
-      // invalidate lessons category lis t cache
+      // invalidate lessons category list cache
       CACHE.lessons.category_list.delete({ lang_id })
     ]);
 
@@ -164,18 +167,29 @@ const update_text_lessons_order_route = protectedAdminProcedure
   .input(
     z.object({
       lesson: TextLessonsSchemaZod.pick({ id: true, order: true }).array(),
-      category_id: z.number().int()
+      category_id: z.number().int(),
+      lang_id: z.number().int()
     })
   )
-  .mutation(async ({ input: { lesson, category_id } }) => {
-    await Promise.allSettled(
-      lesson.map((lesson) =>
+  .mutation(async ({ input: { lesson, category_id, lang_id } }) => {
+    await Promise.allSettled([
+      ...lesson.map((lesson) =>
         db
           .update(text_lessons)
           .set({ order: lesson.order })
-          .where(and(eq(text_lessons.id, lesson.id), eq(text_lessons.category_id, category_id)))
+          .where(
+            and(
+              eq(text_lessons.id, lesson.id),
+              eq(text_lessons.category_id, category_id),
+              eq(text_lessons.lang_id, lang_id)
+            )
+          )
       )
-    );
+    ]);
+
+    // as this routes data invalidation does not depend on cached data so we revaidate the cache in background
+    // invalidate category lesson list cache
+    waitUntil(CACHE.lessons.category_lesson_list.refresh({ lang_id, category_id }));
     return {
       updated: true
     };
@@ -186,10 +200,11 @@ const add_update_lesson_category_route = protectedAdminProcedure
     z.object({
       category_id: z.number().int().min(1).nullable(),
       prev_category_id: z.number().int().optional(),
-      lesson_id: z.number().int()
+      lesson_id: z.number().int(),
+      lang_id: z.number().int()
     })
   )
-  .mutation(async ({ input: { category_id, prev_category_id, lesson_id } }) => {
+  .mutation(async ({ input: { category_id, prev_category_id, lesson_id, lang_id } }) => {
     await Promise.allSettled([
       db
         .update(text_lessons)
@@ -200,24 +215,23 @@ const add_update_lesson_category_route = protectedAdminProcedure
       // no need to reorder the current category as order is set to null which does not affect the concerned order
     ]);
 
+    // as the category_id list is fetched directly from db on list lessons page
+    // so we revalidate the cache in background
+    category_id && waitUntil(CACHE.lessons.category_lesson_list.refresh({ lang_id, category_id }));
+    prev_category_id &&
+      waitUntil(
+        CACHE.lessons.category_lesson_list.refresh({ lang_id, category_id: prev_category_id })
+      );
+
     return {
       added: true
     };
   });
 
 const get_category_text_lesson_list_route = publicProcedure
-  .input(z.object({ category_id: z.number().int() }))
-  .query(async ({ input: { category_id } }) => {
-    const lessons = await db.query.text_lessons.findMany({
-      columns: {
-        id: true,
-        text: true,
-        order: true,
-        uuid: true
-      },
-      orderBy: (tbl, { asc }) => [asc(tbl.order)],
-      where: (tbl, { eq }) => eq(tbl.category_id, category_id)
-    });
+  .input(z.object({ category_id: z.number().int(), lang_id: z.number().int() }))
+  .query(async ({ input: { category_id, lang_id } }) => {
+    const lessons = await CACHE.lessons.category_lesson_list.get({ lang_id, category_id });
     return lessons;
   });
 

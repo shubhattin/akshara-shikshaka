@@ -65,7 +65,7 @@ function createCache<TSchema extends ZodSchema, TData>(
 export const CACHE = {
   lessons: {
     category_list: createCache(
-      'lesson_category_list',
+      'text_lesson_category_list',
       z.object({
         lang_id: z.number().int().positive()
       }),
@@ -77,6 +77,28 @@ export const CACHE = {
           orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
         });
         return data;
+      }
+    ),
+    category_lesson_list: createCache(
+      'text_lesson_category_lessons_list',
+      z.object({
+        lang_id: z.number().int(),
+        category_id: z.number().int()
+      }),
+      ({ category_id, lang_id }) => `${lang_id}:${category_id}`,
+      async ({ category_id, lang_id }) => {
+        const lessons = await db.query.text_lessons.findMany({
+          columns: {
+            id: true,
+            text: true,
+            order: true,
+            uuid: true
+          },
+          orderBy: (tbl, { asc }) => [asc(tbl.order)],
+          where: (tbl, { eq, and }) =>
+            and(eq(tbl.category_id, category_id), eq(tbl.lang_id, lang_id))
+        });
+        return lessons;
       }
     )
   }

@@ -752,7 +752,8 @@ const AddEditSave = (props: Props) => {
     if (props.location !== 'add') {
       delete_text_data_mut.mutate({
         id: props.text_lesson_info.id!,
-        uuid: props.text_lesson_info.uuid!
+        uuid: props.text_lesson_info.uuid!,
+        lang_id: lang_id
       });
     }
   };

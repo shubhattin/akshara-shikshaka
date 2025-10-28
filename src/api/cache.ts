@@ -11,7 +11,7 @@ interface CacheItem<TData, TParams> {
   get: (params: TParams) => Promise<TData>;
   set: (data: TData, params: TParams) => Promise<void>;
   delete: (params: TParams) => Promise<void>;
-  refresh: (params: TParams) => Promise<{ refreshed: boolean }>;
+  refresh: (params: TParams) => Promise<void>;
 }
 
 function createCache<TSchema extends ZodSchema, TData>(
@@ -54,9 +54,8 @@ function createCache<TSchema extends ZodSchema, TData>(
     refresh: async (params) => {
       const parsed = validate(params);
       const key = getKey(parsed);
-      const [data] = await Promise.all([fetchFn(parsed), redis.del(key)]);
+      const data = await fetchFn(parsed);
       await redis.set(key, data, { ex: ttl });
-      return { refreshed: true };
     }
   };
 
@@ -64,19 +63,21 @@ function createCache<TSchema extends ZodSchema, TData>(
 }
 
 export const CACHE = {
-  lesson_list: createCache(
-    'lesson_category_list',
-    z.object({
-      lang_id: z.number().int().positive()
-    }),
-    ({ lang_id }) => `${lang_id}`,
-    async ({ lang_id }) => {
-      const data = await db.query.lesson_categories.findMany({
-        where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
-        columns: { id: true, name: true, order: true },
-        orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
-      });
-      return data;
-    }
-  )
+  lessons: {
+    category_list: createCache(
+      'lesson_category_list',
+      z.object({
+        lang_id: z.number().int().positive()
+      }),
+      ({ lang_id }) => `${lang_id}`,
+      async ({ lang_id }) => {
+        const data = await db.query.lesson_categories.findMany({
+          where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
+          columns: { id: true, name: true, order: true },
+          orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
+        });
+        return data;
+      }
+    )
+  }
 };

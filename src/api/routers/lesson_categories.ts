@@ -4,6 +4,7 @@ import { lesson_categories, text_lessons } from '~/db/schema';
 import { db } from '~/db/db';
 import { and, eq, max } from 'drizzle-orm';
 import { LessonCategoriesSchemaZod, TextLessonsSchemaZod } from '~/db/schema_zod';
+import { CACHE } from '../cache';
 
 /**
  * @param lesson_id_to_ignore This is to allow this function to run in parallel with other operations
@@ -38,23 +39,10 @@ export const reorder_text_lesson_in_category_func = async (
   );
 };
 
-export const get_text_lesson_categories_func = async (lang_id: number) => {
-  const categories = await db.query.lesson_categories.findMany({
-    where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
-    columns: {
-      id: true,
-      name: true,
-      order: true
-    },
-    orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
-  });
-  return categories;
-};
-
 const get_categories_route = publicProcedure
   .input(z.object({ lang_id: z.number().int() }))
   .query(async ({ input: { lang_id } }) => {
-    return await get_text_lesson_categories_func(lang_id);
+    return await CACHE.lessons.category_list.get({ lang_id });
   });
 
 const add_category_route = protectedAdminProcedure
@@ -67,6 +55,9 @@ const add_category_route = protectedAdminProcedure
     const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
     const result = await db.insert(lesson_categories).values({ lang_id, name, order }).returning();
 
+    // invalidate category_list cache
+    await Promise.all([CACHE.lessons.category_list.delete({ lang_id })]);
+
     return {
       id: result[0].id,
       order: result[0].order
@@ -76,17 +67,21 @@ const add_category_route = protectedAdminProcedure
 const update_category_list_route = protectedAdminProcedure
   .input(
     z.object({
+      lang_id: z.number().int(),
       categories: LessonCategoriesSchemaZod.pick({ id: true, name: true, order: true }).array()
     })
   )
-  .mutation(async ({ input: { categories } }) => {
-    await Promise.allSettled(
-      categories.map(async (category) => {
-        db.update(lesson_categories)
+  .mutation(async ({ input: { categories, lang_id } }) => {
+    await Promise.allSettled([
+      ...categories.map((category) =>
+        db
+          .update(lesson_categories)
           .set({ name: category.name, order: category.order })
-          .where(eq(lesson_categories.id, category.id));
-      })
-    );
+          .where(and(eq(lesson_categories.id, category.id), eq(lesson_categories.lang_id, lang_id)))
+      ),
+      // invalidate category list cache
+      CACHE.lessons.category_list.delete({ lang_id })
+    ]);
 
     return {
       updated: true
@@ -114,14 +109,16 @@ const delete_category_route = protectedAdminProcedure
       order: index + 1
     }));
     // Update the order of the categories
-    await Promise.allSettled(
-      reordered_categories.map((category) =>
+    await Promise.allSettled([
+      ...reordered_categories.map((category) =>
         db
           .update(lesson_categories)
           .set({ order: category.order })
           .where(eq(lesson_categories.id, category.id))
-      )
-    );
+      ),
+      // invalidate lessons category lis t cache
+      CACHE.lessons.category_list.delete({ lang_id })
+    ]);
 
     return {
       deleted: true

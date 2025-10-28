@@ -332,7 +332,7 @@ function ManageCategoriesDialog({
   }
 
   async function handleSave() {
-    await update_category_list_mut.mutateAsync({ categories: categoryList });
+    await update_category_list_mut.mutateAsync({ categories: categoryList, lang_id: langId });
     onOpenChange(false);
   }
 

@@ -19,7 +19,7 @@ export const TextGesturesSchemaZod = createSelectSchema(text_gestures, {
   created_at: z.coerce.date(),
   updated_at: z.coerce.date(),
   gestures: GestureSchema.array(),
-  text_center_offset: z.tuple([z.number(), z.number()]).default([0, 0])
+  text_center_offset: z.tuple([z.number(), z.number()]).prefault([0, 0])
 });
 
 export const TextLessonsSchemaZod = createSelectSchema(text_lessons, {

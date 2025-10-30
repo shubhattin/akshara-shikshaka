@@ -41,7 +41,7 @@ export const reorder_text_lesson_in_category_func = async (
 };
 
 const get_categories_route = publicProcedure
-  .input(z.object({ lang_id: z.number().int() }))
+  .input(z.object({ lang_id: z.int() }))
   .query(async ({ input: { lang_id } }) => {
     return await CACHE.lessons.category_list.get({ lang_id });
   });
@@ -69,7 +69,7 @@ const add_category_route = protectedAdminProcedure
 const update_category_list_route = protectedAdminProcedure
   .input(
     z.object({
-      lang_id: z.number().int(),
+      lang_id: z.int(),
       categories: LessonCategoriesSchemaZod.pick({ id: true, name: true, order: true }).array()
     })
   )
@@ -92,7 +92,7 @@ const update_category_list_route = protectedAdminProcedure
   });
 
 const delete_category_route = protectedAdminProcedure
-  .input(z.object({ lesson_id: z.number().int(), lang_id: z.number().int() }))
+  .input(z.object({ lesson_id: z.int(), lang_id: z.int() }))
   .mutation(async ({ input: { lesson_id, lang_id } }) => {
     await db
       .delete(lesson_categories)
@@ -129,7 +129,7 @@ const delete_category_route = protectedAdminProcedure
   });
 
 const get_text_lessons_route = protectedAdminProcedure
-  .input(z.object({ category_id: z.number().int().min(0), lang_id: z.number().int() }))
+  .input(z.object({ category_id: z.int().min(0), lang_id: z.int() }))
   .query(async ({ input: { category_id, lang_id } }) => {
     if (category_id > 0) {
       const lessons = await db.query.text_lessons.findMany({
@@ -167,7 +167,7 @@ const update_text_lessons_order_route = protectedAdminProcedure
   .input(
     z.object({
       lesson: TextLessonsSchemaZod.pick({ id: true, order: true }).array(),
-      category_id: z.number().int()
+      category_id: z.int()
     })
   )
   .mutation(async ({ input: { lesson, category_id } }) => {
@@ -191,9 +191,9 @@ const update_text_lessons_order_route = protectedAdminProcedure
 const add_update_lesson_category_route = protectedAdminProcedure
   .input(
     z.object({
-      category_id: z.number().int().min(1).nullable(),
-      prev_category_id: z.number().int().optional(),
-      lesson_id: z.number().int()
+      category_id: z.int().min(1).nullable(),
+      prev_category_id: z.int().optional(),
+      lesson_id: z.int()
     })
   )
   .mutation(async ({ input: { category_id, prev_category_id, lesson_id } }) => {
@@ -219,7 +219,7 @@ const add_update_lesson_category_route = protectedAdminProcedure
   });
 
 const get_category_text_lesson_list_route = publicProcedure
-  .input(z.object({ category_id: z.number().int() }))
+  .input(z.object({ category_id: z.int() }))
   .query(async ({ input: { category_id } }) => {
     const lessons = await CACHE.lessons.category_lesson_list.get({ category_id });
     return lessons;

@@ -19,10 +19,10 @@ const list_audio_assets_route = protectedAdminProcedure
     z.object({
       search_text: z.string().optional(),
       sort_by: z.enum(['created_at', 'updated_at']).optional(),
-      order_by: z.enum(['asc', 'desc']).optional().default('desc'),
-      page: z.number().int().min(1),
-      limit: z.number().int().min(1),
-      lang_id: z.number().int().optional().nullable()
+      order_by: z.enum(['asc', 'desc']).optional().prefault('desc'),
+      page: z.int().min(1),
+      limit: z.int().min(1),
+      lang_id: z.int().optional().nullable()
     })
   )
   .query(async ({ input }) => {
@@ -90,7 +90,7 @@ const list_audio_assets_route = protectedAdminProcedure
 const make_upload_audio_asset_route = protectedAdminProcedure
   .input(
     z.object({
-      lang_id: z.number().int().optional().nullable(),
+      lang_id: z.int().optional().nullable(),
       text: z.string(),
       text_key: z.string(), // The "Normal" Transliterated version
       voice: VoiceTypeEnum,
@@ -136,7 +136,7 @@ const make_upload_audio_asset_route = protectedAdminProcedure
   });
 
 const delete_audio_asset_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int() }))
+  .input(z.object({ id: z.int() }))
   .mutation(async ({ input }) => {
     const result = await db.query.audio_assets.findFirst({
       where: (tbl) => eq(tbl.id, input.id),
@@ -204,7 +204,7 @@ const delete_audio_asset_route = protectedAdminProcedure
 const get_upload_audio_asset_url_route = protectedAdminProcedure
   .input(
     z.object({
-      lang_id: z.number().int().optional().nullable(),
+      lang_id: z.int().optional().nullable(),
       text: z.string(),
       text_key: z.string()
     })
@@ -222,7 +222,7 @@ const get_upload_audio_asset_url_route = protectedAdminProcedure
 const complete_upload_audio_asset_route = protectedAdminProcedure
   .input(
     z.object({
-      lang_id: z.number().int().optional().nullable(),
+      lang_id: z.int().optional().nullable(),
       text: z.string(),
       text_key: z.string(),
       s3_key: z.string()
@@ -252,9 +252,9 @@ const complete_upload_audio_asset_route = protectedAdminProcedure
 const update_audio_asset_route = protectedAdminProcedure
   .input(
     z.object({
-      id: z.number().int(),
+      id: z.int(),
       description: z.string(),
-      lang_id: z.number().int().optional().nullable()
+      lang_id: z.int().optional().nullable()
     })
   )
   .mutation(async ({ input: { id, description, lang_id } }) => {

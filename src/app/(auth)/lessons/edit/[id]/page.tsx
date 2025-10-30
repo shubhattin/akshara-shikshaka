@@ -65,10 +65,7 @@ const get_cached_text_lesson_info = cache(async (id: number) => {
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const id = z.coerce
-    .number()
-    .int()
-    .parse((await params).id);
+  const id = z.int().parse((await params).id);
 
   const text_data = await get_cached_text_lesson_info(id);
 
@@ -84,10 +81,7 @@ const List = async ({ params }: Props) => {
   const session = await getCachedSession();
   if (!session || session.user.role !== 'admin') redirect('/');
 
-  const id = z.coerce
-    .number()
-    .int()
-    .parse((await params).id);
+  const id = z.int().parse((await params).id);
 
   const text_lesson_info = await get_cached_text_lesson_info(id);
   if (!text_lesson_info) {

@@ -54,9 +54,9 @@ const add_text_lesson_route = protectedAdminProcedure
   )
   .output(
     z.object({
-      id: z.number().int(),
-      uuid: z.string().uuid(),
-      added_word_ids: z.array(z.number().int())
+      id: z.int(),
+      uuid: z.uuid(),
+      added_word_ids: z.array(z.int())
     })
   )
   .mutation(
@@ -118,7 +118,7 @@ const update_text_lesson_route = protectedAdminProcedure
         text_lesson_id: true
       })
         .extend({
-          id: z.number().int().optional()
+          id: z.int().optional()
         })
         .array()
     })
@@ -189,7 +189,7 @@ const update_text_lesson_route = protectedAdminProcedure
   );
 
 const delete_text_lesson_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
+  .input(z.object({ id: z.int(), uuid: z.uuid() }))
   .mutation(async ({ input: { id, uuid } }) => {
     // verify the id, uuid combination
     const text_lesson_ = await db.query.text_lessons.findFirst({
@@ -228,7 +228,7 @@ const delete_text_lesson_route = protectedAdminProcedure
   });
 
 const get_text_lesson_word_media_data_route = protectedAdminProcedure
-  .input(z.object({ word_id: z.number().int(), lesson_id: z.number().int() }))
+  .input(z.object({ word_id: z.int(), lesson_id: z.int() }))
   .query(async ({ input: { word_id, lesson_id } }) => {
     const word = await db.query.text_lesson_words.findFirst({
       where: (tbl, { eq }) => and(eq(tbl.id, word_id), eq(tbl.text_lesson_id, lesson_id)),
@@ -261,7 +261,7 @@ const get_text_lesson_word_media_data_route = protectedAdminProcedure
   });
 
 const get_text_lesson_info_route = publicProcedure
-  .input(z.object({ lesson_id: z.number().int() }))
+  .input(z.object({ lesson_id: z.int() }))
   .query(async ({ input: { lesson_id } }) => {
     const lesson = await db.query.text_lessons.findFirst({
       where: eq(text_lessons.id, lesson_id),

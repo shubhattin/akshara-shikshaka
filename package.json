@@ -65,7 +65,7 @@
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.18",
     "drizzle-orm": "^0.43.1",
-    "drizzle-zod": "^0.7.1",
+    "drizzle-zod": "^0.8.3",
     "fabric": "^6.7.1",
     "framer-motion": "^12.23.24",
     "jotai": "^2.15.0",
@@ -95,7 +95,7 @@
     "uuid": "^10.0.0",
     "vaul": "^1.1.2",
     "wavesurfer.js": "^7.11.0",
-    "zod": "^3.25.76"
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.16",

@@ -9,11 +9,11 @@ const submit_user_gesture_recording_route = publicProcedure
     z.object({
       turnstile_token: z.string(),
       text: z.string().min(1),
-      script_id: z.number().int(),
+      script_id: z.int(),
       completed: z.boolean().optional(),
       vectors: z.array(
         z.object({
-          index: z.number().int(),
+          index: z.int(),
           recorded_vector: z.array(z.number()).min(2),
           drawn_vector: z.array(z.number()).min(2),
           recorded_accuracy: z.number().min(0).max(1)

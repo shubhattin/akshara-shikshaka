@@ -104,7 +104,7 @@ const update_list_route = protectedAdminProcedure
   });
 
 const delete_category_route = protectedAdminProcedure
-  .input(z.object({ category_id: z.number().int() }))
+  .input(z.object({ category_id: z.int() }))
   .mutation(async ({ input: { category_id } }) => {
     await db.delete(gesture_categories).where(eq(gesture_categories.id, category_id));
 
@@ -136,7 +136,7 @@ const delete_category_route = protectedAdminProcedure
   });
 
 const get_gestures_route = protectedAdminProcedure
-  .input(z.object({ category_id: z.number().int().min(0), script_id: z.number().int() }))
+  .input(z.object({ category_id: z.int().min(0), script_id: z.int() }))
   .query(async ({ input: { category_id, script_id } }) => {
     if (category_id > 0) {
       const gestures = await db
@@ -194,7 +194,7 @@ const update_gestures_order_route = protectedAdminProcedure
   .input(
     z.object({
       gesture: TextGesturesSchemaZod.pick({ id: true, order: true }).array(),
-      category_id: z.number().int()
+      category_id: z.int()
     })
   )
   .mutation(async ({ input: { gesture, category_id } }) => {
@@ -230,11 +230,11 @@ const update_gestures_order_route = protectedAdminProcedure
 const add_update_gesture_category_route = protectedAdminProcedure
   .input(
     z.object({
-      category_id: z.number().int().min(1).nullable(),
-      prev_category_id: z.number().int().optional(),
+      category_id: z.int().min(1).nullable(),
+      prev_category_id: z.int().optional(),
       gesture_text_key: z.string().min(1),
-      gesture_id: z.number().int(),
-      script_id: z.number().int()
+      gesture_id: z.int(),
+      script_id: z.int()
     })
   )
   .mutation(

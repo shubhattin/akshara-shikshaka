@@ -52,9 +52,9 @@ const list_image_assets_route = protectedAdminProcedure
     z.object({
       search_text: z.string().optional(),
       sort_by: z.enum(['created_at', 'updated_at']).optional(),
-      order_by: z.enum(['asc', 'desc']).optional().default('desc'),
-      page: z.number().int().min(1),
-      limit: z.number().int().min(1)
+      order_by: z.enum(['asc', 'desc']).optional().prefault('desc'),
+      page: z.int().min(1),
+      limit: z.int().min(1)
     })
   )
   .query(async ({ input }) => {
@@ -120,8 +120,8 @@ const openai = createOpenAI({
 const make_upload_image_asset_route = protectedAdminProcedure
   .input(
     z.object({
-      lang_id: z.number().int(),
-      word_script_id: z.number().int(),
+      lang_id: z.int(),
+      word_script_id: z.int(),
       word: z.string(),
       existing_image_prompt: z.string().optional()
     })
@@ -130,8 +130,8 @@ const make_upload_image_asset_route = protectedAdminProcedure
     z.discriminatedUnion('success', [
       z.object({
         success: z.literal(true),
-        time_ms: z.number().int(),
-        id: z.number().int(),
+        time_ms: z.int(),
+        id: z.int(),
         s3_key: z.string(),
         description: z.string(),
         image_prompt: z.string()
@@ -216,7 +216,7 @@ const make_upload_image_asset_route = protectedAdminProcedure
   });
 
 const delete_image_asset_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int() }))
+  .input(z.object({ id: z.int() }))
   .mutation(async ({ input }) => {
     const result = await db.query.image_assets.findFirst({
       where: eq(image_assets.id, input.id),
@@ -275,7 +275,7 @@ const delete_image_asset_route = protectedAdminProcedure
   });
 
 const update_image_asset_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int(), description: z.string() }))
+  .input(z.object({ id: z.int(), description: z.string() }))
   .mutation(async ({ input }) => {
     await db
       .update(image_assets)

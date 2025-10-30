@@ -95,7 +95,7 @@
     "uuid": "^10.0.0",
     "vaul": "^1.1.2",
     "wavesurfer.js": "^7.11.0",
-    "zod": "^3.25.76"
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.16",

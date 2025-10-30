@@ -35,9 +35,9 @@ const add_text_gesture_data_route = protectedAdminProcedure
       text: z.string().min(1),
       textKey: z.string().min(1),
       gestures: GestureSchema.array(),
-      scriptID: z.number().int(),
+      scriptID: z.int(),
       fontFamily: z.string().min(1),
-      fontSize: z.number().int(),
+      fontSize: z.int(),
       textCenterOffset: z.tuple([z.number(), z.number()])
     })
   )
@@ -46,7 +46,7 @@ const add_text_gesture_data_route = protectedAdminProcedure
       z.object({
         success: z.literal(true),
         id: z.number(),
-        uuid: z.string().uuid()
+        uuid: z.uuid()
       }),
       z.object({
         success: z.literal(false),
@@ -103,10 +103,10 @@ const edit_text_gesture_data_route = protectedAdminProcedure
   .input(
     z.object({
       id: z.number(),
-      uuid: z.string().uuid(),
+      uuid: z.uuid(),
       gestures: GestureSchema.array(),
       fontFamily: z.string().min(1),
-      fontSize: z.number().int(),
+      fontSize: z.int(),
       textCenterOffset: z.tuple([z.number(), z.number()])
     })
   )
@@ -130,7 +130,7 @@ const edit_text_gesture_data_route = protectedAdminProcedure
   });
 
 const delete_text_gesture_data_route = protectedAdminProcedure
-  .input(z.object({ id: z.number(), uuid: z.string().uuid(), script_id: z.number().int() }))
+  .input(z.object({ id: z.number(), uuid: z.uuid(), script_id: z.int() }))
   .mutation(async ({ input }) => {
     const [[text_gesture_], data] = await Promise.all([
       db
@@ -206,7 +206,7 @@ const delete_text_gesture_data_route = protectedAdminProcedure
   });
 
 const get_text_gesture_data_route = publicProcedure
-  .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
+  .input(z.object({ id: z.int(), uuid: z.uuid() }))
   .query(async ({ input: { id, uuid } }) => {
     const text_data = CACHE.gestures.gesture_data.get({ gesture_id: id, gesture_uuid: uuid });
     return text_data;

@@ -67,7 +67,7 @@ export const CACHE = {
     category_list: createCache(
       'text_lesson_category_list',
       z.object({
-        lang_id: z.number().int().positive()
+        lang_id: z.int().positive()
       }),
       ({ lang_id }) => `${lang_id}`,
       async ({ lang_id }) => {
@@ -87,7 +87,7 @@ export const CACHE = {
     category_lesson_list: createCache(
       'text_lesson_category_lessons_list',
       z.object({
-        category_id: z.number().int()
+        category_id: z.int()
       }),
       ({ category_id }) => `${category_id}`,
       async ({ category_id }) => {
@@ -112,7 +112,7 @@ export const CACHE = {
     text_lesson_info: createCache(
       'text_lesson_info',
       z.object({
-        lesson_id: z.number().int()
+        lesson_id: z.int()
       }),
       ({ lesson_id }) => `${lesson_id}`,
       async ({ lesson_id }) => {
@@ -175,8 +175,8 @@ export const CACHE = {
     gesture_data: createCache(
       'text_gesture_data',
       z.object({
-        gesture_id: z.number().int(),
-        gesture_uuid: z.string().uuid()
+        gesture_id: z.int(),
+        gesture_uuid: z.uuid()
       }),
       ({ gesture_id, gesture_uuid }) => `${gesture_id}:${gesture_uuid}`,
       async ({ gesture_id, gesture_uuid }) => {

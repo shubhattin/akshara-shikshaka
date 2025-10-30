@@ -24,7 +24,7 @@ export const AnimationsFunctionsEnumSchema = z.enum(ANIMATION_FUNCTIONS);
 export const StrokePathSchema = z.tuple([z.number(), z.number()]);
 
 export const GestureSchema = z.object({
-  index: z.number().int(),
+  index: z.int(),
   width: z.number(),
   color: z.string(),
   duration: z.number(),

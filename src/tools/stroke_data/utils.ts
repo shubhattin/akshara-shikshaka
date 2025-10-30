@@ -13,7 +13,7 @@ export type GestureAnimationFrame = {
 };
 
 const GenerateGestureAnimationFramesOptions = z.object({
-  maxSteps: z.number().int().min(2).optional().default(50)
+  maxSteps: z.int().min(2).optional().prefault(50)
 });
 
 // Map timing function names to easing implementations

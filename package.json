@@ -65,7 +65,7 @@
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.18",
     "drizzle-orm": "^0.43.1",
-    "drizzle-zod": "^0.7.1",
+    "drizzle-zod": "^0.8.3",
     "fabric": "^6.7.1",
     "framer-motion": "^12.23.24",
     "jotai": "^2.15.0",

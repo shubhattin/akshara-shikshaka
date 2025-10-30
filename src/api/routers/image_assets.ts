@@ -11,6 +11,8 @@ import { generateImageGptImage1 } from '~/utils/ai/image.server';
 import { resizeImage } from '~/utils/sharp/resize.server';
 import { deleteAssetFile, uploadAssetFile } from '~/utils/s3/upload_file.server';
 import { format_string_text } from '~/tools/kry';
+import { waitUntil } from '@vercel/functions';
+import { CACHE } from '../cache';
 
 const SYSTEN_PROMPT = `
 You have to generate an image prompt, file name and description for the word provided. 
@@ -217,11 +219,25 @@ const delete_image_asset_route = protectedAdminProcedure
   .input(z.object({ id: z.number().int() }))
   .mutation(async ({ input }) => {
     const result = await db.query.image_assets.findFirst({
+      where: eq(image_assets.id, input.id),
       columns: {
         s3_key: true,
         id: true
       },
-      where: eq(image_assets.id, input.id)
+      with: {
+        words: {
+          columns: {
+            id: true
+          },
+          with: {
+            lesson: {
+              columns: {
+                id: true
+              }
+            }
+          }
+        }
+      }
     });
     if (!result) {
       return {
@@ -234,6 +250,24 @@ const delete_image_asset_route = protectedAdminProcedure
       deleteAssetFile(result.s3_key),
       db.delete(image_assets).where(eq(image_assets.id, input.id))
     ]);
+
+    waitUntil(
+      (async () => {
+        // finding the lessons connected to this image asset
+        // and refresh the cache for each lesson in background
+        const lesson_ids_to_invalidate = new Set<number>();
+        result.words.forEach((word) => {
+          lesson_ids_to_invalidate.add(word.lesson.id);
+        });
+        if (lesson_ids_to_invalidate.size > 0) {
+          Promise.all(
+            Array.from(lesson_ids_to_invalidate).map((lesson_id) =>
+              CACHE.lessons.text_lesson_info.refresh({ lesson_id })
+            )
+          );
+        }
+      })()
+    );
 
     return {
       deleted: true

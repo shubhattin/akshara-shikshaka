@@ -90,6 +90,9 @@ const add_text_lesson_route = protectedAdminProcedure
           : []
       ]);
 
+      // cache for faster future access
+      waitUntil(CACHE.lessons.text_lesson_info.refresh({ lesson_id: result[0].id }));
+
       return {
         id: result[0].id,
         uuid: result[0].uuid,
@@ -171,8 +174,12 @@ const update_text_lesson_route = protectedAdminProcedure
             .update(text_lesson_words)
             .set(word)
             .where(and(eq(text_lesson_words.id, word.id), eq(text_lesson_words.text_lesson_id, id)))
-        )
+        ),
+        CACHE.lessons.text_lesson_info.delete({ lesson_id: id })
       ]);
+
+      // in the background refresh the cache
+      waitUntil(CACHE.lessons.text_lesson_info.refresh({ lesson_id: id }));
 
       return {
         updated: true,
@@ -201,9 +208,11 @@ const delete_text_lesson_route = protectedAdminProcedure
       // deletes both the lesson gestures and associated words with it
       // due to the cascade delete constraint
 
-      // run this after delete of lesson
       // reordering the catoegory id after deletion if needed
-      text_lesson_.category_id && reorder_text_lesson_in_category_func(text_lesson_.category_id, id)
+      text_lesson_.category_id &&
+        reorder_text_lesson_in_category_func(text_lesson_.category_id, id),
+      // delete cache
+      CACHE.lessons.text_lesson_info.delete({ lesson_id: id })
     ]);
     // refreshing cache of the category it was part of
     text_lesson_.category_id &&

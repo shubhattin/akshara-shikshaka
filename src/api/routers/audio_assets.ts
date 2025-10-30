@@ -11,6 +11,8 @@ import {
   getAudioAssetUploadUrl
 } from '~/utils/s3/upload_file.server';
 import { get_lang_from_id } from '~/state/lang_list';
+import { waitUntil } from '@vercel/functions';
+import { CACHE } from '../cache';
 
 const list_audio_assets_route = protectedAdminProcedure
   .input(
@@ -137,11 +139,30 @@ const delete_audio_asset_route = protectedAdminProcedure
   .input(z.object({ id: z.number().int() }))
   .mutation(async ({ input }) => {
     const result = await db.query.audio_assets.findFirst({
+      where: (tbl) => eq(tbl.id, input.id),
       columns: {
         s3_key: true,
         id: true
       },
-      where: (tbl) => eq(tbl.id, input.id)
+      with: {
+        optional_lessons: {
+          columns: {
+            id: true
+          }
+        },
+        words: {
+          columns: {
+            id: true
+          },
+          with: {
+            lesson: {
+              columns: {
+                id: true
+              }
+            }
+          }
+        }
+      }
     });
     if (!result) {
       return {
@@ -154,6 +175,26 @@ const delete_audio_asset_route = protectedAdminProcedure
       deleteAssetFile(result.s3_key),
       db.delete(audio_assets).where(eq(audio_assets.id, input.id))
     ]);
+
+    waitUntil(
+      (async () => {
+        // finding the lessons connected to this audio asset
+        const lesson_ids_to_invalidate = new Set<number>();
+        result.optional_lessons.forEach((lesson) => {
+          lesson_ids_to_invalidate.add(lesson.id);
+        });
+        result.words.forEach((word) => {
+          lesson_ids_to_invalidate.add(word.lesson.id);
+        });
+        if (lesson_ids_to_invalidate.size > 0) {
+          Promise.all(
+            Array.from(lesson_ids_to_invalidate).map((lesson_id) =>
+              CACHE.lessons.text_lesson_info.refresh({ lesson_id })
+            )
+          );
+        }
+      })()
+    );
 
     return {
       deleted: true

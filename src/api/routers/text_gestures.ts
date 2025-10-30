@@ -10,6 +10,8 @@ import {
   gesture_categories_router,
   reorder_text_gesture_in_category_func
 } from './gesture_categories';
+import { waitUntil } from '@vercel/functions';
+import { CACHE } from '../cache';
 
 const connect_gestures_to_text_lessons_func = async (textKey: string, text_gesture_id: number) => {
   const lessons = await db.query.text_lessons.findMany({
@@ -82,6 +84,14 @@ const add_text_gesture_data_route = protectedAdminProcedure
     // and connect them to the text gesture via the join table `lesson_gestures`
     await connect_gestures_to_text_lessons_func(input.textKey.trim(), result[0].id);
 
+    // precache the new gesture data for faster future access
+    waitUntil(
+      CACHE.gestures.gesture_data.refresh({
+        gesture_id: result[0].id,
+        gesture_uuid: result[0].uuid
+      })
+    );
+
     return {
       success: true,
       id: result[0].id,
@@ -110,6 +120,10 @@ const edit_text_gesture_data_route = protectedAdminProcedure
         text_center_offset: input.textCenterOffset
       })
       .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)));
+
+    waitUntil(
+      CACHE.gestures.gesture_data.refresh({ gesture_id: input.id, gesture_uuid: input.uuid })
+    );
     return {
       updated: true
     };
@@ -118,24 +132,45 @@ const edit_text_gesture_data_route = protectedAdminProcedure
 const delete_text_gesture_data_route = protectedAdminProcedure
   .input(z.object({ id: z.number(), uuid: z.string().uuid(), script_id: z.number().int() }))
   .mutation(async ({ input }) => {
-    const [text_gesture_] = await db
-      .select({
-        id: text_gestures.id,
-        category_id: gesture_text_key_category_join.category_id
-      })
-      .from(text_gestures)
-      .leftJoin(
-        gesture_text_key_category_join,
-        eq(text_gestures.text_key, gesture_text_key_category_join.gesture_text_key)
-      )
-      .where(
-        and(
-          eq(text_gestures.uuid, input.uuid),
-          eq(text_gestures.id, input.id),
-          eq(text_gestures.script_id, input.script_id)
+    const [[text_gesture_], data] = await Promise.all([
+      db
+        .select({
+          id: text_gestures.id,
+          category_id: gesture_text_key_category_join.category_id
+        })
+        .from(text_gestures)
+        .leftJoin(
+          gesture_text_key_category_join,
+          eq(text_gestures.text_key, gesture_text_key_category_join.gesture_text_key)
         )
-      )
-      .limit(1);
+        .where(
+          and(
+            eq(text_gestures.uuid, input.uuid),
+            eq(text_gestures.id, input.id),
+            eq(text_gestures.script_id, input.script_id)
+          )
+        )
+        .limit(1),
+      // prefetching this data as after deletion it wont be available
+      db.query.text_gestures.findFirst({
+        where: (table, { eq }) =>
+          and(
+            eq(table.id, input.id),
+            eq(table.uuid, input.uuid),
+            eq(table.script_id, input.script_id)
+          ),
+        columns: {
+          id: true
+        },
+        with: {
+          lessons: {
+            columns: {
+              text_lesson_id: true
+            }
+          }
+        }
+      })
+    ]);
     if (!text_gesture_) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Text gesture not found' });
     }
@@ -145,8 +180,25 @@ const delete_text_gesture_data_route = protectedAdminProcedure
         reorder_text_gesture_in_category_func(text_gesture_.category_id, input.script_id, input.id),
       db
         .delete(text_gestures)
-        .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)))
+        .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id))),
+      // delete gesture data cache on gesture deletion
+      CACHE.gestures.gesture_data.delete({ gesture_id: input.id, gesture_uuid: input.uuid })
     ]);
+
+    waitUntil(
+      (async () => {
+        // scan for existing text lesson connection that might need revalidating the cache
+        if (!data) return;
+        // if more than one associated text lesson then invalidate the cache
+        if (data.lessons.length > 0) {
+          Promise.all(
+            data.lessons.map(({ text_lesson_id }) =>
+              CACHE.lessons.text_lesson_info.refresh({ lesson_id: text_lesson_id })
+            )
+          );
+        }
+      })()
+    );
 
     return {
       deleted: true
@@ -156,16 +208,7 @@ const delete_text_gesture_data_route = protectedAdminProcedure
 const get_text_gesture_data_route = publicProcedure
   .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
   .query(async ({ input: { id, uuid } }) => {
-    const text_data = await db.query.text_gestures.findFirst({
-      where: (table, { eq }) => and(eq(table.id, id), eq(table.uuid, uuid)),
-      columns: {
-        id: true,
-        uuid: true,
-        text: true,
-        gestures: true,
-        script_id: true
-      }
-    });
+    const text_data = CACHE.gestures.gesture_data.get({ gesture_id: id, gesture_uuid: uuid });
     return text_data;
   });
 

@@ -245,7 +245,7 @@ const add_update_gesture_category_route = protectedAdminProcedure
         where: (tbl, { and, eq }) =>
           prev_category_id
             ? and(eq(tbl.gesture_text_key, gesture_text_key), eq(tbl.category_id, prev_category_id))
-            : and(eq(tbl.gesture_text_key, gesture_text_key))
+            : eq(tbl.gesture_text_key, gesture_text_key)
       });
       await Promise.allSettled([
         db

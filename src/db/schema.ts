@@ -52,11 +52,10 @@ export const gesture_text_key_category_join = pgTable(
   'gesture_text_key_category_join',
   {
     id: serial().primaryKey(),
-    gesture_text_key: text().notNull(),
+    gesture_text_key: text().notNull().unique(),
     category_id: integer().notNull()
   },
   (table) => [
-    unique('gesture_text_key_category_join_unique').on(table.gesture_text_key, table.category_id),
     foreignKey({
       name: 'text_key_category_id_fk',
       columns: [table.category_id],

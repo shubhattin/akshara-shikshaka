@@ -11,16 +11,18 @@ import {
   getAudioAssetUploadUrl
 } from '~/utils/s3/upload_file.server';
 import { get_lang_from_id } from '~/state/lang_list';
+import { waitUntil } from '@vercel/functions';
+import { CACHE } from '../cache';
 
 const list_audio_assets_route = protectedAdminProcedure
   .input(
     z.object({
       search_text: z.string().optional(),
       sort_by: z.enum(['created_at', 'updated_at']).optional(),
-      order_by: z.enum(['asc', 'desc']).optional().default('desc'),
-      page: z.number().int().min(1),
-      limit: z.number().int().min(1),
-      lang_id: z.number().int().optional().nullable()
+      order_by: z.enum(['asc', 'desc']).optional().prefault('desc'),
+      page: z.int().min(1),
+      limit: z.int().min(1),
+      lang_id: z.int().optional().nullable()
     })
   )
   .query(async ({ input }) => {
@@ -88,7 +90,7 @@ const list_audio_assets_route = protectedAdminProcedure
 const make_upload_audio_asset_route = protectedAdminProcedure
   .input(
     z.object({
-      lang_id: z.number().int().optional().nullable(),
+      lang_id: z.int().optional().nullable(),
       text: z.string(),
       text_key: z.string(), // The "Normal" Transliterated version
       voice: VoiceTypeEnum,
@@ -134,14 +136,33 @@ const make_upload_audio_asset_route = protectedAdminProcedure
   });
 
 const delete_audio_asset_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int() }))
+  .input(z.object({ id: z.int() }))
   .mutation(async ({ input }) => {
     const result = await db.query.audio_assets.findFirst({
+      where: (tbl) => eq(tbl.id, input.id),
       columns: {
         s3_key: true,
         id: true
       },
-      where: (tbl) => eq(tbl.id, input.id)
+      with: {
+        optional_lessons: {
+          columns: {
+            id: true
+          }
+        },
+        words: {
+          columns: {
+            id: true
+          },
+          with: {
+            lesson: {
+              columns: {
+                id: true
+              }
+            }
+          }
+        }
+      }
     });
     if (!result) {
       return {
@@ -155,6 +176,26 @@ const delete_audio_asset_route = protectedAdminProcedure
       db.delete(audio_assets).where(eq(audio_assets.id, input.id))
     ]);
 
+    waitUntil(
+      (async () => {
+        // finding the lessons connected to this audio asset
+        const lesson_ids_to_invalidate = new Set<number>();
+        result.optional_lessons.forEach((lesson) => {
+          lesson_ids_to_invalidate.add(lesson.id);
+        });
+        result.words.forEach((word) => {
+          lesson_ids_to_invalidate.add(word.lesson.id);
+        });
+        if (lesson_ids_to_invalidate.size > 0) {
+          await Promise.allSettled(
+            Array.from(lesson_ids_to_invalidate).map((lesson_id) =>
+              CACHE.lessons.text_lesson_info.refresh({ lesson_id })
+            )
+          );
+        }
+      })()
+    );
+
     return {
       deleted: true
     };
@@ -163,7 +204,7 @@ const delete_audio_asset_route = protectedAdminProcedure
 const get_upload_audio_asset_url_route = protectedAdminProcedure
   .input(
     z.object({
-      lang_id: z.number().int().optional().nullable(),
+      lang_id: z.int().optional().nullable(),
       text: z.string(),
       text_key: z.string()
     })
@@ -181,7 +222,7 @@ const get_upload_audio_asset_url_route = protectedAdminProcedure
 const complete_upload_audio_asset_route = protectedAdminProcedure
   .input(
     z.object({
-      lang_id: z.number().int().optional().nullable(),
+      lang_id: z.int().optional().nullable(),
       text: z.string(),
       text_key: z.string(),
       s3_key: z.string()
@@ -211,9 +252,9 @@ const complete_upload_audio_asset_route = protectedAdminProcedure
 const update_audio_asset_route = protectedAdminProcedure
   .input(
     z.object({
-      id: z.number().int(),
+      id: z.int(),
       description: z.string(),
-      lang_id: z.number().int().optional().nullable()
+      lang_id: z.int().optional().nullable()
     })
   )
   .mutation(async ({ input: { id, description, lang_id } }) => {

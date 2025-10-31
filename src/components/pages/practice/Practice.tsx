@@ -396,7 +396,7 @@ function Practice({ text_data }: Props) {
               disabled={canvasCurrentMode === 'playing'}
               className={cn(
                 'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
-                'bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-lg',
+                'bg-linear-to-r from-blue-400 to-blue-600 text-white shadow-lg',
                 'hover:scale-105 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
                 'focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none',
                 'disabled:cursor-not-allowed disabled:opacity-60',
@@ -423,7 +423,7 @@ function Practice({ text_data }: Props) {
               disabled={canvasCurrentMode === 'playing'}
               className={cn(
                 'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
-                'bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 text-white shadow-lg',
+                'bg-linear-to-r from-pink-500 via-red-500 to-yellow-500 text-white shadow-lg',
                 'hover:scale-105 hover:from-pink-600 hover:via-red-600 hover:to-yellow-600 hover:shadow-xl',
                 'focus:ring-2 focus:ring-pink-400 focus:ring-offset-2 focus:outline-none',
                 'disabled:cursor-not-allowed disabled:opacity-60',
@@ -444,7 +444,7 @@ function Practice({ text_data }: Props) {
               disabled={isAnimatingCurrentGesture || completedGesturesCount === totalGestures}
               className={cn(
                 'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
-                'bg-gradient-to-r from-blue-400 to-blue-600 text-white shadow-lg',
+                'bg-linear-to-r from-blue-400 to-blue-600 text-white shadow-lg',
                 'hover:scale-105 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
                 'focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none',
                 'disabled:cursor-not-allowed disabled:opacity-60',
@@ -462,7 +462,7 @@ function Practice({ text_data }: Props) {
               }}
               className={cn(
                 'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
-                'bg-gradient-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-lg',
+                'bg-linear-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-lg',
                 'hover:scale-105 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-xl',
                 'focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none',
                 'disabled:cursor-not-allowed disabled:opacity-60',
@@ -490,8 +490,8 @@ function Practice({ text_data }: Props) {
         <div className="flex justify-center">
           <motion.div
             className={cn(
-              'space-y-4 rounded-xl border border-gray-200 bg-gradient-to-br from-white via-gray-50 to-gray-100 p-6 text-center shadow-lg',
-              'dark:border-gray-700 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-700'
+              'space-y-4 rounded-xl border border-gray-200 bg-linear-to-br from-white via-gray-50 to-gray-100 p-6 text-center shadow-lg',
+              'dark:border-gray-700 dark:bg-linear-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-700'
             )}
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -514,7 +514,7 @@ function Practice({ text_data }: Props) {
               }}
               className={cn(
                 'relative inline-flex items-center rounded-lg px-4 py-2 font-semibold transition-all duration-200',
-                'bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 text-yellow-900 shadow-md',
+                'bg-linear-to-r from-yellow-400 via-orange-400 to-yellow-500 text-yellow-900 shadow-md',
                 'hover:scale-105 hover:from-yellow-500 hover:via-orange-500 hover:to-yellow-600 hover:shadow-lg',
                 'focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:outline-none',
                 'disabled:cursor-not-allowed disabled:opacity-60',
@@ -648,7 +648,7 @@ const TryAgainSection = ({
                 onClick={() => onTryAgain()}
                 className={cn(
                   'flex items-center justify-center space-x-2 rounded-lg px-5 py-2.5 font-semibold shadow-lg transition-all duration-200',
-                  'bg-gradient-to-r from-orange-400 to-red-500 text-white',
+                  'bg-linear-to-r from-orange-400 to-red-500 text-white',
                   'hover:from-orange-500 hover:to-red-600 hover:shadow-xl',
                   'focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 focus:outline-none',
                   'dark:from-orange-600 dark:to-red-700 dark:hover:from-orange-700 dark:hover:to-red-800'
@@ -664,7 +664,7 @@ const TryAgainSection = ({
                 onClick={onSkipGesture}
                 className={cn(
                   'flex items-center justify-center space-x-2 rounded-lg px-5 py-2.5 font-semibold shadow-lg transition-all duration-200',
-                  'bg-gradient-to-r from-blue-400 to-blue-600 text-white',
+                  'bg-linear-to-r from-blue-400 to-blue-600 text-white',
                   'hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
                   'focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none',
                   'dark:from-blue-600 dark:to-blue-800 dark:hover:from-blue-700 dark:hover:to-blue-900'
@@ -729,7 +729,7 @@ const ProgressDisplay = ({
 }) => {
   return (
     <motion.div
-      className="inline-flex items-center justify-center space-x-6 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 shadow-lg dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30"
+      className="inline-flex items-center justify-center space-x-6 rounded-xl border border-blue-100 bg-linear-to-r from-blue-50 to-indigo-50 px-6 py-4 shadow-lg dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30"
       initial={{ y: -40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: -40, opacity: 0 }}
@@ -740,7 +740,7 @@ const ProgressDisplay = ({
         <motion.div
           animate={{ rotate: [0, 360] }}
           transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-          className="flex-shrink-0"
+          className="shrink-0"
         >
           <FiTrendingUp className="text-2xl text-blue-500 dark:text-blue-400" />
         </motion.div>
@@ -760,7 +760,7 @@ const ProgressDisplay = ({
       </div>
 
       {/* Separator */}
-      <div className="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-600"></div>
+      <div className="h-8 w-px bg-linear-to-b from-transparent via-gray-300 to-transparent dark:via-gray-600"></div>
 
       {/* Completed Gestures */}
       <div className="flex items-center space-x-2">
@@ -774,7 +774,7 @@ const ProgressDisplay = ({
             repeat: Infinity,
             ease: 'easeInOut'
           }}
-          className="flex-shrink-0"
+          className="shrink-0"
         >
           <MdCheckCircle className="text-2xl text-green-500 dark:text-green-400" />
         </motion.div>

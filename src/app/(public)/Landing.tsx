@@ -35,7 +35,7 @@ export default function Home() {
   const StartLearningButton = (
     <Button
       size="lg"
-      className="bg-gradient-to-r from-amber-500 to-orange-500 text-lg font-semibold text-white shadow-lg hover:from-amber-600 hover:to-orange-600"
+      className="bg-linear-to-r from-amber-500 to-orange-500 text-lg font-semibold text-white shadow-lg hover:from-amber-600 hover:to-orange-600"
       asChild
     >
       <Link href="/learn">
@@ -64,7 +64,7 @@ export default function Home() {
               <BsStars className="mx-auto text-5xl text-amber-500 md:text-6xl" />
             </motion.div>
 
-            <h1 className="mb-5 bg-gradient-to-r from-amber-600 via-orange-500 to-rose-500 bg-clip-text text-4xl font-bold text-transparent md:text-5xl lg:text-6xl">
+            <h1 className="mb-5 bg-linear-to-r from-amber-600 via-orange-500 to-rose-500 bg-clip-text text-4xl font-bold text-transparent md:text-5xl lg:text-6xl">
               Learn Scripts, The Interactive Way
             </h1>
 
@@ -146,7 +146,7 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="bg-gradient-to-b from-slate-50 to-white px-4 py-12 md:py-16 dark:from-slate-900 dark:to-slate-800">
+      <section className="bg-linear-to-b from-slate-50 to-white px-4 py-12 md:py-16 dark:from-slate-900 dark:to-slate-800">
         <div className="mx-auto max-w-6xl">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -173,7 +173,7 @@ export default function Home() {
             {/* Feature Card 1 */}
             <motion.div variants={itemVariants} transition={{ duration: 0.5 }}>
               <Card className="group h-full border-2 border-slate-200 bg-white p-6 transition-all hover:border-emerald-400 hover:shadow-xl dark:border-slate-700 dark:bg-slate-800">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-lg">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-linear-to-br from-emerald-400 to-teal-500 text-white shadow-lg">
                   <MdDraw className="text-2xl" />
                 </div>
                 <h3 className="mb-3 text-xl font-semibold text-slate-800 dark:text-slate-100">
@@ -189,7 +189,7 @@ export default function Home() {
             {/* Feature Card 2 */}
             <motion.div variants={itemVariants} transition={{ duration: 0.5 }}>
               <Card className="group h-full border-2 border-slate-200 bg-white p-6 transition-all hover:border-rose-400 hover:shadow-xl dark:border-slate-700 dark:bg-slate-800">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-lg">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-linear-to-br from-rose-400 to-pink-500 text-white shadow-lg">
                   <MdRecordVoiceOver className="text-2xl" />
                 </div>
                 <h3 className="mb-3 text-xl font-semibold text-slate-800 dark:text-slate-100">
@@ -205,7 +205,7 @@ export default function Home() {
             {/* Feature Card 3 */}
             <motion.div variants={itemVariants} transition={{ duration: 0.5 }}>
               <Card className="group h-full border-2 border-slate-200 bg-white p-6 transition-all hover:border-amber-400 hover:shadow-xl dark:border-slate-700 dark:bg-slate-800">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow-lg">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-linear-to-br from-amber-400 to-yellow-500 text-white shadow-lg">
                   <IoLanguage className="text-2xl" />
                 </div>
                 <h3 className="mb-3 text-xl font-semibold text-slate-800 dark:text-slate-100">
@@ -221,7 +221,7 @@ export default function Home() {
             {/* Feature Card 4 */}
             <motion.div variants={itemVariants} transition={{ duration: 0.5 }}>
               <Card className="group h-full border-2 border-slate-200 bg-white p-6 transition-all hover:border-purple-400 hover:shadow-xl dark:border-slate-700 dark:bg-slate-800">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-purple-400 to-indigo-500 text-white shadow-lg">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-linear-to-br from-purple-400 to-indigo-500 text-white shadow-lg">
                   <FaBookOpen className="text-2xl" />
                 </div>
                 <h3 className="mb-3 text-xl font-semibold text-slate-800 dark:text-slate-100">
@@ -237,7 +237,7 @@ export default function Home() {
             {/* Feature Card 5 */}
             <motion.div variants={itemVariants} transition={{ duration: 0.5 }}>
               <Card className="group h-full border-2 border-slate-200 bg-white p-6 transition-all hover:border-cyan-400 hover:shadow-xl dark:border-slate-700 dark:bg-slate-800">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 text-white shadow-lg">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-linear-to-br from-cyan-400 to-blue-500 text-white shadow-lg">
                   <FaVolumeUp className="text-2xl" />
                 </div>
                 <h3 className="mb-3 text-xl font-semibold text-slate-800 dark:text-slate-100">
@@ -253,7 +253,7 @@ export default function Home() {
             {/* Feature Card 6 */}
             <motion.div variants={itemVariants} transition={{ duration: 0.5 }}>
               <Card className="group h-full border-2 border-slate-200 bg-white p-6 transition-all hover:border-orange-400 hover:shadow-xl dark:border-slate-700 dark:bg-slate-800">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-orange-400 to-red-500 text-white shadow-lg">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-linear-to-br from-orange-400 to-red-500 text-white shadow-lg">
                   <FaPencilAlt className="text-2xl" />
                 </div>
                 <h3 className="mb-3 text-xl font-semibold text-slate-800 dark:text-slate-100">
@@ -293,7 +293,7 @@ export default function Home() {
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="overflow-hidden rounded-2xl border-2 border-slate-200 bg-gradient-to-br from-white via-amber-50 to-orange-50 p-8 shadow-2xl md:p-12 dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900"
+            className="overflow-hidden rounded-2xl border-2 border-slate-200 bg-linear-to-br from-white via-amber-50 to-orange-50 p-8 shadow-2xl md:p-12 dark:border-slate-700 dark:from-slate-800 dark:via-slate-800 dark:to-slate-900"
           >
             <div className="grid gap-8 md:grid-cols-2">
               <motion.div
@@ -365,7 +365,7 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 px-4 py-16 md:py-20">
+      <section className="bg-linear-to-r from-amber-500 via-orange-500 to-rose-500 px-4 py-16 md:py-20">
         <div className="mx-auto max-w-4xl text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

@@ -1,0 +1,2 @@
+ALTER TABLE "gesture_text_key_category_join" DROP CONSTRAINT "gesture_text_key_category_join_unique";--> statement-breakpoint
+ALTER TABLE "gesture_text_key_category_join" ADD CONSTRAINT "gesture_text_key_category_join_gesture_text_key_unique" UNIQUE("gesture_text_key");

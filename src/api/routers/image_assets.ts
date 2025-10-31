@@ -11,6 +11,8 @@ import { generateImageGptImage1 } from '~/utils/ai/image.server';
 import { resizeImage } from '~/utils/sharp/resize.server';
 import { deleteAssetFile, uploadAssetFile } from '~/utils/s3/upload_file.server';
 import { format_string_text } from '~/tools/kry';
+import { waitUntil } from '@vercel/functions';
+import { CACHE } from '../cache';
 
 const SYSTEN_PROMPT = `
 You have to generate an image prompt, file name and description for the word provided. 
@@ -50,9 +52,9 @@ const list_image_assets_route = protectedAdminProcedure
     z.object({
       search_text: z.string().optional(),
       sort_by: z.enum(['created_at', 'updated_at']).optional(),
-      order_by: z.enum(['asc', 'desc']).optional().default('desc'),
-      page: z.number().int().min(1),
-      limit: z.number().int().min(1)
+      order_by: z.enum(['asc', 'desc']).optional().prefault('desc'),
+      page: z.int().min(1),
+      limit: z.int().min(1)
     })
   )
   .query(async ({ input }) => {
@@ -118,8 +120,8 @@ const openai = createOpenAI({
 const make_upload_image_asset_route = protectedAdminProcedure
   .input(
     z.object({
-      lang_id: z.number().int(),
-      word_script_id: z.number().int(),
+      lang_id: z.int(),
+      word_script_id: z.int(),
       word: z.string(),
       existing_image_prompt: z.string().optional()
     })
@@ -128,8 +130,8 @@ const make_upload_image_asset_route = protectedAdminProcedure
     z.discriminatedUnion('success', [
       z.object({
         success: z.literal(true),
-        time_ms: z.number().int(),
-        id: z.number().int(),
+        time_ms: z.int(),
+        id: z.int(),
         s3_key: z.string(),
         description: z.string(),
         image_prompt: z.string()
@@ -214,14 +216,28 @@ const make_upload_image_asset_route = protectedAdminProcedure
   });
 
 const delete_image_asset_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int() }))
+  .input(z.object({ id: z.int() }))
   .mutation(async ({ input }) => {
     const result = await db.query.image_assets.findFirst({
+      where: eq(image_assets.id, input.id),
       columns: {
         s3_key: true,
         id: true
       },
-      where: eq(image_assets.id, input.id)
+      with: {
+        words: {
+          columns: {
+            id: true
+          },
+          with: {
+            lesson: {
+              columns: {
+                id: true
+              }
+            }
+          }
+        }
+      }
     });
     if (!result) {
       return {
@@ -235,13 +251,31 @@ const delete_image_asset_route = protectedAdminProcedure
       db.delete(image_assets).where(eq(image_assets.id, input.id))
     ]);
 
+    waitUntil(
+      (async () => {
+        // finding the lessons connected to this image asset
+        // and refresh the cache for each lesson in background
+        const lesson_ids_to_invalidate = new Set<number>();
+        result.words.forEach((word) => {
+          lesson_ids_to_invalidate.add(word.lesson.id);
+        });
+        if (lesson_ids_to_invalidate.size > 0) {
+          await Promise.allSettled(
+            Array.from(lesson_ids_to_invalidate).map((lesson_id) =>
+              CACHE.lessons.text_lesson_info.refresh({ lesson_id })
+            )
+          );
+        }
+      })()
+    );
+
     return {
       deleted: true
     };
   });
 
 const update_image_asset_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int(), description: z.string() }))
+  .input(z.object({ id: z.int(), description: z.string() }))
   .mutation(async ({ input }) => {
     await db
       .update(image_assets)

@@ -1,5 +1,5 @@
 'use client';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { atom, useAtom, useAtomValue } from 'jotai';
 import {
   selected_language_id_atom,
   lesson_category_type,
@@ -7,7 +7,7 @@ import {
   selected_lesson_id_atom,
   selected_script_id_atom
 } from './learn_page_state';
-import { get_lang_from_id, get_script_from_id } from '~/state/lang_list';
+import { get_lang_from_id, get_script_from_id, lang_list_obj } from '~/state/lang_list';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '~/api/client';
 import { useState, useEffect, useRef } from 'react';
@@ -27,12 +27,25 @@ import Practice from '~/components/pages/practice/Practice';
 import { Provider as JotaiProvider } from 'jotai';
 import { MdPlayArrow, MdStop } from 'react-icons/md';
 import { lipi_parivartak } from '~/tools/lipi_lekhika';
+import { useHydrateAtoms } from 'jotai/utils';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
+  init_lang_id: number;
 };
 
-export default function LearnPage({ init_lesson_categories }: Props) {
+const lang_id_atom = atom(lang_list_obj.Sanskrit);
+
+export default function LearnPageComponent(props: Props) {
+  useHydrateAtoms([[lang_id_atom, props.init_lang_id]]);
+  return (
+    <>
+      <LearnPage {...props}></LearnPage>
+    </>
+  );
+}
+
+function LearnPage({ init_lesson_categories }: Props) {
   const trpc = useTRPC();
   const selectedLanguageId = useAtomValue(selected_language_id_atom);
   const [selectedCategoryId, setSelectedCategoryId] = useAtom(selected_category_id_atom);
@@ -146,6 +159,7 @@ export default function LearnPage({ init_lesson_categories }: Props) {
 const LessonList = ({ lesson_id }: { lesson_id: number }) => {
   const [scriptId, setScriptId] = useAtom(selected_script_id_atom);
   const trpc = useTRPC();
+
   const lesson_info_q = useQuery(
     trpc.text_lessons.get_text_lesson_info.queryOptions(
       { lesson_id: lesson_id },

@@ -332,7 +332,7 @@ function ManageCategoriesDialog({
   }
 
   async function handleSave() {
-    await update_category_list_mut.mutateAsync({ categories: categoryList });
+    await update_category_list_mut.mutateAsync({ categories: categoryList, lang_id: langId });
     onOpenChange(false);
   }
 
@@ -654,6 +654,7 @@ function CategorizedLessonsList({
   const queryClient = useQueryClient();
   const [unordered, setUnordered] = useState<LessonItem[]>([]);
   const [ordered, setOrdered] = useState<LessonItem[]>([]);
+  const langId = useAtomValue(lang_id_atom);
 
   useEffect(() => {
     const unorderedInit = (lessons ?? []).filter((l) => l.order === null);

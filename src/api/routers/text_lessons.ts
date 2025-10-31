@@ -9,6 +9,8 @@ import {
   reorder_text_lesson_in_category_func,
   lesson_categories_router
 } from './lesson_categories';
+import { waitUntil } from '@vercel/functions';
+import { CACHE } from '../cache';
 
 const connect_gestures_to_text_lessons_func = async (textKey: string, text_lesson_id: number) => {
   const gestures = await db.query.text_gestures.findMany({
@@ -52,9 +54,9 @@ const add_text_lesson_route = protectedAdminProcedure
   )
   .output(
     z.object({
-      id: z.number().int(),
-      uuid: z.string().uuid(),
-      added_word_ids: z.array(z.number().int())
+      id: z.int(),
+      uuid: z.uuid(),
+      added_word_ids: z.array(z.int())
     })
   )
   .mutation(
@@ -88,6 +90,9 @@ const add_text_lesson_route = protectedAdminProcedure
           : []
       ]);
 
+      // cache for faster future access
+      waitUntil(CACHE.lessons.text_lesson_info.refresh({ lesson_id: result[0].id }));
+
       return {
         id: result[0].id,
         uuid: result[0].uuid,
@@ -113,7 +118,7 @@ const update_text_lesson_route = protectedAdminProcedure
         text_lesson_id: true
       })
         .extend({
-          id: z.number().int().optional()
+          id: z.int().optional()
         })
         .array()
     })
@@ -169,8 +174,12 @@ const update_text_lesson_route = protectedAdminProcedure
             .update(text_lesson_words)
             .set(word)
             .where(and(eq(text_lesson_words.id, word.id), eq(text_lesson_words.text_lesson_id, id)))
-        )
+        ),
+        CACHE.lessons.text_lesson_info.delete({ lesson_id: id })
       ]);
+
+      // in the background refresh the cache
+      waitUntil(CACHE.lessons.text_lesson_info.refresh({ lesson_id: id }));
 
       return {
         updated: true,
@@ -180,7 +189,7 @@ const update_text_lesson_route = protectedAdminProcedure
   );
 
 const delete_text_lesson_route = protectedAdminProcedure
-  .input(z.object({ id: z.number().int(), uuid: z.string().uuid() }))
+  .input(z.object({ id: z.int(), uuid: z.uuid() }))
   .mutation(async ({ input: { id, uuid } }) => {
     // verify the id, uuid combination
     const text_lesson_ = await db.query.text_lessons.findFirst({
@@ -199,10 +208,19 @@ const delete_text_lesson_route = protectedAdminProcedure
       // deletes both the lesson gestures and associated words with it
       // due to the cascade delete constraint
 
-      // run this after delete of lesson
       // reordering the catoegory id after deletion if needed
-      text_lesson_.category_id && reorder_text_lesson_in_category_func(text_lesson_.category_id, id)
+      text_lesson_.category_id &&
+        reorder_text_lesson_in_category_func(text_lesson_.category_id, id),
+      // delete cache
+      CACHE.lessons.text_lesson_info.delete({ lesson_id: id })
     ]);
+    // refreshing cache of the category it was part of
+    text_lesson_.category_id &&
+      waitUntil(
+        CACHE.lessons.category_lesson_list.refresh({
+          category_id: text_lesson_.category_id
+        })
+      );
 
     return {
       deleted: true
@@ -210,7 +228,7 @@ const delete_text_lesson_route = protectedAdminProcedure
   });
 
 const get_text_lesson_word_media_data_route = protectedAdminProcedure
-  .input(z.object({ word_id: z.number().int(), lesson_id: z.number().int() }))
+  .input(z.object({ word_id: z.int(), lesson_id: z.int() }))
   .query(async ({ input: { word_id, lesson_id } }) => {
     const word = await db.query.text_lesson_words.findFirst({
       where: (tbl, { eq }) => and(eq(tbl.id, word_id), eq(tbl.text_lesson_id, lesson_id)),
@@ -243,7 +261,7 @@ const get_text_lesson_word_media_data_route = protectedAdminProcedure
   });
 
 const get_text_lesson_info_route = publicProcedure
-  .input(z.object({ lesson_id: z.number().int() }))
+  .input(z.object({ lesson_id: z.int() }))
   .query(async ({ input: { lesson_id } }) => {
     const lesson = await db.query.text_lessons.findFirst({
       where: eq(text_lessons.id, lesson_id),

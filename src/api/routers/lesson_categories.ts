@@ -80,11 +80,11 @@ const update_category_list_route = protectedAdminProcedure
           .update(lesson_categories)
           .set({ name: category.name, order: category.order })
           .where(and(eq(lesson_categories.id, category.id), eq(lesson_categories.lang_id, lang_id)))
-      ),
-      // invalidate category list cache
-      // as being referched onSuccess
-      CACHE.lessons.category_list.delete({ lang_id })
+      )
     ]);
+    // invalidate category list cache
+    // as being referched onSuccess
+    await CACHE.lessons.category_list.delete({ lang_id });
 
     return {
       updated: true
@@ -118,10 +118,10 @@ const delete_category_route = protectedAdminProcedure
           .update(lesson_categories)
           .set({ order: category.order })
           .where(eq(lesson_categories.id, category.id))
-      ),
-      // invalidate lessons category list cache
-      CACHE.lessons.category_list.delete({ lang_id })
+      )
     ]);
+    // invalidate lessons category list cache
+    await CACHE.lessons.category_list.delete({ lang_id });
 
     return {
       deleted: true

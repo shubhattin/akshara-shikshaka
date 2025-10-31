@@ -187,7 +187,7 @@ const delete_audio_asset_route = protectedAdminProcedure
           lesson_ids_to_invalidate.add(word.lesson.id);
         });
         if (lesson_ids_to_invalidate.size > 0) {
-          Promise.all(
+          await Promise.allSettled(
             Array.from(lesson_ids_to_invalidate).map((lesson_id) =>
               CACHE.lessons.text_lesson_info.refresh({ lesson_id })
             )

@@ -191,7 +191,7 @@ const delete_text_gesture_data_route = protectedAdminProcedure
         if (!data) return;
         // if more than one associated text lesson then invalidate the cache
         if (data.lessons.length > 0) {
-          Promise.all(
+          await Promise.allSettled(
             data.lessons.map(({ text_lesson_id }) =>
               CACHE.lessons.text_lesson_info.refresh({ lesson_id: text_lesson_id })
             )

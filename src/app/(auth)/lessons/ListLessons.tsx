@@ -77,6 +77,7 @@ import { Card, CardContent } from '~/components/ui/card';
 import { atomWithStorage, useHydrateAtoms } from 'jotai/utils';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { toast } from 'sonner';
+import { LANGUAGES_ADDED } from '~/state/font_list';
 
 type Props = {
   init_lang_id: number;
@@ -87,7 +88,6 @@ type Props = {
 };
 
 const lang_id_atom = atom(0);
-const LANGUAGES_ADDED = ['Sanskrit'] as const;
 
 export default function ListLessonsWrapper(props: Props) {
   useHydrateAtoms([[lang_id_atom, props.init_lang_id]]);

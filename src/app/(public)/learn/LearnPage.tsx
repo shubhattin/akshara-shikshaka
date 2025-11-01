@@ -7,7 +7,13 @@ import {
   selected_lesson_id_atom,
   selected_script_id_atom
 } from './learn_page_state';
-import { get_lang_from_id, get_script_from_id, lang_list_obj } from '~/state/lang_list';
+import {
+  get_script_from_id,
+  lang_list_obj,
+  lang_list_type,
+  script_list_obj,
+  script_list_type
+} from '~/state/lang_list';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '~/api/client';
 import { useState, useEffect, useRef } from 'react';
@@ -28,16 +34,17 @@ import { Provider as JotaiProvider } from 'jotai';
 import { MdPlayArrow, MdStop } from 'react-icons/md';
 import { lipi_parivartak } from '~/tools/lipi_lekhika';
 import { useHydrateAtoms } from 'jotai/utils';
+import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
+import { Skeleton } from '~/components/ui/skeleton';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
   init_lang_id: number;
 };
 
-const lang_id_atom = atom(lang_list_obj.Sanskrit);
-
 export default function LearnPageComponent(props: Props) {
-  useHydrateAtoms([[lang_id_atom, props.init_lang_id]]);
+  useHydrateAtoms([[selected_language_id_atom, props.init_lang_id]]);
+
   return (
     <>
       <LearnPage {...props}></LearnPage>
@@ -47,10 +54,16 @@ export default function LearnPageComponent(props: Props) {
 
 function LearnPage({ init_lesson_categories }: Props) {
   const trpc = useTRPC();
-  const selectedLanguageId = useAtomValue(selected_language_id_atom);
+  const [selectedLanguageId, setSelectedLanguageId] = useAtom(selected_language_id_atom);
+  const [selectedScriptId, setSelectedScriptId] = useAtom(selected_script_id_atom);
   const [selectedCategoryId, setSelectedCategoryId] = useAtom(selected_category_id_atom);
   const [open, setOpen] = useState(false);
   const [selectedLessonId, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
@@ -59,6 +72,11 @@ function LearnPage({ init_lesson_categories }: Props) {
     )
   );
   const categories = categories_q.data ?? [];
+  useEffect(() => {
+    // on mount set the the first category in the list
+    setSelectedCategoryId(init_lesson_categories[0]?.id ?? null);
+  }, [init_lesson_categories]);
+
   const lessons_q = useQuery(
     trpc.text_lessons.categories.get_category_text_lesson_list.queryOptions(
       { category_id: selectedCategoryId! },
@@ -69,9 +87,41 @@ function LearnPage({ init_lesson_categories }: Props) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-center gap-2 text-sm">
-        <span className="">Selected Language:</span>
-        <span className="font-semibold underline">{get_lang_from_id(selectedLanguageId)}</span>
+      <div className="flex items-center justify-center gap-2 space-x-12 text-sm">
+        <label>
+          <select
+            value={selectedScriptId}
+            onChange={(e) => setSelectedScriptId(Number(e.target.value))}
+            className="flex w-32 rounded-md border border-input bg-transparent px-2 py-1 text-sm font-semibold shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {FONT_SCRIPTS.map((script) => (
+              <option
+                key={script}
+                value={script_list_obj[script as script_list_type]}
+                className="bg-background text-foreground"
+              >
+                {script}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <select
+            value={selectedLanguageId}
+            onChange={(e) => setSelectedLanguageId(Number(e.target.value))}
+            className="flex w-28 rounded-md border border-input bg-transparent px-2 py-1 text-sm font-semibold shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {LANGUAGES_ADDED.map((lang) => (
+              <option
+                key={lang}
+                value={lang_list_obj[lang as lang_list_type]}
+                className="bg-background text-foreground"
+              >
+                {lang}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="flex flex-wrap items-center justify-center">
         <Popover open={open} onOpenChange={setOpen}>
@@ -82,10 +132,15 @@ function LearnPage({ init_lesson_categories }: Props) {
               aria-expanded={open}
               className="w-[180px] justify-between"
             >
-              {selectedCategoryId !== null
-                ? categories.find((category) => category.id === selectedCategoryId)?.name ||
-                  (selectedCategoryId === 0 ? 'Uncategorized' : 'Select category...')
-                : 'Select category...'}
+              {mounted &&
+                selectedCategoryId !== null &&
+                (categories.find((category) => category.id === selectedCategoryId)?.name ??
+                  'Select category...')}
+              {(!mounted &&
+                selectedCategoryId === null &&
+                categories.find((category) => category.id === init_lesson_categories[0]?.id)
+                  ?.name) ??
+                'Select category...'}
               <ChevronsUpDown className="opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -123,7 +178,18 @@ function LearnPage({ init_lesson_categories }: Props) {
           </PopoverContent>
         </Popover>
       </div>
-      {lessons.length > 0 && (
+      {lessons_q.isLoading && (
+        <div className="flex flex-wrap items-center justify-center">
+          <div className="flex max-w-[90vw] flex-col items-center gap-2 p-1 sm:max-w-[70vw] md:max-w-[50vw]">
+            <div className="flex w-full gap-2 overflow-x-auto">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-24 shrink-0 rounded-md" />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {!lessons_q.isLoading && lessons_q.isSuccess && lessons.length > 0 && (
         <div className="flex flex-wrap items-center justify-center">
           <div className="flex max-w-[90vw] flex-col items-center gap-2 p-1 sm:max-w-[70vw] md:max-w-[50vw]">
             <div className="flex w-full gap-2 overflow-x-auto">
@@ -183,22 +249,12 @@ const LessonList = ({ lesson_id }: { lesson_id: number }) => {
     }
   }, [lesson?.words, scriptId]);
 
-  const availableScriptIds = (lesson?.gestures ?? [])
-    .map((g) => g.text_gesture.script_id)
-    .filter((v, i, arr) => arr.indexOf(v) === i);
-
-  useEffect(() => {
-    if (availableScriptIds.length > 0 && !availableScriptIds.includes(scriptId)) {
-      setScriptId(availableScriptIds[0]);
-    }
-  }, [lesson?.id, availableScriptIds.join(','), scriptId, setScriptId]);
-
   const selected_gesture = lesson?.gestures.find(
     (gesture) => gesture.text_gesture.script_id === scriptId
-  );
+  )?.text_gesture;
   const text_gesture_data_q = useQuery(
     trpc.text_gestures.get_text_gesture_data.queryOptions(
-      { id: selected_gesture?.text_gesture.id!, uuid: selected_gesture?.text_gesture.uuid! },
+      { id: selected_gesture?.id!, uuid: selected_gesture?.uuid! },
       { enabled: !!selected_gesture }
     )
   );
@@ -226,26 +282,6 @@ const LessonList = ({ lesson_id }: { lesson_id: number }) => {
 
   return (
     <div className="space-y-4">
-      {/* Script selector */}
-      {availableScriptIds.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {availableScriptIds.map((sid) => (
-            <button
-              key={sid}
-              className={cn(
-                'rounded-md border px-3 py-1 text-sm',
-                sid === scriptId
-                  ? 'border-primary bg-primary/10 text-primary'
-                  : 'border-border bg-background text-foreground hover:bg-accent'
-              )}
-              onClick={() => setScriptId(sid)}
-            >
-              {get_script_from_id(sid)}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Words with image and audio - horizontally scrollable */}
       {lesson && lesson.words && lesson.words.length > 0 && (
         <div className="flex w-full items-stretch justify-center gap-3 overflow-x-auto py-2">
@@ -290,8 +326,33 @@ const LessonList = ({ lesson_id }: { lesson_id: number }) => {
           })}
         </div>
       )}
+      {lesson_info_q.isLoading && (
+        <div className="flex w-full items-stretch justify-center gap-3 overflow-x-auto py-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="shrink-0 rounded-md border p-3 shadow-sm">
+              <Skeleton className="mb-2 h-5 w-16" />
+              <Skeleton className="mx-auto mb-2 h-20 w-20" />
+              <Skeleton className="h-8 w-16" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Practice component below */}
+      {selected_gesture && text_gesture_data_q.isLoading && (
+        <div className="space-y-4">
+          <div className="text-center">
+            <Skeleton className="mx-auto mb-2 h-8 w-48" />
+          </div>
+          <div className="flex justify-center gap-4">
+            <Skeleton className="h-11 w-32" />
+            <Skeleton className="h-11 w-32" />
+          </div>
+          <div className="flex justify-center">
+            <Skeleton className="h-[400px] w-[400px] rounded-lg border-2" />
+          </div>
+        </div>
+      )}
       {selected_gesture && text_gesture_data_q.data && (
         <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
           <Practice text_data={text_gesture_data_q.data!} />

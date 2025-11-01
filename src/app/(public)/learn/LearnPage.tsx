@@ -36,6 +36,13 @@ import { lipi_parivartak } from '~/tools/lipi_lekhika';
 import { useHydrateAtoms } from 'jotai/utils';
 import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
 import { Skeleton } from '~/components/ui/skeleton';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious
+} from '~/components/ui/carousel';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
@@ -86,7 +93,7 @@ function LearnPage({ init_lesson_categories }: Props) {
   const lessons = lessons_q.data ?? [];
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       <div className="flex items-center justify-center gap-2 space-x-12 text-sm">
         <label>
           <select
@@ -130,7 +137,7 @@ function LearnPage({ init_lesson_categories }: Props) {
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              className="w-[180px] justify-between"
+              className="w-[180px] justify-between text-base font-semibold"
             >
               {mounted &&
                 selectedCategoryId !== null &&
@@ -178,52 +185,80 @@ function LearnPage({ init_lesson_categories }: Props) {
           </PopoverContent>
         </Popover>
       </div>
-      {lessons_q.isLoading && (
-        <div className="flex flex-wrap items-center justify-center">
-          <div className="flex max-w-[90vw] flex-col items-center gap-2 p-1 sm:max-w-[70vw] md:max-w-[50vw]">
-            <div className="flex w-full gap-2 overflow-x-auto">
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-10 w-24 shrink-0 rounded-md" />
-              ))}
-            </div>
+      <div>
+        {lessons_q.isLoading && (
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
+            <Carousel
+              opts={{
+                align: 'start'
+              }}
+              className="w-full max-w-[90vw] min-w-0 sm:max-w-[70vw] md:max-w-[50vw]"
+            >
+              <CarouselContent>
+                {[...Array(6)].map((_, index) => (
+                  <CarouselItem
+                    key={index}
+                    className="basis-1/2 sm:basis-1/2 md:basis-1/3 lg:basis-1/4"
+                  >
+                    <div className="p-1">
+                      <Skeleton className="h-10 w-full rounded-md" />
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="left-0 sm:-left-12" />
+              <CarouselNext className="right-0 sm:-right-12" />
+            </Carousel>
           </div>
-        </div>
-      )}
-      {!lessons_q.isLoading && lessons_q.isSuccess && lessons.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center">
-          <div className="flex max-w-[90vw] flex-col items-center gap-2 p-1 sm:max-w-[70vw] md:max-w-[50vw]">
-            <div className="flex w-full gap-2 overflow-x-auto">
-              {lessons.map((lesson) => (
-                <Button
-                  key={lesson.id}
-                  variant={selectedLessonId === lesson.id ? 'default' : 'outline'}
-                  className={cn(
-                    'shrink-0 text-base transition-all',
-                    selectedLessonId === lesson.id &&
-                      'border border-primary shadow-md ring-2 ring-primary/20'
-                  )}
-                  onClick={() => {
-                    if (selectedLessonId === lesson.id) {
-                      setSelectedLessonId(null);
-                    } else {
-                      setSelectedLessonId(lesson.id);
-                    }
-                  }}
-                >
-                  {lesson.text}
-                </Button>
-              ))}
-            </div>
+        )}
+        {!lessons_q.isLoading && lessons_q.isSuccess && lessons.length > 0 && (
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
+            <Carousel
+              opts={{
+                align: 'start'
+              }}
+              className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
+            >
+              <CarouselContent>
+                {lessons.map((lesson) => (
+                  <CarouselItem
+                    key={lesson.id}
+                    className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5"
+                  >
+                    <Button
+                      variant={selectedLessonId === lesson.id ? 'default' : 'outline'}
+                      className={cn(
+                        'w-full text-xl transition-all',
+                        selectedLessonId === lesson.id
+                          ? 'border border-blue-600 bg-blue-600 text-white shadow-md ring-2 ring-blue-500/20 hover:bg-blue-700 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600'
+                          : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
+                      )}
+                      onClick={() => {
+                        if (selectedLessonId === lesson.id) {
+                          setSelectedLessonId(null);
+                        } else {
+                          setSelectedLessonId(lesson.id);
+                        }
+                      }}
+                    >
+                      {lesson.text}
+                    </Button>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="left-0 sm:-left-12" />
+              <CarouselNext className="right-0 sm:-right-12" />
+            </Carousel>
           </div>
-        </div>
-      )}
-      {selectedLessonId !== null && <LessonList lesson_id={selectedLessonId} />}
+        )}
+        {selectedLessonId !== null && <LessonList lesson_id={selectedLessonId} />}
+      </div>
     </div>
   );
 }
 
 const LessonList = ({ lesson_id }: { lesson_id: number }) => {
-  const [scriptId, setScriptId] = useAtom(selected_script_id_atom);
+  const scriptId = useAtomValue(selected_script_id_atom);
   const trpc = useTRPC();
 
   const lesson_info_q = useQuery(
@@ -286,8 +321,8 @@ const LessonList = ({ lesson_id }: { lesson_id: number }) => {
       {lesson && lesson.words && lesson.words.length > 0 && (
         <div className="flex w-full items-stretch justify-center gap-3 overflow-x-auto py-2">
           {lesson.words.map((w, idx) => {
-            const imageKey = w.image?.s3_key as string | undefined;
-            const audioKey = w.audio?.s3_key as string | undefined;
+            const imageKey = w.image?.s3_key;
+            const audioKey = w.audio?.s3_key;
             return (
               <div key={w.id} className="shrink-0 rounded-md border p-3 text-center shadow-sm">
                 <div className="mb-2 text-base font-semibold">
@@ -338,26 +373,28 @@ const LessonList = ({ lesson_id }: { lesson_id: number }) => {
         </div>
       )}
 
-      {/* Practice component below */}
-      {selected_gesture && text_gesture_data_q.isLoading && (
-        <div className="space-y-4">
-          <div className="text-center">
-            <Skeleton className="mx-auto mb-2 h-8 w-48" />
+      <div className="mt-4">
+        {/* Practice component below */}
+        {selected_gesture && text_gesture_data_q.isLoading && (
+          <div className="space-y-4">
+            <div className="text-center">
+              <Skeleton className="mx-auto mb-2 h-8 w-48" />
+            </div>
+            <div className="flex justify-center gap-4">
+              <Skeleton className="h-11 w-32" />
+              <Skeleton className="h-11 w-32" />
+            </div>
+            <div className="flex justify-center">
+              <Skeleton className="h-[400px] w-[400px] rounded-lg border-2" />
+            </div>
           </div>
-          <div className="flex justify-center gap-4">
-            <Skeleton className="h-11 w-32" />
-            <Skeleton className="h-11 w-32" />
-          </div>
-          <div className="flex justify-center">
-            <Skeleton className="h-[400px] w-[400px] rounded-lg border-2" />
-          </div>
-        </div>
-      )}
-      {selected_gesture && text_gesture_data_q.data && (
-        <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
-          <Practice text_data={text_gesture_data_q.data!} />
-        </JotaiProvider>
-      )}
+        )}
+        {selected_gesture && text_gesture_data_q.isSuccess && text_gesture_data_q.data && (
+          <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
+            <Practice text_data={text_gesture_data_q.data} />
+          </JotaiProvider>
+        )}
+      </div>
     </div>
   );
 };

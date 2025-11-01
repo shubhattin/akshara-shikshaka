@@ -1,11 +1,12 @@
 'use client';
-import { atom, useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import {
   selected_language_id_atom,
   lesson_category_type,
   selected_category_id_atom,
   selected_lesson_id_atom,
-  selected_script_id_atom
+  selected_script_id_atom,
+  saveLearnPageCookies
 } from './learn_page_state';
 import {
   get_script_from_id,
@@ -16,7 +17,7 @@ import {
 } from '~/state/lang_list';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '~/api/client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
 import { Button } from '~/components/ui/button';
 import { Check, ChevronsUpDown } from 'lucide-react';
@@ -30,10 +31,10 @@ import {
 } from '~/components/ui/command';
 import { cn } from '~/lib/utils';
 import Practice from '~/components/pages/practice/Practice';
-import { Provider as JotaiProvider } from 'jotai';
+import { Provider as JotaiProvider, createStore } from 'jotai';
 import { MdPlayArrow, MdStop } from 'react-icons/md';
 import { lipi_parivartak } from '~/tools/lipi_lekhika';
-import { useHydrateAtoms } from 'jotai/utils';
+//
 import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
 import { Skeleton } from '~/components/ui/skeleton';
 import {
@@ -47,31 +48,49 @@ import {
 type Props = {
   init_lesson_categories: lesson_category_type[];
   init_lang_id: number;
+  init_script_id?: number | null;
+  saved_category_id?: number | null;
+  saved_lesson_id?: number | null;
 };
 
 export default function LearnPageComponent(props: Props) {
-  useHydrateAtoms([[selected_language_id_atom, props.init_lang_id]]);
+  const store = () => {
+    const s = createStore();
+    s.set(selected_language_id_atom, props.init_lang_id);
+    s.set(selected_script_id_atom, props.init_script_id ?? script_list_obj['Devanagari']);
+    s.set(
+      selected_category_id_atom,
+      (() => {
+        if (props.saved_category_id === null || props.saved_category_id === undefined) {
+          return props.init_lesson_categories[0]?.id ?? null;
+        }
+        const saved_category = props.init_lesson_categories.find(
+          (category) => category.id === props.saved_category_id
+        );
+        if (saved_category) {
+          return saved_category.id;
+        }
+        return props.init_lesson_categories[0]?.id ?? null;
+      })()
+    );
+    s.set(selected_lesson_id_atom, props.saved_lesson_id ?? null);
+    return s;
+  };
 
   return (
-    <>
-      <LearnPage {...props}></LearnPage>
-    </>
+    <JotaiProvider store={store()}>
+      <LearnPage {...props} />
+    </JotaiProvider>
   );
 }
 
-function LearnPage({ init_lesson_categories }: Props) {
+function LearnPage({ init_lesson_categories, saved_category_id }: Props) {
   const trpc = useTRPC();
   const [selectedLanguageId, setSelectedLanguageId] = useAtom(selected_language_id_atom);
   const [selectedScriptId, setSelectedScriptId] = useAtom(selected_script_id_atom);
   const [selectedCategoryId, setSelectedCategoryId] = useAtom(selected_category_id_atom);
   const [open, setOpen] = useState(false);
   const [selectedLessonId, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
       { lang_id: selectedLanguageId },
@@ -79,10 +98,6 @@ function LearnPage({ init_lesson_categories }: Props) {
     )
   );
   const categories = categories_q.data ?? [];
-  useEffect(() => {
-    // on mount set the the first category in the list
-    setSelectedCategoryId(init_lesson_categories[0]?.id ?? null);
-  }, [init_lesson_categories]);
 
   const lessons_q = useQuery(
     trpc.text_lessons.categories.get_category_text_lesson_list.queryOptions(
@@ -98,7 +113,10 @@ function LearnPage({ init_lesson_categories }: Props) {
         <label>
           <select
             value={selectedScriptId}
-            onChange={(e) => setSelectedScriptId(Number(e.target.value))}
+            onChange={(e) => {
+              setSelectedScriptId(Number(e.target.value));
+              saveLearnPageCookies('script_id', Number(e.target.value));
+            }}
             className="flex w-32 rounded-md border border-input bg-transparent px-2 py-1 text-sm font-semibold shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           >
             {FONT_SCRIPTS.map((script) => (
@@ -115,7 +133,13 @@ function LearnPage({ init_lesson_categories }: Props) {
         <label>
           <select
             value={selectedLanguageId}
-            onChange={(e) => setSelectedLanguageId(Number(e.target.value))}
+            onChange={(e) => {
+              setSelectedLanguageId(Number(e.target.value));
+              setSelectedCategoryId(null);
+              setSelectedLessonId(null);
+              saveLearnPageCookies('category_id', null);
+              saveLearnPageCookies('lesson_id', null);
+            }}
             className="flex w-28 rounded-md border border-input bg-transparent px-2 py-1 text-sm font-semibold shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           >
             {LANGUAGES_ADDED.map((lang) => (
@@ -139,15 +163,9 @@ function LearnPage({ init_lesson_categories }: Props) {
               aria-expanded={open}
               className="w-[180px] justify-between text-base font-semibold"
             >
-              {mounted &&
-                selectedCategoryId !== null &&
+              {selectedCategoryId !== null &&
                 (categories.find((category) => category.id === selectedCategoryId)?.name ??
                   'Select category...')}
-              {(!mounted &&
-                selectedCategoryId === null &&
-                categories.find((category) => category.id === init_lesson_categories[0]?.id)
-                  ?.name) ??
-                'Select category...'}
               <ChevronsUpDown className="opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -167,6 +185,10 @@ function LearnPage({ init_lesson_categories }: Props) {
                         setSelectedCategoryId(
                           Number(currentValue) === selectedCategoryId ? null : Number(currentValue)
                         );
+                        // saving cookies
+                        saveLearnPageCookies('lesson_id', null);
+                        saveLearnPageCookies('category_id', Number(currentValue));
+                        console.log('saved_category_id', Number(currentValue));
                         setOpen(false);
                       }}
                     >
@@ -195,10 +217,10 @@ function LearnPage({ init_lesson_categories }: Props) {
               className="w-full max-w-[90vw] min-w-0 sm:max-w-[70vw] md:max-w-[50vw]"
             >
               <CarouselContent>
-                {[...Array(6)].map((_, index) => (
+                {[...Array(7)].map((_, index) => (
                   <CarouselItem
                     key={index}
-                    className="basis-1/2 sm:basis-1/2 md:basis-1/3 lg:basis-1/4"
+                    className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5"
                   >
                     <div className="p-1">
                       <Skeleton className="h-10 w-full rounded-md" />
@@ -236,8 +258,10 @@ function LearnPage({ init_lesson_categories }: Props) {
                       onClick={() => {
                         if (selectedLessonId === lesson.id) {
                           setSelectedLessonId(null);
+                          saveLearnPageCookies('lesson_id', null);
                         } else {
                           setSelectedLessonId(lesson.id);
+                          saveLearnPageCookies('lesson_id', lesson.id);
                         }
                       }}
                     >
@@ -251,13 +275,13 @@ function LearnPage({ init_lesson_categories }: Props) {
             </Carousel>
           </div>
         )}
-        {selectedLessonId !== null && <LessonList lesson_id={selectedLessonId} />}
+        {selectedLessonId !== null && <Lesson lesson_id={selectedLessonId} />}
       </div>
     </div>
   );
 }
 
-const LessonList = ({ lesson_id }: { lesson_id: number }) => {
+const Lesson = ({ lesson_id }: { lesson_id: number }) => {
   const scriptId = useAtomValue(selected_script_id_atom);
   const trpc = useTRPC();
 

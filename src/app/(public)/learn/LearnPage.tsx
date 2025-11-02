@@ -38,6 +38,7 @@ import { lipi_parivartak } from '~/tools/lipi_lekhika';
 import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
 import { Skeleton } from '~/components/ui/skeleton';
 import {
+  type CarouselApi,
   Carousel,
   CarouselContent,
   CarouselItem,
@@ -54,37 +55,35 @@ type Props = {
 };
 
 export default function LearnPageComponent(props: Props) {
-  const store = () => {
+  const store = useMemo(() => {
     const s = createStore();
     s.set(selected_language_id_atom, props.init_lang_id);
     s.set(selected_script_id_atom, props.init_script_id ?? script_list_obj['Devanagari']);
-    s.set(
-      selected_category_id_atom,
-      (() => {
-        if (props.saved_category_id === null || props.saved_category_id === undefined) {
-          return props.init_lesson_categories[0]?.id ?? null;
-        }
-        const saved_category = props.init_lesson_categories.find(
-          (category) => category.id === props.saved_category_id
-        );
-        if (saved_category) {
-          return saved_category.id;
-        }
+    const category_id_ = (() => {
+      if (props.saved_category_id === null || props.saved_category_id === undefined) {
         return props.init_lesson_categories[0]?.id ?? null;
-      })()
-    );
-    s.set(selected_lesson_id_atom, props.saved_lesson_id ?? null);
+      }
+      const saved_category = props.init_lesson_categories.find(
+        (category) => category.id === props.saved_category_id
+      );
+      if (saved_category) {
+        return saved_category.id;
+      }
+      return props.init_lesson_categories[0]?.id ?? null;
+    })();
+    s.set(selected_category_id_atom, category_id_);
+    if (category_id_ !== null) s.set(selected_lesson_id_atom, props.saved_lesson_id ?? null);
     return s;
-  };
+  }, []);
 
   return (
-    <JotaiProvider store={store()}>
+    <JotaiProvider store={store} key={`learn_page`}>
       <LearnPage {...props} />
     </JotaiProvider>
   );
 }
 
-function LearnPage({ init_lesson_categories, saved_category_id }: Props) {
+function LearnPage({ init_lesson_categories }: Props) {
   const trpc = useTRPC();
   const [selectedLanguageId, setSelectedLanguageId] = useAtom(selected_language_id_atom);
   const [selectedScriptId, setSelectedScriptId] = useAtom(selected_script_id_atom);
@@ -94,7 +93,7 @@ function LearnPage({ init_lesson_categories, saved_category_id }: Props) {
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
       { lang_id: selectedLanguageId },
-      { enabled: !!selectedLanguageId, placeholderData: init_lesson_categories }
+      { enabled: !!selectedLanguageId, initialData: init_lesson_categories }
     )
   );
   const categories = categories_q.data ?? [];
@@ -106,6 +105,28 @@ function LearnPage({ init_lesson_categories, saved_category_id }: Props) {
     )
   );
   const lessons = lessons_q.data ?? [];
+
+  const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
+  const carouselScrolledToSelectedLesson = useRef(false);
+  useEffect(() => {
+    if (!carouselApi || carouselScrolledToSelectedLesson.current) return;
+
+    carouselScrolledToSelectedLesson.current = true;
+
+    if (selectedLessonId === null) {
+      // select first in list if not set initially
+      setSelectedLessonId(lessons[0]?.id ?? null);
+      return;
+    }
+
+    const idx = lessons.findIndex((l) => l.id === selectedLessonId);
+    if (idx === -1) {
+      // wrong initial cookie state seems to be passed from server
+      setSelectedLessonId(null);
+    } else if (idx >= 0) {
+      carouselApi.scrollTo(idx);
+    }
+  }, [carouselApi, selectedLessonId, lessons]);
 
   return (
     <div className="space-y-4">
@@ -217,10 +238,10 @@ function LearnPage({ init_lesson_categories, saved_category_id }: Props) {
               className="w-full max-w-[90vw] min-w-0 sm:max-w-[70vw] md:max-w-[50vw]"
             >
               <CarouselContent>
-                {[...Array(7)].map((_, index) => (
+                {[...Array(8)].map((_, index) => (
                   <CarouselItem
                     key={index}
-                    className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5"
+                    className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
                   >
                     <div className="p-1">
                       <Skeleton className="h-10 w-full rounded-md" />
@@ -239,13 +260,14 @@ function LearnPage({ init_lesson_categories, saved_category_id }: Props) {
               opts={{
                 align: 'start'
               }}
+              setApi={setCarouselApi}
               className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
             >
               <CarouselContent>
                 {lessons.map((lesson) => (
                   <CarouselItem
                     key={lesson.id}
-                    className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5"
+                    className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
                   >
                     <Button
                       variant={selectedLessonId === lesson.id ? 'default' : 'outline'}

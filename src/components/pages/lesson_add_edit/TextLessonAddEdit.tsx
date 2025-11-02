@@ -644,11 +644,19 @@ const AddEditSave = (props: Props) => {
   const [words, setWords] = useAtom(words_atom);
   const textKey = useAtomValue(text_key_atom);
 
+  const queryClient = useQueryClient();
+
   const add_text_data_mut = useMutation(
     trpc.text_lessons.add_text_lesson.mutationOptions({
       onSuccess(data) {
         toast.success('Text Lesson Added');
         router.push(`/lessons/edit/${data.id}`);
+        queryClient.invalidateQueries(
+          trpc.text_lessons.categories.get_text_lessons.queryFilter({
+            category_id: props.text_lesson_info.category_id ?? 0, // 0 -> uncategorized
+            lang_id: lang_id
+          })
+        );
       },
       onError(error) {
         toast.error('Failed to Add Text Lesson ' + error.message);
@@ -659,6 +667,7 @@ const AddEditSave = (props: Props) => {
   const update_text_data_mut = useMutation(
     trpc.text_lessons.update_text_lesson.mutationOptions({
       onSuccess(data) {
+        if (!data.updated) return;
         // find indexes or words that were to be added, they will have no id
         const to_be_added_word_indexes = words
           .map((w, idx) => [w, idx] as [text_lesson_word_type, number])
@@ -687,17 +696,16 @@ const AddEditSave = (props: Props) => {
     })
   );
 
-  const queryClient = useQueryClient();
-
   const delete_text_data_mut = useMutation(
     trpc.text_lessons.delete_text_lesson.mutationOptions({
       async onSuccess(data) {
+        if (!data.deleted) return;
         toast.success('Text Lesson Deleted');
         await queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_text_lessons.pathFilter()
-        );
-        await queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_categories.pathFilter()
+          trpc.text_lessons.categories.get_text_lessons.queryFilter({
+            category_id: props.text_lesson_info.category_id ?? 0, // 0 -> uncategorized
+            lang_id: lang_id
+          })
         );
         router.push('/lessons');
       },

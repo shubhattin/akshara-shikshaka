@@ -45,3 +45,16 @@ export async function saveLearnPageCookies(key: keyof typeof SAVED_COOKIES_KEY, 
   const cookie = (await import('js-cookie')).default;
   cookie.set(SAVED_COOKIES_KEY[key].key, JSON.stringify(value));
 }
+
+export function parseLearnPageCookie<K extends keyof typeof SAVED_COOKIES_KEY>(
+  key: K,
+  cookieValue: string | undefined
+): z.infer<(typeof SAVED_COOKIES_KEY)[K]['schema']> {
+  try {
+    const parsedValue = cookieValue ? JSON.parse(cookieValue) : null;
+    return SAVED_COOKIES_KEY[key].schema.parse(parsedValue) as any;
+    // the return type takes care of this so we dont have to manually cast the type
+  } catch (error) {
+    return null as any;
+  }
+}

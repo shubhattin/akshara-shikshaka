@@ -21,6 +21,8 @@ export const FONT_FAMILIES = [
   'Noto_Serif_Malayalam',
   'Noto_Sans_Malayalam'
 ] as const;
+
+export const LANGUAGES_ADDED = ['Sanskrit'] as const;
 export type FontFamily = (typeof FONT_FAMILIES)[number];
 
 /**

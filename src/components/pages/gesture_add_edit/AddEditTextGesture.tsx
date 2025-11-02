@@ -1093,6 +1093,12 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
         if (data.success) {
           toast.success('Text Added');
           router.push(`/gestures/edit/${data.id}`);
+          queryClient.invalidateQueries(
+            trpc.text_gestures.categories.get_gestures.queryFilter({
+              category_id: text_data.category?.id ?? 0, // 0 -> uncategorized
+              script_id: scriptID
+            })
+          );
         } else {
           if (data.err_code === 'text_already_exists') {
             toast.error('Text already exists');
@@ -1110,6 +1116,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const update_text_data_mut = useMutation(
     trpc.text_gestures.edit_text_gesture_data.mutationOptions({
       onSuccess(data) {
+        if (!data.updated) return;
         toast.success('Text Updated');
       },
       onError(error) {
@@ -1121,7 +1128,14 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const delete_text_data_mut = useMutation(
     trpc.text_gestures.delete_text_gesture_data.mutationOptions({
       async onSuccess(data) {
+        if (!data.deleted) return;
         toast.success('Text Deleted');
+        await queryClient.invalidateQueries(
+          trpc.text_gestures.categories.get_gestures.queryFilter({
+            category_id: text_data.category?.id ?? 0, // 0 -> uncategorized
+            script_id: scriptID
+          })
+        );
         router.push('/gestures');
       },
       onError(error) {

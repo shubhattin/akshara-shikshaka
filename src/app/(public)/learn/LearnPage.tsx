@@ -397,7 +397,7 @@ const Lesson = ({ lesson_id }: { lesson_id: number }) => {
       {lesson && (
         <div className="flex items-center justify-center gap-3">
           <div className="text-center">
-            <div className="text-2xl font-bold">{lesson.text}</div>
+            {/* <div className="text-2xl font-bold">{lesson.text}</div> */}
             {varnaAudioKey && (
               <div className="mt-2 flex justify-center">
                 <button

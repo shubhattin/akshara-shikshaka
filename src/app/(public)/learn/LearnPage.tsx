@@ -9,6 +9,7 @@ import {
   saveLearnPageCookies
 } from './learn_page_state';
 import {
+  get_lang_from_id,
   get_script_from_id,
   lang_list_obj,
   lang_list_type,
@@ -16,7 +17,7 @@ import {
   script_list_type
 } from '~/state/lang_list';
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '~/api/client';
+import { useTRPC, useTRPCClient } from '~/api/client';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
 import { Button } from '~/components/ui/button';
@@ -33,7 +34,7 @@ import { cn } from '~/lib/utils';
 import Practice from '~/components/pages/practice/Practice';
 import { Provider as JotaiProvider, createStore } from 'jotai';
 import { MdPlayArrow, MdStop } from 'react-icons/md';
-import { lipi_parivartak } from '~/tools/lipi_lekhika';
+import { lipi_parivartak, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
 //
 import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
 import { Skeleton } from '~/components/ui/skeleton';
@@ -85,6 +86,7 @@ export default function LearnPageComponent(props: Props) {
 
 function LearnPage({ init_lesson_categories }: Props) {
   const trpc = useTRPC();
+  const trpcClient = useTRPCClient();
   const [selectedLanguageId, setSelectedLanguageId] = useAtom(selected_language_id_atom);
   const [selectedScriptId, setSelectedScriptId] = useAtom(selected_script_id_atom);
   const [selectedCategoryId, setSelectedCategoryId] = useAtom(selected_category_id_atom);
@@ -98,13 +100,34 @@ function LearnPage({ init_lesson_categories }: Props) {
   );
   const categories = categories_q.data ?? [];
 
+  useEffect(() => {
+    // preload lipi lekhika data for transliteration
+    load_parivartak_lang_data(get_script_from_id(selectedScriptId));
+  }, [selectedScriptId]);
+
   const lessons_q = useQuery(
     trpc.text_lessons.categories.get_category_text_lesson_list.queryOptions(
       { category_id: selectedCategoryId! },
       { enabled: selectedCategoryId !== null }
     )
   );
-  const lessons = lessons_q.data ?? [];
+  const [lessons, setLessons] = useState<NonNullable<typeof lessons_q.data>>(lessons_q.data ?? []);
+  useEffect(() => {
+    if (!lessons_q.isSuccess) return;
+    const data = lessons_q.data;
+    Promise.all(
+      data.map(async (lesson) => ({
+        ...lesson,
+        text: await lipi_parivartak(
+          lesson.text,
+          get_lang_from_id(selectedLanguageId),
+          get_script_from_id(selectedScriptId)
+        )
+      }))
+    ).then((transliterated_data) => {
+      setLessons(transliterated_data);
+    });
+  }, [lessons_q.isSuccess, lessons_q.data, selectedLanguageId, selectedScriptId]);
 
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
   const carouselScrolledToSelectedLesson = useRef(false);
@@ -494,11 +517,14 @@ const Lesson = ({ lesson_id }: { lesson_id: number }) => {
             </div>
           </div>
         )}
-        {selected_gesture && text_gesture_data_q.isSuccess && text_gesture_data_q.data && (
-          <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
-            <Practice text_data={text_gesture_data_q.data} play_gesture_on_mount={true} />
-          </JotaiProvider>
-        )}
+        {selected_gesture &&
+          !text_gesture_data_q.isLoading &&
+          text_gesture_data_q.isSuccess &&
+          text_gesture_data_q.data && (
+            <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
+              <Practice text_data={text_gesture_data_q.data} play_gesture_on_mount={true} />
+            </JotaiProvider>
+          )}
       </div>
     </div>
   );

@@ -35,7 +35,6 @@ import Practice from '~/components/pages/practice/Practice';
 import { Provider as JotaiProvider, createStore } from 'jotai';
 import { MdPlayArrow, MdStop } from 'react-icons/md';
 import { lipi_parivartak, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
-//
 import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
 import { Skeleton } from '~/components/ui/skeleton';
 import {
@@ -222,7 +221,9 @@ const LessonsList = () => {
       { enabled: selectedCategoryId !== null }
     )
   );
-  const [lessons, setLessons] = useState<NonNullable<typeof lessons_q.data>>(lessons_q.data ?? []);
+  const [lessonsTransliterated, setTransliteratedLessons] = useState<
+    NonNullable<typeof lessons_q.data>
+  >(lessons_q.data ?? []);
   const transliterationVersion = useRef(0);
   useEffect(() => {
     if (!lessons_q.isSuccess) return;
@@ -241,19 +242,28 @@ const LessonsList = () => {
     ).then((transliterated_data) => {
       // avoid race condition by checking if this is still the latest transliteration request
       if (currentVersion !== transliterationVersion.current) return;
-      setLessons(transliterated_data);
+      setTransliteratedLessons(transliterated_data);
     });
   }, [lessons_q.isSuccess, lessons_q.data, selectedLanguageId, selectedScriptId]);
 
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
   const carouselScrolledToSelectedLesson = useRef(false);
   useEffect(() => {
-    if (carouselScrolledToSelectedLesson.current) return;
-    const idx = lessons.findIndex((l) => l.id === selectedLessonId);
+    // currently this effect only runs once and not on category change
+    if (
+      carouselScrolledToSelectedLesson.current ||
+      lessons_q.isPending ||
+      !lessons_q.isSuccess ||
+      selectedCategoryId === null ||
+      selectedCategoryId === undefined
+    )
+      return;
+    // not using the lessons as they are transliterated before being used
+    const lessons_ = lessons_q.data;
+    const idx = lessons_.findIndex((l) => l.id === selectedLessonId);
     if (idx === -1) {
       // wrong initial cookie state seems to be passed from server
       setSelectedLessonId(null);
-      saveLearnPageCookies('lesson_id', null);
       carouselScrolledToSelectedLesson.current = true;
       return;
     }
@@ -262,13 +272,13 @@ const LessonsList = () => {
 
     if (selectedLessonId === null) {
       // select first in list if not set initially
-      setSelectedLessonId(lessons[0]?.id ?? null);
+      setSelectedLessonId(lessons_[0]?.id ?? null);
       return;
     }
     if (idx >= 0) {
       carouselApi.scrollTo(idx);
     }
-  }, [carouselApi, selectedLessonId, lessons]);
+  }, [carouselApi, selectedLessonId, lessons_q]);
 
   return (
     <div>
@@ -297,7 +307,7 @@ const LessonsList = () => {
           </Carousel>
         </div>
       )}
-      {!lessons_q.isLoading && lessons_q.isSuccess && lessons.length > 0 && (
+      {!lessons_q.isLoading && lessons_q.isSuccess && lessonsTransliterated.length > 0 && (
         <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
           <Carousel
             opts={{
@@ -307,7 +317,7 @@ const LessonsList = () => {
             className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
           >
             <CarouselContent>
-              {lessons.map((lesson) => (
+              {lessonsTransliterated.map((lesson) => (
                 <CarouselItem
                   key={lesson.id}
                   className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"

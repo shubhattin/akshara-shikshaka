@@ -17,7 +17,7 @@ import {
   script_list_type
 } from '~/state/lang_list';
 import { useQuery } from '@tanstack/react-query';
-import { useTRPC, useTRPCClient } from '~/api/client';
+import { useTRPC } from '~/api/client';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
 import { Button } from '~/components/ui/button';
@@ -84,14 +84,14 @@ export default function LearnPageComponent(props: Props) {
   );
 }
 
-function LearnPage({ init_lesson_categories }: Props) {
+function LearnPage(props: Props) {
+  const { init_lesson_categories } = props;
   const trpc = useTRPC();
-  const trpcClient = useTRPCClient();
   const [selectedLanguageId, setSelectedLanguageId] = useAtom(selected_language_id_atom);
   const [selectedScriptId, setSelectedScriptId] = useAtom(selected_script_id_atom);
   const [selectedCategoryId, setSelectedCategoryId] = useAtom(selected_category_id_atom);
   const [open, setOpen] = useState(false);
-  const [selectedLessonId, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
+  const [, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
       { lang_id: selectedLanguageId },
@@ -99,57 +99,6 @@ function LearnPage({ init_lesson_categories }: Props) {
     )
   );
   const categories = categories_q.data ?? [];
-
-  useEffect(() => {
-    // preload lipi lekhika data for transliteration
-    load_parivartak_lang_data(get_script_from_id(selectedScriptId));
-  }, [selectedScriptId]);
-
-  const lessons_q = useQuery(
-    trpc.text_lessons.categories.get_category_text_lesson_list.queryOptions(
-      { category_id: selectedCategoryId! },
-      { enabled: selectedCategoryId !== null }
-    )
-  );
-  const [lessons, setLessons] = useState<NonNullable<typeof lessons_q.data>>(lessons_q.data ?? []);
-  useEffect(() => {
-    if (!lessons_q.isSuccess) return;
-    const data = lessons_q.data;
-    Promise.all(
-      data.map(async (lesson) => ({
-        ...lesson,
-        text: await lipi_parivartak(
-          lesson.text,
-          get_lang_from_id(selectedLanguageId),
-          get_script_from_id(selectedScriptId)
-        )
-      }))
-    ).then((transliterated_data) => {
-      setLessons(transliterated_data);
-    });
-  }, [lessons_q.isSuccess, lessons_q.data, selectedLanguageId, selectedScriptId]);
-
-  const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
-  const carouselScrolledToSelectedLesson = useRef(false);
-  useEffect(() => {
-    if (!carouselApi || carouselScrolledToSelectedLesson.current) return;
-
-    carouselScrolledToSelectedLesson.current = true;
-
-    if (selectedLessonId === null) {
-      // select first in list if not set initially
-      setSelectedLessonId(lessons[0]?.id ?? null);
-      return;
-    }
-
-    const idx = lessons.findIndex((l) => l.id === selectedLessonId);
-    if (idx === -1) {
-      // wrong initial cookie state seems to be passed from server
-      setSelectedLessonId(null);
-    } else if (idx >= 0) {
-      carouselApi.scrollTo(idx);
-    }
-  }, [carouselApi, selectedLessonId, lessons]);
 
   return (
     <div className="space-y-4">
@@ -232,7 +181,6 @@ function LearnPage({ init_lesson_categories }: Props) {
                         // saving cookies
                         saveLearnPageCookies('lesson_id', null);
                         saveLearnPageCookies('category_id', Number(currentValue));
-                        console.log('saved_category_id', Number(currentValue));
                         setOpen(false);
                       }}
                     >
@@ -251,80 +199,142 @@ function LearnPage({ init_lesson_categories }: Props) {
           </PopoverContent>
         </Popover>
       </div>
-      <div>
-        {lessons_q.isLoading && (
-          <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
-            <Carousel
-              opts={{
-                align: 'start'
-              }}
-              className="w-full max-w-[90vw] min-w-0 sm:max-w-[70vw] md:max-w-[50vw]"
-            >
-              <CarouselContent>
-                {[...Array(8)].map((_, index) => (
-                  <CarouselItem
-                    key={index}
-                    className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
-                  >
-                    <div className="p-1">
-                      <Skeleton className="h-10 w-full rounded-md" />
-                    </div>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="left-0 sm:-left-12" />
-              <CarouselNext className="right-0 sm:-right-12" />
-            </Carousel>
-          </div>
-        )}
-        {!lessons_q.isLoading && lessons_q.isSuccess && lessons.length > 0 && (
-          <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
-            <Carousel
-              opts={{
-                align: 'start'
-              }}
-              setApi={setCarouselApi}
-              className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
-            >
-              <CarouselContent>
-                {lessons.map((lesson) => (
-                  <CarouselItem
-                    key={lesson.id}
-                    className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
-                  >
-                    <Button
-                      variant={selectedLessonId === lesson.id ? 'default' : 'outline'}
-                      className={cn(
-                        'w-full text-xl transition-all',
-                        selectedLessonId === lesson.id
-                          ? 'border border-blue-600 bg-blue-600 text-white shadow-md ring-2 ring-blue-500/20 hover:bg-blue-700 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600'
-                          : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
-                      )}
-                      onClick={() => {
-                        if (selectedLessonId === lesson.id) {
-                          setSelectedLessonId(null);
-                          saveLearnPageCookies('lesson_id', null);
-                        } else {
-                          setSelectedLessonId(lesson.id);
-                          saveLearnPageCookies('lesson_id', lesson.id);
-                        }
-                      }}
-                    >
-                      {lesson.text}
-                    </Button>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="left-0 sm:-left-12" />
-              <CarouselNext className="right-0 sm:-right-12" />
-            </Carousel>
-          </div>
-        )}
-        {selectedLessonId !== null && <Lesson lesson_id={selectedLessonId} />}
-      </div>
+      <LessonList />
     </div>
   );
 }
+
+const LessonList = () => {
+  const trpc = useTRPC();
+  const selectedLanguageId = useAtomValue(selected_language_id_atom);
+  const selectedScriptId = useAtomValue(selected_script_id_atom);
+  const selectedCategoryId = useAtomValue(selected_category_id_atom);
+  const [selectedLessonId, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
+
+  useEffect(() => {
+    // preload lipi lekhika data for transliteration
+    load_parivartak_lang_data(get_script_from_id(selectedScriptId));
+  }, [selectedScriptId]);
+
+  const lessons_q = useQuery(
+    trpc.text_lessons.categories.get_category_text_lesson_list.queryOptions(
+      { category_id: selectedCategoryId! },
+      { enabled: selectedCategoryId !== null }
+    )
+  );
+  const [lessons, setLessons] = useState<NonNullable<typeof lessons_q.data>>(lessons_q.data ?? []);
+  useEffect(() => {
+    if (!lessons_q.isSuccess) return;
+    const data = lessons_q.data;
+    Promise.all(
+      data.map(async (lesson) => ({
+        ...lesson,
+        text: await lipi_parivartak(
+          lesson.text,
+          get_lang_from_id(selectedLanguageId),
+          get_script_from_id(selectedScriptId)
+        )
+      }))
+    ).then((transliterated_data) => {
+      setLessons(transliterated_data);
+    });
+  }, [lessons_q.isSuccess, lessons_q.data, selectedLanguageId, selectedScriptId]);
+
+  const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
+  const carouselScrolledToSelectedLesson = useRef(false);
+  useEffect(() => {
+    if (!carouselApi || carouselScrolledToSelectedLesson.current) return;
+
+    carouselScrolledToSelectedLesson.current = true;
+
+    if (selectedLessonId === null) {
+      // select first in list if not set initially
+      setSelectedLessonId(lessons[0]?.id ?? null);
+      return;
+    }
+
+    const idx = lessons.findIndex((l) => l.id === selectedLessonId);
+    if (idx === -1) {
+      // wrong initial cookie state seems to be passed from server
+      setSelectedLessonId(null);
+    } else if (idx >= 0) {
+      carouselApi.scrollTo(idx);
+    }
+  }, [carouselApi, selectedLessonId, lessons]);
+  return (
+    <div>
+      {lessons_q.isLoading && (
+        <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
+          <Carousel
+            opts={{
+              align: 'start'
+            }}
+            className="w-full max-w-[90vw] min-w-0 sm:max-w-[70vw] md:max-w-[50vw]"
+          >
+            <CarouselContent>
+              {[...Array(8)].map((_, index) => (
+                <CarouselItem
+                  key={index}
+                  className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
+                >
+                  <div className="p-1">
+                    <Skeleton className="h-10 w-full rounded-md" />
+                  </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselPrevious className="left-0 sm:-left-12" />
+            <CarouselNext className="right-0 sm:-right-12" />
+          </Carousel>
+        </div>
+      )}
+      {!lessons_q.isLoading && lessons_q.isSuccess && lessons.length > 0 && (
+        <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
+          <Carousel
+            opts={{
+              align: 'start'
+            }}
+            setApi={setCarouselApi}
+            className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
+          >
+            <CarouselContent>
+              {lessons.map((lesson) => (
+                <CarouselItem
+                  key={lesson.id}
+                  className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
+                >
+                  <Button
+                    variant={selectedLessonId === lesson.id ? 'default' : 'outline'}
+                    className={cn(
+                      'w-full text-xl transition-all',
+                      selectedLessonId === lesson.id
+                        ? 'border border-blue-600 bg-blue-600 text-white shadow-md ring-2 ring-blue-500/20 hover:bg-blue-700 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600'
+                        : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
+                    )}
+                    onClick={() => {
+                      if (selectedLessonId === lesson.id) {
+                        setSelectedLessonId(null);
+                        saveLearnPageCookies('lesson_id', null);
+                      } else {
+                        setSelectedLessonId(lesson.id);
+                        saveLearnPageCookies('lesson_id', lesson.id);
+                      }
+                    }}
+                  >
+                    {lesson.text}
+                  </Button>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselPrevious className="left-0 sm:-left-12" />
+            <CarouselNext className="right-0 sm:-right-12" />
+          </Carousel>
+        </div>
+      )}
+      {selectedLessonId !== null && <Lesson lesson_id={selectedLessonId} />}
+    </div>
+  );
+};
 
 const Lesson = ({ lesson_id }: { lesson_id: number }) => {
   const scriptId = useAtomValue(selected_script_id_atom);

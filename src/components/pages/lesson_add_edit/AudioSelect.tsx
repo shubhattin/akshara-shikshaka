@@ -99,7 +99,8 @@ export default function AudioSelect(props: Props) {
         className="text-lg"
         variant="outline"
       >
-        <IoAddOutline className="size-6 text-yellow-600 dark:text-yellow-400" /> Add Audio to Word
+        <IoAddOutline className="size-6 text-yellow-600 dark:text-yellow-400" />{' '}
+        {props.type === 'varna' ? 'Add Audio to Varna' : 'Add Audio to Word'}
       </Button>
     </div>
   );

@@ -133,7 +133,7 @@ const update_text_lesson_route = protectedAdminProcedure
       // updating text lessons
       const res = await db
         .update(text_lessons)
-        // this audio id is the optional audio id which can be defind for the varna too
+        // this audio id is the optional audio id which can be defined for the varna too
         .set({ audio_id })
         .where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)))
         .returning();
@@ -261,53 +261,33 @@ const get_text_lesson_word_media_data_route = protectedAdminProcedure
     };
   });
 
-const get_text_lesson_info_route = publicProcedure
+const get_text_lesson_optional_audio_data_route = protectedAdminProcedure
   .input(z.object({ lesson_id: z.int() }))
   .query(async ({ input: { lesson_id } }) => {
     const lesson = await db.query.text_lessons.findFirst({
-      where: eq(text_lessons.id, lesson_id),
+      where: (tbl, { eq }) => eq(tbl.id, lesson_id),
       columns: {
-        id: true,
-        base_word_script_id: true,
-        text: true
+        id: true
       },
       with: {
-        gestures: {
-          columns: {
-            text_gesture_id: true
-          },
-          with: {
-            text_gesture: {
-              columns: {
-                id: true,
-                uuid: true,
-                script_id: true
-              }
-            }
-          }
-        },
-        words: {
+        optional_audio: {
           columns: {
             id: true,
-            word: true,
-            order: true
-          },
-          orderBy: (tbl, { asc }) => [asc(tbl.order)],
-          with: {
-            image: {
-              columns: {
-                s3_key: true
-              }
-            },
-            audio: {
-              columns: {
-                s3_key: true
-              }
-            }
+            description: true,
+            s3_key: true
           }
         }
       }
     });
+    return {
+      audio_asset: lesson?.optional_audio ?? null
+    };
+  });
+
+const get_text_lesson_info_route = publicProcedure
+  .input(z.object({ lesson_id: z.int() }))
+  .query(async ({ input: { lesson_id } }) => {
+    const lesson = CACHE.lessons.text_lesson_info.get({ lesson_id });
     return lesson;
   });
 
@@ -316,6 +296,7 @@ export const text_lessons_router = t.router({
   update_text_lesson: update_text_lesson_route,
   delete_text_lesson: delete_text_lesson_route,
   get_text_lesson_word_media_data: get_text_lesson_word_media_data_route,
+  get_text_lesson_optional_audio_data: get_text_lesson_optional_audio_data_route,
   categories: lesson_categories_router,
   get_text_lesson_info: get_text_lesson_info_route
 });

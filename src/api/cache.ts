@@ -157,6 +157,11 @@ export const CACHE = {
                   }
                 }
               }
+            },
+            optional_audio: {
+              columns: {
+                s3_key: true
+              }
             }
           }
         });

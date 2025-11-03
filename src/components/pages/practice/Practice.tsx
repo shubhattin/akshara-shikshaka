@@ -59,6 +59,7 @@ type text_data_type = {
 
 type Props = {
   text_data: text_data_type;
+  play_gesture_on_mount?: boolean;
 };
 
 const turnstile_token_atom = atom<string | null>(null);
@@ -87,7 +88,7 @@ export default function PracticeWrapper(props: Props) {
   );
 }
 
-function Practice({ text_data }: Props) {
+function Practice({ text_data, play_gesture_on_mount }: Props) {
   const stageRef = useRef<Konva.Stage | null>(null);
   const trpc = useTRPC();
 
@@ -248,6 +249,11 @@ function Practice({ text_data }: Props) {
 
     setCanvasCurrentMode('none');
   };
+
+  useEffect(() => {
+    // on mount play the gesture
+    if (play_gesture_on_mount) playAllGestures();
+  }, []);
 
   // Konva-based gesture animation
   const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {

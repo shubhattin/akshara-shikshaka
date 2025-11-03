@@ -437,7 +437,7 @@ const Lesson = ({ lesson_id }: { lesson_id: number }) => {
         )}
         {selected_gesture && text_gesture_data_q.isSuccess && text_gesture_data_q.data && (
           <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
-            <Practice text_data={text_gesture_data_q.data} />
+            <Practice text_data={text_gesture_data_q.data} play_gesture_on_mount={true} />
           </JotaiProvider>
         )}
       </div>

@@ -45,7 +45,9 @@ import Link from 'next/link';
 
 type Props = {
   onAudioSelect: (audio: audio_type) => void;
-  wordItem: text_lesson_word_type;
+  // this can be both varna or a word
+  type: 'varna' | 'word';
+  text: string;
 };
 
 const selected_audio_atom = atom<audio_type | null>(null);
@@ -56,13 +58,9 @@ export default function AudioSelect(props: Props) {
 
   useEffect(() => {
     setSelectedAudio(null);
-  }, [props.wordItem]);
+  }, []);
 
   const [createTab, setCreateTab] = useState<'ai' | 'record'>('record');
-
-  useEffect(() => {
-    setSelectedAudio(null);
-  }, [createTab, props.wordItem]);
 
   return (
     <div className="space-y-4">
@@ -328,7 +326,7 @@ const VOICE_TYPE_LIST = [
 type voice_types = (typeof VOICE_TYPE_LIST)[number];
 const DEFAULT_VOICE = 'alloy' satisfies voice_types;
 
-const AudioCreation = ({ wordItem }: Props) => {
+const AudioCreation = ({ text }: Props) => {
   const trpc = useTRPC();
   const [, setSelectedAudio] = useAtom(selected_audio_atom);
   const queryClient = useQueryClient();
@@ -363,14 +361,10 @@ const AudioCreation = ({ wordItem }: Props) => {
   const handleCreateAudio = async () => {
     setSelectedAudio(null);
     create_audio_mut.reset();
-    const text_key = await lipi_parivartak(
-      wordItem.word,
-      get_script_from_id(word_script_id),
-      'Normal'
-    );
+    const text_key = await lipi_parivartak(text, get_script_from_id(word_script_id), 'Normal');
     const voice_language = get_lang_from_id(lesson_lang_id); // for prompting the tts model
     create_audio_mut.mutate({
-      text: wordItem.word,
+      text: text,
       text_key: text_key,
       lang_id: langId,
       voice: voice,
@@ -442,7 +436,7 @@ const AudioCreation = ({ wordItem }: Props) => {
             onClick={handleCreateAudio}
           >
             <HiOutlineSparkles className="size-6 text-sky-400" />
-            Create Audio for "{wordItem.word}"
+            Create Audio for "{text}"
           </Button>
         )}
 
@@ -510,7 +504,7 @@ const AudioCreation = ({ wordItem }: Props) => {
 const selected_device_id_atom = atom<string | null>(null);
 const SELECTED_DEVICE_ID_STORAGE_KEY = 'selected_device_id';
 
-const AudioRecord = ({ wordItem }: Props) => {
+const AudioRecord = ({ text }: Props) => {
   // const trpcClient = useTRPCClient();
   const [langId, setLangId] = useState<number | null>(null);
   const word_script_id = useAtomValue(base_word_script_id_atom);
@@ -547,14 +541,10 @@ const AudioRecord = ({ wordItem }: Props) => {
         });
         if (!putRes.ok) throw new Error('Upload failed');
 
-        const text_key = await lipi_parivartak(
-          wordItem.word,
-          get_script_from_id(word_script_id),
-          'Normal'
-        );
+        const text_key = await lipi_parivartak(text, get_script_from_id(word_script_id), 'Normal');
         complete_upload_mut.mutateAsync({
           lang_id: langId,
-          text: wordItem.word,
+          text: text,
           text_key,
           s3_key: data.s3_key
         });
@@ -714,14 +704,10 @@ const AudioRecord = ({ wordItem }: Props) => {
   const upload_recorded_func = async () => {
     if (!recordedBlob) return;
     setRecError(null);
-    const text_key = await lipi_parivartak(
-      wordItem.word,
-      get_script_from_id(word_script_id),
-      'Normal'
-    );
+    const text_key = await lipi_parivartak(text, get_script_from_id(word_script_id), 'Normal');
     await get_upload_url_mut.mutateAsync({
       lang_id: langId,
-      text: wordItem.word,
+      text: text,
       text_key
     });
   };

@@ -605,7 +605,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
                 <DialogHeader className="sr-only">
                   <DialogTitle>Add Audio</DialogTitle>
                 </DialogHeader>
-                <AudioSelect wordItem={wordItem} onAudioSelect={onAudioSelect} />
+                <AudioSelect text={wordItem.word} onAudioSelect={onAudioSelect} type="word" />
               </DialogContent>
             </Dialog>
           )}

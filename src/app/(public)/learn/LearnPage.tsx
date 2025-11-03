@@ -220,12 +220,15 @@ const LessonList = () => {
     trpc.text_lessons.categories.get_category_text_lesson_list.queryOptions(
       { category_id: selectedCategoryId! },
       { enabled: selectedCategoryId !== null }
-    )
+    )c
   );
   const [lessons, setLessons] = useState<NonNullable<typeof lessons_q.data>>(lessons_q.data ?? []);
+  const transliterationVersion = useRef(0);
   useEffect(() => {
     if (!lessons_q.isSuccess) return;
     const data = lessons_q.data;
+    transliterationVersion.current += 1;
+    const currentVersion = transliterationVersion.current;
     Promise.all(
       data.map(async (lesson) => ({
         ...lesson,
@@ -236,6 +239,8 @@ const LessonList = () => {
         )
       }))
     ).then((transliterated_data) => {
+      // avoid race condition by checking if this is still the latest transliteration request
+      if (currentVersion !== transliterationVersion.current) return;
       setLessons(transliterated_data);
     });
   }, [lessons_q.isSuccess, lessons_q.data, selectedLanguageId, selectedScriptId]);
@@ -261,6 +266,7 @@ const LessonList = () => {
       carouselApi.scrollTo(idx);
     }
   }, [carouselApi, selectedLessonId, lessons]);
+
   return (
     <div>
       {lessons_q.isLoading && (

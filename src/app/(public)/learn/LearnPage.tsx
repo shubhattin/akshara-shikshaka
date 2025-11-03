@@ -199,12 +199,12 @@ function LearnPage(props: Props) {
           </PopoverContent>
         </Popover>
       </div>
-      <LessonList />
+      <LessonsList />
     </div>
   );
 }
 
-const LessonList = () => {
+const LessonsList = () => {
   const trpc = useTRPC();
   const selectedLanguageId = useAtomValue(selected_language_id_atom);
   const selectedScriptId = useAtomValue(selected_script_id_atom);
@@ -248,8 +248,16 @@ const LessonList = () => {
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
   const carouselScrolledToSelectedLesson = useRef(false);
   useEffect(() => {
-    if (!carouselApi || carouselScrolledToSelectedLesson.current) return;
-
+    if (carouselScrolledToSelectedLesson.current) return;
+    const idx = lessons.findIndex((l) => l.id === selectedLessonId);
+    if (idx === -1) {
+      // wrong initial cookie state seems to be passed from server
+      setSelectedLessonId(null);
+      saveLearnPageCookies('lesson_id', null);
+      carouselScrolledToSelectedLesson.current = true;
+      return;
+    }
+    if (!carouselApi) return;
     carouselScrolledToSelectedLesson.current = true;
 
     if (selectedLessonId === null) {
@@ -257,12 +265,7 @@ const LessonList = () => {
       setSelectedLessonId(lessons[0]?.id ?? null);
       return;
     }
-
-    const idx = lessons.findIndex((l) => l.id === selectedLessonId);
-    if (idx === -1) {
-      // wrong initial cookie state seems to be passed from server
-      setSelectedLessonId(null);
-    } else if (idx >= 0) {
+    if (idx >= 0) {
       carouselApi.scrollTo(idx);
     }
   }, [carouselApi, selectedLessonId, lessons]);

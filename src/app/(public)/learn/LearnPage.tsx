@@ -340,9 +340,11 @@ const Lesson = ({ lesson_id }: { lesson_id: number }) => {
     )
   );
 
-  // Audio playback state for word audios
+  // Audio playback state for word audios and varna audio
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const [playingVarnaAudio, setPlayingVarnaAudio] = useState(false);
+
   const togglePlay = (index: number, s3_key?: string) => {
     if (!s3_key) return;
     if (playingIndex === index) {
@@ -354,6 +356,10 @@ const Lesson = ({ lesson_id }: { lesson_id: number }) => {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    // Stop any playing varna audio
+    if (playingVarnaAudio) {
+      setPlayingVarnaAudio(false);
+    }
     const audio = new Audio(`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingIndex(null);
@@ -361,8 +367,61 @@ const Lesson = ({ lesson_id }: { lesson_id: number }) => {
     setPlayingIndex(index);
   };
 
+  const togglePlayVarnaAudio = (s3_key?: string) => {
+    if (!s3_key) return;
+    if (playingVarnaAudio) {
+      if (audioRef.current) audioRef.current.pause();
+      setPlayingVarnaAudio(false);
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    // Stop any playing word audio
+    if (playingIndex !== null) {
+      setPlayingIndex(null);
+    }
+    const audio = new Audio(`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${s3_key}`);
+    audioRef.current = audio as any;
+    audio.onended = () => setPlayingVarnaAudio(false);
+    audio.play();
+    setPlayingVarnaAudio(true);
+  };
+
+  const varnaAudioKey = lesson?.optional_audio?.s3_key;
+
   return (
     <div className="space-y-4">
+      {/* Varna text with optional audio */}
+      {lesson && (
+        <div className="flex items-center justify-center gap-3">
+          <div className="text-center">
+            {/* <div className="text-2xl font-bold">{lesson.text}</div> */}
+            {varnaAudioKey && (
+              <div className="mt-2 flex justify-center">
+                <button
+                  className={cn(
+                    'inline-flex items-center rounded-md border px-3 py-1.5 text-sm',
+                    'hover:bg-accent'
+                  )}
+                  onClick={() => togglePlayVarnaAudio(varnaAudioKey)}
+                >
+                  {playingVarnaAudio ? (
+                    <span className="flex items-center gap-1">
+                      <MdStop className="h-4 w-4" /> Stop
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <MdPlayArrow className="h-4 w-4" /> Play Varna
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {/* Words with image and audio - horizontally scrollable */}
       {lesson && lesson.words && lesson.words.length > 0 && (
         <div className="flex w-full items-stretch justify-center gap-3 overflow-x-auto py-2">

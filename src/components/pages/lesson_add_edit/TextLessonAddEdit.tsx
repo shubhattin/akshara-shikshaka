@@ -213,7 +213,7 @@ const LessonInfo = (props: Props) => {
           )}
         </Label>
       </div>
-      <div className="flex items-center">
+      <div className="flex items-center gap-4">
         <Label className="flex items-center gap-2">
           <span className="text-base font-semibold">Varna</span>
           {props.location === 'add' && (
@@ -238,6 +238,9 @@ const LessonInfo = (props: Props) => {
           )}
           {props.location === 'edit' && <span className="text-base font-bold">{text}</span>}
         </Label>
+        {props.location === 'edit' && (
+          <OptionalAudioSection lesson_id={props.text_lesson_info.id!} text={text} />
+        )}
       </div>
       {props.location === 'edit' && (
         <div className="space-y-3 select-none">
@@ -262,6 +265,120 @@ const LessonInfo = (props: Props) => {
               </div>
             )}
           </div>
+        </div>
+      )}
+      {props.location === 'add' && text.trim().length > 0 && (
+        <OptionalAudioSection lesson_id={null} text={text} />
+      )}
+    </div>
+  );
+};
+
+type OptionalAudioSectionProps = {
+  lesson_id: number | null;
+  text: string;
+};
+
+const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) => {
+  const trpc = useTRPC();
+  const [audio_id_optional, setAudioIdOptional] = useAtom(audio_id_optional_atom);
+  const [audioDialogOpen, setAudioDialogOpen] = useState(false);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [toSaveAudioInfo, setToSaveAudioInfo] = useState<audio_type | null>(null);
+  const [deleteAudioInfoStatus, setDeleteAudioInfoStatus] = useState(false);
+
+  const get_text_lesson_optional_audio_data_q = useQuery(
+    trpc.text_lessons.get_text_lesson_optional_audio_data.queryOptions(
+      {
+        lesson_id: lesson_id!
+      },
+      {
+        enabled: !!lesson_id
+      }
+    )
+  );
+
+  const audio_asset = !deleteAudioInfoStatus
+    ? (toSaveAudioInfo ?? get_text_lesson_optional_audio_data_q.data?.audio_asset)
+    : null;
+
+  const onAudioSelect = (audio: audio_type) => {
+    setDeleteAudioInfoStatus(false);
+    setAudioIdOptional(audio.id!);
+    setToSaveAudioInfo(audio);
+    setAudioDialogOpen(false);
+  };
+
+  const onRemoveAudio = () => {
+    setAudioIdOptional(null);
+    setDeleteAudioInfoStatus(true);
+  };
+
+  const togglePlay = () => {
+    const asset = audio_asset;
+    if (!asset) return;
+    if (playingId === asset.id) {
+      if (audioRef.current) audioRef.current.pause();
+      setPlayingId(null);
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    const audio = new Audio(`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${asset.s3_key}`);
+    audioRef.current = audio as any;
+    audio.onended = () => setPlayingId(null);
+    audio.play();
+    setPlayingId(asset.id);
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      {/* show skeleton while fetching audio data */}
+      {get_text_lesson_optional_audio_data_q.isLoading && lesson_id && (
+        <Skeleton className="h-9 w-24" />
+      )}
+
+      {!audio_asset &&
+        text.trim().length > 0 &&
+        (!lesson_id || !get_text_lesson_optional_audio_data_q.isLoading) && (
+          <Dialog open={audioDialogOpen} onOpenChange={setAudioDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <AiOutlineAudio className="size-6 text-emerald-400" />
+                Add Audio
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="h-[70vh] w-full overflow-y-scroll px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
+              <DialogHeader className="sr-only">
+                <DialogTitle>Add Audio</DialogTitle>
+              </DialogHeader>
+              <AudioSelect text={text} onAudioSelect={onAudioSelect} type="varna" />
+            </DialogContent>
+          </Dialog>
+        )}
+
+      {audio_asset && text.trim().length > 0 && (
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" className="h-7 px-2 text-xs" onClick={togglePlay}>
+            {playingId === audio_asset.id ? (
+              <span className="flex items-center gap-1">
+                <MdStop /> Stop
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <MdPlayArrow /> Play
+              </span>
+            )}
+          </Button>
+          <button
+            onClick={onRemoveAudio}
+            className="rounded-full p-1 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500/50 dark:hover:bg-gray-800"
+          >
+            <MdClose className="size-4" />
+          </button>
         </div>
       )}
     </div>
@@ -605,7 +722,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
                 <DialogHeader className="sr-only">
                   <DialogTitle>Add Audio</DialogTitle>
                 </DialogHeader>
-                <AudioSelect wordItem={wordItem} onAudioSelect={onAudioSelect} />
+                <AudioSelect text={wordItem.word} onAudioSelect={onAudioSelect} type="word" />
               </DialogContent>
             </Dialog>
           )}
@@ -643,6 +760,7 @@ const AddEditSave = (props: Props) => {
   const base_word_script_id = useAtomValue(base_word_script_id_atom);
   const [words, setWords] = useAtom(words_atom);
   const textKey = useAtomValue(text_key_atom);
+  const audio_id_optional = useAtomValue(audio_id_optional_atom);
 
   const queryClient = useQueryClient();
 
@@ -735,7 +853,7 @@ const AddEditSave = (props: Props) => {
           text: text,
           lang_id: lang_id,
           base_word_script_id: base_word_script_id,
-          audio_id: null
+          audio_id: audio_id_optional ?? null
         },
         text_key: textKey!,
         words
@@ -745,7 +863,7 @@ const AddEditSave = (props: Props) => {
         lesson_info: {
           id: props.text_lesson_info.id!,
           uuid: props.text_lesson_info.uuid!,
-          audio_id: null
+          audio_id: audio_id_optional ?? null
         },
         words
       });

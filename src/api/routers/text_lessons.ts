@@ -133,6 +133,7 @@ const update_text_lesson_route = protectedAdminProcedure
       // updating text lessons
       const res = await db
         .update(text_lessons)
+        // this audio id is the optional audio id which can be defind for the varna too
         .set({ audio_id })
         .where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid)))
         .returning();

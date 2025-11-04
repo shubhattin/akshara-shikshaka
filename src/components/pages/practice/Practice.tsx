@@ -63,8 +63,8 @@ type text_data_type = {
 type Props = {
   text_data: text_data_type;
   play_gesture_on_mount?: boolean;
-  // rendered on complete
-  children?: React.ReactNode;
+  // rendered on complete - can be ReactNode or a function that receives restartPractice callback
+  children?: React.ReactNode | ((restartPractice: () => Promise<void>) => React.ReactNode);
 };
 
 const turnstile_token_atom = atom<string | null>(null);
@@ -523,7 +523,11 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
 
       {completedGesturesCount === gestureData.length &&
         (children ? (
-          children
+          typeof children === 'function' ? (
+            children(restartPractice)
+          ) : (
+            children
+          )
         ) : (
           <div className="flex justify-center">
             <motion.div

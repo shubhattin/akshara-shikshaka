@@ -33,7 +33,7 @@ import {
 import { cn } from '~/lib/utils';
 import Practice from '~/components/pages/practice/Practice';
 import { Provider as JotaiProvider, createStore } from 'jotai';
-import { MdPlayArrow, MdStop } from 'react-icons/md';
+import { MdArrowForward, MdPlayArrow, MdRefresh, MdStop } from 'react-icons/md';
 import { lipi_parivartak, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
 import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
 import { Skeleton } from '~/components/ui/skeleton';
@@ -575,42 +575,54 @@ const Lesson = ({
           text_gesture_data_q.data && (
             <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
               <Practice text_data={text_gesture_data_q.data} play_gesture_on_mount={true}>
-                <div className="flex justify-center">
-                  <div
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg border border-emerald-200 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-md',
-                      'dark:border-emerald-800 dark:bg-gray-900/90'
-                    )}
-                  >
-                    <span className="text-xl">🌟</span>
-                    <div className="leading-tight">
-                      <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                        Wonderful job!
+                {(restartPractice) => (
+                  <div className="flex justify-center select-none">
+                    <div
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg border border-emerald-200 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-md',
+                        'dark:border-emerald-800 dark:bg-gray-900/90'
+                      )}
+                    >
+                      <span className="text-3xl">🌟</span>
+                      <div className="leading-tight">
+                        <div className="text-lg font-semibold text-emerald-700 dark:text-emerald-300">
+                          Wonderful job!
+                        </div>
+                        <div className="text-base font-bold text-muted-foreground">
+                          You completed {lesson?.text}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        You completed {lesson?.text}
-                      </div>
+                      {/* <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" /> */}
+                      {hasNext && (
+                        <>
+                          <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" />
+                          <Button
+                            size="sm"
+                            onClick={() => goToNextLesson && goToNextLesson()}
+                            className={cn(
+                              'gap-1.5 font-semibold',
+                              'bg-linear-to-r from-emerald-500 to-emerald-600 text-white shadow-md',
+                              'border border-emerald-400/50 dark:border-emerald-500/30',
+                              'hover:border-emerald-400/70 hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg',
+                              'transition-all duration-200'
+                            )}
+                          >
+                            Next Varna
+                            <MdArrowForward className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => restartPractice()}
+                        className="h-8 w-8"
+                      >
+                        <MdRefresh className="h-4 w-4" />
+                      </Button>
                     </div>
-                    {hasNext && (
-                      <>
-                        <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" />
-                        <Button
-                          size="sm"
-                          onClick={() => goToNextLesson && goToNextLesson()}
-                          className={cn(
-                            'gap-1.5',
-                            'bg-linear-to-r from-emerald-400 to-emerald-600 text-white shadow-md backdrop-blur-xl',
-                            'border border-white/30 dark:border-white/20',
-                            'hover:border-white/40 hover:from-emerald-500 hover:to-emerald-700 hover:shadow-lg',
-                            'transition-all duration-300'
-                          )}
-                        >
-                          Next Varna
-                        </Button>
-                      </>
-                    )}
                   </div>
-                </div>
+                )}
               </Practice>
             </JotaiProvider>
           )}

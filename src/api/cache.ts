@@ -80,7 +80,6 @@ export const CACHE = {
         // ADD new category
         // UPDATE/REORDER category list
         // DELETE category
-
         return data;
       }
     ),
@@ -99,7 +98,8 @@ export const CACHE = {
             uuid: true
           },
           orderBy: (tbl, { asc }) => [asc(tbl.order)],
-          where: (tbl, { eq }) => eq(tbl.category_id, category_id)
+          where: (tbl, { eq, isNotNull, and }) =>
+            and(eq(tbl.category_id, category_id), isNotNull(tbl.order))
         });
         // this cache has to be invalidated when
         // ADD new lesson to a category

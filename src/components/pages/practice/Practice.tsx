@@ -35,6 +35,9 @@ import { useMutation } from '@tanstack/react-query';
 import { useTurnstile } from 'react-turnstile';
 import TurnstileWidget, { TURNSTILE_ENABLED } from '~/components/Turnstile';
 import { deepCopy } from '~/tools/kry';
+import { Button } from '~/components/ui/button';
+
+const ACCURACY_THRESHOLD = 0.75;
 
 // Dynamic import for PracticeKonvaCanvas to avoid SSR issues
 const PracticeKonvaCanvas = dynamic(() => import('./PracticeCanvas'), {
@@ -59,6 +62,9 @@ type text_data_type = {
 
 type Props = {
   text_data: text_data_type;
+  play_gesture_on_mount?: boolean;
+  // rendered on complete - can be ReactNode or a function that receives restartPractice callback
+  children?: React.ReactNode | ((restartPractice: () => Promise<void>) => React.ReactNode);
 };
 
 const turnstile_token_atom = atom<string | null>(null);
@@ -87,7 +93,7 @@ export default function PracticeWrapper(props: Props) {
   );
 }
 
-function Practice({ text_data }: Props) {
+function Practice({ text_data, play_gesture_on_mount, children }: Props) {
   const stageRef = useRef<Konva.Stage | null>(null);
   const trpc = useTRPC();
 
@@ -239,6 +245,8 @@ function Practice({ text_data }: Props) {
 
   const playAllGestures = async () => {
     setCanvasCurrentMode('playing');
+    // clear user drawn gestures
+    setCurrentGesturePoints([]);
     setAnimatedGestureLines([]);
 
     for (const gesture of gestureData) {
@@ -248,6 +256,11 @@ function Practice({ text_data }: Props) {
 
     setCanvasCurrentMode('none');
   };
+
+  useEffect(() => {
+    // on mount play the gesture
+    if (play_gesture_on_mount) playAllGestures();
+  }, []);
 
   // Konva-based gesture animation
   const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {
@@ -309,7 +322,7 @@ function Practice({ text_data }: Props) {
       console.error('Error saving user stroke vectors:', e);
     }
 
-    if (accuracy > 0.7) {
+    if (accuracy > ACCURACY_THRESHOLD) {
       // completeCurrentGesture
       setShowTryAgain(false);
       playNextGesture();
@@ -374,6 +387,23 @@ function Practice({ text_data }: Props) {
     userGestureVectorsRef.current = [];
   };
 
+  const restartPractice = async () => {
+    await resetPractice();
+    await playAllGestures();
+    // startPractice();
+  };
+
+  const startPractice = async () => {
+    setCanvasCurrentMode('practicing');
+    setCurrentGestureIndex(0);
+    setCompletedGesturesCount(0);
+    setShowTryAgain(false);
+    setAnimatedGestureLines([]);
+    clearCurrentAnimatedGesture();
+    userGestureVectorsRef.current = [];
+    playGestureIndex(currentGestureIndex);
+  };
+
   if (!gestureData.length) {
     return (
       <div className="text text-center text-muted-foreground">
@@ -384,99 +414,104 @@ function Practice({ text_data }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="text-center">
+      {/* <div className="text-center">
         <h2 className="mb-2 text-2xl font-bold">Practice: {text_data.text}</h2>
-      </div>
+      </div> */}
 
       <div className="flex justify-center gap-4">
         {(canvasCurrentMode === 'none' || canvasCurrentMode === 'playing') && (
           <>
-            <button
-              onClick={playAllGestures}
-              disabled={canvasCurrentMode === 'playing'}
-              className={cn(
-                'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
-                'bg-linear-to-r from-blue-400 to-blue-600 text-white shadow-lg',
-                'hover:scale-105 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
-                'focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-60',
-                'dark:from-blue-700 dark:to-blue-900 dark:text-white',
-                'dark:hover:from-blue-800 dark:hover:to-blue-950'
-              )}
-            >
-              <MdPlayArrow className="mr-2 size-6 text-xl drop-shadow" />
-              How to Write
-            </button>
-            <button
+            <Button
               onClick={() => {
-                if (totalGestures === 0) return;
-
-                setCanvasCurrentMode('practicing');
-                setCurrentGestureIndex(0);
-                setCompletedGesturesCount(0);
-                setShowTryAgain(false);
-                setAnimatedGestureLines([]);
-                clearCurrentAnimatedGesture();
-                userGestureVectorsRef.current = [];
-                playGestureIndex(currentGestureIndex);
+                if (canvasCurrentMode === 'playing') return;
+                playAllGestures();
               }}
-              disabled={canvasCurrentMode === 'playing'}
               className={cn(
-                'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
-                'bg-linear-to-r from-pink-500 via-red-500 to-yellow-500 text-white shadow-lg',
-                'hover:scale-105 hover:from-pink-600 hover:via-red-600 hover:to-yellow-600 hover:shadow-xl',
-                'focus:ring-2 focus:ring-pink-400 focus:ring-offset-2 focus:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-60',
-                'dark:from-pink-700 dark:via-red-700 dark:to-yellow-700 dark:text-white',
-                'dark:hover:from-pink-800 dark:hover:via-red-800 dark:hover:to-yellow-800'
+                'gap-1',
+                'bg-linear-to-r from-orange-400 via-amber-400 to-yellow-500 text-white shadow-lg backdrop-blur-xl',
+                'border border-white/30 dark:border-white/20',
+                'hover:border-white/40 hover:from-orange-500 hover:via-amber-500 hover:to-yellow-600 hover:shadow-xl',
+                'dark:from-orange-400 dark:via-amber-600 dark:to-yellow-600 dark:text-white',
+                'dark:hover:from-orange-600 dark:hover:via-amber-700 dark:hover:to-yellow-700',
+                'transition-all duration-300'
               )}
             >
-              <AiOutlineSignature className="mr-2 size-6 text-xl text-white drop-shadow" />
+              <MdPlayArrow className="size-6 text-base drop-shadow" />
+              Play
+            </Button>
+            <Button
+              onClick={() => {
+                if (totalGestures === 0 || canvasCurrentMode === 'playing') return;
+
+                startPractice();
+              }}
+              className={cn(
+                'gap-1',
+                'bg-linear-to-r from-emerald-400 to-emerald-500 text-white shadow-lg backdrop-blur-xl',
+                'border border-white/30 dark:border-white/20',
+                'hover:border-white/40 hover:from-emerald-500 hover:to-emerald-600 hover:shadow-xl',
+                'dark:from-emerald-600 dark:to-emerald-700 dark:text-white',
+                'dark:hover:from-emerald-700 dark:hover:to-emerald-800',
+                'transition-all duration-300'
+              )}
+            >
+              <AiOutlineSignature className="size-6 text-base drop-shadow" />
               Practice
-            </button>
+            </Button>
           </>
         )}
 
         {canvasCurrentMode === 'practicing' && completedGesturesCount !== totalGestures && (
           <>
-            <button
+            <Button
               onClick={replayCurrentGesture}
               disabled={isAnimatingCurrentGesture || completedGesturesCount === totalGestures}
               className={cn(
-                'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
-                'bg-linear-to-r from-blue-400 to-blue-600 text-white shadow-lg',
-                'hover:scale-105 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
-                'focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-60',
+                'gap-1 text-base',
+                'bg-linear-to-r from-blue-400 to-blue-600 text-white shadow-lg backdrop-blur-xl',
+                'border border-white/30 dark:border-white/20',
+                'hover:border-white/40 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
                 'dark:from-blue-700 dark:to-blue-900 dark:text-white',
-                'dark:hover:from-blue-800 dark:hover:to-blue-950'
+                'dark:hover:from-blue-800 dark:hover:to-blue-950',
+                'transition-all duration-300'
               )}
             >
-              <MdPlayArrow className="mr-2 text-xl drop-shadow" />
-              Play Current Gesture
-            </button>
-            <button
+              <MdPlayArrow className="size-6 text-base drop-shadow" />
+              Replay
+            </Button>
+            <Button
               onClick={async () => {
                 submit_user_gesture_recording_func(false);
-                resetPractice();
+                restartPractice();
               }}
               className={cn(
-                'relative inline-flex items-center rounded-lg px-5 py-2.5 font-semibold transition-all duration-200',
-                'bg-linear-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-lg',
-                'hover:scale-105 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-xl',
-                'focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-60',
+                'gap-1 text-base',
+                'bg-linear-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-lg backdrop-blur-xl',
+                'border border-white/30 dark:border-white/20',
+                'hover:border-white/40 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-xl',
                 'dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 dark:text-white',
-                'dark:hover:from-gray-800 dark:hover:via-gray-900 dark:hover:to-black'
+                'dark:hover:from-gray-800 dark:hover:via-gray-900 dark:hover:to-black',
+                'transition-all duration-300'
               )}
             >
-              <MdClear className="mr-2 text-xl drop-shadow" />
-              Reset
-            </button>
+              <MdRefresh className="size-6 text-base drop-shadow" />
+              Restart
+            </Button>
+            {/* <Button
+              variant={'ghost'}
+              className="p-1"
+              size="icon"
+              onClick={() => {
+                resetPractice();
+                // playAllGestures();
+              }}
+            >
+              <MdClear className="size-6 text-base drop-shadow" />
+            </Button> */}
           </>
         )}
       </div>
-      {canvasCurrentMode === 'practicing' && completedGesturesCount !== gestureData.length && (
+      {/* {canvasCurrentMode === 'practicing' && completedGesturesCount !== gestureData.length && (
         <div className="flex justify-center">
           <ProgressDisplay
             currentGesture={currentGestureIndex + 1}
@@ -484,70 +519,83 @@ function Practice({ text_data }: Props) {
             completedCount={completedGesturesCount}
           />
         </div>
-      )}
+      )} */}
 
-      {completedGesturesCount === gestureData.length && (
-        <div className="flex justify-center">
-          <motion.div
-            className={cn(
-              'space-y-4 rounded-xl border border-gray-200 bg-linear-to-br from-white via-gray-50 to-gray-100 p-6 text-center shadow-lg',
-              'dark:border-gray-700 dark:bg-linear-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-700'
-            )}
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          >
-            <div className="mb-2 text-3xl">🎉</div>
-            <div className="mb-1 text-xl font-bold text-yellow-800 dark:text-yellow-200">
-              Congratulations!
-            </div>
-            <div className="mb-3 text-yellow-700 dark:text-yellow-300">
-              You successfully completed all gestures!
-            </div>
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              whileHover={{ scale: 1.07 }}
-              onClick={() => {
-                resetPractice();
-                playAllGestures();
-              }}
+      {completedGesturesCount === gestureData.length &&
+        (children ? (
+          typeof children === 'function' ? (
+            children(restartPractice)
+          ) : (
+            children
+          )
+        ) : (
+          <div className="flex justify-center">
+            <motion.div
               className={cn(
-                'relative inline-flex items-center rounded-lg px-4 py-2 font-semibold transition-all duration-200',
-                'bg-linear-to-r from-yellow-400 via-orange-400 to-yellow-500 text-yellow-900 shadow-md',
-                'hover:scale-105 hover:from-yellow-500 hover:via-orange-500 hover:to-yellow-600 hover:shadow-lg',
-                'focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 focus:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-60',
-                'dark:from-yellow-600 dark:via-orange-500 dark:to-yellow-700 dark:text-yellow-100',
-                'dark:hover:from-yellow-700 dark:hover:via-orange-600 dark:hover:to-yellow-800'
+                'flex items-center gap-4 rounded-lg border border-yellow-200 bg-white/95 px-5 py-3 shadow-lg backdrop-blur-xl',
+                'dark:border-yellow-800 dark:bg-gray-900/95'
               )}
-              style={{ fontSize: '0.95rem' }}
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             >
-              <MdArrowForward className="mr-2 text-lg drop-shadow" />
-              Play Again
-            </motion.button>
-          </motion.div>
-        </div>
-      )}
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🎉</span>
+                <div className="flex flex-col">
+                  <span className="text-base font-bold text-yellow-800 dark:text-yellow-200">
+                    Congratulations!
+                  </span>
+                  <span className="text-sm text-yellow-700 dark:text-yellow-300">
+                    All gestures completed
+                  </span>
+                </div>
+              </div>
 
-      <AnimatePresence>
-        {showTryAgain && canvasCurrentMode === 'practicing' && (
-          <TryAgainSection accuracy={lastAccuracy} onSkipGesture={skipCurrentGesture} />
-        )}
-      </AnimatePresence>
+              <div className="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
+
+              <Button
+                onClick={() => {
+                  resetPractice();
+                  playAllGestures();
+                }}
+                className={cn(
+                  'gap-1.5',
+                  'bg-linear-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-md backdrop-blur-xl',
+                  'border border-white/30 dark:border-white/20',
+                  'hover:border-white/40 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-lg',
+                  'dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 dark:text-white',
+                  'dark:hover:from-gray-800 dark:hover:via-gray-900 dark:hover:to-black',
+                  'transition-all duration-300'
+                )}
+              >
+                <MdArrowForward className="size-4" />
+                Play Again
+              </Button>
+            </motion.div>
+          </div>
+        ))}
 
       <div className="flex justify-center">
-        <div
-          className={cn(
-            'rounded-lg border-2 transition-colors',
-            isDrawing ? 'border-blue-500' : 'border-border'
-          )}
-        >
-          <PracticeKonvaCanvas
-            ref={stageRef}
-            gestureData={gestureData}
-            onUserStroke={handleUserStroke}
-          />
+        <div className="relative">
+          <AnimatePresence>
+            {showTryAgain && canvasCurrentMode === 'practicing' && (
+              <TryAgainSection accuracy={lastAccuracy} onSkipGesture={skipCurrentGesture} />
+            )}
+          </AnimatePresence>
+
+          <div
+            className={cn(
+              'rounded-lg border-2 transition-colors',
+              isDrawing ? 'border-blue-500' : 'border-border'
+            )}
+          >
+            <PracticeKonvaCanvas
+              ref={stageRef}
+              gestureData={gestureData}
+              onUserStroke={handleUserStroke}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -575,119 +623,85 @@ const TryAgainSection = ({
 
   return (
     <motion.div
-      className="fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2"
-      initial={{ scale: 0, opacity: 0 }}
+      className="absolute top-4 left-1/2 z-50 -translate-x-1/2"
+      initial={{ y: -20, opacity: 0 }}
       animate={{
-        scale: 1,
+        y: 0,
         opacity: 1
       }}
       transition={{
         type: 'spring',
         stiffness: 300,
-        damping: 15,
-        duration: 0.6
+        damping: 25
       }}
       exit={{
-        scale: 0,
+        y: -20,
         opacity: 0,
         transition: { duration: 0.2 }
       }}
     >
-      <motion.div
-        initial={{ scale: 1 }}
-        animate={{ scale: [1, 1.05, 1] }}
-        transition={{
-          delay: 0.3,
-          duration: 0.4,
-          ease: 'easeInOut'
-        }}
+      <div
+        className={cn(
+          'flex items-center gap-3 rounded-lg border border-red-200 bg-white/95 px-4 py-2.5 shadow-lg backdrop-blur-xl',
+          'dark:border-red-800 dark:bg-gray-900/95'
+        )}
       >
-        <div className="rounded-xl border border-red-200 bg-white p-4 shadow-2xl sm:p-6 dark:border-red-800 dark:bg-gray-900">
-          <div className="flex flex-col items-center space-y-2">
-            {/* Accuracy Display */}
-            <div className="text-center">
-              <div className="mb-2 flex items-center justify-center space-x-2">
-                <motion.div
-                  animate={{ rotate: [0, 10, -10, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                >
-                  <span className="text-2xl">📊</span>
-                </motion.div>
-                <span className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                  Accuracy Check
-                </span>
-              </div>
-
-              <div className="flex items-center justify-center space-x-3">
-                <div
-                  className={cn(
-                    'rounded-full px-4 py-2 text-lg font-bold shadow-md',
-                    isBelowThreshold
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                  )}
-                >
-                  {accuracyPercent}%
-                </div>
-                <span
-                  className={cn(
-                    'text-sm font-medium brightness-75',
-                    isBelowThreshold
-                      ? 'text-red-600 dark:text-red-400'
-                      : 'text-green-600 dark:text-green-400'
-                  )}
-                >
-                  {isBelowThreshold ? 'Need 70%+' : 'Great!'}
-                </span>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex w-full flex-col gap-y-4 sm:w-auto sm:flex-row sm:gap-x-4">
-              <motion.button
-                onClick={() => onTryAgain()}
-                className={cn(
-                  'flex items-center justify-center space-x-2 rounded-lg px-5 py-2.5 font-semibold shadow-lg transition-all duration-200',
-                  'bg-linear-to-r from-orange-400 to-red-500 text-white',
-                  'hover:from-orange-500 hover:to-red-600 hover:shadow-xl',
-                  'focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 focus:outline-none',
-                  'dark:from-orange-600 dark:to-red-700 dark:hover:from-orange-700 dark:hover:to-red-800'
-                )}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <MdRefresh className="h-4 w-4" />
-                <span>Try Again</span>
-              </motion.button>
-
-              <motion.button
-                onClick={onSkipGesture}
-                className={cn(
-                  'flex items-center justify-center space-x-2 rounded-lg px-5 py-2.5 font-semibold shadow-lg transition-all duration-200',
-                  'bg-linear-to-r from-blue-400 to-blue-600 text-white',
-                  'hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
-                  'focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:outline-none',
-                  'dark:from-blue-600 dark:to-blue-800 dark:hover:from-blue-700 dark:hover:to-blue-900'
-                )}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <MdArrowForward className="h-4 w-4" />
-                <span>Next Gesture</span>
-              </motion.button>
-            </div>
-          </div>
+        {/* Accuracy Badge */}
+        <div className="flex items-center gap-2">
+          <span className="text-lg">📊</span>
+          {/* <div
+            className={cn(
+              'rounded-md px-2.5 py-1 text-sm font-bold',
+              isBelowThreshold
+                ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+            )}
+          >
+            {accuracyPercent}%
+          </div> */}
+          <span className="text-center text-sm font-medium text-gray-600 dark:text-gray-400">
+            Try Again
+          </span>
         </div>
-      </motion.div>
 
-      {/* Backdrop to close on click */}
-      <motion.div
-        className="fixed inset-0 -z-10 bg-black/20 backdrop-blur-sm"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onTryAgain}
-      />
+        {/* Divider */}
+        <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button
+            onClick={() => onTryAgain()}
+            size="sm"
+            className={cn(
+              'gap-1.5',
+              'bg-linear-to-r from-orange-400 to-red-500 text-white shadow-md backdrop-blur-xl',
+              'border border-white/30 dark:border-white/20',
+              'hover:border-white/40 hover:from-orange-500 hover:to-red-600 hover:shadow-lg',
+              'dark:from-orange-600 dark:to-red-700 dark:hover:from-orange-700 dark:hover:to-red-800',
+              'transition-all duration-300'
+            )}
+          >
+            <MdRefresh className="size-4" />
+            Try Again
+          </Button>
+
+          <Button
+            onClick={onSkipGesture}
+            size="sm"
+            className={cn(
+              'gap-1.5',
+              'bg-linear-to-r from-blue-400 to-blue-600 text-white shadow-md backdrop-blur-xl',
+              'border border-white/30 dark:border-white/20',
+              'hover:border-white/40 hover:from-blue-500 hover:to-blue-700 hover:shadow-lg',
+              'dark:from-blue-600 dark:to-blue-800 dark:hover:from-blue-700 dark:hover:to-blue-900',
+              'transition-all duration-300'
+            )}
+          >
+            <MdArrowForward className="size-4" />
+            Next
+          </Button>
+        </div>
+      </div>
     </motion.div>
   );
 };

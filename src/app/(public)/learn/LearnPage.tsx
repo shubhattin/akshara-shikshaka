@@ -263,7 +263,7 @@ const LessonsList = () => {
     const idx = lessons_.findIndex((l) => l.id === selectedLessonId);
     if (idx === -1) {
       // wrong initial cookie state seems to be passed from server
-      setSelectedLessonId(null);
+      setSelectedLessonId(lessons_[0]?.id ?? null);
       carouselScrolledToSelectedLesson.current = true;
       return;
     }

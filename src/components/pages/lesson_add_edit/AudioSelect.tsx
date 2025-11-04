@@ -834,9 +834,11 @@ const AudioRecord = ({ text }: Props) => {
                     >
                       <MdRefresh /> Re-record
                     </Button>
-                    <Button className="gap-2" variant="default" onClick={upload_recorded_func}>
-                      <MdCloudUpload /> Upload
-                    </Button>
+                    {!uploading_status && (
+                      <Button className="gap-2" variant="default" onClick={upload_recorded_func}>
+                        <MdCloudUpload /> Upload
+                      </Button>
+                    )}
                   </>
                 )}
                 {uploading_status && (

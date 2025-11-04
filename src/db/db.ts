@@ -1,6 +1,6 @@
 import * as schema from './schema';
-import { drizzle as drizzle_neon } from 'drizzle-orm/neon-http';
-import { neon } from '@neondatabase/serverless';
+import { drizzle as drizzle_neon } from 'drizzle-orm/neon-serverless';
+import { Pool } from '@neondatabase/serverless';
 import { get_db_url } from './db_utils';
 
 const DB_URL = get_db_url(process.env);
@@ -15,4 +15,5 @@ const get_drizzle_instance_dev = async () => {
 export const db =
   process.env.NODE_ENV === 'development'
     ? await get_drizzle_instance_dev()
-    : drizzle_neon(neon(DB_URL), { schema });
+    : // testing neon websocket adapter
+      drizzle_neon(new Pool({ connectionString: process.env.PG_DATABASE_URL }), { schema });

@@ -280,6 +280,19 @@ const LessonsList = () => {
     }
   }, [carouselApi, selectedLessonId, lessons_q]);
 
+  // Helpers to drive carousel from child Lesson
+  const currentIndex = lessonsTransliterated.findIndex((l) => l.id === selectedLessonId);
+  const hasNext = currentIndex >= 0 && currentIndex < lessonsTransliterated.length - 1;
+  const goToNextLesson = () => {
+    if (!hasNext) return;
+    const nextLesson = lessonsTransliterated[currentIndex + 1];
+    setSelectedLessonId(nextLesson.id);
+    saveLearnPageCookies('lesson_id', nextLesson.id);
+    if (carouselApi) {
+      carouselApi.scrollTo(currentIndex + 1);
+    }
+  };
+
   return (
     <div>
       {lessons_q.isLoading && (
@@ -350,12 +363,22 @@ const LessonsList = () => {
           </Carousel>
         </div>
       )}
-      {selectedLessonId !== null && <Lesson lesson_id={selectedLessonId} />}
+      {selectedLessonId !== null && (
+        <Lesson lesson_id={selectedLessonId} hasNext={hasNext} goToNextLesson={goToNextLesson} />
+      )}
     </div>
   );
 };
 
-const Lesson = ({ lesson_id }: { lesson_id: number }) => {
+const Lesson = ({
+  lesson_id,
+  hasNext,
+  goToNextLesson
+}: {
+  lesson_id: number;
+  hasNext?: boolean;
+  goToNextLesson?: () => void;
+}) => {
   const scriptId = useAtomValue(selected_script_id_atom);
   const trpc = useTRPC();
 
@@ -551,7 +574,44 @@ const Lesson = ({ lesson_id }: { lesson_id: number }) => {
           text_gesture_data_q.isSuccess &&
           text_gesture_data_q.data && (
             <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
-              <Practice text_data={text_gesture_data_q.data} play_gesture_on_mount={true} />
+              <Practice text_data={text_gesture_data_q.data} play_gesture_on_mount={true}>
+                <div className="flex justify-center">
+                  <div
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg border border-emerald-200 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-md',
+                      'dark:border-emerald-800 dark:bg-gray-900/90'
+                    )}
+                  >
+                    <span className="text-xl">🌟</span>
+                    <div className="leading-tight">
+                      <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                        Wonderful job!
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        You completed {lesson?.text}
+                      </div>
+                    </div>
+                    {hasNext && (
+                      <>
+                        <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" />
+                        <Button
+                          size="sm"
+                          onClick={() => goToNextLesson && goToNextLesson()}
+                          className={cn(
+                            'gap-1.5',
+                            'bg-linear-to-r from-emerald-400 to-emerald-600 text-white shadow-md backdrop-blur-xl',
+                            'border border-white/30 dark:border-white/20',
+                            'hover:border-white/40 hover:from-emerald-500 hover:to-emerald-700 hover:shadow-lg',
+                            'transition-all duration-300'
+                          )}
+                        >
+                          Next Varna
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </Practice>
             </JotaiProvider>
           )}
       </div>

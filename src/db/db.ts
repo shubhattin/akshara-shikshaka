@@ -23,18 +23,10 @@ export const db =
       drizzle_neon(new Pool({ connectionString: process.env.PG_DATABASE_URL }), { schema });
 
 export type transactionType =
-  | PgTransaction<
-      NeonQueryResultHKT,
-      typeof import('/home/shubhattin/yojanAni/lipi/akshara/src/db/schema'),
-      ExtractTablesWithRelations<
-        typeof import('/home/shubhattin/yojanAni/lipi/akshara/src/db/schema')
-      >
-    >
+  | PgTransaction<NeonQueryResultHKT, typeof schema, ExtractTablesWithRelations<typeof schema>>
   | PgTransaction<
       PostgresJsQueryResultHKT,
-      typeof import('/home/shubhattin/yojanAni/lipi/akshara/src/db/schema'),
-      ExtractTablesWithRelations<
-        typeof import('/home/shubhattin/yojanAni/lipi/akshara/src/db/schema')
-      >
+      typeof schema,
+      ExtractTablesWithRelations<typeof schema>
     >
   | typeof db;

@@ -432,6 +432,11 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
   const hasCustomCompleted = Children.toArray(children as React.ReactNode).some(
     (child) => isValidElement(child) && (child.type as any)?._slot === 'PracticeCompleted'
   );
+  // Detect CanvasCenterCompleted slot usage
+  const hasCanvasCenterCompleted = Children.toArray(children as React.ReactNode).some(
+    (child) =>
+      isValidElement(child) && (child.type as any)?._slot === 'PracticeCanvasCenterCompleted'
+  );
 
   const renderedChildren = typeof children === 'function' ? null : (children as React.ReactNode);
 
@@ -465,6 +470,23 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
                 <TryAgainSection accuracy={lastAccuracy} onSkipGesture={skipCurrentGesture} />
               )}
             </AnimatePresence>
+
+            {/* CanvasCenterCompleted slot - centered overlay when completed */}
+            {isCompleted && hasCanvasCenterCompleted && (
+              <div className="pointer-events-none absolute inset-0 z-40 mt-4 flex justify-center">
+                <div className="pointer-events-auto">
+                  {Children.toArray(children as React.ReactNode)
+                    .filter(
+                      (child) =>
+                        isValidElement(child) &&
+                        (child.type as any)?._slot === 'PracticeCanvasCenterCompleted'
+                    )
+                    .map((child, idx) => (
+                      <div key={idx}>{(child as any).props?.children}</div>
+                    ))}
+                </div>
+              </div>
+            )}
 
             <div
               className={cn(
@@ -862,11 +884,20 @@ const PracticeCompletedDefault = () => {
   );
 };
 
+// CanvasCenterCompleted slot subcomponent - renders via overlay only
+const PracticeCanvasCenterCompleted = ({ children }: { children?: React.ReactNode }) => {
+  // This component acts as a marker; actual rendering happens in the overlay above
+  return null;
+};
+(PracticeCanvasCenterCompleted as any)._slot = 'PracticeCanvasCenterCompleted' as const;
+
 type PracticeComponent = typeof PracticeWrapper & {
   Completed: typeof PracticeCompleted;
+  CanvasCenterCompleted: typeof PracticeCanvasCenterCompleted;
 };
 
 const PracticeExport = PracticeWrapper as PracticeComponent;
 PracticeExport.Completed = PracticeCompleted;
+PracticeExport.CanvasCenterCompleted = PracticeCanvasCenterCompleted;
 
 export default PracticeExport;

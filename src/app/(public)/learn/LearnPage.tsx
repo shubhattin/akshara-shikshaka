@@ -622,25 +622,7 @@ const Lesson = ({
                           </div>
                         </div>
                         {/* <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" /> */}
-                        {hasNext && (
-                          <>
-                            <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" />
-                            <Button
-                              size="sm"
-                              onClick={() => goToNextLesson && goToNextLesson()}
-                              className={cn(
-                                'gap-1.5 font-semibold',
-                                'bg-linear-to-r from-emerald-500 to-emerald-600 text-white shadow-md',
-                                'border border-emerald-400/50 dark:border-emerald-500/30',
-                                'hover:border-emerald-400/70 hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg',
-                                'transition-all duration-200'
-                              )}
-                            >
-                              Next Varna
-                              <MdArrowForward className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                        {/* Moved Next Varna into Practice.CanvasCenterCompleted */}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -653,6 +635,35 @@ const Lesson = ({
                     </div>
                   )}
                 </Practice.Completed>
+                {hasNext && (
+                  <Practice.CanvasCenterCompleted>
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0, opacity: 0 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                    >
+                      <Button
+                        size="sm"
+                        onClick={() => goToNextLesson && goToNextLesson()}
+                        className={cn(
+                          'group gap-2 font-bold',
+                          'bg-linear-to-r from-blue-500 via-sky-500 to-indigo-500 text-white',
+                          'shadow-lg shadow-blue-500/20 backdrop-blur-xl',
+                          'border border-white/30 dark:border-white/20',
+                          'hover:border-white/40 hover:from-blue-600 hover:via-sky-600 hover:to-indigo-600 hover:shadow-xl',
+                          'focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:outline-none',
+                          'dark:from-blue-600 dark:via-sky-600 dark:to-indigo-600 dark:text-white',
+                          'dark:hover:from-blue-700 dark:hover:via-sky-700 dark:hover:to-indigo-700',
+                          'rounded-full transition-all duration-300'
+                        )}
+                      >
+                        Next Varna
+                        <MdArrowForward className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </Button>
+                    </motion.div>
+                  </Practice.CanvasCenterCompleted>
+                )}
               </Practice>
             </JotaiProvider>
           )}

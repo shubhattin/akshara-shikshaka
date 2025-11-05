@@ -18,7 +18,7 @@ import {
 } from '~/state/lang_list';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '~/api/client';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useContext } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
 import { Button } from '~/components/ui/button';
 import { Check, ChevronsUpDown } from 'lucide-react';
@@ -33,7 +33,7 @@ import {
 import { cn } from '~/lib/utils';
 import Practice from '~/components/pages/practice/Practice';
 import { Provider as JotaiProvider, createStore } from 'jotai';
-import { MdArrowForward, MdPlayArrow, MdRefresh, MdStop } from 'react-icons/md';
+import { MdArrowForward, MdRefresh, MdStop } from 'react-icons/md';
 import { lipi_parivartak, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
 import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
 import { Skeleton } from '~/components/ui/skeleton';
@@ -46,6 +46,9 @@ import {
   CarouselPrevious
 } from '~/components/ui/carousel';
 import { HiSpeakerWave } from 'react-icons/hi2';
+import { AppContext } from '~/components/AppDataContext';
+import Link from 'next/link';
+import { FaExternalLinkAlt } from 'react-icons/fa';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
@@ -366,6 +369,7 @@ const Lesson = ({
   const scriptId = useAtomValue(selected_script_id_atom);
   const selectedLanguageId = useAtomValue(selected_language_id_atom);
   const trpc = useTRPC();
+  const { user_info } = useContext(AppContext);
 
   const lesson_info_q = useQuery(
     trpc.text_lessons.get_text_lesson_info.queryOptions(
@@ -465,8 +469,7 @@ const Lesson = ({
       {lesson_info_q.isLoading && (
         <div className="flex items-center justify-center gap-3">
           <div className="mt-2 flex items-center gap-2">
-            <Skeleton className="h-9 w-9 rounded-full" />
-            <Skeleton className="h-9 w-40 rounded-md" />
+            <Skeleton className="h-9 w-20 rounded-md" />
           </div>
         </div>
       )}
@@ -511,7 +514,7 @@ const Lesson = ({
         >
           <CarouselContent className="-ml-2 md:-ml-4">
             {lesson_info_q.isLoading &&
-              [...Array(4)].map((_, i) => (
+              [...Array(9)].map((_, i) => (
                 <CarouselItem key={i} className={carouselBasicClassName}>
                   <div className="rounded-md border p-3 shadow-sm">
                     <div className="mb-2 flex items-center justify-center gap-2">
@@ -647,6 +650,18 @@ const Lesson = ({
             </JotaiProvider>
           )}
       </div>
+      {user_info && user_info.role === 'admin' && (
+        <div className="mt-16 flex items-center justify-center">
+          <Link
+            href={`/lessons/edit/${lesson_id}`}
+            target="_blank"
+            className="group flex items-center justify-center gap-2 text-blue-600 transition-all hover:text-blue-700 hover:underline dark:text-sky-400 dark:hover:text-blue-300"
+          >
+            <FaExternalLinkAlt className="size-4 text-yellow-500 group-hover:text-yellow-600 dark:text-yellow-400 dark:group-hover:text-yellow-300" />
+            Edit Lesson
+          </Link>
+        </div>
+      )}
     </div>
   );
 };

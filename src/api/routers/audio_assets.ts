@@ -116,15 +116,22 @@ const make_upload_audio_asset_route = protectedAdminProcedure
     console.log('audio uploaded');
 
     const description = `${input.text} (${input.text_key})`;
-    const [result] = await db
-      .insert(audio_assets)
-      .values({
-        description,
-        lang_id: input.lang_id,
-        s3_key: s3_key,
-        type: 'ai_generated'
-      })
-      .returning();
+    let result;
+    try {
+      [result] = await db
+        .insert(audio_assets)
+        .values({
+          description,
+          lang_id: input.lang_id,
+          s3_key: s3_key,
+          type: 'ai_generated'
+        })
+        .returning();
+    } catch (e) {
+      // DB insert failed after upload; cleanup uploaded S3 object and rethrow
+      await deleteAssetFile(s3_key);
+      throw e;
+    }
 
     return {
       id: result.id,

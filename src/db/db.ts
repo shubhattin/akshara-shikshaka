@@ -2,6 +2,10 @@ import * as schema from './schema';
 import { drizzle as drizzle_neon } from 'drizzle-orm/neon-serverless';
 import { Pool } from '@neondatabase/serverless';
 import { get_db_url } from './db_utils';
+import type { PgTransaction } from 'drizzle-orm/pg-core';
+import type { NeonQueryResultHKT } from 'drizzle-orm/neon-serverless';
+import type { ExtractTablesWithRelations } from 'drizzle-orm';
+import type { PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js';
 
 const DB_URL = get_db_url(process.env);
 
@@ -17,3 +21,20 @@ export const db =
     ? await get_drizzle_instance_dev()
     : // testing neon websocket adapter
       drizzle_neon(new Pool({ connectionString: process.env.PG_DATABASE_URL }), { schema });
+
+export type transactionType =
+  | PgTransaction<
+      NeonQueryResultHKT,
+      typeof import('/home/shubhattin/yojanAni/lipi/akshara/src/db/schema'),
+      ExtractTablesWithRelations<
+        typeof import('/home/shubhattin/yojanAni/lipi/akshara/src/db/schema')
+      >
+    >
+  | PgTransaction<
+      PostgresJsQueryResultHKT,
+      typeof import('/home/shubhattin/yojanAni/lipi/akshara/src/db/schema'),
+      ExtractTablesWithRelations<
+        typeof import('/home/shubhattin/yojanAni/lipi/akshara/src/db/schema')
+      >
+    >
+  | typeof db;

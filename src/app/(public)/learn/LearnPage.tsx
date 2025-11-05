@@ -310,14 +310,7 @@ const LessonsList = () => {
           className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
         >
           <CarouselContent className="">
-            {lessons_q.isLoading &&
-              [...Array(8)].map((_, index) => (
-                <CarouselItem key={index} className={carouselBasicClassName}>
-                  <div className="p-1">
-                    <Skeleton className="h-12 w-full rounded-md" />
-                  </div>
-                </CarouselItem>
-              ))}
+            {lessons_q.isLoading && LOADING_SKELETONS.lessons(carouselBasicClassName)}
 
             {!lessons_q.isLoading &&
               lessons_q.isSuccess &&
@@ -467,13 +460,7 @@ const Lesson = ({
   return (
     <div className="mt-2 space-y-4">
       {/* Varna text with optional audio */}
-      {lesson_info_q.isLoading && (
-        <div className="flex items-center justify-center gap-3">
-          <div className="mt-2 flex items-center gap-2">
-            <Skeleton className="h-9 w-20 rounded-md" />
-          </div>
-        </div>
-      )}
+      {lesson_info_q.isLoading && LOADING_SKELETONS.varna_text()}
       {lesson && (
         <div className="flex items-center justify-center gap-3">
           <div className="text-center">
@@ -514,18 +501,7 @@ const Lesson = ({
           className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
         >
           <CarouselContent className="-ml-2 md:-ml-4">
-            {lesson_info_q.isLoading &&
-              [...Array(9)].map((_, i) => (
-                <CarouselItem key={i} className={carouselBasicClassName}>
-                  <div className="rounded-md border p-3 shadow-sm">
-                    <div className="mb-2 flex items-center justify-center gap-2">
-                      <Skeleton className="h-5 w-20" />
-                      <Skeleton className="h-5 w-5 rounded-full" />
-                    </div>
-                    <Skeleton className="mx-auto mb-2 size-20 rounded-md" />
-                  </div>
-                </CarouselItem>
-              ))}
+            {lesson_info_q.isLoading && LOADING_SKELETONS.lesson_words(carouselBasicClassName)}
 
             {lesson &&
               lesson.words &&
@@ -582,17 +558,7 @@ const Lesson = ({
       </div>
       {/* Practice component below */}
       <div>
-        {selected_gesture && text_gesture_data_q.isLoading && (
-          <div className="space-y-4">
-            <div className="flex justify-center">
-              <div className="relative">
-                <Skeleton className="h-[400px] w-[400px] rounded-lg border-2" />
-                <Skeleton className="absolute top-3 left-3 h-8 w-8 rounded-full" />
-                <Skeleton className="absolute top-3 right-3 h-8 w-8 rounded-full" />
-              </div>
-            </div>
-          </div>
-        )}
+        {(text_gesture_data_q.isLoading || !selected_gesture) && LOADING_SKELETONS.gesture_canavs()}
         {selected_gesture &&
           !text_gesture_data_q.isLoading &&
           text_gesture_data_q.isSuccess &&
@@ -618,7 +584,7 @@ const Lesson = ({
                             Wonderful job!
                           </div>
                           <div className="text-base font-bold text-muted-foreground">
-                            You completed {lesson?.text}
+                            You completed {lesson.text}
                           </div>
                         </div>
                         {/* <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" /> */}
@@ -704,4 +670,46 @@ const HighlightVarnaInWord = ({
       ))}
     </>
   );
+};
+
+const LOADING_SKELETONS = {
+  lessons: (carouselBasicClassName: string) =>
+    [...Array(8)].map((_, index) => (
+      <CarouselItem key={index} className={carouselBasicClassName}>
+        <div className="p-1">
+          <Skeleton className="h-12 w-full rounded-md" />
+        </div>
+      </CarouselItem>
+    )),
+  varna_text: () => (
+    <div className="flex items-center justify-center gap-3">
+      <div className="mt-2 flex items-center gap-2">
+        <Skeleton className="h-9 w-20 rounded-md" />
+      </div>
+    </div>
+  ),
+  lesson_words: (carouselBasicClassName: string) =>
+    [...Array(9)].map((_, i) => (
+      <CarouselItem key={i} className={carouselBasicClassName}>
+        <div className="rounded-md border p-3 shadow-sm">
+          <div className="mb-2 flex items-center justify-center gap-2">
+            <Skeleton className="h-5 w-20" />
+            <Skeleton className="h-5 w-5 rounded-full" />
+          </div>
+          <Skeleton className="mx-auto mb-2 size-20 rounded-md" />
+        </div>
+      </CarouselItem>
+    )),
+
+  gesture_canavs: () => (
+    <div className="space-y-4">
+      <div className="flex justify-center">
+        <div className="relative">
+          <Skeleton className="h-[400px] w-[400px] rounded-lg border-2" />
+          <Skeleton className="absolute top-3 left-3 h-8 w-8 rounded-full" />
+          <Skeleton className="absolute top-3 right-3 h-8 w-8 rounded-full" />
+        </div>
+      </div>
+    </div>
+  )
 };

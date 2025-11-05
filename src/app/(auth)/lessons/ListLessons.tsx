@@ -747,7 +747,7 @@ function CategorizedLessonsList({
               const all_lessons = [...ordered, ...unordered];
               save_order_mut.mutate({
                 category_id: category_id,
-                lesson: all_lessons.map((l) => ({
+                lessons: all_lessons.map((l) => ({
                   id: l.id,
                   order: l.order!
                 }))

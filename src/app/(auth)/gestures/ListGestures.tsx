@@ -750,7 +750,7 @@ function CategorizedGesturesList({
               const all = [...ordered, ...unordered];
               save_order_mut.mutate({
                 category_id,
-                gesture: all.map((g) => ({ id: g.id, order: g.order }))
+                gestures: all.map((g) => ({ id: g.id, order: g.order }))
               });
             }}
             disabled={save_order_mut.isPending}

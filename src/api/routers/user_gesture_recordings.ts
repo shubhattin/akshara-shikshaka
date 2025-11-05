@@ -26,21 +26,25 @@ const submit_user_gesture_recording_route = publicProcedure
     if (!is_valid) {
       throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid turnstile token' });
     }
-    const [{ id }] = await db
-      .insert(user_gesture_recordings)
-      .values({
-        text: input.text,
-        script_id: input.script_id,
-        completed: input.completed
-      })
-      .returning();
+    const { id } = await db.transaction(async (tx) => {
+      const [{ id }] = await tx
+        .insert(user_gesture_recordings)
+        .values({
+          text: input.text,
+          script_id: input.script_id,
+          completed: input.completed
+        })
+        .returning();
 
-    await db.insert(user_gesture_recording_vectors).values(
-      input.vectors.map((vector) => ({
-        ...vector,
-        user_gesture_recording_id: id
-      }))
-    );
+      await tx.insert(user_gesture_recording_vectors).values(
+        input.vectors.map((vector) => ({
+          ...vector,
+          user_gesture_recording_id: id
+        }))
+      );
+
+      return { id };
+    });
 
     return {
       success: true,

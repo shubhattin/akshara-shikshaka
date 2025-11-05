@@ -418,99 +418,7 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
         <h2 className="mb-2 text-2xl font-bold">Practice: {text_data.text}</h2>
       </div> */}
 
-      <div className="flex justify-center gap-4">
-        {(canvasCurrentMode === 'none' || canvasCurrentMode === 'playing') && (
-          <>
-            <Button
-              onClick={() => {
-                if (canvasCurrentMode === 'playing') return;
-                playAllGestures();
-              }}
-              className={cn(
-                'gap-1',
-                'bg-linear-to-r from-orange-400 via-amber-400 to-yellow-500 text-white shadow-lg backdrop-blur-xl',
-                'border border-white/30 dark:border-white/20',
-                'hover:border-white/40 hover:from-orange-500 hover:via-amber-500 hover:to-yellow-600 hover:shadow-xl',
-                'dark:from-orange-400 dark:via-amber-600 dark:to-yellow-600 dark:text-white',
-                'dark:hover:from-orange-600 dark:hover:via-amber-700 dark:hover:to-yellow-700',
-                'transition-all duration-300'
-              )}
-            >
-              <MdPlayArrow className="size-6 text-base drop-shadow" />
-              Play
-            </Button>
-            <Button
-              onClick={() => {
-                if (totalGestures === 0 || canvasCurrentMode === 'playing') return;
-
-                startPractice();
-              }}
-              className={cn(
-                'gap-1',
-                'bg-linear-to-r from-emerald-400 to-emerald-500 text-white shadow-lg backdrop-blur-xl',
-                'border border-white/30 dark:border-white/20',
-                'hover:border-white/40 hover:from-emerald-500 hover:to-emerald-600 hover:shadow-xl',
-                'dark:from-emerald-600 dark:to-emerald-700 dark:text-white',
-                'dark:hover:from-emerald-700 dark:hover:to-emerald-800',
-                'transition-all duration-300'
-              )}
-            >
-              <AiOutlineSignature className="size-6 text-base drop-shadow" />
-              Practice
-            </Button>
-          </>
-        )}
-
-        {canvasCurrentMode === 'practicing' && completedGesturesCount !== totalGestures && (
-          <>
-            <Button
-              onClick={replayCurrentGesture}
-              disabled={isAnimatingCurrentGesture || completedGesturesCount === totalGestures}
-              className={cn(
-                'gap-1 text-base',
-                'bg-linear-to-r from-blue-400 to-blue-600 text-white shadow-lg backdrop-blur-xl',
-                'border border-white/30 dark:border-white/20',
-                'hover:border-white/40 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
-                'dark:from-blue-700 dark:to-blue-900 dark:text-white',
-                'dark:hover:from-blue-800 dark:hover:to-blue-950',
-                'transition-all duration-300'
-              )}
-            >
-              <MdPlayArrow className="size-6 text-base drop-shadow" />
-              Replay
-            </Button>
-            <Button
-              onClick={async () => {
-                submit_user_gesture_recording_func(false);
-                restartPractice();
-              }}
-              className={cn(
-                'gap-1 text-base',
-                'bg-linear-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-lg backdrop-blur-xl',
-                'border border-white/30 dark:border-white/20',
-                'hover:border-white/40 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-xl',
-                'dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 dark:text-white',
-                'dark:hover:from-gray-800 dark:hover:via-gray-900 dark:hover:to-black',
-                'transition-all duration-300'
-              )}
-            >
-              <MdRefresh className="size-6 text-base drop-shadow" />
-              Restart
-            </Button>
-            {/* <Button
-              variant={'ghost'}
-              className="p-1"
-              size="icon"
-              onClick={() => {
-                resetPractice();
-                // playAllGestures();
-              }}
-            >
-              <MdClear className="size-6 text-base drop-shadow" />
-            </Button> */}
-          </>
-        )}
-      </div>
+      {/* {canvasCurrentMode === 'practicing' && completedGesturesCount !== totalGestures && null} */}
       {/* {canvasCurrentMode === 'practicing' && completedGesturesCount !== gestureData.length && (
         <div className="flex justify-center">
           <ProgressDisplay
@@ -596,6 +504,99 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
               onUserStroke={handleUserStroke}
             />
           </div>
+
+          {(canvasCurrentMode === 'none' || canvasCurrentMode === 'playing') && (
+            <>
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-between p-3">
+                <div className="pointer-events-auto">
+                  <Button
+                    onClick={() => {
+                      if (canvasCurrentMode === 'playing') return;
+                      playAllGestures();
+                    }}
+                    size="icon"
+                    className={cn(
+                      'gap-1',
+                      'bg-linear-to-r from-orange-400 via-amber-400 to-yellow-500 text-white shadow-lg backdrop-blur-xl',
+                      'border border-white/30 dark:border-white/20',
+                      'hover:border-white/40 hover:from-orange-500 hover:via-amber-500 hover:to-yellow-600 hover:shadow-xl',
+                      'dark:from-orange-400 dark:via-amber-600 dark:to-yellow-600 dark:text-white',
+                      'dark:hover:from-orange-600 dark:hover:via-amber-700 dark:hover:to-yellow-700',
+                      'rounded-full transition-all duration-300'
+                    )}
+                  >
+                    <MdPlayArrow className="size-6 text-base drop-shadow" />
+                  </Button>
+                </div>
+                <div className="pointer-events-auto">
+                  <Button
+                    onClick={() => {
+                      if (totalGestures === 0 || canvasCurrentMode === 'playing') return;
+                      startPractice();
+                    }}
+                    size={'icon'}
+                    className={cn(
+                      'gap-1',
+                      'bg-linear-to-r from-emerald-400 to-emerald-500 text-white shadow-lg backdrop-blur-xl',
+                      'border border-white/30 dark:border-white/20',
+                      'hover:border-white/40 hover:from-emerald-500 hover:to-emerald-600 hover:shadow-xl',
+                      'dark:from-emerald-600 dark:to-emerald-700 dark:text-white',
+                      'dark:hover:from-emerald-700 dark:hover:to-emerald-800',
+                      'rounded-full transition-all duration-300'
+                    )}
+                  >
+                    <AiOutlineSignature className="size-6 text-base drop-shadow" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {canvasCurrentMode === 'practicing' && completedGesturesCount !== totalGestures && (
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-between p-3">
+              <div className="pointer-events-auto">
+                <Button
+                  onClick={() => {
+                    if (isAnimatingCurrentGesture || completedGesturesCount === totalGestures)
+                      return;
+                    replayCurrentGesture();
+                  }}
+                  size="icon"
+                  className={cn(
+                    'gap-1 text-base',
+                    'bg-linear-to-r from-blue-400 to-blue-600 text-white shadow-lg backdrop-blur-xl',
+                    'border border-white/30 dark:border-white/20',
+                    'hover:border-white/40 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
+                    'dark:from-blue-700 dark:to-blue-900 dark:text-white',
+                    'dark:hover:from-blue-800 dark:hover:to-blue-950',
+                    'rounded-full transition-all duration-300'
+                  )}
+                >
+                  <MdPlayArrow className="size-6 text-base drop-shadow" />
+                </Button>
+              </div>
+              <div className="pointer-events-auto">
+                <Button
+                  onClick={async () => {
+                    submit_user_gesture_recording_func(false);
+                    restartPractice();
+                  }}
+                  size="icon"
+                  className={cn(
+                    'gap-1 text-base',
+                    'bg-linear-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-lg backdrop-blur-xl',
+                    'border border-white/30 dark:border-white/20',
+                    'hover:border-white/40 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-xl',
+                    'dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 dark:text-white',
+                    'dark:hover:from-gray-800 dark:hover:via-gray-900 dark:hover:to-black',
+                    'rounded-full transition-all duration-300'
+                  )}
+                >
+                  <MdRefresh className="size-6 text-base drop-shadow" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

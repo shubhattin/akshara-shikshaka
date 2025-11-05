@@ -45,6 +45,7 @@ import {
   CarouselNext,
   CarouselPrevious
 } from '~/components/ui/carousel';
+import { HiSpeakerWave } from 'react-icons/hi2';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
@@ -293,48 +294,32 @@ const LessonsList = () => {
     }
   };
 
+  const carouselBasicClassName = 'basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6';
   return (
     <div>
-      {lessons_q.isLoading && (
-        <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
-          <Carousel
-            opts={{
-              align: 'start'
-            }}
-            className="w-full max-w-[90vw] min-w-0 sm:max-w-[70vw] md:max-w-[50vw]"
-          >
-            <CarouselContent>
-              {[...Array(8)].map((_, index) => (
-                <CarouselItem
-                  key={index}
-                  className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
-                >
+      <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
+        <Carousel
+          opts={{
+            align: 'start'
+          }}
+          setApi={setCarouselApi}
+          className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
+        >
+          <CarouselContent className="">
+            {lessons_q.isLoading &&
+              [...Array(8)].map((_, index) => (
+                <CarouselItem key={index} className={carouselBasicClassName}>
                   <div className="p-1">
-                    <Skeleton className="h-10 w-full rounded-md" />
+                    <Skeleton className="h-12 w-full rounded-md" />
                   </div>
                 </CarouselItem>
               ))}
-            </CarouselContent>
-            <CarouselPrevious className="left-0 sm:-left-12" />
-            <CarouselNext className="right-0 sm:-right-12" />
-          </Carousel>
-        </div>
-      )}
-      {!lessons_q.isLoading && lessons_q.isSuccess && lessonsTransliterated.length > 0 && (
-        <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
-          <Carousel
-            opts={{
-              align: 'start'
-            }}
-            setApi={setCarouselApi}
-            className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
-          >
-            <CarouselContent>
-              {lessonsTransliterated.map((lesson) => (
-                <CarouselItem
-                  key={lesson.id}
-                  className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6"
-                >
+
+            {!lessons_q.isLoading &&
+              lessons_q.isSuccess &&
+              lessonsTransliterated.length > 0 &&
+              lessonsTransliterated.map((lesson) => (
+                <CarouselItem key={lesson.id} className={carouselBasicClassName}>
                   <Button
                     variant={selectedLessonId === lesson.id ? 'default' : 'outline'}
                     className={cn(
@@ -357,12 +342,11 @@ const LessonsList = () => {
                   </Button>
                 </CarouselItem>
               ))}
-            </CarouselContent>
-            <CarouselPrevious className="left-0 sm:-left-12" />
-            <CarouselNext className="right-0 sm:-right-12" />
-          </Carousel>
-        </div>
-      )}
+          </CarouselContent>
+          <CarouselPrevious className="left-0 sm:-left-12" />
+          <CarouselNext className="right-0 sm:-right-12" />
+        </Carousel>
+      </div>
       {selectedLessonId !== null && (
         <Lesson lesson_id={selectedLessonId} hasNext={hasNext} goToNextLesson={goToNextLesson} />
       )}
@@ -380,6 +364,7 @@ const Lesson = ({
   goToNextLesson?: () => void;
 }) => {
   const scriptId = useAtomValue(selected_script_id_atom);
+  const selectedLanguageId = useAtomValue(selected_language_id_atom);
   const trpc = useTRPC();
 
   const lesson_info_q = useQuery(
@@ -390,6 +375,7 @@ const Lesson = ({
   );
   const lesson = lesson_info_q.data;
   const [wordsTransliterated, setWordsTransliterated] = useState<string[]>([]);
+  const [varnaTransliterated, setVarnaTransliterated] = useState<string | null>(null);
   useEffect(() => {
     if (lesson?.words && scriptId) {
       Promise.all(
@@ -402,6 +388,11 @@ const Lesson = ({
             )
         )
       ).then((transliterated_words) => setWordsTransliterated(transliterated_words));
+      lipi_parivartak(
+        lesson.text,
+        get_lang_from_id(selectedLanguageId),
+        get_script_from_id(scriptId)
+      ).then((transliterated_varna) => setVarnaTransliterated(transliterated_varna));
     }
   }, [lesson?.words, scriptId]);
 
@@ -465,10 +456,20 @@ const Lesson = ({
   };
 
   const varnaAudioKey = lesson?.optional_audio?.s3_key;
+  const carouselBasicClassName =
+    'basis-1/3 pl-2 sm:basis-1/4 md:basis-1/5 md:pl-4 lg:basis-1/6 xl:basis-1/7';
 
   return (
-    <div className="space-y-4">
+    <div className="mt-2 space-y-4">
       {/* Varna text with optional audio */}
+      {lesson_info_q.isLoading && (
+        <div className="flex items-center justify-center gap-3">
+          <div className="mt-2 flex items-center gap-2">
+            <Skeleton className="h-9 w-9 rounded-full" />
+            <Skeleton className="h-9 w-40 rounded-md" />
+          </div>
+        </div>
+      )}
       {lesson && (
         <div className="flex items-center justify-center gap-3">
           <div className="text-center">
@@ -478,19 +479,22 @@ const Lesson = ({
                 <button
                   className={cn(
                     'inline-flex items-center rounded-md border px-3 py-1.5 text-sm',
-                    'hover:bg-accent'
+                    'gap-2 hover:bg-accent'
                   )}
                   onClick={() => togglePlayVarnaAudio(varnaAudioKey)}
                 >
                   {playingVarnaAudio ? (
                     <span className="flex items-center gap-1">
-                      <MdStop className="h-4 w-4" /> Stop
+                      <MdStop className="h-4 w-4" />
                     </span>
                   ) : (
                     <span className="flex items-center gap-1">
-                      <MdPlayArrow className="h-4 w-4" /> Play Varna
+                      <HiSpeakerWave className="size-4" />
                     </span>
                   )}
+                  <span className="text-lg font-semibold">
+                    {varnaTransliterated ?? lesson.text}
+                  </span>
                 </button>
               </div>
             )}
@@ -498,74 +502,90 @@ const Lesson = ({
         </div>
       )}
       {/* Words with image and audio - horizontally scrollable */}
-      {lesson && lesson.words && lesson.words.length > 0 && (
-        <div className="flex w-full items-stretch justify-center gap-3 overflow-x-auto py-2">
-          {lesson.words.map((w, idx) => {
-            const imageKey = w.image?.s3_key;
-            const audioKey = w.audio?.s3_key;
-            return (
-              <div key={w.id} className="shrink-0 rounded-md border p-3 text-center shadow-sm">
-                <div className="mb-2 text-base font-semibold">
-                  {wordsTransliterated[idx] ?? w.word}
-                </div>
-                {imageKey && (
-                  <img
-                    src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${imageKey}`}
-                    alt={w.word}
-                    className="mx-auto size-20 object-contain"
-                  />
-                )}
-                {audioKey && (
-                  <div className="mt-2 flex justify-center">
-                    <button
-                      className={cn(
-                        'inline-flex items-center rounded-md border px-2 py-1 text-xs',
-                        'hover:bg-accent'
-                      )}
-                      onClick={() => togglePlay(idx, audioKey)}
-                    >
-                      {playingIndex === idx ? (
-                        <span className="flex items-center gap-1">
-                          <MdStop className="h-4 w-4" /> Stop
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1">
-                          <MdPlayArrow className="h-4 w-4" /> Play
-                        </span>
-                      )}
-                    </button>
+      <div className="flex w-full items-stretch justify-center">
+        <Carousel
+          opts={{
+            align: 'start'
+          }}
+          className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
+        >
+          <CarouselContent className="-ml-2 md:-ml-4">
+            {lesson_info_q.isLoading &&
+              [...Array(4)].map((_, i) => (
+                <CarouselItem key={i} className={carouselBasicClassName}>
+                  <div className="rounded-md border p-3 shadow-sm">
+                    <div className="mb-2 flex items-center justify-center gap-2">
+                      <Skeleton className="h-5 w-20" />
+                      <Skeleton className="h-5 w-5 rounded-full" />
+                    </div>
+                    <Skeleton className="mx-auto mb-2 size-20 rounded-md" />
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {lesson_info_q.isLoading && (
-        <div className="flex w-full items-stretch justify-center gap-3 overflow-x-auto py-2">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="shrink-0 rounded-md border p-3 shadow-sm">
-              <Skeleton className="mb-2 h-5 w-16" />
-              <Skeleton className="mx-auto mb-2 h-20 w-20" />
-              <Skeleton className="h-8 w-16" />
-            </div>
-          ))}
-        </div>
-      )}
+                </CarouselItem>
+              ))}
 
-      <div className="mt-4">
-        {/* Practice component below */}
+            {lesson &&
+              lesson.words &&
+              lesson.words.length > 0 &&
+              lesson.words.map((w, idx) => {
+                const imageKey = w.image?.s3_key;
+                const audioKey = w.audio?.s3_key;
+                return (
+                  <CarouselItem key={w.id} className={carouselBasicClassName}>
+                    <div className="rounded-md border p-3 text-center shadow-sm">
+                      <div className="mb-2 flex items-center justify-center gap-1">
+                        <div className="text-base font-semibold">
+                          <HighlightVarnaInWord
+                            word={wordsTransliterated[idx] ?? w.word}
+                            varna={varnaTransliterated ?? lesson.text}
+                            style="dark:text-orange-400 text-orange-600"
+                          />
+                        </div>
+                        {audioKey && (
+                          <button
+                            className={cn(
+                              'inline-flex items-center rounded-md p-1 text-xs',
+                              'block hover:bg-accent'
+                            )}
+                            onClick={() => togglePlay(idx, audioKey)}
+                          >
+                            {playingIndex === idx ? (
+                              <span className="flex items-center gap-1">
+                                <MdStop className="h-4 w-4" />
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                <HiSpeakerWave className="size-4" />
+                              </span>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                      {imageKey && (
+                        <img
+                          src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${imageKey}`}
+                          alt={w.word}
+                          className="mx-auto size-20 object-contain"
+                        />
+                      )}
+                    </div>
+                  </CarouselItem>
+                );
+              })}
+          </CarouselContent>
+          <CarouselPrevious className="left-0 sm:-left-12" />
+          <CarouselNext className="right-0 sm:-right-12" />
+        </Carousel>
+      </div>
+      {/* Practice component below */}
+      <div>
         {selected_gesture && text_gesture_data_q.isLoading && (
           <div className="space-y-4">
-            <div className="text-center">
-              <Skeleton className="mx-auto mb-2 h-8 w-48" />
-            </div>
-            <div className="flex justify-center gap-4">
-              <Skeleton className="h-11 w-32" />
-              <Skeleton className="h-11 w-32" />
-            </div>
             <div className="flex justify-center">
-              <Skeleton className="h-[400px] w-[400px] rounded-lg border-2" />
+              <div className="relative">
+                <Skeleton className="h-[400px] w-[400px] rounded-lg border-2" />
+                <Skeleton className="absolute top-3 left-3 h-8 w-8 rounded-full" />
+                <Skeleton className="absolute top-3 right-3 h-8 w-8 rounded-full" />
+              </div>
             </div>
           </div>
         )}
@@ -628,5 +648,27 @@ const Lesson = ({
           )}
       </div>
     </div>
+  );
+};
+
+const HighlightVarnaInWord = ({
+  word,
+  style,
+  varna
+}: {
+  word: string;
+  varna: string;
+  style: string;
+}) => {
+  const splits = word.split(varna);
+  return (
+    <>
+      {splits.map((split, index) => (
+        <span key={index}>
+          {split}
+          {index < splits.length - 1 && <span className={style}>{varna}</span>}
+        </span>
+      ))}
+    </>
   );
 };

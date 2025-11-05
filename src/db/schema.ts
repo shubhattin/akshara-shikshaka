@@ -42,9 +42,8 @@ export const text_gestures = pgTable(
     // and should be handled accordingly in the UI and backend
   },
   (table) => [
-    index('text_gestures_script_text_id_idx').on(table.script_id, table.text),
     index('text_gestures_text_key_idx').on(table.text_key),
-    unique('text_gestures_text_key_script_id_unique').on(table.text_key, table.script_id)
+    unique('text_gestures_text_script_id_unique').on(table.text, table.script_id)
   ]
 );
 
@@ -76,27 +75,34 @@ export const gesture_categories = pgTable('gesture_categories', {
     .$onUpdate(() => new Date())
 });
 
-export const text_lessons = pgTable('text_lessons', {
-  id: serial().primaryKey(),
-  uuid: uuid().notNull().defaultRandom(),
-  lang_id: smallint().notNull(),
-  base_word_script_id: smallint().notNull(),
-  // ^ script in which the words are stored, used for transliteration
-  // it is the script used for writing those words
-  text: text().notNull(),
-  // ^ will be in the base_word_script_id script
-  text_key: text().notNull(),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
-    .notNull()
-    .$onUpdate(() => new Date()),
-  audio_id: integer().references(() => audio_assets.id, { onDelete: 'set null' }),
-  // optional audio for the lesson, eg :- when no words for the "text",
-  category_id: integer().references(() => lesson_categories.id, { onDelete: 'set null' }),
-  order: smallint()
-  // order is "nullable" for text lessons
-  // and should be handled accordingly in the UI and backend
-});
+export const text_lessons = pgTable(
+  'text_lessons',
+  {
+    id: serial().primaryKey(),
+    uuid: uuid().notNull().defaultRandom(),
+    lang_id: smallint().notNull(),
+    base_word_script_id: smallint().notNull(),
+    // ^ script in which the words are stored, used for transliteration
+    // it is the script used for writing those words
+    text: text().notNull(),
+    // ^ will be in the base_word_script_id script
+    text_key: text().notNull(),
+    created_at: timestamp().notNull().defaultNow(),
+    updated_at: timestamp()
+      .notNull()
+      .$onUpdate(() => new Date()),
+    audio_id: integer().references(() => audio_assets.id, { onDelete: 'set null' }),
+    // optional audio for the lesson, eg :- when no words for the "text",
+    category_id: integer().references(() => lesson_categories.id, { onDelete: 'set null' }),
+    order: smallint()
+    // order is "nullable" for text lessons
+    // and should be handled accordingly in the UI and backend
+  },
+  (table) => [
+    index('text_lessons_text_key_idx').on(table.text_key),
+    unique('text_lessons_text_lang_id_unique').on(table.text, table.lang_id)
+  ]
+);
 
 // A text lesson will have multiple gestures connected to it. But as other text lessons can alsp access the same gestures
 // So we need to join table for the M2M relationship between text_gestures and text_lessons

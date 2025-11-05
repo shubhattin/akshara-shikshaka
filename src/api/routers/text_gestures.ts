@@ -61,12 +61,15 @@ const add_text_gesture_data_route = protectedAdminProcedure
   .mutation(async ({ input }) => {
     const result = await db.transaction(async (tx) => {
       // Check if the text already exists
-      const existingText = await tx
-        .select()
-        .from(text_gestures)
-        .where(eq(text_gestures.text, input.text))
-        .limit(1);
-      if (existingText.length > 0) {
+      const existingText = await tx.query.text_gestures.findFirst({
+        where: (tbl, { and, eq }) =>
+          and(eq(tbl.text, input.text), eq(tbl.script_id, input.scriptID)),
+        columns: {
+          id: true
+        }
+      });
+
+      if (existingText) {
         return { success: false, err_code: 'text_already_exists' } as const;
       }
 

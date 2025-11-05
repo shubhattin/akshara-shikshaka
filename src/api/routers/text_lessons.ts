@@ -72,6 +72,15 @@ const add_text_lesson_route = protectedAdminProcedure
       }
     }) => {
       const { result, added_word_ids } = await db.transaction(async (tx) => {
+        const existing_lesson = await tx.query.text_lessons.findFirst({
+          where: (tbl, { and, eq }) => and(eq(tbl.text, text), eq(tbl.lang_id, lang_id)),
+          columns: {
+            id: true
+          }
+        });
+        if (existing_lesson) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Text lesson already exists' });
+        }
         const [inserted] = await tx
           .insert(text_lessons)
           .values({ lang_id, base_word_script_id, audio_id, text, text_key: text_key.trim() })
@@ -102,7 +111,8 @@ const add_text_lesson_route = protectedAdminProcedure
       return {
         id: result.id,
         uuid: result.uuid,
-        added_word_ids: added_word_ids
+        added_word_ids: added_word_ids,
+        success: true
       };
     }
   );

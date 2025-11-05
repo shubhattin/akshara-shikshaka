@@ -344,9 +344,7 @@ const LessonsList = () => {
           <CarouselNext className="right-0 sm:-right-12" />
         </Carousel>
       </div>
-      {selectedLessonId !== null && (
-        <Lesson lesson_id={selectedLessonId} hasNext={hasNext} goToNextLesson={goToNextLesson} />
-      )}
+      <Lesson lesson_id={selectedLessonId} hasNext={hasNext} goToNextLesson={goToNextLesson} />
     </div>
   );
 };
@@ -356,7 +354,8 @@ const Lesson = ({
   hasNext,
   goToNextLesson
 }: {
-  lesson_id: number;
+  lesson_id?: number | null;
+  // taking nullable lesson_id too to be able to display loading spinner when then the user opens it for the very first time
   hasNext?: boolean;
   goToNextLesson?: () => void;
 }) => {
@@ -367,7 +366,7 @@ const Lesson = ({
 
   const lesson_info_q = useQuery(
     trpc.text_lessons.get_text_lesson_info.queryOptions(
-      { lesson_id: lesson_id },
+      { lesson_id: lesson_id! },
       { enabled: !!lesson_id }
     )
   );
@@ -460,7 +459,7 @@ const Lesson = ({
   return (
     <div className="mt-2 space-y-4">
       {/* Varna text with optional audio */}
-      {lesson_info_q.isLoading && LOADING_SKELETONS.varna_text()}
+      {(lesson_info_q.isLoading || !lesson_id) && LOADING_SKELETONS.varna_text()}
       {lesson && (
         <div className="flex items-center justify-center gap-3">
           <div className="text-center">
@@ -501,7 +500,8 @@ const Lesson = ({
           className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
         >
           <CarouselContent className="-ml-2 md:-ml-4">
-            {lesson_info_q.isLoading && LOADING_SKELETONS.lesson_words(carouselBasicClassName)}
+            {(lesson_info_q.isLoading || !lesson_id) &&
+              LOADING_SKELETONS.lesson_words(carouselBasicClassName)}
 
             {lesson &&
               lesson.words &&

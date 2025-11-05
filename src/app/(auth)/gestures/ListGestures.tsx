@@ -564,7 +564,9 @@ function AddGestureToCategoryDialog({
         setOpen(false);
         setSelectedCategory(null);
         const category_name = categories.find((c) => c.id === data.category_id)?.name;
-        toast.success(`Gesture added to category ${category_name}`);
+        toast.success(
+          `Gesture added to category '${data.category_id === 0 ? 'Uncategorized' : category_name}'`
+        );
       },
       onError: (err) => {
         toast.error('Failed to add gesture to category' + (err?.message ? `: ${err.message}` : ''));

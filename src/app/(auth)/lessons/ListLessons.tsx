@@ -570,7 +570,9 @@ function AddToCategoryDialog({
         setOpen(false);
         setSelectedCategory(null);
         const category_name = categories.find((c) => c.id === data.category_id)?.name;
-        toast.success(`Lesson added to category ${category_name}`);
+        toast.success(
+          `Lesson added to category '${data.category_id === 0 ? 'Uncategorized' : category_name}'`
+        );
         onAdded?.();
       },
       onError: (err) => {

@@ -549,7 +549,8 @@ function AddGestureToCategoryDialog({
 
   const add_to_category_mut = useMutation(
     trpc.text_gestures.categories.add_update_gesture_category.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async (out, data) => {
+        if (!out.added) return;
         await queryClient.invalidateQueries(
           trpc.text_gestures.categories.get_gestures.queryFilter({
             category_id: selectedCategory!
@@ -562,6 +563,11 @@ function AddGestureToCategoryDialog({
         );
         setOpen(false);
         setSelectedCategory(null);
+        const category_name = categories.find((c) => c.id === data.category_id)?.name;
+        toast.success(`Gesture added to category ${category_name}`);
+      },
+      onError: (err) => {
+        toast.error('Failed to add gesture to category' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );

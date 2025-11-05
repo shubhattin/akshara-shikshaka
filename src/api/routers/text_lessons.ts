@@ -218,7 +218,7 @@ const delete_text_lesson_route = protectedAdminProcedure
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Text lesson not found' });
       }
 
-      await Promise.allSettled([
+      await Promise.all([
         tx.delete(text_lessons).where(and(eq(text_lessons.id, id), eq(text_lessons.uuid, uuid))),
         // deletes both the lesson gestures and associated words with it
         // due to the cascade delete constraint

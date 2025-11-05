@@ -172,6 +172,9 @@ const AudioInfo = () => {
         toast.success('Audio updated successfully');
         queryClient.invalidateQueries(trpc.audio_assets.list_audio_assets.pathFilter());
         setIsEditing(false);
+      },
+      onError: (err) => {
+        toast.error('Failed to update audio' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );

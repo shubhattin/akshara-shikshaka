@@ -181,7 +181,7 @@ const delete_text_gesture_data_route = protectedAdminProcedure
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Text gesture not found' });
       }
 
-      await Promise.allSettled([
+      await Promise.all([
         text_gesture_.category_id &&
           reorder_text_gesture_in_category_func(
             text_gesture_.category_id,

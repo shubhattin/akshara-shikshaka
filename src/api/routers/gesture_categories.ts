@@ -44,7 +44,8 @@ export const reorder_text_gesture_in_category_func = async (
       order: index + 1
     }));
 
-  await Promise.allSettled(
+  // inside a transaction we do not use  `allSettled` as it swallows write failures and the transaction cannot do its intended job
+  await Promise.all(
     reordered_gestures.map((gesture) =>
       dbConn
         .update(text_gestures)
@@ -73,15 +74,18 @@ const get_categories_route = protectedAdminProcedure.query(async () => {
 const add_category_route = protectedAdminProcedure
   .input(GestureCategoriesSchemaZod.pick({ name: true }))
   .mutation(async ({ input: { name } }) => {
-    const last_order = await db
-      .select({ max_order: max(gesture_categories.order) })
-      .from(gesture_categories);
-    const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
-    const result = await db.insert(gesture_categories).values({ name, order }).returning();
+    const result = await db.transaction(async (tx) => {
+      const last_order = await tx
+        .select({ max_order: max(gesture_categories.order) })
+        .from(gesture_categories);
+      const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
+      const result = await tx.insert(gesture_categories).values({ name, order }).returning();
+      return result[0];
+    });
 
     return {
-      id: result[0].id,
-      order: result[0].order
+      id: result.id,
+      order: result.order
     };
   });
 
@@ -95,7 +99,7 @@ const update_list_route = protectedAdminProcedure
     await db.transaction(async (tx) => {
       // Run updates in parallel within a transaction
       // as order of these categories are dependent on each other
-      await Promise.allSettled(
+      await Promise.all(
         categories.map((category) =>
           tx
             .update(gesture_categories)
@@ -132,7 +136,7 @@ const delete_category_route = protectedAdminProcedure
         order: index + 1
       }));
       // Update the order of the categories
-      await Promise.allSettled(
+      await Promise.all(
         reordered_categories.map((category) =>
           tx
             .update(gesture_categories)
@@ -213,7 +217,7 @@ const update_gestures_order_route = protectedAdminProcedure
     await db.transaction(async (tx) => {
       // a transaction is not necessary here but fine to use too
       // also the order of these gestures are dependent on each other
-      await Promise.allSettled(
+      await Promise.all(
         gestures.map((gesture) =>
           tx
             .update(text_gestures)
@@ -268,7 +272,7 @@ const add_update_gesture_category_route = protectedAdminProcedure
               : eq(tbl.gesture_text_key, gesture_text_key)
         });
 
-        await Promise.allSettled([
+        await Promise.all([
           tx
             .update(text_gestures)
             .set({ order: null })

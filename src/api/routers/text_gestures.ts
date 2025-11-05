@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
-import { db } from '~/db/db';
+import { db, type transactionType } from '~/db/db';
 import { gesture_text_key_category_join, lesson_gestures, text_gestures } from '~/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { GestureSchema } from '~/tools/stroke_data/types';
@@ -13,15 +13,19 @@ import {
 import { waitUntil } from '@vercel/functions';
 import { CACHE } from '../cache';
 
-const connect_gestures_to_text_lessons_func = async (textKey: string, text_gesture_id: number) => {
-  const lessons = await db.query.text_lessons.findMany({
+const connect_gestures_to_text_lessons_func = async (
+  textKey: string,
+  text_gesture_id: number,
+  dbConn: transactionType
+) => {
+  const lessons = await dbConn.query.text_lessons.findMany({
     columns: {
       id: true
     },
     where: (tbl, { eq }) => eq(tbl.text_key, textKey)
   });
   if (lessons.length === 0) return;
-  await db.insert(lesson_gestures).values(
+  await dbConn.insert(lesson_gestures).values(
     lessons.map((lesson) => ({
       text_gesture_id: text_gesture_id,
       text_lesson_id: lesson.id
@@ -55,48 +59,49 @@ const add_text_gesture_data_route = protectedAdminProcedure
     ])
   )
   .mutation(async ({ input }) => {
-    // Check if the text already exists
-    const existingText = await db
-      .select()
-      .from(text_gestures)
-      .where(eq(text_gestures.text, input.text))
-      .limit(1);
-    if (existingText.length > 0) {
-      return {
-        success: false,
-        err_code: 'text_already_exists'
-      };
-    }
+    const result = await db.transaction(async (tx) => {
+      // Check if the text already exists
+      const existingText = await tx
+        .select()
+        .from(text_gestures)
+        .where(eq(text_gestures.text, input.text))
+        .limit(1);
+      if (existingText.length > 0) {
+        return { success: false, err_code: 'text_already_exists' } as const;
+      }
 
-    const result = await db
-      .insert(text_gestures)
-      .values({
-        text: input.text,
-        text_key: input.textKey,
-        gestures: input.gestures,
-        script_id: input.scriptID,
-        font_family: input.fontFamily as FontFamily,
-        font_size: input.fontSize,
-        text_center_offset: input.textCenterOffset
-      })
-      .returning();
-    // on text gesture creation scan for lessons associated with the text key
-    // and connect them to the text gesture via the join table `lesson_gestures`
-    await connect_gestures_to_text_lessons_func(input.textKey.trim(), result[0].id);
+      const [inserted] = await tx
+        .insert(text_gestures)
+        .values({
+          text: input.text,
+          text_key: input.textKey,
+          gestures: input.gestures,
+          script_id: input.scriptID,
+          font_family: input.fontFamily as FontFamily,
+          font_size: input.fontSize,
+          text_center_offset: input.textCenterOffset
+        })
+        .returning();
+      // on text gesture creation scan for lessons associated with the text key
+      // and connect them to the text gesture via the join table `lesson_gestures`
+      await connect_gestures_to_text_lessons_func(input.textKey.trim(), inserted.id, tx);
+
+      return { success: true, id: inserted.id, uuid: inserted.uuid } as const;
+    });
+
+    if (!result.success) {
+      return result;
+    }
 
     // precache the new gesture data for faster future access
     waitUntil(
       CACHE.gestures.gesture_data.refresh({
-        gesture_id: result[0].id,
-        gesture_uuid: result[0].uuid
+        gesture_id: result.id,
+        gesture_uuid: result.uuid
       })
     );
 
-    return {
-      success: true,
-      id: result[0].id,
-      uuid: result[0].uuid
-    };
+    return result;
   });
 
 const edit_text_gesture_data_route = protectedAdminProcedure
@@ -132,73 +137,81 @@ const edit_text_gesture_data_route = protectedAdminProcedure
 const delete_text_gesture_data_route = protectedAdminProcedure
   .input(z.object({ id: z.number(), uuid: z.uuid(), script_id: z.int() }))
   .mutation(async ({ input }) => {
-    const [[text_gesture_], data] = await Promise.all([
-      db
-        .select({
-          id: text_gestures.id,
-          category_id: gesture_text_key_category_join.category_id
-        })
-        .from(text_gestures)
-        .leftJoin(
-          gesture_text_key_category_join,
-          eq(text_gestures.text_key, gesture_text_key_category_join.gesture_text_key)
-        )
-        .where(
-          and(
-            eq(text_gestures.uuid, input.uuid),
-            eq(text_gestures.id, input.id),
-            eq(text_gestures.script_id, input.script_id)
+    const { lessons } = await db.transaction(async (tx) => {
+      const [[text_gesture_], data] = await Promise.all([
+        tx
+          .select({
+            id: text_gestures.id,
+            category_id: gesture_text_key_category_join.category_id
+          })
+          .from(text_gestures)
+          .leftJoin(
+            gesture_text_key_category_join,
+            eq(text_gestures.text_key, gesture_text_key_category_join.gesture_text_key)
           )
-        )
-        .limit(1),
-      // prefetching this data as after deletion it wont be available
-      db.query.text_gestures.findFirst({
-        where: (table, { eq }) =>
-          and(
-            eq(table.id, input.id),
-            eq(table.uuid, input.uuid),
-            eq(table.script_id, input.script_id)
-          ),
-        columns: {
-          id: true
-        },
-        with: {
-          lessons: {
-            columns: {
-              text_lesson_id: true
+          .where(
+            and(
+              eq(text_gestures.uuid, input.uuid),
+              eq(text_gestures.id, input.id),
+              eq(text_gestures.script_id, input.script_id)
+            )
+          )
+          .limit(1),
+        // prefetching this data as after deletion it wont be available
+        tx.query.text_gestures.findFirst({
+          where: (table, { eq }) =>
+            and(
+              eq(table.id, input.id),
+              eq(table.uuid, input.uuid),
+              eq(table.script_id, input.script_id)
+            ),
+          columns: {
+            id: true
+          },
+          with: {
+            lessons: {
+              columns: {
+                text_lesson_id: true
+              }
             }
           }
-        }
-      })
-    ]);
-    if (!text_gesture_) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Text gesture not found' });
-    }
+        })
+      ]);
+      if (!text_gesture_) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Text gesture not found' });
+      }
 
-    await Promise.allSettled([
-      text_gesture_.category_id &&
-        reorder_text_gesture_in_category_func(text_gesture_.category_id, input.script_id, input.id),
-      db
-        .delete(text_gestures)
-        .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id))),
-      // delete gesture data cache on gesture deletion
-      CACHE.gestures.gesture_data.delete({ gesture_id: input.id, gesture_uuid: input.uuid })
-    ]);
+      await Promise.all([
+        text_gesture_.category_id &&
+          reorder_text_gesture_in_category_func(
+            text_gesture_.category_id,
+            input.script_id,
+            input.id,
+            tx
+          ),
+        tx
+          .delete(text_gestures)
+          .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)))
+      ]);
+
+      return { category_id: text_gesture_.category_id, lessons: data?.lessons ?? [] };
+    });
 
     waitUntil(
       (async () => {
-        // scan for existing text lesson connection that might need revalidating the cache
-        if (!data) return;
-        // if more than one associated text lesson then invalidate the cache
-        if (data.lessons.length > 0) {
+        // if associated text lessons exist then refresh their caches in background
+        if (lessons.length > 0) {
           await Promise.allSettled(
-            data.lessons.map(({ text_lesson_id }) =>
+            lessons.map(({ text_lesson_id }) =>
               CACHE.lessons.text_lesson_info.refresh({ lesson_id: text_lesson_id })
             )
           );
         }
       })()
     );
+
+    // delete gesture data cache on gesture deletion
+    await CACHE.gestures.gesture_data.delete({ gesture_id: input.id, gesture_uuid: input.uuid });
 
     return {
       deleted: true

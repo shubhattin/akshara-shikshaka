@@ -195,15 +195,22 @@ const make_upload_image_asset_route = protectedAdminProcedure
       };
     }
 
-    const [result] = await db
-      .insert(image_assets)
-      .values({
-        description: description,
-        width: IMAGE_DIMENSIONS,
-        height: IMAGE_DIMENSIONS,
-        s3_key: s3_image_key
-      })
-      .returning();
+    let result;
+    try {
+      [result] = await db
+        .insert(image_assets)
+        .values({
+          description: description,
+          width: IMAGE_DIMENSIONS,
+          height: IMAGE_DIMENSIONS,
+          s3_key: s3_image_key
+        })
+        .returning();
+    } catch (e) {
+      // DB insert failed after upload; cleanup S3 object and rethrow
+      await deleteAssetFile(s3_image_key);
+      throw e;
+    }
 
     return {
       success: true,

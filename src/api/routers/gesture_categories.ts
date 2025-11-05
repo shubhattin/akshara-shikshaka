@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { t, protectedAdminProcedure } from '~/api/trpc_init';
-import { db } from '~/db/db';
+import { db, type transactionType } from '~/db/db';
 import { gesture_categories, gesture_text_key_category_join, text_gestures } from '~/db/schema';
 import { and, asc, eq, exists, isNull, max, ne } from 'drizzle-orm';
 import { GestureCategoriesSchemaZod, TextGesturesSchemaZod } from '~/db/schema_zod';
@@ -12,9 +12,10 @@ import { GestureCategoriesSchemaZod, TextGesturesSchemaZod } from '~/db/schema_z
 export const reorder_text_gesture_in_category_func = async (
   category_id: number,
   script_id: number,
-  gesture_id_to_ignore: number
+  gesture_id_to_ignore: number,
+  dbConn: transactionType
 ) => {
-  const gestures_ = await db
+  const gestures_ = await dbConn
     .select()
     .from(text_gestures)
     .innerJoin(
@@ -43,9 +44,13 @@ export const reorder_text_gesture_in_category_func = async (
       order: index + 1
     }));
 
-  await Promise.allSettled(
+  // inside a transaction we do not use  `allSettled` as it swallows write failures and the transaction cannot do its intended job
+  await Promise.all(
     reordered_gestures.map((gesture) =>
-      db.update(text_gestures).set({ order: gesture.order }).where(eq(text_gestures.id, gesture.id))
+      dbConn
+        .update(text_gestures)
+        .set({ order: gesture.order })
+        .where(eq(text_gestures.id, gesture.id))
     )
   );
 };
@@ -69,15 +74,18 @@ const get_categories_route = protectedAdminProcedure.query(async () => {
 const add_category_route = protectedAdminProcedure
   .input(GestureCategoriesSchemaZod.pick({ name: true }))
   .mutation(async ({ input: { name } }) => {
-    const last_order = await db
-      .select({ max_order: max(gesture_categories.order) })
-      .from(gesture_categories);
-    const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
-    const result = await db.insert(gesture_categories).values({ name, order }).returning();
+    const result = await db.transaction(async (tx) => {
+      const last_order = await tx
+        .select({ max_order: max(gesture_categories.order) })
+        .from(gesture_categories);
+      const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
+      const result = await tx.insert(gesture_categories).values({ name, order }).returning();
+      return result[0];
+    });
 
     return {
-      id: result[0].id,
-      order: result[0].order
+      id: result.id,
+      order: result.order
     };
   });
 
@@ -88,15 +96,18 @@ const update_list_route = protectedAdminProcedure
     })
   )
   .mutation(async ({ input: { categories } }) => {
-    // Run updates in parallel by returning the db promises directly
-    await Promise.allSettled(
-      categories.map((category) =>
-        db
-          .update(gesture_categories)
-          .set({ name: category.name, order: category.order })
-          .where(eq(gesture_categories.id, category.id))
-      )
-    );
+    await db.transaction(async (tx) => {
+      // Run updates in parallel within a transaction
+      // as order of these categories are dependent on each other
+      await Promise.all(
+        categories.map((category) =>
+          tx
+            .update(gesture_categories)
+            .set({ name: category.name, order: category.order })
+            .where(eq(gesture_categories.id, category.id))
+        )
+      );
+    });
 
     return {
       updated: true
@@ -106,29 +117,34 @@ const update_list_route = protectedAdminProcedure
 const delete_category_route = protectedAdminProcedure
   .input(z.object({ category_id: z.int() }))
   .mutation(async ({ input: { category_id } }) => {
-    await db.delete(gesture_categories).where(eq(gesture_categories.id, category_id));
+    await db.transaction(async (tx) => {
+      const [, categories] = await Promise.all([
+        tx.delete(gesture_categories).where(eq(gesture_categories.id, category_id)),
+        tx.query.gesture_categories.findMany({
+          columns: {
+            id: true,
+            order: true
+          },
+          // ignore the category to be deleted
+          where: (tbl, { ne }) => ne(tbl.id, category_id),
+          orderBy: (gesture_categories, { asc }) => [asc(gesture_categories.order)]
+        })
+      ]);
 
-    const categories = await db.query.gesture_categories.findMany({
-      columns: {
-        id: true,
-        order: true
-      },
-      orderBy: (gesture_categories, { asc }) => [asc(gesture_categories.order)]
+      const reordered_categories = categories.map((category, index) => ({
+        ...category,
+        order: index + 1
+      }));
+      // Update the order of the categories
+      await Promise.all(
+        reordered_categories.map((category) =>
+          tx
+            .update(gesture_categories)
+            .set({ order: category.order })
+            .where(eq(gesture_categories.id, category.id))
+        )
+      );
     });
-
-    const reordered_categories = categories.map((category, index) => ({
-      ...category,
-      order: index + 1
-    }));
-    // Update the order of the categories
-    await Promise.allSettled(
-      reordered_categories.map((category) =>
-        db
-          .update(gesture_categories)
-          .set({ order: category.order })
-          .where(eq(gesture_categories.id, category.id))
-      )
-    );
 
     return {
       deleted: true
@@ -193,35 +209,39 @@ const get_gestures_route = protectedAdminProcedure
 const update_gestures_order_route = protectedAdminProcedure
   .input(
     z.object({
-      gesture: TextGesturesSchemaZod.pick({ id: true, order: true }).array(),
+      gestures: TextGesturesSchemaZod.pick({ id: true, order: true }).array(),
       category_id: z.int()
     })
   )
-  .mutation(async ({ input: { gesture, category_id } }) => {
-    await Promise.allSettled(
-      gesture.map((gesture) =>
-        db
-          .update(text_gestures)
-          .set({ order: gesture.order })
-          .where(
-            and(
-              eq(text_gestures.id, gesture.id),
-              // security check
-              exists(
-                db
-                  .select()
-                  .from(gesture_text_key_category_join)
-                  .where(
-                    and(
-                      eq(gesture_text_key_category_join.gesture_text_key, text_gestures.text_key),
-                      eq(gesture_text_key_category_join.category_id, category_id)
+  .mutation(async ({ input: { gestures, category_id } }) => {
+    await db.transaction(async (tx) => {
+      // a transaction is not necessary here but fine to use too
+      // also the order of these gestures are dependent on each other
+      await Promise.all(
+        gestures.map((gesture) =>
+          tx
+            .update(text_gestures)
+            .set({ order: gesture.order })
+            .where(
+              and(
+                eq(text_gestures.id, gesture.id),
+                // security check
+                exists(
+                  tx
+                    .select()
+                    .from(gesture_text_key_category_join)
+                    .where(
+                      and(
+                        eq(gesture_text_key_category_join.gesture_text_key, text_gestures.text_key),
+                        eq(gesture_text_key_category_join.category_id, category_id)
+                      )
                     )
-                  )
+                )
               )
             )
-          )
-      )
-    );
+        )
+      );
+    });
     return {
       updated: true
     };
@@ -241,36 +261,42 @@ const add_update_gesture_category_route = protectedAdminProcedure
     async ({
       input: { category_id, prev_category_id, gesture_id, gesture_text_key, script_id }
     }) => {
-      const prev_join = await db.query.gesture_text_key_category_join.findFirst({
-        where: (tbl, { and, eq }) =>
-          prev_category_id
-            ? and(eq(tbl.gesture_text_key, gesture_text_key), eq(tbl.category_id, prev_category_id))
-            : eq(tbl.gesture_text_key, gesture_text_key)
+      await db.transaction(async (tx) => {
+        const prev_join = await tx.query.gesture_text_key_category_join.findFirst({
+          where: (tbl, { and, eq }) =>
+            prev_category_id
+              ? and(
+                  eq(tbl.gesture_text_key, gesture_text_key),
+                  eq(tbl.category_id, prev_category_id)
+                )
+              : eq(tbl.gesture_text_key, gesture_text_key)
+        });
+
+        await Promise.all([
+          tx
+            .update(text_gestures)
+            .set({ order: null })
+            // reset the order to null on add/update to a category
+            .where(and(eq(text_gestures.id, gesture_id), eq(text_gestures.script_id, script_id))),
+          category_id
+            ? prev_join
+              ? tx
+                  .update(gesture_text_key_category_join)
+                  .set({ category_id: category_id })
+                  .where(eq(gesture_text_key_category_join.id, prev_join.id))
+              : tx
+                  .insert(gesture_text_key_category_join)
+                  .values({ gesture_text_key, category_id: category_id })
+            : tx
+                .delete(gesture_text_key_category_join)
+                .where(and(eq(gesture_text_key_category_join.gesture_text_key, gesture_text_key))),
+          // removing the category join, thus making it uncategorized
+          prev_category_id &&
+            prev_category_id !== category_id &&
+            reorder_text_gesture_in_category_func(prev_category_id, script_id, gesture_id, tx)
+          // no need to reorder the current category as order is set to null which does not affect the concerned order
+        ]);
       });
-      await Promise.allSettled([
-        db
-          .update(text_gestures)
-          .set({ order: null })
-          // reset the order to null on add/update to a category
-          .where(and(eq(text_gestures.id, gesture_id), eq(text_gestures.script_id, script_id))),
-        category_id
-          ? prev_join
-            ? db
-                .update(gesture_text_key_category_join)
-                .set({ category_id: category_id })
-                .where(eq(gesture_text_key_category_join.id, prev_join.id))
-            : db
-                .insert(gesture_text_key_category_join)
-                .values({ gesture_text_key, category_id: category_id })
-          : db
-              .delete(gesture_text_key_category_join)
-              .where(and(eq(gesture_text_key_category_join.gesture_text_key, gesture_text_key))),
-        // removing the category join, thus making it uncategorized
-        prev_category_id &&
-          prev_category_id !== category_id &&
-          reorder_text_gesture_in_category_func(prev_category_id, script_id, gesture_id)
-        // no need to reorder the current category as order is set to null which does not affect the concerned order
-      ]);
 
       return {
         added: true

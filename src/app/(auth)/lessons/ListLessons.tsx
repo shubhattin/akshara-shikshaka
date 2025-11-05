@@ -555,7 +555,8 @@ function AddToCategoryDialog({
 
   const add_to_category_mut = useMutation(
     trpc.text_lessons.categories.add_update_lesson_category.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async (out, data) => {
+        if (!out.added) return;
         await queryClient.invalidateQueries(
           trpc.text_lessons.categories.get_text_lessons.queryFilter({
             category_id: selectedCategory!
@@ -568,7 +569,14 @@ function AddToCategoryDialog({
         );
         setOpen(false);
         setSelectedCategory(null);
+        const category_name = categories.find((c) => c.id === data.category_id)?.name;
+        toast.success(
+          `Lesson added to category '${data.category_id === 0 ? 'Uncategorized' : category_name}'`
+        );
         onAdded?.();
+      },
+      onError: (err) => {
+        toast.error('Failed to add lesson to category' + (err?.message ? `: ${err.message}` : ''));
       }
     })
   );
@@ -747,7 +755,7 @@ function CategorizedLessonsList({
               const all_lessons = [...ordered, ...unordered];
               save_order_mut.mutate({
                 category_id: category_id,
-                lesson: all_lessons.map((l) => ({
+                lessons: all_lessons.map((l) => ({
                   id: l.id,
                   order: l.order!
                 }))

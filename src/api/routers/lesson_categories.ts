@@ -1,7 +1,7 @@
 import { t, protectedAdminProcedure, publicProcedure } from '../trpc_init';
 import { z } from 'zod';
 import { lesson_categories, text_lessons } from '~/db/schema';
-import { db } from '~/db/db';
+import { db, transactionType } from '~/db/db';
 import { and, eq, max } from 'drizzle-orm';
 import { LessonCategoriesSchemaZod, TextLessonsSchemaZod } from '~/db/schema_zod';
 import { CACHE } from '../cache';
@@ -12,16 +12,17 @@ import { waitUntil } from '@vercel/functions';
  */
 export const reorder_text_lesson_in_category_func = async (
   category_id: number,
-  lesson_id_to_ignore: number
+  lesson_id_to_ignore: number,
+  dbConn: transactionType
 ) => {
-  const lessons = await db.query.text_lessons.findMany({
+  const lessons: { id: number; order: number | null }[] = await dbConn.query.text_lessons.findMany({
     columns: {
       id: true,
       order: true
     },
-    where: (tbl, { eq, ne, and }) =>
+    where: (tbl: any, { eq, ne, and }: any) =>
       and(eq(tbl.category_id, category_id), ne(tbl.id, lesson_id_to_ignore)),
-    orderBy: (tbl, { asc }) => [asc(tbl.order)]
+    orderBy: (tbl: any, { asc }: any) => [asc(tbl.order)]
   });
   const reordered_lessons = lessons
     .filter((lesson) => lesson.order !== null)
@@ -30,9 +31,9 @@ export const reorder_text_lesson_in_category_func = async (
       order: index + 1
     }));
 
-  await Promise.allSettled(
+  await Promise.all(
     reordered_lessons.map((lesson) =>
-      db
+      dbConn
         .update(text_lessons)
         .set({ order: lesson.order })
         .where(and(eq(text_lessons.id, lesson.id), eq(text_lessons.category_id, category_id)))
@@ -49,20 +50,25 @@ const get_categories_route = publicProcedure
 const add_category_route = protectedAdminProcedure
   .input(LessonCategoriesSchemaZod.pick({ lang_id: true, name: true }))
   .mutation(async ({ input: { lang_id, name } }) => {
-    const last_order = await db
-      .select({ max_order: max(lesson_categories.order) })
-      .from(lesson_categories)
-      .where(eq(lesson_categories.lang_id, lang_id));
-    const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
-    const result = await db.insert(lesson_categories).values({ lang_id, name, order }).returning();
-
+    const result = await db.transaction(async (tx) => {
+      const last_order = await tx
+        .select({ max_order: max(lesson_categories.order) })
+        .from(lesson_categories)
+        .where(eq(lesson_categories.lang_id, lang_id));
+      const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
+      const result = await tx
+        .insert(lesson_categories)
+        .values({ lang_id, name, order })
+        .returning();
+      return result[0];
+    });
     // as this route refetches data from a cached route so we need to invalidate it
     // invalidate category_list cache
     await Promise.all([CACHE.lessons.category_list.delete({ lang_id })]);
 
     return {
-      id: result[0].id,
-      order: result[0].order
+      id: result.id,
+      order: result.order
     };
   });
 
@@ -74,14 +80,19 @@ const update_category_list_route = protectedAdminProcedure
     })
   )
   .mutation(async ({ input: { categories, lang_id } }) => {
-    await Promise.allSettled([
-      ...categories.map((category) =>
-        db
-          .update(lesson_categories)
-          .set({ name: category.name, order: category.order })
-          .where(and(eq(lesson_categories.id, category.id), eq(lesson_categories.lang_id, lang_id)))
-      )
-    ]);
+    await db.transaction(async (tx) => {
+      // transaction is good to have here  as the order of these categories are dependent on each other
+      await Promise.all([
+        ...categories.map((category) =>
+          tx
+            .update(lesson_categories)
+            .set({ name: category.name, order: category.order })
+            .where(
+              and(eq(lesson_categories.id, category.id), eq(lesson_categories.lang_id, lang_id))
+            )
+        )
+      ]);
+    });
     // invalidate category list cache
     // as being referched onSuccess
     await CACHE.lessons.category_list.delete({ lang_id });
@@ -94,32 +105,36 @@ const update_category_list_route = protectedAdminProcedure
 const delete_category_route = protectedAdminProcedure
   .input(z.object({ lesson_id: z.int(), lang_id: z.int() }))
   .mutation(async ({ input: { lesson_id, lang_id } }) => {
-    await db
-      .delete(lesson_categories)
-      .where(and(eq(lesson_categories.id, lesson_id), eq(lesson_categories.lang_id, lang_id)));
+    await db.transaction(async (tx) => {
+      const [, categories] = await Promise.all([
+        tx
+          .delete(lesson_categories)
+          .where(and(eq(lesson_categories.id, lesson_id), eq(lesson_categories.lang_id, lang_id))),
+        // ignore the category to be deleted
+        tx.query.lesson_categories.findMany({
+          where: (tbl, { eq, ne, and }) => and(eq(tbl.lang_id, lang_id), ne(tbl.id, lesson_id)),
+          columns: {
+            id: true,
+            order: true
+          },
+          orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
+        })
+      ]);
 
-    const categories = await db.query.lesson_categories.findMany({
-      where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
-      columns: {
-        id: true,
-        order: true
-      },
-      orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
+      const reordered_categories = categories.map((category, index) => ({
+        ...category,
+        order: index + 1
+      }));
+      // Update the order of the categories
+      await Promise.all([
+        ...reordered_categories.map((category) =>
+          tx
+            .update(lesson_categories)
+            .set({ order: category.order })
+            .where(eq(lesson_categories.id, category.id))
+        )
+      ]);
     });
-
-    const reordered_categories = categories.map((category, index) => ({
-      ...category,
-      order: index + 1
-    }));
-    // Update the order of the categories
-    await Promise.allSettled([
-      ...reordered_categories.map((category) =>
-        db
-          .update(lesson_categories)
-          .set({ order: category.order })
-          .where(eq(lesson_categories.id, category.id))
-      )
-    ]);
     // invalidate lessons category list cache
     await CACHE.lessons.category_list.delete({ lang_id });
 
@@ -166,19 +181,21 @@ const get_text_lessons_route = protectedAdminProcedure
 const update_text_lessons_order_route = protectedAdminProcedure
   .input(
     z.object({
-      lesson: TextLessonsSchemaZod.pick({ id: true, order: true }).array(),
+      lessons: TextLessonsSchemaZod.pick({ id: true, order: true }).array(),
       category_id: z.int()
     })
   )
-  .mutation(async ({ input: { lesson, category_id } }) => {
-    await Promise.allSettled([
-      ...lesson.map((lesson) =>
-        db
-          .update(text_lessons)
-          .set({ order: lesson.order })
-          .where(and(eq(text_lessons.id, lesson.id), eq(text_lessons.category_id, category_id)))
-      )
-    ]);
+  .mutation(async ({ input: { lessons, category_id } }) => {
+    await db.transaction(async (tx) => {
+      await Promise.all([
+        ...lessons.map((lesson) =>
+          tx
+            .update(text_lessons)
+            .set({ order: lesson.order })
+            .where(and(eq(text_lessons.id, lesson.id), eq(text_lessons.category_id, category_id)))
+        )
+      ]);
+    });
 
     // as this routes data invalidation does not depend on cached data so we revaidate the cache in background
     // invalidate category lesson list cache
@@ -197,15 +214,17 @@ const add_update_lesson_category_route = protectedAdminProcedure
     })
   )
   .mutation(async ({ input: { category_id, prev_category_id, lesson_id } }) => {
-    await Promise.allSettled([
-      db
-        .update(text_lessons)
-        .set({ category_id: category_id, order: null })
-        // reset the order to null on add/update to a category
-        .where(eq(text_lessons.id, lesson_id)),
-      prev_category_id && reorder_text_lesson_in_category_func(prev_category_id, lesson_id)
-      // no need to reorder the current category as order is set to null which does not affect the concerned order
-    ]);
+    await db.transaction(async (tx) => {
+      await Promise.all([
+        tx
+          .update(text_lessons)
+          .set({ category_id: category_id, order: null })
+          // reset the order to null on add/update to a category
+          .where(eq(text_lessons.id, lesson_id)),
+        prev_category_id && reorder_text_lesson_in_category_func(prev_category_id, lesson_id, tx)
+        // no need to reorder the current category as order is set to null which does not affect the concerned order
+      ]);
+    });
 
     // as the category_id list is fetched directly from db on list lessons page
     // so we revalidate the cache in background

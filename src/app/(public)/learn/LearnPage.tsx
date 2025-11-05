@@ -49,6 +49,7 @@ import { HiSpeakerWave } from 'react-icons/hi2';
 import { AppContext } from '~/components/AppDataContext';
 import Link from 'next/link';
 import { FaExternalLinkAlt } from 'react-icons/fa';
+import { motion } from 'framer-motion';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
@@ -598,54 +599,60 @@ const Lesson = ({
           text_gesture_data_q.data && (
             <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
               <Practice text_data={text_gesture_data_q.data} play_gesture_on_mount={true}>
-                {(restartPractice) => (
-                  <div className="flex justify-center select-none">
-                    <div
-                      className={cn(
-                        'flex items-center gap-3 rounded-lg border border-emerald-200 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-md',
-                        'dark:border-emerald-800 dark:bg-gray-900/90'
-                      )}
-                    >
-                      <span className="text-3xl">🌟</span>
-                      <div className="leading-tight">
-                        <div className="text-lg font-semibold text-emerald-700 dark:text-emerald-300">
-                          Wonderful job!
-                        </div>
-                        <div className="text-base font-bold text-muted-foreground">
-                          You completed {lesson?.text}
-                        </div>
-                      </div>
-                      {/* <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" /> */}
-                      {hasNext && (
-                        <>
-                          <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" />
-                          <Button
-                            size="sm"
-                            onClick={() => goToNextLesson && goToNextLesson()}
-                            className={cn(
-                              'gap-1.5 font-semibold',
-                              'bg-linear-to-r from-emerald-500 to-emerald-600 text-white shadow-md',
-                              'border border-emerald-400/50 dark:border-emerald-500/30',
-                              'hover:border-emerald-400/70 hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg',
-                              'transition-all duration-200'
-                            )}
-                          >
-                            Next Varna
-                            <MdArrowForward className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => restartPractice()}
-                        className="h-8 w-8"
+                <Practice.Completed>
+                  {(restartPractice) => (
+                    <div className="flex justify-center select-none">
+                      <motion.div
+                        className={cn(
+                          'flex items-center gap-3 rounded-lg border border-emerald-200 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-md',
+                          'dark:border-emerald-800 dark:bg-gray-900/90'
+                        )}
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0, opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                       >
-                        <MdRefresh className="h-4 w-4" />
-                      </Button>
+                        <span className="text-3xl">🌟</span>
+                        <div className="leading-tight">
+                          <div className="text-lg font-semibold text-emerald-700 dark:text-emerald-300">
+                            Wonderful job!
+                          </div>
+                          <div className="text-base font-bold text-muted-foreground">
+                            You completed {lesson?.text}
+                          </div>
+                        </div>
+                        {/* <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" /> */}
+                        {hasNext && (
+                          <>
+                            <div className="mx-2 h-6 w-px bg-gray-300 dark:bg-gray-600" />
+                            <Button
+                              size="sm"
+                              onClick={() => goToNextLesson && goToNextLesson()}
+                              className={cn(
+                                'gap-1.5 font-semibold',
+                                'bg-linear-to-r from-emerald-500 to-emerald-600 text-white shadow-md',
+                                'border border-emerald-400/50 dark:border-emerald-500/30',
+                                'hover:border-emerald-400/70 hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg',
+                                'transition-all duration-200'
+                              )}
+                            >
+                              Next Varna
+                              <MdArrowForward className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => restartPractice()}
+                          className="h-8 w-8"
+                        >
+                          <MdRefresh className="h-4 w-4" />
+                        </Button>
+                      </motion.div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </Practice.Completed>
               </Practice>
             </JotaiProvider>
           )}

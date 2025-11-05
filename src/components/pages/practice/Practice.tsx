@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, createContext, useContext, Children, isValidElement } from 'react';
 import dynamic from 'next/dynamic';
 import type Konva from 'konva';
 import { cn } from '~/lib/utils';
@@ -69,7 +69,7 @@ type Props = {
 
 const turnstile_token_atom = atom<string | null>(null);
 
-export default function PracticeWrapper(props: Props) {
+function PracticeWrapper(props: Props) {
   // Initialize atoms with default values
   useHydrateAtoms([
     [canvas_current_mode, 'none' as const],
@@ -87,10 +87,24 @@ export default function PracticeWrapper(props: Props) {
 
   return (
     <>
-      <Practice {...props} />
+      <Practice {...props}>{props.children as React.ReactNode}</Practice>
       <TurnstileWidget setToken={setTurnstileToken} />
     </>
   );
+}
+
+// Context to share Practice state and actions with subcomponents
+type PracticeContextValue = {
+  isCompleted: boolean;
+  restartPractice: () => Promise<void>;
+};
+
+const PracticeContext = createContext<PracticeContextValue | null>(null);
+
+function usePracticeContext(): PracticeContextValue {
+  const ctx = useContext(PracticeContext);
+  if (!ctx) throw new Error('Practice subcomponents must be used within <Practice>');
+  return ctx;
 }
 
 function Practice({ text_data, play_gesture_on_mount, children }: Props) {
@@ -345,13 +359,13 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
 
     setCurrentGestureIndex(currentGestureIndex + 1);
     setCompletedGesturesCount(completedGesturesCount + 1);
+    setIsDrawing(false);
     if (currentGestureIndex < totalGestures - 1) {
       setTimeout(() => {
         playGestureIndex(currentGestureIndex + 1);
       }, 300);
-      setIsDrawing(false);
     } else {
-      setIsDrawing(false);
+      setCanvasCurrentMode('none');
       submit_user_gesture_recording_func(true);
     }
   };
@@ -412,14 +426,24 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     );
   }
 
+  const isCompleted = completedGesturesCount === gestureData.length;
+
+  // Detect custom Completed slot usage
+  const hasCustomCompleted = Children.toArray(children as React.ReactNode).some(
+    (child) => isValidElement(child) && (child.type as any)?._slot === 'PracticeCompleted'
+  );
+
+  const renderedChildren = typeof children === 'function' ? null : (children as React.ReactNode);
+
   return (
-    <div className="space-y-4">
-      {/* <div className="text-center">
+    <PracticeContext.Provider value={{ isCompleted, restartPractice }}>
+      <div className="space-y-4">
+        {/* <div className="text-center">
         <h2 className="mb-2 text-2xl font-bold">Practice: {text_data.text}</h2>
       </div> */}
 
-      {/* {canvasCurrentMode === 'practicing' && completedGesturesCount !== totalGestures && null} */}
-      {/* {canvasCurrentMode === 'practicing' && completedGesturesCount !== gestureData.length && (
+        {/* {canvasCurrentMode === 'practicing' && completedGesturesCount !== totalGestures && null} */}
+        {/* {canvasCurrentMode === 'practicing' && completedGesturesCount !== gestureData.length && (
         <div className="flex justify-center">
           <ProgressDisplay
             currentGesture={currentGestureIndex + 1}
@@ -429,99 +453,96 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
         </div>
       )} */}
 
-      {completedGesturesCount === gestureData.length &&
-        (children ? (
-          typeof children === 'function' ? (
-            children(restartPractice)
-          ) : (
-            children
-          )
-        ) : (
-          <div className="flex justify-center">
-            <motion.div
-              className={cn(
-                'flex items-center gap-4 rounded-lg border border-yellow-200 bg-white/95 px-5 py-3 shadow-lg backdrop-blur-xl',
-                'dark:border-yellow-800 dark:bg-gray-900/95'
+        {/* Custom slots (e.g., <Practice.Completed />) */}
+        {renderedChildren}
+        {/* Default Completed fallback when no custom Completed is provided */}
+        {isCompleted && !hasCustomCompleted && <PracticeCompletedDefault />}
+
+        <div className="flex justify-center">
+          <div className="relative">
+            <AnimatePresence>
+              {showTryAgain && canvasCurrentMode === 'practicing' && (
+                <TryAgainSection accuracy={lastAccuracy} onSkipGesture={skipCurrentGesture} />
               )}
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -20, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            </AnimatePresence>
+
+            <div
+              className={cn(
+                'rounded-lg border-2 transition-colors',
+                isDrawing ? 'border-blue-500' : 'border-border'
+              )}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🎉</span>
-                <div className="flex flex-col">
-                  <span className="text-base font-bold text-yellow-800 dark:text-yellow-200">
-                    Congratulations!
-                  </span>
-                  <span className="text-sm text-yellow-700 dark:text-yellow-300">
-                    All gestures completed
-                  </span>
+              <PracticeKonvaCanvas
+                ref={stageRef}
+                gestureData={gestureData}
+                onUserStroke={handleUserStroke}
+              />
+            </div>
+
+            {(canvasCurrentMode === 'none' || canvasCurrentMode === 'playing') && (
+              <>
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-between p-3">
+                  <div className="pointer-events-auto">
+                    <Button
+                      onClick={() => {
+                        if (canvasCurrentMode === 'playing') return;
+                        playAllGestures();
+                      }}
+                      size="icon"
+                      className={cn(
+                        'gap-1',
+                        'bg-linear-to-r from-orange-400 via-amber-400 to-yellow-500 text-white shadow-lg backdrop-blur-xl',
+                        'border border-white/30 dark:border-white/20',
+                        'hover:border-white/40 hover:from-orange-500 hover:via-amber-500 hover:to-yellow-600 hover:shadow-xl',
+                        'dark:from-orange-400 dark:via-amber-600 dark:to-yellow-600 dark:text-white',
+                        'dark:hover:from-orange-600 dark:hover:via-amber-700 dark:hover:to-yellow-700',
+                        'rounded-full transition-all duration-300'
+                      )}
+                    >
+                      <MdPlayArrow className="size-6 text-base drop-shadow" />
+                    </Button>
+                  </div>
+                  <div className="pointer-events-auto">
+                    <Button
+                      onClick={() => {
+                        if (totalGestures === 0 || canvasCurrentMode === 'playing') return;
+                        startPractice();
+                      }}
+                      size={'icon'}
+                      className={cn(
+                        'gap-1',
+                        'bg-linear-to-r from-emerald-400 to-emerald-500 text-white shadow-lg backdrop-blur-xl',
+                        'border border-white/30 dark:border-white/20',
+                        'hover:border-white/40 hover:from-emerald-500 hover:to-emerald-600 hover:shadow-xl',
+                        'dark:from-emerald-600 dark:to-emerald-700 dark:text-white',
+                        'dark:hover:from-emerald-700 dark:hover:to-emerald-800',
+                        'rounded-full transition-all duration-300'
+                      )}
+                    >
+                      <AiOutlineSignature className="size-6 text-base drop-shadow" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-
-              <div className="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
-
-              <Button
-                onClick={() => {
-                  resetPractice();
-                  playAllGestures();
-                }}
-                className={cn(
-                  'gap-1.5',
-                  'bg-linear-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-md backdrop-blur-xl',
-                  'border border-white/30 dark:border-white/20',
-                  'hover:border-white/40 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-lg',
-                  'dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 dark:text-white',
-                  'dark:hover:from-gray-800 dark:hover:via-gray-900 dark:hover:to-black',
-                  'transition-all duration-300'
-                )}
-              >
-                <MdArrowForward className="size-4" />
-                Play Again
-              </Button>
-            </motion.div>
-          </div>
-        ))}
-
-      <div className="flex justify-center">
-        <div className="relative">
-          <AnimatePresence>
-            {showTryAgain && canvasCurrentMode === 'practicing' && (
-              <TryAgainSection accuracy={lastAccuracy} onSkipGesture={skipCurrentGesture} />
+              </>
             )}
-          </AnimatePresence>
 
-          <div
-            className={cn(
-              'rounded-lg border-2 transition-colors',
-              isDrawing ? 'border-blue-500' : 'border-border'
-            )}
-          >
-            <PracticeKonvaCanvas
-              ref={stageRef}
-              gestureData={gestureData}
-              onUserStroke={handleUserStroke}
-            />
-          </div>
-
-          {(canvasCurrentMode === 'none' || canvasCurrentMode === 'playing') && (
-            <>
+            {canvasCurrentMode === 'practicing' && completedGesturesCount !== totalGestures && (
               <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-between p-3">
                 <div className="pointer-events-auto">
                   <Button
                     onClick={() => {
-                      if (canvasCurrentMode === 'playing') return;
-                      playAllGestures();
+                      if (isAnimatingCurrentGesture || completedGesturesCount === totalGestures)
+                        return;
+                      replayCurrentGesture();
                     }}
                     size="icon"
                     className={cn(
-                      'gap-1',
-                      'bg-linear-to-r from-orange-400 via-amber-400 to-yellow-500 text-white shadow-lg backdrop-blur-xl',
+                      'gap-1 text-base',
+                      'bg-linear-to-r from-blue-400 to-blue-600 text-white shadow-lg backdrop-blur-xl',
                       'border border-white/30 dark:border-white/20',
-                      'hover:border-white/40 hover:from-orange-500 hover:via-amber-500 hover:to-yellow-600 hover:shadow-xl',
-                      'dark:from-orange-400 dark:via-amber-600 dark:to-yellow-600 dark:text-white',
-                      'dark:hover:from-orange-600 dark:hover:via-amber-700 dark:hover:to-yellow-700',
+                      'hover:border-white/40 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
+                      'dark:from-blue-700 dark:to-blue-900 dark:text-white',
+                      'dark:hover:from-blue-800 dark:hover:to-blue-950',
                       'rounded-full transition-all duration-300'
                     )}
                   >
@@ -530,76 +551,30 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
                 </div>
                 <div className="pointer-events-auto">
                   <Button
-                    onClick={() => {
-                      if (totalGestures === 0 || canvasCurrentMode === 'playing') return;
-                      startPractice();
+                    onClick={async () => {
+                      submit_user_gesture_recording_func(false);
+                      restartPractice();
                     }}
-                    size={'icon'}
+                    size="icon"
                     className={cn(
-                      'gap-1',
-                      'bg-linear-to-r from-emerald-400 to-emerald-500 text-white shadow-lg backdrop-blur-xl',
+                      'gap-1 text-base',
+                      'bg-linear-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-lg backdrop-blur-xl',
                       'border border-white/30 dark:border-white/20',
-                      'hover:border-white/40 hover:from-emerald-500 hover:to-emerald-600 hover:shadow-xl',
-                      'dark:from-emerald-600 dark:to-emerald-700 dark:text-white',
-                      'dark:hover:from-emerald-700 dark:hover:to-emerald-800',
+                      'hover:border-white/40 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-xl',
+                      'dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 dark:text-white',
+                      'dark:hover:from-gray-800 dark:hover:via-gray-900 dark:hover:to-black',
                       'rounded-full transition-all duration-300'
                     )}
                   >
-                    <AiOutlineSignature className="size-6 text-base drop-shadow" />
+                    <MdRefresh className="size-6 text-base drop-shadow" />
                   </Button>
                 </div>
               </div>
-            </>
-          )}
-
-          {canvasCurrentMode === 'practicing' && completedGesturesCount !== totalGestures && (
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex justify-between p-3">
-              <div className="pointer-events-auto">
-                <Button
-                  onClick={() => {
-                    if (isAnimatingCurrentGesture || completedGesturesCount === totalGestures)
-                      return;
-                    replayCurrentGesture();
-                  }}
-                  size="icon"
-                  className={cn(
-                    'gap-1 text-base',
-                    'bg-linear-to-r from-blue-400 to-blue-600 text-white shadow-lg backdrop-blur-xl',
-                    'border border-white/30 dark:border-white/20',
-                    'hover:border-white/40 hover:from-blue-500 hover:to-blue-700 hover:shadow-xl',
-                    'dark:from-blue-700 dark:to-blue-900 dark:text-white',
-                    'dark:hover:from-blue-800 dark:hover:to-blue-950',
-                    'rounded-full transition-all duration-300'
-                  )}
-                >
-                  <MdPlayArrow className="size-6 text-base drop-shadow" />
-                </Button>
-              </div>
-              <div className="pointer-events-auto">
-                <Button
-                  onClick={async () => {
-                    submit_user_gesture_recording_func(false);
-                    restartPractice();
-                  }}
-                  size="icon"
-                  className={cn(
-                    'gap-1 text-base',
-                    'bg-linear-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-lg backdrop-blur-xl',
-                    'border border-white/30 dark:border-white/20',
-                    'hover:border-white/40 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-xl',
-                    'dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 dark:text-white',
-                    'dark:hover:from-gray-800 dark:hover:via-gray-900 dark:hover:to-black',
-                    'rounded-full transition-all duration-300'
-                  )}
-                >
-                  <MdRefresh className="size-6 text-base drop-shadow" />
-                </Button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </PracticeContext.Provider>
   );
 }
 
@@ -821,3 +796,77 @@ const ProgressDisplay = ({
     </motion.div>
   );
 };
+
+// Completed slot subcomponent
+const PracticeCompleted = ({
+  children
+}: {
+  children?: React.ReactNode | ((restartPractice: () => Promise<void>) => React.ReactNode);
+}) => {
+  const { isCompleted, restartPractice } = usePracticeContext();
+  if (!isCompleted) return null;
+  if (typeof children === 'function') {
+    return <>{children(restartPractice)}</>;
+  }
+  if (children) return <>{children}</>;
+  return <PracticeCompletedDefault />;
+};
+(PracticeCompleted as any)._slot = 'PracticeCompleted' as const;
+
+// Default Completed UI
+const PracticeCompletedDefault = () => {
+  const { restartPractice } = usePracticeContext();
+  return (
+    <div className="flex justify-center">
+      <motion.div
+        className={cn(
+          'flex items-center gap-4 rounded-lg border border-yellow-200 bg-white/95 px-5 py-3 shadow-lg backdrop-blur-xl',
+          'dark:border-yellow-800 dark:bg-gray-900/95'
+        )}
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: -20, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">🎉</span>
+          <div className="flex flex-col">
+            <span className="text-base font-bold text-yellow-800 dark:text-yellow-200">
+              Congratulations!
+            </span>
+            <span className="text-sm text-yellow-700 dark:text-yellow-300">
+              All gestures completed
+            </span>
+          </div>
+        </div>
+
+        <div className="h-8 w-px bg-gray-300 dark:bg-gray-600"></div>
+
+        <Button
+          onClick={() => restartPractice()}
+          className={cn(
+            'gap-1.5',
+            'bg-linear-to-r from-gray-200 via-gray-400 to-gray-600 text-gray-800 shadow-md backdrop-blur-xl',
+            'border border-white/30 dark:border-white/20',
+            'hover:border-white/40 hover:from-gray-300 hover:via-gray-500 hover:to-gray-700 hover:shadow-lg',
+            'dark:from-gray-700 dark:via-gray-800 dark:to-gray-900 dark:text-white',
+            'dark:hover:from-gray-800 dark:hover:via-gray-900 dark:hover:to-black',
+            'transition-all duration-300'
+          )}
+        >
+          <MdArrowForward className="size-4" />
+          Play Again
+        </Button>
+      </motion.div>
+    </div>
+  );
+};
+
+type PracticeComponent = typeof PracticeWrapper & {
+  Completed: typeof PracticeCompleted;
+};
+
+const PracticeExport = PracticeWrapper as PracticeComponent;
+PracticeExport.Completed = PracticeCompleted;
+
+export default PracticeExport;

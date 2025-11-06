@@ -28,8 +28,9 @@ export default async function page() {
   const category_id = !saved_category_id_ ? lesson_categories[0]?.id : saved_category_id_;
   const init_lessons_list = await CACHE.lessons.category_lesson_list.get({ category_id });
 
-  const lesson_id =
-    !saved_category_id_ || !saved_lesson_id_ ? init_lessons_list[0]?.id : saved_lesson_id_;
+  const lesson_id = !saved_lesson_id_
+    ? init_lessons_list[0]?.id
+    : (init_lessons_list.find((lesson) => lesson.id === saved_lesson_id_)?.id ?? null);
 
   return (
     <div className="mt-4">

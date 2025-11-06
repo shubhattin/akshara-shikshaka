@@ -280,19 +280,13 @@ const LessonsList = (props: Props) => {
       lessons_q.isPending ||
       !lessons_q.isSuccess ||
       selectedCategoryId === null ||
-      selectedCategoryId === undefined
+      selectedCategoryId === undefined ||
+      !carouselApi
     )
       return;
-    // not using the lessons as they are transliterated before being used
     const lessons_ = lessons_q.data;
     const idx = lessons_.findIndex((l) => l.id === selectedLessonId);
-    if (idx === -1) {
-      // wrong initial cookie state seems to be passed from server
-      setSelectedLessonId(lessons_[0]?.id ?? null);
-      carouselScrolledToSelectedLesson.current = true;
-      return;
-    }
-    if (!carouselApi) return;
+    // the not found case due to invalid lesson id is now handled on server itself
     carouselScrolledToSelectedLesson.current = true;
 
     if (selectedLessonId === null) {

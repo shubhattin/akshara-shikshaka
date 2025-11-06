@@ -28,7 +28,9 @@ interface PracticeKonvaCanvasProps {
 const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
   ({ gestureData, onUserStroke }, ref) => {
     // Canvas state from atoms
-    const scalingFactor = useAtomValue(scaling_factor_atom);
+    // as we are restricting the parent to render this untill the scaling factor is set
+    // we can safely assume that the scaling factor is not null
+    const scalingFactor = useAtomValue(scaling_factor_atom)!;
     const animatedGestureLines = useAtomValue(animated_gesture_lines_atom);
     const [currentGesturePoints, setCurrentGesturePoints] = useAtom(current_gesture_points_atom);
     const [isRecordingStroke, setIsRecordingStroke] = useAtom(is_recording_stroke_atom);

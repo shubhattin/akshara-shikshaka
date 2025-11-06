@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic';
 import type Konva from 'konva';
 import { cn } from '~/lib/utils';
 import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward, MdRefresh } from 'react-icons/md';
-import { FiTrendingUp } from 'react-icons/fi';
 import { evaluateGestureAccuracy, animateGesture } from '~/tools/stroke_data/utils';
 import {
   GesturePoints,
@@ -36,6 +35,7 @@ import { useTurnstile } from 'react-turnstile';
 import TurnstileWidget, { TURNSTILE_ENABLED } from '~/components/Turnstile';
 import { deepCopy } from '~/tools/kry';
 import { Button } from '~/components/ui/button';
+import { Skeleton } from '~/components/ui/skeleton';
 
 const ACCURACY_THRESHOLD = 0.75;
 
@@ -43,10 +43,7 @@ const ACCURACY_THRESHOLD = 0.75;
 const PracticeKonvaCanvas = dynamic(() => import('./PracticeCanvas'), {
   ssr: false,
   loading: () => (
-    <div
-      className="flex items-center justify-center rounded-lg border-2 bg-gray-50"
-      style={{ width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }}
-    >
+    <div className="flex h-[400px] w-[400px] max-w-[90vw] items-center justify-center rounded-lg border-2 bg-gray-50">
       {/* <div className="text-gray-500">Loading canvas...</div> */}
     </div>
   )
@@ -79,7 +76,6 @@ function PracticeWrapper(props: Props) {
     [is_animating_current_gesture_atom, false],
     [show_try_again_atom, false],
     [last_accuracy_atom, 0],
-    [scaling_factor_atom, 1],
     [animated_gesture_lines_atom, []]
   ]);
 
@@ -126,7 +122,7 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
   );
   const [showTryAgain, setShowTryAgain] = useAtom(show_try_again_atom);
   const [lastAccuracy, setLastAccuracy] = useAtom(last_accuracy_atom);
-  const setScalingFactor = useSetAtom(scaling_factor_atom);
+  const [scalingFactor, setScalingFactor] = useAtom(scaling_factor_atom);
   const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
   const setCurrentGesturePoints = useSetAtom(current_gesture_points_atom);
 
@@ -437,8 +433,10 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     (child) =>
       isValidElement(child) && (child.type as any)?._slot === 'PracticeCanvasCenterCompleted'
   );
-
+  if (scalingFactor === null) return <PracticeLoadingSkeleton />;
   const renderedChildren = typeof children === 'function' ? null : (children as React.ReactNode);
+
+  if (scalingFactor === null) return <PracticeLoadingSkeleton />;
 
   return (
     <PracticeContext.Provider value={{ isCompleted, restartPractice }}>
@@ -729,96 +727,6 @@ const AnimatedNumber = ({ value, className = '' }: { value: number; className?: 
   );
 };
 
-// Progress Display Component
-const ProgressDisplay = ({
-  currentGesture,
-  totalGestures,
-  completedCount
-}: {
-  currentGesture: number;
-  totalGestures: number;
-  completedCount: number;
-}) => {
-  return (
-    <motion.div
-      className="inline-flex items-center justify-center space-x-6 rounded-xl border border-blue-100 bg-linear-to-r from-blue-50 to-indigo-50 px-6 py-4 shadow-lg dark:border-blue-800 dark:from-blue-950/30 dark:to-indigo-950/30"
-      initial={{ y: -40, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: -40, opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-    >
-      {/* Current Gesture Progress */}
-      <div className="flex items-center space-x-2">
-        <motion.div
-          animate={{ rotate: [0, 360] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-          className="shrink-0"
-        >
-          <FiTrendingUp className="text-2xl text-blue-500 dark:text-blue-400" />
-        </motion.div>
-        <div className="flex items-center space-x-1 text-lg font-bold">
-          <span className="text-gray-600 dark:text-gray-300">Gesture</span>
-          <motion.div className="flex items-center space-x-1" whileHover={{ scale: 1.05 }}>
-            <AnimatedNumber
-              value={currentGesture}
-              className="text-2xl font-bold text-blue-600 dark:text-blue-400"
-            />
-            <span className="text-gray-500 dark:text-gray-400">/</span>
-            <span className="text-xl font-semibold text-gray-700 dark:text-gray-300">
-              {totalGestures}
-            </span>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Separator */}
-      <div className="h-8 w-px bg-linear-to-b from-transparent via-gray-300 to-transparent dark:via-gray-600"></div>
-
-      {/* Completed Gestures */}
-      <div className="flex items-center space-x-2">
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            rotate: [0, 10, -10, 0]
-          }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            ease: 'easeInOut'
-          }}
-          className="shrink-0"
-        >
-          <MdCheckCircle className="text-2xl text-green-500 dark:text-green-400" />
-        </motion.div>
-        <div className="flex items-center space-x-1 text-lg font-bold">
-          <span className="text-gray-600 dark:text-gray-300">Completed</span>
-          <motion.div className="relative" whileHover={{ scale: 1.05 }}>
-            <AnimatedNumber
-              value={completedCount}
-              className="text-2xl font-bold text-green-600 dark:text-green-400"
-            />
-            {/* Celebration effect when completed count increases */}
-            <AnimatePresence>
-              {completedCount > 0 && (
-                <motion.div
-                  key={`celebration-${completedCount}`}
-                  initial={{ scale: 0, opacity: 1 }}
-                  animate={{ scale: 1.5, opacity: 0 }}
-                  exit={{ scale: 2, opacity: 0 }}
-                  transition={{ duration: 0.6, ease: 'easeOut' }}
-                  className="absolute inset-0 flex items-center justify-center text-2xl"
-                >
-                  ✨
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
 // Completed slot subcomponent
 const PracticeCompleted = ({
   children
@@ -901,3 +809,17 @@ PracticeExport.Completed = PracticeCompleted;
 PracticeExport.CanvasCenterCompleted = PracticeCanvasCenterCompleted;
 
 export default PracticeExport;
+
+export const PracticeLoadingSkeleton = () => {
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-center">
+        <div className="relative">
+          <Skeleton className="h-[400px] w-[400px] max-w-[90vw] rounded-lg border-2" />
+          <Skeleton className="absolute top-3 left-3 h-8 w-8 rounded-full" />
+          <Skeleton className="absolute top-3 right-3 h-8 w-8 rounded-full" />
+        </div>
+      </div>
+    </div>
+  );
+};

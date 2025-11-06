@@ -32,7 +32,7 @@ import {
   CommandList
 } from '~/components/ui/command';
 import { cn } from '~/lib/utils';
-import Practice from '~/components/pages/practice/Practice';
+import Practice, { PracticeLoadingSkeleton } from '~/components/pages/practice/Practice';
 import { Provider as JotaiProvider, createStore } from 'jotai';
 import { MdArrowForward, MdRefresh, MdStop } from 'react-icons/md';
 import { lipi_parivartak, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
@@ -700,15 +700,5 @@ const LOADING_SKELETONS = {
       </CarouselItem>
     )),
 
-  gesture_canavs: () => (
-    <div className="space-y-4">
-      <div className="flex justify-center">
-        <div className="relative">
-          <Skeleton className="h-[400px] w-[400px] rounded-lg border-2" />
-          <Skeleton className="absolute top-3 left-3 h-8 w-8 rounded-full" />
-          <Skeleton className="absolute top-3 right-3 h-8 w-8 rounded-full" />
-        </div>
-      </div>
-    </div>
-  )
+  gesture_canavs: () => <PracticeLoadingSkeleton />
 };

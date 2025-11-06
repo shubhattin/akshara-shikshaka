@@ -13,7 +13,7 @@ export const current_gesture_index_atom = atom(0);
 export const is_animating_current_gesture_atom = atom(false);
 
 // Responsive scaling
-export const scaling_factor_atom = atom(1);
+export const scaling_factor_atom = atom<number | null>(null);
 
 // Gesture data atoms
 export const animated_gesture_lines_atom = atom<

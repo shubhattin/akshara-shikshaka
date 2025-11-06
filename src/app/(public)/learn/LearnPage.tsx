@@ -17,7 +17,7 @@ import {
   script_list_obj,
   script_list_type
 } from '~/state/lang_list';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '~/api/client';
 import { useState, useEffect, useRef, useMemo, useContext } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
@@ -217,6 +217,7 @@ const LessonsList = (props: Props) => {
   const selectedScriptId = useAtomValue(selected_script_id_atom);
   const selectedCategoryId = useAtomValue(selected_category_id_atom);
   const [selectedLessonId, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     // preload lipi lekhika data for transliteration
@@ -226,7 +227,22 @@ const LessonsList = (props: Props) => {
   const lessons_q = useQuery(
     trpc.text_lessons.categories.get_category_text_lesson_list.queryOptions(
       { category_id: selectedCategoryId! },
-      { enabled: selectedCategoryId !== null, placeholderData: props.init_lessons_list }
+      {
+        enabled: selectedCategoryId !== null,
+        initialData:
+          selectedCategoryId === null
+            ? undefined
+            : ((queryClient.getQueryData(
+                trpc.text_lessons.categories.get_category_text_lesson_list.queryKey({
+                  category_id: selectedCategoryId
+                })
+              ) as typeof props.init_lessons_list | undefined) ??
+              (selectedCategoryId === props.saved_category_id
+                ? props.init_lessons_list
+                : undefined))
+        // we are not keeping the previous data while new is fetching
+        // so no need for keeping previousDataRef as placeholderData
+      }
     )
   );
 

@@ -232,7 +232,11 @@ function ListGestures({ init_gesture_categories }: Props) {
         />
       ) : null}
 
-      {selectedCategoryID !== null && (
+      {selectedCategoryID === null ? (
+        <div className="mx-auto w-full max-w-5xl text-center font-semibold text-muted-foreground">
+          Please select a category to view gestures.
+        </div>
+      ) : (
         <div className="mx-auto w-full max-w-5xl">
           {category_gestures_q.isLoading ? (
             <div className="space-y-2">
@@ -298,6 +302,18 @@ function ManageCategoriesDialog({
       onSuccess: async () => {
         setDeleteId(null);
         queryClient.invalidateQueries(trpc.text_gestures.categories.get_categories.queryFilter());
+        // invalidate the uncategorized gestures list
+        queryClient.invalidateQueries(
+          trpc.text_gestures.categories.get_gestures.queryFilter({
+            category_id: 0
+          })
+        );
+        // invalidate the gestures list for the deleted category
+        queryClient.invalidateQueries(
+          trpc.text_gestures.categories.get_gestures.queryFilter({
+            category_id: deleteId!
+          })
+        );
         toast.success('Category deleted');
       },
       onError: (err) => {

@@ -230,7 +230,11 @@ function ListLessons({ init_lesson_categories }: Props) {
       ) : null}
 
       {/* Category Lessons Rendering */}
-      {selectedCategoryID !== null && (
+      {selectedCategoryID === null ? (
+        <div className="mx-auto w-full max-w-5xl text-center font-semibold text-muted-foreground">
+          Please select a category to view lessons.
+        </div>
+      ) : (
         <div className="mx-auto w-full max-w-5xl">
           {category_lessons_q.isLoading ? (
             <div className="space-y-2">
@@ -298,6 +302,18 @@ function ManageCategoriesDialog({
         setDeleteId(null);
         // reordering is done on server on delete
         queryClient.invalidateQueries(trpc.text_lessons.categories.get_categories.queryFilter());
+        // invalidate the uncategorized lessons list
+        queryClient.invalidateQueries(
+          trpc.text_lessons.categories.get_category_text_lesson_list.queryFilter({
+            category_id: 0
+          })
+        );
+        // invalidate the lessons list for the deleted category
+        queryClient.invalidateQueries(
+          trpc.text_lessons.categories.get_category_text_lesson_list.queryFilter({
+            category_id: deleteId!
+          })
+        );
         toast.success('Category deleted');
       },
       onError: (err) => {

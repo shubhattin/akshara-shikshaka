@@ -4,6 +4,7 @@ import { lang_list_obj } from '~/state/lang_list';
 import { CACHE } from '~/api/cache';
 import { parseLearnPageCookie, SAVED_COOKIES_KEY } from './learn_page_state';
 import { cookies } from 'next/headers';
+import { getMetadata } from '~/components/tags/getPageMetaTags';
 
 export default async function page() {
   const lang_id = lang_list_obj['Sanskrit'];
@@ -44,4 +45,6 @@ export default async function page() {
   );
 }
 
-export const metadata: Metadata = { title: 'Learn Scripts the Interactive way' };
+export const metadata: Metadata = getMetadata({
+  title: 'Learn Scripts the Interactive way | Akshara Shikshaka'
+});

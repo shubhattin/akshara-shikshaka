@@ -475,6 +475,22 @@ const Lesson = ({
   const carouselBasicClassName =
     'basis-1/3 pl-2 sm:basis-1/4 md:basis-1/5 md:pl-4 lg:basis-1/6 xl:basis-1/7';
 
+  const PracticeNotFound = () => (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.3 }}
+      className="mt-16 text-center text-lg font-semibold text-muted-foreground"
+    >
+      Practice for <span className="font-bold">{varnaTransliterated ?? lesson?.text ?? ''}</span>{' '}
+      not found. Coming soon...
+    </motion.div>
+    //  This component has to be displayed in both cases.
+    // - If gesture record for that script does exist or data is empty
+    // - Or gesture record for that script does not exist
+  );
+
   return (
     <div className="mt-2 space-y-4">
       {/* Varna text with optional audio */}
@@ -576,7 +592,12 @@ const Lesson = ({
       </div>
       {/* Practice component below */}
       <div>
-        {(text_gesture_data_q.isLoading || !selected_gesture) && LOADING_SKELETONS.gesture_canavs()}
+        {/* Accept the !selected_gesture only when gesture have not finished yet after that show a not found message */}
+        {(text_gesture_data_q.isLoading || (!selected_gesture && !lesson?.gestures)) &&
+          LOADING_SKELETONS.gesture_canavs()}
+        {lesson?.gestures && !selected_gesture && !text_gesture_data_q.isLoading && (
+          <PracticeNotFound />
+        )}
         {selected_gesture &&
           !text_gesture_data_q.isLoading &&
           text_gesture_data_q.isSuccess &&
@@ -645,6 +666,9 @@ const Lesson = ({
                     </motion.div>
                   </Practice.CanvasCenterCompleted>
                 )}
+                <Practice.NotFound>
+                  <PracticeNotFound />
+                </Practice.NotFound>
               </Practice>
             </JotaiProvider>
           )}

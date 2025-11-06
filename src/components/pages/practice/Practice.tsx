@@ -414,14 +414,6 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     playGestureIndex(currentGestureIndex);
   };
 
-  if (!gestureData.length) {
-    return (
-      <div className="text text-center text-muted-foreground">
-        No gesture data available to display
-      </div>
-    );
-  }
-
   const isCompleted = completedGesturesCount === gestureData.length;
 
   // Detect custom Completed slot usage
@@ -433,9 +425,28 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     (child) =>
       isValidElement(child) && (child.type as any)?._slot === 'PracticeCanvasCenterCompleted'
   );
-  if (scalingFactor === null) return <PracticeLoadingSkeleton />;
+  // Detect custom NotFound slot usage
+  const hasCustomNotFound = Children.toArray(children as React.ReactNode).some(
+    (child) => isValidElement(child) && (child.type as any)?._slot === 'PracticeNotFound'
+  );
   const renderedChildren = typeof children === 'function' ? null : (children as React.ReactNode);
 
+  if (!gestureData.length) {
+    return (
+      <PracticeContext.Provider value={{ isCompleted: false, restartPractice: async () => {} }}>
+        {renderedChildren}
+        {hasCustomNotFound ? (
+          Children.toArray(children as React.ReactNode)
+            .filter(
+              (child) => isValidElement(child) && (child.type as any)?._slot === 'PracticeNotFound'
+            )
+            .map((child, idx) => <div key={idx}>{(child as any).props?.children}</div>)
+        ) : (
+          <PracticeNotFoundDefault />
+        )}
+      </PracticeContext.Provider>
+    );
+  }
   if (scalingFactor === null) return <PracticeLoadingSkeleton />;
 
   return (
@@ -702,31 +713,6 @@ const TryAgainSection = ({
   );
 };
 
-// Animated Number Component with carousel effect
-const AnimatedNumber = ({ value, className = '' }: { value: number; className?: string }) => {
-  return (
-    <div className={cn('relative inline-flex overflow-hidden', className)}>
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={value}
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -20, opacity: 0 }}
-          transition={{
-            type: 'spring',
-            stiffness: 400,
-            damping: 25,
-            duration: 0.4
-          }}
-          className="block"
-        >
-          {value}
-        </motion.span>
-      </AnimatePresence>
-    </div>
-  );
-};
-
 // Completed slot subcomponent
 const PracticeCompleted = ({
   children
@@ -799,14 +785,28 @@ const PracticeCanvasCenterCompleted = ({ children }: { children?: React.ReactNod
 };
 (PracticeCanvasCenterCompleted as any)._slot = 'PracticeCanvasCenterCompleted' as const;
 
+// NotFound slot subcomponent
+const PracticeNotFound = ({ children }: { children?: React.ReactNode }) => {
+  // This component acts as a marker; actual rendering happens in the main component
+  return null;
+};
+(PracticeNotFound as any)._slot = 'PracticeNotFound' as const;
+
+// Default NotFound UI
+const PracticeNotFoundDefault = () => {
+  return <div className="text text-center text-muted-foreground">Comming Soon...</div>;
+};
+
 type PracticeComponent = typeof PracticeWrapper & {
   Completed: typeof PracticeCompleted;
   CanvasCenterCompleted: typeof PracticeCanvasCenterCompleted;
+  NotFound: typeof PracticeNotFound;
 };
 
 const PracticeExport = PracticeWrapper as PracticeComponent;
 PracticeExport.Completed = PracticeCompleted;
 PracticeExport.CanvasCenterCompleted = PracticeCanvasCenterCompleted;
+PracticeExport.NotFound = PracticeNotFound;
 
 export default PracticeExport;
 

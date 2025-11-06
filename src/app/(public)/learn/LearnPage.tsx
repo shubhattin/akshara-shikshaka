@@ -326,10 +326,7 @@ const LessonsList = () => {
                         : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
                     )}
                     onClick={() => {
-                      if (selectedLessonId === lesson.id) {
-                        setSelectedLessonId(null);
-                        saveLearnPageCookies('lesson_id', null);
-                      } else {
+                      if (selectedLessonId !== lesson.id) {
                         setSelectedLessonId(lesson.id);
                         saveLearnPageCookies('lesson_id', lesson.id);
                       }

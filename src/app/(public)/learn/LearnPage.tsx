@@ -6,7 +6,8 @@ import {
   selected_category_id_atom,
   selected_lesson_id_atom,
   selected_script_id_atom,
-  saveLearnPageCookies
+  saveLearnPageCookies,
+  text_lesson_type
 } from './learn_page_state';
 import {
   get_lang_from_id,
@@ -55,6 +56,7 @@ type Props = {
   init_lesson_categories: lesson_category_type[];
   init_lang_id: number;
   init_script_id?: number | null;
+  init_lessons_list?: text_lesson_type[];
   saved_category_id?: number | null;
   saved_lesson_id?: number | null;
 };
@@ -203,12 +205,12 @@ function LearnPage(props: Props) {
           </PopoverContent>
         </Popover>
       </div>
-      <LessonsList />
+      <LessonsList {...props} />
     </div>
   );
 }
 
-const LessonsList = () => {
+const LessonsList = (props: Props) => {
   const trpc = useTRPC();
   const selectedLanguageId = useAtomValue(selected_language_id_atom);
   const selectedScriptId = useAtomValue(selected_script_id_atom);
@@ -223,9 +225,10 @@ const LessonsList = () => {
   const lessons_q = useQuery(
     trpc.text_lessons.categories.get_category_text_lesson_list.queryOptions(
       { category_id: selectedCategoryId! },
-      { enabled: selectedCategoryId !== null }
+      { enabled: selectedCategoryId !== null, placeholderData: props.init_lessons_list }
     )
   );
+
   const [lessonsTransliterated, setTransliteratedLessons] = useState<
     NonNullable<typeof lessons_q.data>
   >(lessons_q.data ?? []);
@@ -341,7 +344,9 @@ const LessonsList = () => {
           <CarouselNext className="right-0 sm:-right-12" />
         </Carousel>
       </div>
-      <Lesson lesson_id={selectedLessonId} hasNext={hasNext} goToNextLesson={goToNextLesson} />
+      {selectedLessonId !== null && (
+        <Lesson lesson_id={selectedLessonId} hasNext={hasNext} goToNextLesson={goToNextLesson} />
+      )}
     </div>
   );
 };
@@ -456,7 +461,7 @@ const Lesson = ({
   return (
     <div className="mt-2 space-y-4">
       {/* Varna text with optional audio */}
-      {(lesson_info_q.isLoading || !lesson_id) && LOADING_SKELETONS.varna_text()}
+      {lesson_info_q.isLoading && LOADING_SKELETONS.varna_text()}
       {lesson && (
         <div className="flex items-center justify-center gap-3">
           <div className="text-center">
@@ -497,8 +502,7 @@ const Lesson = ({
           className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
         >
           <CarouselContent className="-ml-2 md:-ml-4">
-            {(lesson_info_q.isLoading || !lesson_id) &&
-              LOADING_SKELETONS.lesson_words(carouselBasicClassName)}
+            {lesson_info_q.isLoading && LOADING_SKELETONS.lesson_words(carouselBasicClassName)}
 
             {lesson &&
               lesson.words &&

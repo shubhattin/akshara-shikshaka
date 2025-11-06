@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
 import { lang_list_obj, script_list_obj } from '~/state/lang_list';
-import type { lesson_categories } from '~/db/schema';
+import type { lesson_categories, text_lessons } from '~/db/schema';
 import type { InferSelectModel } from 'drizzle-orm';
 import z from 'zod';
 import { SCRIPT_LIST_IDS } from '~/state/lang_list';
@@ -8,6 +8,10 @@ import { SCRIPT_LIST_IDS } from '~/state/lang_list';
 export type lesson_category_type = Omit<
   InferSelectModel<typeof lesson_categories>,
   'created_at' | 'updated_at' | 'lang_id'
+>;
+export type text_lesson_type = Pick<
+  InferSelectModel<typeof text_lessons>,
+  'id' | 'text' | 'order' | 'uuid'
 >;
 
 export const selected_language_id_atom = atom<number>(lang_list_obj['Sanskrit']);

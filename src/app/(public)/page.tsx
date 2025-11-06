@@ -5,8 +5,12 @@ import { getMetadata } from '~/components/tags/getPageMetaTags';
 export default function page() {
   return <Landing />;
 }
-export const metadata: Metadata = getMetadata({
-  title: 'Akshara Shikshaka - Master Sanskrit in Multiple Indian Scripts',
-  description:
-    'Learn to write and read Sanskrit across multiple Indian scripts including Devanagari, Telugu, Kannada, Malayalam, and more. Interactive lessons with authentic pronunciations and guided hand gestures.'
-});
+export const metadata: Metadata = {
+  ...getMetadata({
+    title: 'Akshara Shikshaka - Master Sanskrit in Multiple Indian Scripts',
+    description:
+      'Learn to write and read Sanskrit across multiple Indian scripts including Devanagari, Telugu, Kannada, Malayalam, and more. Interactive lessons with authentic pronunciations and guided hand gestures.'
+  }),
+  keywords:
+    'Sanskrit, learning, scripts, akshara, varnas, Devanagari, Telugu, Kannada, Malayalam, Gujarati, Bengali, Odia, Indian scripts'
+};

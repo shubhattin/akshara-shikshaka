@@ -51,6 +51,7 @@ import { AppContext } from '~/components/AppDataContext';
 import Link from 'next/link';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { motion } from 'framer-motion';
+import { TiTick } from 'react-icons/ti';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
@@ -571,7 +572,7 @@ const Lesson = ({
                     <div className="flex justify-center select-none">
                       <motion.div
                         className={cn(
-                          'flex items-center gap-3 rounded-lg border border-emerald-200 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-md',
+                          'flex items-center gap-2 rounded-lg border border-emerald-200 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-md sm:gap-3',
                           'dark:border-emerald-800 dark:bg-gray-900/90'
                         )}
                         initial={{ scale: 0, opacity: 0 }}
@@ -579,11 +580,8 @@ const Lesson = ({
                         exit={{ scale: 0, opacity: 0 }}
                         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                       >
-                        <span className="text-3xl">🌟</span>
+                        <TiTick className="size-7 text-emerald-700 dark:text-emerald-300" />
                         <div className="leading-tight">
-                          <div className="text-lg font-semibold text-emerald-700 dark:text-emerald-300">
-                            Wonderful job!
-                          </div>
                           <div className="text-base font-bold text-muted-foreground">
                             You completed {lesson.text}
                           </div>
@@ -625,7 +623,7 @@ const Lesson = ({
                           'rounded-full transition-all duration-300'
                         )}
                       >
-                        Next Varna
+                        Next
                         <MdArrowForward className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                       </Button>
                     </motion.div>

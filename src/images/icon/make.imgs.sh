@@ -4,7 +4,7 @@ magick src/images/icon/original.png -resize 512x512 src/images/icon/org_icon_512
 
 magick src/images/icon/org_icon_512.png -resize 440x440 -background transparent -gravity center -extent 512x512 src/images/icon/icon_512_padded.png
 
-# magick src/images/icon/org_icon_512.png -resize 128x128 public/img/icon_128_no_pad.png
+magick src/images/icon/org_icon_512.png -resize 128x128 public/img/icon_128_no_pad.png
 # magick src/images/icon/icon_512_padded.png -resize 128x128 public/img/icon_128.png
 # magick src/images/icon/icon_512_padded.png -resize 512x512 public/img/icon_512.png
 

@@ -367,6 +367,7 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     } else {
       setCanvasCurrentMode('none');
       submit_user_gesture_recording_func(true);
+      setCurrentGestureIndex(0);
     }
   };
 
@@ -415,7 +416,8 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     setAnimatedGestureLines([]);
     clearCurrentAnimatedGesture();
     userGestureVectorsRef.current = [];
-    playGestureIndex(currentGestureIndex);
+    // we cannot pass currentGestureIndex here as it is not upto date with setCurrentGestureIndex call in this function
+    playGestureIndex(0);
   };
 
   const isCompleted = completedGesturesCount === gestureData.length;

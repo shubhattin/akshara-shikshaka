@@ -67,20 +67,8 @@ export default function LearnPageComponent(props: Props) {
     const s = createStore();
     s.set(selected_language_id_atom, props.init_lang_id);
     s.set(selected_script_id_atom, props.init_script_id ?? script_list_obj['Devanagari']);
-    const category_id_ = (() => {
-      if (props.saved_category_id === null || props.saved_category_id === undefined) {
-        return props.init_lesson_categories[0]?.id ?? null;
-      }
-      const saved_category = props.init_lesson_categories.find(
-        (category) => category.id === props.saved_category_id
-      );
-      if (saved_category) {
-        return saved_category.id;
-      }
-      return props.init_lesson_categories[0]?.id ?? null;
-    })();
-    s.set(selected_category_id_atom, category_id_);
-    if (category_id_ !== null) s.set(selected_lesson_id_atom, props.saved_lesson_id ?? null);
+    s.set(selected_category_id_atom, props.saved_category_id ?? null);
+    s.set(selected_lesson_id_atom, props.saved_lesson_id ?? null);
     return s;
   }, []);
 

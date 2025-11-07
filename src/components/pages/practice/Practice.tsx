@@ -4,7 +4,7 @@ import { useEffect, useRef, createContext, useContext, Children, isValidElement 
 import dynamic from 'next/dynamic';
 import type Konva from 'konva';
 import { cn } from '~/lib/utils';
-import { MdPlayArrow, MdClear, MdCheckCircle, MdArrowForward, MdRefresh } from 'react-icons/md';
+import { MdPlayArrow, MdArrowForward, MdRefresh, MdClose, MdReplay } from 'react-icons/md';
 import { evaluateGestureAccuracy, animateGesture } from '~/tools/stroke_data/utils';
 import {
   GesturePoints,
@@ -356,6 +356,10 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     setCurrentGestureIndex(currentGestureIndex + 1);
     setCompletedGesturesCount(completedGesturesCount + 1);
     setIsDrawing(false);
+    // for the previous gesture, we reset the gesture tyoe attribute to null form current_animated_gesture
+    setAnimatedGestureLines((prev) =>
+      prev.map((line, i) => (i === prev.length - 1 ? { ...line, gesture_type: null } : line))
+    );
     if (currentGestureIndex < totalGestures - 1) {
       setTimeout(() => {
         playGestureIndex(currentGestureIndex + 1);
@@ -577,7 +581,7 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
                       'rounded-full transition-all duration-300'
                     )}
                   >
-                    <MdPlayArrow className="size-6 text-base drop-shadow" />
+                    <MdReplay className="size-6 text-base drop-shadow" />
                   </Button>
                 </div>
                 <div className="pointer-events-auto">
@@ -597,7 +601,7 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
                       'rounded-full transition-all duration-300'
                     )}
                   >
-                    <MdRefresh className="size-6 text-base drop-shadow" />
+                    <MdClose className="size-6 text-base drop-shadow" />
                   </Button>
                 </div>
               </div>

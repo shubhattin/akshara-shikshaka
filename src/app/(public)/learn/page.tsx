@@ -8,7 +8,7 @@ import { getMetadata } from '~/components/tags/getPageMetaTags';
 
 export default async function page() {
   const lang_id = lang_list_obj['Sanskrit'];
-  const lesson_categories = await CACHE.lessons.category_list.get({ lang_id });
+  const lesson_categories_prom = CACHE.lessons.category_list.get({ lang_id });
 
   const cookie = await cookies();
   const saved_category_id_ = parseLearnPageCookie(
@@ -24,13 +24,20 @@ export default async function page() {
     cookie.get(SAVED_COOKIES_KEY.script_id.key)?.value
   );
 
+  const lesson_categories = await lesson_categories_prom;
+
   // choose the first category if no category is saved
-  const category_id = !saved_category_id_ ? lesson_categories[0]?.id : saved_category_id_;
+  const category_id = !saved_category_id_
+    ? (lesson_categories[0]?.id ?? null)
+    : (lesson_categories.find((category) => category.id === saved_category_id_)?.id ??
+      lesson_categories[0]?.id);
   const init_lessons_list = await CACHE.lessons.category_lesson_list.get({ category_id });
 
   const lesson_id = !saved_lesson_id_
-    ? init_lessons_list[0]?.id
-    : (init_lessons_list.find((lesson) => lesson.id === saved_lesson_id_)?.id ?? null);
+    ? (init_lessons_list[0]?.id ?? null)
+    : (init_lessons_list.find((lesson) => lesson.id === saved_lesson_id_)?.id ??
+      init_lessons_list[0]?.id ??
+      null);
 
   return (
     <div className="mt-4">

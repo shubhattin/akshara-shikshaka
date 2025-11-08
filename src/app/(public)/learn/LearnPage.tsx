@@ -585,7 +585,11 @@ const Lesson = ({
           text_gesture_data_q.isSuccess &&
           text_gesture_data_q.data && (
             <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
-              <Practice text_data={text_gesture_data_q.data} play_gesture_on_mount={true}>
+              <Practice
+                key={`${selected_gesture.id}-${selected_gesture.uuid}`}
+                text_data={text_gesture_data_q.data}
+                play_gesture_on_mount={true}
+              >
                 <Practice.Completed>
                   {(restartPractice) => (
                     <div className="flex justify-center select-none">

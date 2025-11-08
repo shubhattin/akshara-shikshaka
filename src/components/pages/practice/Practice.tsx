@@ -420,6 +420,13 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     playGestureIndex(0);
   };
 
+  useEffect(() => {
+    // reset state on unmount
+    return () => {
+      resetPractice();
+    };
+  }, [text_data.id, text_data.uuid]);
+
   const isCompleted = completedGesturesCount === gestureData.length;
 
   // Detect custom Completed slot usage
@@ -510,6 +517,7 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
               )}
             >
               <PracticeKonvaCanvas
+                key={`${text_data.uuid}-${text_data.id}`}
                 ref={stageRef}
                 gestureData={gestureData}
                 onUserStroke={handleUserStroke}

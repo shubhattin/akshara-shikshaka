@@ -51,13 +51,13 @@ async function backup_data() {
   // Backup using pg_dump
   console.log('Backing up schema...');
   backup(
-    `pg_dump --dbname=${envs.PG_DATABASE_URL} --if-exists --schema-only --clean --no-owner -f b.sql`,
+    `pg_dump --dbname='${envs.PG_DATABASE_URL}' --if-exists --schema-only --clean --no-owner -f b.sql`,
     'db_dump_schema.sql',
     'b.sql'
   );
   console.log('Backing up data...');
   backup(
-    `pg_dump --dbname=${envs.PG_DATABASE_URL} --data-only --insert --no-owner --rows-per-insert=8000 -f b.sql`,
+    `pg_dump --dbname='${envs.PG_DATABASE_URL}' --data-only --insert --no-owner --rows-per-insert=8000 -f b.sql`,
     'db_dump_data.sql',
     'b.sql'
   );

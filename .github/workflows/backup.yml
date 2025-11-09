@@ -2,7 +2,7 @@ name: Data Backup
 
 on:
   schedule:
-    - cron: '30 17 */4 * *' # Run at 11:00 PM IST every 3 days
+    - cron: "30 17 */4 * *" # Run at 11:00 PM IST every 3 days
   workflow_dispatch: # Allows manual triggering of the workflow
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PG_DATABASE_URL: ${{ secrets.PG_DATABASE_URL }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DB_BACKUP_BUCKET_NAME: ${{ secrets.AWS_DB_BACKUP_BUCKET_NAME }}

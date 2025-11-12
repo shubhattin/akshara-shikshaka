@@ -9,6 +9,7 @@ import { getCachedSession } from '~/lib/cache_server_route_data';
 import { AppContextProvider } from '~/components/AppDataContext';
 import { robotoSans } from '~/components/fonts';
 import AppBar from '~/components/app-bar/AppBar';
+import PosthogInit from '~/components/tags/PosthogInit';
 
 export default async function RootLayout({
   children
@@ -42,6 +43,7 @@ export default async function RootLayout({
             </AppContextProvider>
           </TRPCProvider>
         </ThemeProvider>
+        <PosthogInit />
       </body>
     </html>
   );

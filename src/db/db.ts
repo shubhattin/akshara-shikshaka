@@ -19,7 +19,7 @@ const get_drizzle_instance_dev = async () => {
 export const db =
   process.env.NODE_ENV === 'development'
     ? await get_drizzle_instance_dev()
-    : // testing neon websocket adapter
+    : // using neon websocket adapter
       drizzle_neon(new Pool({ connectionString: process.env.PG_DATABASE_URL }), { schema });
 
 export type transactionType =

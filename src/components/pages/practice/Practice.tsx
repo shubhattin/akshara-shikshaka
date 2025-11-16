@@ -1,6 +1,14 @@
 'use client';
 
-import { useEffect, useRef, createContext, useContext, Children, isValidElement } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  createContext,
+  useContext,
+  Children,
+  isValidElement
+} from 'react';
 import dynamic from 'next/dynamic';
 import type Konva from 'konva';
 import { cn } from '~/lib/utils';
@@ -38,6 +46,7 @@ import { Button } from '~/components/ui/button';
 import { Skeleton } from '~/components/ui/skeleton';
 
 const ACCURACY_THRESHOLD = 0.75;
+const SCALING_FACTOR_FOR_WIDTH = 0.85;
 
 // Dynamic import for PracticeKonvaCanvas to avoid SSR issues
 const PracticeKonvaCanvas = dynamic(() => import('./PracticeCanvas'), {
@@ -230,13 +239,13 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
   function updateScalingFactor() {
     if (typeof window === 'undefined') return;
     // calculate scale based on available width, cap to 1
-    const availableWidth = window.innerWidth * 0.8;
+    const availableWidth = window.innerWidth * SCALING_FACTOR_FOR_WIDTH;
     const scaleX = availableWidth / CANVAS_DIMS.width;
     const scale = Math.min(1, scaleX);
     setScalingFactor(scale);
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     updateScalingFactor();
     window.addEventListener('resize', updateScalingFactor);
     const unsub_func = () => {

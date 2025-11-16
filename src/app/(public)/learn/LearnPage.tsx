@@ -584,7 +584,9 @@ const Lesson = ({
           !text_gesture_data_q.isLoading &&
           text_gesture_data_q.isSuccess &&
           text_gesture_data_q.data && (
-            <JotaiProvider key={`lesson_learn_page-${lesson_id}`}>
+            <JotaiProvider
+              key={`lesson_learn_page-${lesson_id}-${selected_gesture.id}-${selected_gesture.uuid}`}
+            >
               <Practice
                 key={`${selected_gesture.id}-${selected_gesture.uuid}`}
                 text_data={text_gesture_data_q.data}

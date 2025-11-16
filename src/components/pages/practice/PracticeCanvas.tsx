@@ -49,7 +49,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
     // Mouse/touch event handlers for drawing
     const handleStageMouseDown = (e: any) => {
-      if (!isDrawing || !isDrawing) return;
+      if (!isDrawing) return;
 
       setIsRecordingStroke(true);
 
@@ -64,7 +64,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
     };
 
     const handleStageMouseMove = (e: any) => {
-      if (!isDrawing || !isDrawing || !isRecordingStroke) return;
+      if (!isDrawing || !isRecordingStroke) return;
 
       const pos = e.target.getStage().getPointerPosition();
       // Scale coordinates back to logical space
@@ -127,7 +127,8 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       lockScroll();
 
       // Ensure the full canvas is brought into view when practice starts/continues
-      requestAnimationFrame(() => {
+      // Use a small delay to ensure the canvas has rendered with correct dimensions
+      const scrollTimeout = setTimeout(() => {
         if (!containerRef.current) return;
         const rect = containerRef.current.getBoundingClientRect();
         const fullyInView =
@@ -142,7 +143,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
             behavior: 'smooth'
           });
         }
-      });
+      }, 50);
 
       const isDrawingCanvas = (target: Element | null): boolean => {
         return !!(
@@ -194,6 +195,9 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       document.addEventListener('dblclick', preventDoubleClickZoom, { passive: false });
 
       return () => {
+        // Clear scroll timeout
+        clearTimeout(scrollTimeout);
+
         // Unlock page scroll and restore previous position
         unlockScroll();
 

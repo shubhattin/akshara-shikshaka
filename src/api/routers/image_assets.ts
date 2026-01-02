@@ -5,7 +5,7 @@ import { image_assets } from '~/db/schema';
 import { dev_delay } from '~/tools/delay';
 import { asc, count, desc, eq, ilike } from 'drizzle-orm';
 import { generateObject } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { get_lang_from_id, get_script_from_id } from '~/state/lang_list';
 import { generateImageGptImage1 } from '~/utils/ai/image.server';
 import { resizeImage } from '~/utils/sharp/resize.server';
@@ -113,8 +113,8 @@ const list_image_assets_route = protectedAdminProcedure
     };
   });
 
-const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY
 });
 
 const make_upload_image_asset_route = protectedAdminProcedure
@@ -152,7 +152,7 @@ const make_upload_image_asset_route = protectedAdminProcedure
     const get_prompt_result = async () => {
       if (input.existing_image_prompt) {
         const response = await generateObject({
-          model: openai('gpt-4.1'),
+          model: openrouter('openai/gpt-4.1'),
           schema: description_file_name_response_schema,
           system: 'Generate a file name and description for the image prompt provided',
           prompt: input.existing_image_prompt
@@ -160,7 +160,7 @@ const make_upload_image_asset_route = protectedAdminProcedure
         return { ...response.object, image_prompt: input.existing_image_prompt };
       }
       const response = await generateObject({
-        model: openai('gpt-4.1'),
+        model: openrouter('openai/gpt-4.1'),
         schema: description_file_name_image_prompt_response_schema,
         system: SYSTEN_PROMPT,
         prompt: format_string_text(PROMPT, { word, lang, word_script })

@@ -40,7 +40,7 @@ import {
   LANG_LIST,
   type lang_list_type
 } from '~/state/lang_list';
-import { lipi_parivartak } from '~/tools/lipi_lekhika';
+import { transliterate } from 'lipilekhika';
 import Link from 'next/link';
 
 type Props = {
@@ -362,7 +362,7 @@ const AudioCreation = ({ text }: Props) => {
   const handleCreateAudio = async () => {
     setSelectedAudio(null);
     create_audio_mut.reset();
-    const text_key = await lipi_parivartak(text, get_script_from_id(word_script_id), 'Normal');
+    const text_key = await transliterate(text, get_script_from_id(word_script_id), 'Normal');
     const voice_language = get_lang_from_id(lesson_lang_id); // for prompting the tts model
     create_audio_mut.mutate({
       text: text,
@@ -542,7 +542,7 @@ const AudioRecord = ({ text }: Props) => {
         });
         if (!putRes.ok) throw new Error('Upload failed');
 
-        const text_key = await lipi_parivartak(text, get_script_from_id(word_script_id), 'Normal');
+        const text_key = await transliterate(text, get_script_from_id(word_script_id), 'Normal');
         complete_upload_mut.mutateAsync({
           lang_id: langId,
           text: text,
@@ -705,7 +705,7 @@ const AudioRecord = ({ text }: Props) => {
   const upload_recorded_func = async () => {
     if (!recordedBlob) return;
     setRecError(null);
-    const text_key = await lipi_parivartak(text, get_script_from_id(word_script_id), 'Normal');
+    const text_key = await transliterate(text, get_script_from_id(word_script_id), 'Normal');
     await get_upload_url_mut.mutateAsync({
       lang_id: langId,
       text: text,

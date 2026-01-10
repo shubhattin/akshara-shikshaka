@@ -83,11 +83,12 @@ import {
   canvas_text_center_offset_atoms
 } from './gesture_add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
+import { transliterate, preloadScriptData } from 'lipilekhika';
 import {
-  lekhika_typing_tool,
-  lipi_parivartak,
-  load_parivartak_lang_data
-} from '~/tools/lipi_lekhika';
+  createTypingContext,
+  clearTypingContextOnKeyDown,
+  handleTypingBeforeInputEvent
+} from 'lipilekhika/typing';
 import { FONT_LIST, FONT_SCRIPTS, type FontFamily } from '~/state/font_list';
 import { script_list_obj, script_list_type } from '~/state/lang_list';
 import { get_script_from_id } from '~/state/lang_list';
@@ -366,7 +367,7 @@ function AddEditTextData({
   const first_script_set_ref = useRef(true);
   useEffect(() => {
     if (location !== 'add') return;
-    load_parivartak_lang_data(script);
+    preloadScriptData(script);
     if (first_script_set_ref.current) {
       first_script_set_ref.current = false;
       return;
@@ -418,6 +419,12 @@ function AddEditTextData({
       )
     );
   }, [gestureData, selectedGestureIndex]);
+
+  const ctx = createTypingContext(script);
+
+  useEffect(() => {
+    ctx.ready;
+  }, [ctx]);
 
   return (
     <div className="space-y-4">
@@ -506,24 +513,15 @@ function AddEditTextData({
         {location === 'add' && (
           <div className="flex items-center gap-2">
             <Input
-              value={textIntermediate}
               className="w-32"
               disabled={!textEditMode}
-              // onInput={(e) => setIntermediateText(e.target.value)}
-              onInput={(e) => {
-                setIntermediateText(e.currentTarget.value);
-                lekhika_typing_tool(
-                  e.nativeEvent.target,
-                  // @ts-ignore
-                  e.nativeEvent.data,
-                  script,
-                  true,
-                  // @ts-ignore
-                  (val) => {
-                    setIntermediateText(val);
-                  }
-                );
-              }}
+              value={textIntermediate}
+              onChange={(e) => setIntermediateText(e.target.value)}
+              onBeforeInput={(e) =>
+                handleTypingBeforeInputEvent(ctx, e, (newValue) => setIntermediateText(newValue))
+              }
+              onBlur={() => ctx.clearContext()}
+              onKeyDown={(e) => clearTypingContextOnKeyDown(e, ctx)}
             />
             {!textEditMode && <Button onClick={() => setTextEditMode(true)}>Edit</Button>}
             {textEditMode && (
@@ -1153,7 +1151,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
     if (is_addition) {
       add_text_data_mut.mutate({
         text: text.trim(),
-        textKey: await lipi_parivartak(text.trim(), script, 'Normal'),
+        textKey: await transliterate(text.trim(), script, 'Normal'),
         scriptID,
         gestures: gestureData,
         fontFamily,

@@ -53,11 +53,12 @@ import {
   script_list_type,
   get_script_from_id
 } from '~/state/lang_list';
+import { transliterate, preloadScriptData } from 'lipilekhika';
 import {
-  lekhika_typing_tool,
-  lipi_parivartak,
-  load_parivartak_lang_data
-} from '~/tools/lipi_lekhika';
+  createTypingContext,
+  clearTypingContextOnKeyDown,
+  handleTypingBeforeInputEvent
+} from 'lipilekhika/typing';
 import {
   audio_id_optional_atom,
   base_word_script_id_atom,
@@ -142,16 +143,21 @@ const LessonInfo = (props: Props) => {
       return;
     }
     // setTextKey(await lipi_parivartak(text, base_word_script_id, lang_id));
-    lipi_parivartak(text, get_lang_from_id(lang_id), 'Normal').then((textKey) => {
+    transliterate(text, get_lang_from_id(lang_id), 'Normal').then((textKey) => {
       setTextKey(textKey);
     });
   }, [text, lang_id]);
 
   useEffect(() => {
     // load lipi lekhika language/script data for typing tool
-    load_parivartak_lang_data(get_lang_from_id(lang_id));
-    load_parivartak_lang_data(get_script_from_id(base_word_script_id));
+    preloadScriptData(get_lang_from_id(lang_id));
+    preloadScriptData(get_script_from_id(base_word_script_id));
   }, [lang_id, base_word_script_id]);
+
+  const ctx = createTypingContext(get_lang_from_id(lang_id));
+  useEffect(() => {
+    ctx.ready;
+  }, [ctx]);
 
   return (
     <div className="space-y-6">
@@ -219,20 +225,12 @@ const LessonInfo = (props: Props) => {
           {props.location === 'add' && (
             <Input
               value={text}
-              onInput={(e) => {
-                setText(e.currentTarget.value);
-                lekhika_typing_tool(
-                  e.nativeEvent.target,
-                  // @ts-ignore
-                  e.nativeEvent.data,
-                  get_lang_from_id(lang_id),
-                  true,
-                  // @ts-ignore
-                  (val) => {
-                    setText(val);
-                  }
-                );
-              }}
+              onChange={(e) => setText(e.target.value)}
+              onBeforeInput={(e) =>
+                handleTypingBeforeInputEvent(ctx, e, (newValue) => setText(newValue))
+              }
+              onBlur={() => ctx.clearContext()}
+              onKeyDown={(e) => clearTypingContextOnKeyDown(e, ctx)}
               className="w-32"
             />
           )}
@@ -597,6 +595,11 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
     setPlayingId(wordItem.order);
   };
 
+  const ctx = createTypingContext(get_script_from_id(base_word_script_id));
+  useEffect(() => {
+    ctx.ready;
+  }, [ctx]);
+
   return (
     <div
       ref={setNodeRef}
@@ -608,21 +611,12 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
       </div>
       <Input
         value={wordItem.word}
-        onInput={(e) => {
-          onChange(wordItem.order, e.currentTarget.value);
-          lekhika_typing_tool(
-            e.nativeEvent.target,
-            // @ts-ignore
-            e.nativeEvent.data,
-            get_script_from_id(base_word_script_id),
-            true,
-            // @ts-ignore
-            (val) => {
-              onChange(wordItem.order, val);
-            }
-          );
-        }}
-        // onChange={(e) => onChange(wordItem.order, e.target.value)}
+        onChange={(e) => onChange(wordItem.order, e.target.value)}
+        onBeforeInput={(e) =>
+          handleTypingBeforeInputEvent(ctx, e, (newValue) => onChange(wordItem.order, newValue))
+        }
+        onBlur={() => ctx.clearContext()}
+        onKeyDown={(e) => clearTypingContextOnKeyDown(e, ctx)}
         className="w-32"
       />
       <Button

@@ -35,7 +35,7 @@ import { cn } from '~/lib/utils';
 import Practice, { PracticeLoadingSkeleton } from '~/components/pages/practice/Practice';
 import { Provider as JotaiProvider, createStore } from 'jotai';
 import { MdArrowForward, MdRefresh, MdStop } from 'react-icons/md';
-import { lipi_parivartak, load_parivartak_lang_data } from '~/tools/lipi_lekhika';
+import { transliterate, preloadScriptData } from 'lipilekhika';
 import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
 import { Skeleton } from '~/components/ui/skeleton';
 import {
@@ -209,7 +209,7 @@ const LessonsList = (props: Props) => {
 
   useEffect(() => {
     // preload lipi lekhika data for transliteration
-    load_parivartak_lang_data(get_script_from_id(selectedScriptId));
+    preloadScriptData(get_script_from_id(selectedScriptId));
   }, [selectedScriptId]);
 
   const lessons_q = useQuery(
@@ -246,7 +246,7 @@ const LessonsList = (props: Props) => {
     Promise.all(
       data.map(async (lesson) => ({
         ...lesson,
-        text: await lipi_parivartak(
+        text: await transliterate(
           lesson.text,
           get_lang_from_id(selectedLanguageId),
           get_script_from_id(selectedScriptId)
@@ -379,14 +379,14 @@ const Lesson = ({
       Promise.all(
         lesson.words.map(
           async (w) =>
-            await lipi_parivartak(
+            await transliterate(
               w.word,
               get_script_from_id(lesson.base_word_script_id),
               get_script_from_id(scriptId)
             )
         )
       ).then((transliterated_words) => setWordsTransliterated(transliterated_words));
-      lipi_parivartak(
+      transliterate(
         lesson.text,
         get_lang_from_id(selectedLanguageId),
         get_script_from_id(scriptId)

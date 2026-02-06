@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogAction
 } from '~/components/ui/alert-dialog';
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
+import { VisuallyHidden } from 'radix-ui';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -678,9 +678,9 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
             <Dialog open={imageViewDialogOpen} onOpenChange={setImageViewDialogOpen}>
               {/* <DialogTrigger asChild className="cursor-pointer"></DialogTrigger> */}
               <DialogContent className="flex items-center justify-center px-8 py-6">
-                <VisuallyHidden>
+                <VisuallyHidden.Root>
                   <DialogTitle>View Image</DialogTitle>
-                </VisuallyHidden>
+                </VisuallyHidden.Root>
                 <div className="flex flex-col items-center justify-center space-y-4">
                   <span className="text-sm font-semibold text-muted-foreground">
                     {image_asset.description}

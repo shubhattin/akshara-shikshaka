@@ -54,7 +54,7 @@
     "jotai": "^2.16.1",
     "js-cookie": "^3.0.5",
     "konva": "^9.3.22",
-    "lipilekhika": "^1.0.4",
+    "lipilekhika": "^1.0.8",
     "lucide-react": "^0.510.0",
     "mime-types": "^3.0.2",
     "ms": "^2.1.3",
@@ -65,6 +65,7 @@
     "posthog-js": "^1.318.1",
     "pretty-ms": "^9.3.0",
     "qrcode": "^1.5.4",
+    "radix-ui": "latest",
     "react": "^19.2.3",
     "react-day-picker": "^9.13.0",
     "react-dom": "19.2.0",
@@ -79,8 +80,7 @@
     "uuid": "^10.0.0",
     "vaul": "^1.1.2",
     "wavesurfer.js": "^7.12.1",
-    "zod": "^4.3.5",
-    "radix-ui": "latest"
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",

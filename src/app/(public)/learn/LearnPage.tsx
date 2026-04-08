@@ -66,6 +66,7 @@ type Props = {
   init_lang_id: number;
   init_script_id?: number | null;
   init_lessons_list?: text_lesson_type[];
+  init_lessons_list_transliterated?: text_lesson_type[];
   saved_category_id?: number | null;
   saved_lesson_id?: number | null;
 };
@@ -265,8 +266,9 @@ const LessonsList = (props: Props) => {
 
   const [lessonsTransliterated, setTransliteratedLessons] = useState<
     NonNullable<typeof lessons_q.data>
-  >(lessons_q.data ?? []);
+  >(props.init_lessons_list_transliterated ?? []);
   const transliterationVersion = useRef(0);
+
   useEffect(() => {
     if (!lessons_q.isSuccess) return;
     const data = lessons_q.data;
@@ -329,7 +331,7 @@ const LessonsList = (props: Props) => {
     }
   };
 
-  const carouselBasicClassName = 'basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6';
+  const carouselBasicClassName_akshara = 'basis-1/2 sm:basis-1/3 md:basis-1/4';
   return (
     <div>
       <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
@@ -341,13 +343,13 @@ const LessonsList = (props: Props) => {
           className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
         >
           <CarouselContent className="">
-            {lessons_q.isLoading && LOADING_SKELETONS.lessons(carouselBasicClassName)}
+            {lessons_q.isLoading && LOADING_SKELETONS.lessons(carouselBasicClassName_akshara)}
 
             {!lessons_q.isLoading &&
               lessons_q.isSuccess &&
               lessonsTransliterated.length > 0 &&
               lessonsTransliterated.map((lesson) => (
-                <CarouselItem key={lesson.id} className={carouselBasicClassName}>
+                <CarouselItem key={lesson.id} className={carouselBasicClassName_akshara}>
                   <Button
                     variant={selectedLessonId === lesson.id ? 'default' : 'outline'}
                     className={cn(
@@ -483,8 +485,8 @@ const Lesson = ({
   };
 
   const varnaAudioKey = lesson?.optional_audio?.s3_key;
-  const carouselBasicClassName =
-    'basis-1/3 pl-2 sm:basis-1/4 md:basis-1/5 md:pl-4 lg:basis-1/6 xl:basis-1/7';
+  const carouselBasicClassName_card =
+    'basis-1/3 pl-2 sm:basis-1/4 md:basis-1/5 md:pl-4 lg:basis-1/5';
 
   const PracticeNotFound = () => (
     <motion.div
@@ -546,7 +548,7 @@ const Lesson = ({
           className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
         >
           <CarouselContent className="-ml-2 md:-ml-4">
-            {lesson_info_q.isLoading && LOADING_SKELETONS.lesson_words(carouselBasicClassName)}
+            {lesson_info_q.isLoading && LOADING_SKELETONS.lesson_words(carouselBasicClassName_card)}
 
             {lesson &&
               lesson.words &&
@@ -555,7 +557,7 @@ const Lesson = ({
                 const imageKey = w.image?.s3_key;
                 const audioKey = w.audio?.s3_key;
                 return (
-                  <CarouselItem key={w.id} className={carouselBasicClassName}>
+                  <CarouselItem key={w.id} className={carouselBasicClassName_card}>
                     <div className="rounded-md border p-3 text-center shadow-sm">
                       <div className="mb-2 flex items-center justify-center gap-1">
                         <div className="text-base font-semibold">

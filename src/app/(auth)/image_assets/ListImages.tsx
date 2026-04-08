@@ -56,6 +56,15 @@ export default function ListImages() {
   const [limit, setLimit] = useState<number>(DEFAULT_LIMIT);
   const [deleteImageId, setDeleteImageId] = useState<number | null>(null);
   const queryClient = useQueryClient();
+  const sortItems = [
+    { label: 'Created', value: 'created_at' },
+    { label: 'Updated', value: 'updated_at' }
+  ];
+  const orderItems = [
+    { label: 'Latest', value: 'desc' },
+    { label: 'Oldest', value: 'asc' }
+  ];
+  const pageSizeItems = [12, 24, 32, 48].map((sz) => ({ label: `${sz} / page`, value: String(sz) }));
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(searchText.trim()), 300);
@@ -117,6 +126,7 @@ export default function ListImages() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Select
+              items={sortItems}
               value={sortBy}
               onValueChange={(val) => setSortBy(val as 'created_at' | 'updated_at')}
             >
@@ -131,7 +141,11 @@ export default function ListImages() {
           </div>
           <div className="flex items-center gap-2">
             <ArrowUpDown className="size-4 text-muted-foreground" />
-            <Select value={orderBy} onValueChange={(val) => setOrderBy(val as 'asc' | 'desc')}>
+            <Select
+              items={orderItems}
+              value={orderBy}
+              onValueChange={(val) => setOrderBy(val as 'asc' | 'desc')}
+            >
               <SelectTrigger className="w-36">
                 <SelectValue placeholder="Order" />
               </SelectTrigger>
@@ -142,7 +156,11 @@ export default function ListImages() {
             </Select>
           </div>
 
-          <Select value={String(limit)} onValueChange={(val) => setLimit(Number(val))}>
+          <Select
+            items={pageSizeItems}
+            value={String(limit)}
+            onValueChange={(val) => setLimit(Number(val))}
+          >
             <SelectTrigger className="w-32">
               <SelectValue placeholder="Page size" />
             </SelectTrigger>

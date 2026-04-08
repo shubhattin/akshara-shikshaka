@@ -77,6 +77,13 @@ export default function ListAudio() {
 
   const data = list_q?.data;
   const items = data?.list ?? [];
+  const langItems = [
+    { label: 'All', value: 'all' },
+    ...LANG_LIST.map((lang) => ({
+      label: lang,
+      value: String(lang_list_obj[lang as lang_list_type])
+    }))
+  ];
 
   const delete_audio_mut = useMutation(
     trpc.audio_assets.delete_audio_asset.mutationOptions({
@@ -127,6 +134,7 @@ export default function ListAudio() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Select
+              items={langItems}
               value={langFilter === null ? 'all' : String(langFilter)}
               onValueChange={(v) => setLangFilter(v === 'all' ? null : Number(v))}
             >

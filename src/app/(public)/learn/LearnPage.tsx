@@ -23,7 +23,7 @@ import { useState, useEffect, useRef, useMemo, useContext } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
 import { Button } from '~/components/ui/button';
 import { buttonVariants } from '~/components/ui/button';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { ChevronsUpDown } from 'lucide-react';
 import {
   Command,
   CommandEmpty,
@@ -153,9 +153,10 @@ function LearnPage(props: Props) {
               'w-[180px] justify-between text-base font-semibold'
             )}
           >
-            {selectedCategoryId !== null &&
-              (categories.find((category) => category.id === selectedCategoryId)?.name ??
-                'Select category...')}
+            {selectedCategoryId !== null
+              ? (categories.find((category) => category.id === selectedCategoryId)?.name ??
+                'Select category...')
+              : 'Select category...'}
             <ChevronsUpDown className="opacity-50" />
           </PopoverTrigger>
           <PopoverContent className="w-[200px] p-0">
@@ -167,26 +168,26 @@ function LearnPage(props: Props) {
                   {categories.map((category) => (
                     <CommandItem
                       key={category.id}
-                      value={category.id.toString()}
-                      onSelect={(currentValue) => {
+                      value={category.name}
+                      keywords={[category.id.toString()]}
+                      data-checked={selectedCategoryId === category.id ? 'true' : undefined}
+                      className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
+                      onSelect={() => {
                         // reset lesson id when category is changed
                         setSelectedLessonId(null);
                         setSelectedCategoryId(
-                          Number(currentValue) === selectedCategoryId ? null : Number(currentValue)
+                          selectedCategoryId === category.id ? null : category.id
                         );
                         // saving cookies
                         saveLearnPageCookies('lesson_id', null);
-                        saveLearnPageCookies('category_id', Number(currentValue));
+                        saveLearnPageCookies(
+                          'category_id',
+                          selectedCategoryId === category.id ? null : category.id
+                        );
                         setOpen(false);
                       }}
                     >
                       {category.name}
-                      <Check
-                        className={cn(
-                          'ml-auto',
-                          selectedCategoryId === category.id ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
                     </CommandItem>
                   ))}
                 </CommandGroup>

@@ -778,6 +778,13 @@ const SelectedGestureControls = ({
         <div className="space-y-2">
           <Label className="text-sm font-medium">Animation Easing</Label>
           <Select
+            items={[
+              { label: 'Linear', value: 'linear' },
+              { label: 'Ease', value: 'ease' },
+              { label: 'Ease In', value: 'ease-in' },
+              { label: 'Ease Out', value: 'ease-out' },
+              { label: 'Ease In-Out', value: 'ease-in-out' }
+            ]}
             value={selectedGesture.anim_fn}
             onValueChange={(value) =>
               setGestureData((prev: Gesture[]) =>

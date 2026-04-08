@@ -19,6 +19,7 @@ import { FaYoutube, FaInstagram } from 'react-icons/fa';
 import { useTheme } from 'next-themes';
 
 import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '~/lib/utils';
@@ -56,14 +57,13 @@ export function MenuButton() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          className="relative overflow-hidden border-slate-300/60 bg-white/80 backdrop-blur-sm transition-all duration-200 hover:bg-slate-100/80 dark:border-slate-600/60 dark:bg-slate-800/80 dark:hover:bg-slate-700/80"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
+      <PopoverTrigger
+        className={cn(
+          buttonVariants({ variant: 'outline', size: 'icon' }),
+          'relative overflow-hidden border-slate-300/60 bg-white/80 backdrop-blur-sm transition-all duration-200 hover:bg-slate-100/80 dark:border-slate-600/60 dark:bg-slate-800/80 dark:hover:bg-slate-700/80'
+        )}
+      >
+        <Menu className="h-5 w-5" />
       </PopoverTrigger>
       <PopoverContent
         className="scrollbar-hide w-80 border-slate-200/80 bg-white/95 p-0 backdrop-blur-md dark:border-slate-700/80 dark:bg-slate-800/95"

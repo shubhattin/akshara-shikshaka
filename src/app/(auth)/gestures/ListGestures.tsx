@@ -24,7 +24,6 @@ import { useHydrateAtoms } from 'jotai/react/utils';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import {
   ChevronsUpDown,
-  Check,
   GripVertical,
   Plus,
   ArrowUpFromLine,
@@ -86,6 +85,7 @@ import { toast } from 'sonner';
 import { TiEdit } from 'react-icons/ti';
 import { atomWithStorage } from 'jotai/utils';
 import { cn } from '~/lib/utils';
+import { buttonVariants } from '~/components/ui/button';
 
 type Props = {
   init_script_id: number;
@@ -117,6 +117,10 @@ function ListGestures({ init_gesture_categories }: Props) {
     name,
     id: script_list_obj[name as script_list_type]
   }));
+  const scriptItems = [
+    { label: 'Select a Script', value: null },
+    ...scriptOptions.map((o) => ({ label: o.name, value: o.id.toString() }))
+  ];
 
   const categories_q = useQuery(
     trpc.text_gestures.categories.get_categories.queryOptions(void 0, {
@@ -137,8 +141,10 @@ function ListGestures({ init_gesture_categories }: Props) {
     <div className="space-y-6">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3">
         <Select
+          items={scriptItems}
           value={scriptId?.toString()}
           onValueChange={(val) => {
+            if (!val) return;
             setScriptId(Number(val));
             Cookie.set(SCRIPT_ID_COOKIE_KEY, val, { expires: 30 });
           }}
@@ -157,19 +163,16 @@ function ListGestures({ init_gesture_categories }: Props) {
       </div>
       <div className="flex items-center justify-center space-x-4">
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="w-[200px] justify-between"
-            >
-              {selectedCategoryID !== null
-                ? categories.find((category) => category.id === selectedCategoryID)?.name ||
-                  (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
-                : 'Select category...'}
-              <ChevronsUpDown className="opacity-50" />
-            </Button>
+          <PopoverTrigger
+            role="combobox"
+            aria-expanded={open}
+            className={cn(buttonVariants({ variant: 'outline' }), 'w-[200px] justify-between')}
+          >
+            {selectedCategoryID !== null
+              ? categories.find((category) => category.id === selectedCategoryID)?.name ||
+                (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
+              : 'Select category...'}
+            <ChevronsUpDown className="opacity-50" />
           </PopoverTrigger>
           <PopoverContent className="w-[200px] p-0">
             <Command>
@@ -180,37 +183,31 @@ function ListGestures({ init_gesture_categories }: Props) {
                   {categories.map((category) => (
                     <CommandItem
                       key={category.id}
-                      value={category.id.toString()}
-                      onSelect={(currentValue) => {
+                      value={category.name}
+                      keywords={[category.id.toString()]}
+                      data-checked={selectedCategoryID === category.id ? 'true' : undefined}
+                      className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
+                      onSelect={() => {
                         setSelectedCategoryID(
-                          Number(currentValue) === selectedCategoryID ? null : Number(currentValue)
+                          selectedCategoryID === category.id ? null : category.id
                         );
                         setOpen(false);
                       }}
                     >
                       {category.name}
-                      <Check
-                        className={
-                          selectedCategoryID === category.id
-                            ? 'ml-auto opacity-100'
-                            : 'ml-auto opacity-0'
-                        }
-                      />
                     </CommandItem>
                   ))}
                   <CommandItem
-                    value="0"
+                    value="Uncategorized"
+                    keywords={['0']}
+                    data-checked={selectedCategoryID === 0 ? 'true' : undefined}
+                    className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
                     onSelect={() => {
-                      setSelectedCategoryID(0);
+                      setSelectedCategoryID(selectedCategoryID === 0 ? null : 0);
                       setOpen(false);
                     }}
                   >
                     Uncategorized
-                    <Check
-                      className={
-                        selectedCategoryID === 0 ? 'ml-auto opacity-100' : 'ml-auto opacity-0'
-                      }
-                    />
                   </CommandItem>
                 </CommandGroup>
               </CommandList>
@@ -730,7 +727,7 @@ function CategorizedGesturesList({
 
   return (
     <div className="space-y-6">
-      <Accordion type="single" collapsible defaultValue="unordered">
+      <Accordion defaultValue={['unordered']}>
         <AccordionItem value="unordered">
           <AccordionTrigger className="text-base font-semibold">Unordered</AccordionTrigger>
           <AccordionContent>

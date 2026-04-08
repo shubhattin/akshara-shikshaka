@@ -150,6 +150,13 @@ const AudioList = () => {
   const isLoading = list_q.isLoading || list_q.isFetching;
   const data = list_q.data;
   const items = useMemo(() => data?.list ?? [], [data]);
+  const langItems = [
+    { label: 'All', value: 'all' },
+    ...LANG_LIST.map((lang) => ({
+      label: lang,
+      value: String(lang_list_obj[lang as lang_list_type])
+    }))
+  ];
 
   const handlePlay = (id: number, s3_key: string) => {
     if (playingId === id) {
@@ -180,6 +187,7 @@ const AudioList = () => {
         <div className="flex items-center gap-2">
           <Label className="text-sm font-semibold">Language</Label>
           <Select
+            items={langItems}
             value={langFilter === null ? 'all' : String(langFilter)}
             onValueChange={(v) => setLangFilter(v === 'all' ? null : Number(v))}
           >
@@ -337,6 +345,14 @@ const AudioCreation = ({ text }: Props) => {
 
   const [voice, setVoice] = useState<voice_types>(DEFAULT_VOICE);
   const word_script_id = useAtomValue(base_word_script_id_atom);
+  const langItems = [
+    { label: 'All', value: 'all' },
+    ...LANG_LIST.map((lang) => ({
+      label: lang,
+      value: String(lang_list_obj[lang as lang_list_type])
+    }))
+  ];
+  const voiceItems = VOICE_TYPE_LIST.map((v) => ({ label: v, value: v }));
 
   const create_audio_mut = useMutation(
     trpc.audio_assets.upload_audio_asset.mutationOptions({
@@ -396,6 +412,7 @@ const AudioCreation = ({ text }: Props) => {
         <div className="flex items-center gap-2">
           <Label className="text-sm font-semibold">Language</Label>
           <Select
+            items={langItems}
             value={langId === null ? 'all' : String(langId)}
             onValueChange={(v) => setLangId(v === 'all' ? null : Number(v))}
           >
@@ -414,7 +431,11 @@ const AudioCreation = ({ text }: Props) => {
         </div>
         <div className="flex items-center gap-2">
           <Label className="text-sm font-semibold">Voice</Label>
-          <Select value={voice} onValueChange={(v) => setVoice(v as voice_types)}>
+          <Select
+            items={voiceItems}
+            value={voice}
+            onValueChange={(v) => setVoice(v as voice_types)}
+          >
             <SelectTrigger size="sm" className="w-28">
               <SelectValue placeholder={DEFAULT_VOICE} />
             </SelectTrigger>
@@ -530,6 +551,17 @@ const AudioRecord = ({ text }: Props) => {
   const [reviewPlaying, setReviewPlaying] = useState(false);
   const [recordElapsedMs, setRecordElapsedMs] = useState(0);
   const [recordedDurationSec, setRecordedDurationSec] = useState<number | null>(null);
+  const langItems = [
+    { label: 'All', value: 'all' },
+    ...LANG_LIST.map((lang) => ({
+      label: lang,
+      value: String(lang_list_obj[lang as lang_list_type])
+    }))
+  ];
+  const micItems = [
+    { label: 'Select input', value: 'none' },
+    ...devices.map((d) => ({ label: d.label || 'Microphone', value: d.deviceId }))
+  ];
 
   const get_upload_url_mut = useMutation(
     trpc.audio_assets.get_upload_audio_asset_url.mutationOptions({
@@ -727,6 +759,7 @@ const AudioRecord = ({ text }: Props) => {
             <div className="flex items-center gap-2">
               <Label className="text-sm font-semibold">Language</Label>
               <Select
+                items={langItems}
                 disabled={recStatus === 'recording' || recStatus === 'recorded'}
                 value={langId === null ? 'all' : String(langId)}
                 onValueChange={(v) => setLangId(v === 'all' ? null : Number(v))}
@@ -747,6 +780,7 @@ const AudioRecord = ({ text }: Props) => {
             <div className="flex items-center gap-2">
               <Label className="text-sm font-semibold">Mic</Label>
               <Select
+                items={micItems}
                 disabled={recStatus === 'recording' || recStatus === 'recorded'}
                 value={selectedDeviceId || 'none'}
                 onValueChange={(v) => {

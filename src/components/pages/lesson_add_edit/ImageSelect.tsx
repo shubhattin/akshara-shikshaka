@@ -10,6 +10,7 @@ import { Skeleton } from '~/components/ui/skeleton';
 import { Progress } from '~/components/ui/progress';
 import { Textarea } from '~/components/ui/textarea';
 import { IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
+import { custom_classes } from '~/components/custom_ui';
 import { cn } from '~/lib/utils';
 import {
   base_word_script_id_atom,
@@ -396,9 +397,10 @@ const ImageCreation = ({ wordItem }: Props) => {
             </div>
             <div className="flex items-center justify-center space-x-4">
               <Button
-                variant={'blue'}
+                variant="default"
                 onClick={handleDeleteAndRemake}
                 disabled={delete_image_mut.isPending || !create_image_mut.data?.success}
+                className={custom_classes.button.blue}
               >
                 Delete and Make Image
               </Button>

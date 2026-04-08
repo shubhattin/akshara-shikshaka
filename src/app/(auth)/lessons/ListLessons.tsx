@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useTRPC } from '~/api/client';
 import { Skeleton } from '~/components/ui/skeleton';
-import { ArrowRightLeft, Check, ChevronsUpDown } from 'lucide-react';
+import { ArrowRightLeft, ChevronsUpDown } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -78,6 +78,7 @@ import { atomWithStorage, useHydrateAtoms } from 'jotai/utils';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { toast } from 'sonner';
 import { LANGUAGES_ADDED } from '~/state/font_list';
+import { buttonVariants } from '~/components/ui/button';
 
 type Props = {
   init_lang_id: number;
@@ -109,6 +110,10 @@ function ListLessons({ init_lesson_categories }: Props) {
     name,
     id: lang_list_obj[name as lang_list_type]
   }));
+  const langItems = [
+    { label: 'Select a Language', value: null },
+    ...langOptions.map((o) => ({ label: o.name, value: o.id.toString() }))
+  ];
 
   const [open, setOpen] = useState(false);
   // 0 will be for uncategorized
@@ -134,8 +139,10 @@ function ListLessons({ init_lesson_categories }: Props) {
     <div className="space-y-6">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3">
         <Select
+          items={langItems}
           value={langId?.toString()}
           onValueChange={(val) => {
+            if (!val) return;
             setLangId(Number(val));
             setSelectedCategoryID(0);
             Cookie.set(LESSON_LANG_ID_COOKIE_KEY, val, { expires: 30 });
@@ -155,19 +162,16 @@ function ListLessons({ init_lesson_categories }: Props) {
       </div>
       <div className="flex items-center justify-center space-x-4">
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="w-[200px] justify-between"
-            >
-              {selectedCategoryID !== null
-                ? categories.find((category) => category.id === selectedCategoryID)?.name ||
-                  (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
-                : 'Select category...'}
-              <ChevronsUpDown className="opacity-50" />
-            </Button>
+          <PopoverTrigger
+            role="combobox"
+            aria-expanded={open}
+            className={cn(buttonVariants({ variant: 'outline' }), 'w-[200px] justify-between')}
+          >
+            {selectedCategoryID !== null
+              ? categories.find((category) => category.id === selectedCategoryID)?.name ||
+                (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
+              : 'Select category...'}
+            <ChevronsUpDown className="opacity-50" />
           </PopoverTrigger>
           <PopoverContent className="w-[200px] p-0">
             <Command>
@@ -178,37 +182,31 @@ function ListLessons({ init_lesson_categories }: Props) {
                   {categories.map((category) => (
                     <CommandItem
                       key={category.id}
-                      value={category.id.toString()}
-                      onSelect={(currentValue) => {
+                      value={category.name}
+                      keywords={[category.id.toString()]}
+                      data-checked={selectedCategoryID === category.id ? 'true' : undefined}
+                      className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
+                      onSelect={() => {
                         setSelectedCategoryID(
-                          Number(currentValue) === selectedCategoryID ? null : Number(currentValue)
+                          selectedCategoryID === category.id ? null : category.id
                         );
                         setOpen(false);
                       }}
                     >
                       {category.name}
-                      <Check
-                        className={cn(
-                          'ml-auto',
-                          selectedCategoryID === category.id ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
                     </CommandItem>
                   ))}
                   <CommandItem
-                    value="0"
+                    value="Uncategorized"
+                    keywords={['0']}
+                    data-checked={selectedCategoryID === 0 ? 'true' : undefined}
+                    className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
                     onSelect={() => {
-                      setSelectedCategoryID(0);
+                      setSelectedCategoryID(selectedCategoryID === 0 ? null : 0);
                       setOpen(false);
                     }}
                   >
                     Uncategorized
-                    <Check
-                      className={cn(
-                        'ml-auto',
-                        selectedCategoryID === 0 ? 'opacity-100' : 'opacity-0'
-                      )}
-                    />
                   </CommandItem>
                 </CommandGroup>
               </CommandList>
@@ -731,7 +729,7 @@ function CategorizedLessonsList({
 
   return (
     <div className="space-y-6">
-      <Accordion type="single" collapsible defaultValue="unordered">
+      <Accordion defaultValue={['unordered']}>
         <AccordionItem value="unordered">
           <AccordionTrigger className="text-base font-semibold">Unordered</AccordionTrigger>
           <AccordionContent>

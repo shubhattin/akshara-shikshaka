@@ -38,6 +38,7 @@ import {
   MdReplay
 } from 'react-icons/md';
 import { toast } from 'sonner';
+import { custom_classes } from '~/components/custom_ui';
 import { cn } from '~/lib/utils';
 import {
   DndContext,
@@ -101,6 +102,7 @@ import { FONT_FAMILY_COOKIE_KEY, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
 import { Provider as JotaiProvider } from 'jotai';
 
 import { useMutation } from '@tanstack/react-query';
+import { buttonVariants } from '~/components/ui/button';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
 const KonvaCanvas = dynamic(() => import('./AddEditGestureCanvas'), {
@@ -432,74 +434,66 @@ function AddEditTextData({
         <div className="flex items-center gap-2">
           <Label className="font-bold">Script</Label>
           {location === 'add' && (
-            <select
+            <Select
+              items={[
+                { label: 'Script', value: null },
+                ...FONT_SCRIPTS.map((s) => ({ label: s, value: s }))
+              ]}
               value={script}
-              onChange={(e) => {
-                setScript(e.target.value as script_list_type);
+              onValueChange={(v) => {
+                if (!v) return;
+                setScript(v as script_list_type);
                 Cookie.set(
                   SCRIPT_ID_COOKIE_KEY,
-                  script_list_obj[e.target.value as script_list_type].toString(),
+                  script_list_obj[v as script_list_type].toString(),
                   {
-                    expires: 30 // 30 days
+                    expires: 30
                   }
                 );
               }}
-              className={cn(
-                'w-32 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm transition-colors',
-                'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-                'text-foreground',
-                'dark:border-border dark:bg-background dark:text-foreground'
-              )}
             >
-              {FONT_SCRIPTS.map((script) => (
-                <option
-                  key={script}
-                  value={script}
-                  className={cn(
-                    'bg-background text-foreground',
-                    'dark:bg-background dark:text-foreground'
-                  )}
-                >
-                  {script}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-32 text-sm">
+                <SelectValue placeholder="Script" />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_SCRIPTS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           {location !== 'add' && <span className="text-sm">{script}</span>}
         </div>
         <div className="flex items-center gap-2">
           <Label className="font-bold">Font Family</Label>
-          <select
+          <Select
+            items={[
+              { label: 'Font Family', value: null },
+              ...currentScriptFontList.map((f) => ({
+                label: f.font_family.split('_').join(' '),
+                value: f.font_family
+              }))
+            ]}
             value={fontFamily}
-            onChange={(e) => {
-              setFontFamily(e.target.value as FontFamily);
-              Cookie.set(FONT_FAMILY_COOKIE_KEY, e.target.value as FontFamily, {
-                expires: 30 // 30 days
-              });
+            onValueChange={(v) => {
+              if (!v) return;
+              setFontFamily(v as FontFamily);
+              Cookie.set(FONT_FAMILY_COOKIE_KEY, v as FontFamily, { expires: 30 });
             }}
-            className={cn(
-              'w-40 rounded-md border border-input bg-background px-2 py-1 shadow-sm transition-colors',
-              'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-              'disabled:cursor-not-allowed disabled:opacity-50',
-              'text-foreground',
-              'tdark:border-border dark:bg-background dark:text-foreground',
-              'text-xs'
-            )}
           >
-            {currentScriptFontList.map((font) => (
-              <option
-                key={font.font_family}
-                value={font.font_family}
-                className={cn(
-                  'bg-background text-foreground',
-                  'dark:bg-background dark:text-foreground'
-                )}
-              >
-                {font.font_family.split('_').join(' ')}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-40 text-xs">
+              <SelectValue placeholder="Font Family" />
+            </SelectTrigger>
+            <SelectContent>
+              {currentScriptFontList.map((font) => (
+                <SelectItem key={font.font_family} value={font.font_family}>
+                  {font.font_family.split('_').join(' ')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-2">
           <Label className="font-bold">Category</Label>
@@ -777,6 +771,13 @@ const SelectedGestureControls = ({
         <div className="space-y-2">
           <Label className="text-sm font-medium">Animation Easing</Label>
           <Select
+            items={[
+              { label: 'Linear', value: 'linear' },
+              { label: 'Ease', value: 'ease' },
+              { label: 'Ease In', value: 'ease-in' },
+              { label: 'Ease Out', value: 'ease-out' },
+              { label: 'Ease In-Out', value: 'ease-in-out' }
+            ]}
             value={selectedGesture.anim_fn}
             onValueChange={(value) =>
               setGestureData((prev: Gesture[]) =>
@@ -810,7 +811,9 @@ const SelectedGestureControls = ({
             onValueChange={(value) =>
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
-                  gesture.index === selectedGestureIndex ? { ...gesture, width: value[0] } : gesture
+                  gesture.index === selectedGestureIndex
+                    ? { ...gesture, width: Array.isArray(value) ? value[0] : value }
+                    : gesture
                 )
               )
             }
@@ -831,7 +834,7 @@ const SelectedGestureControls = ({
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
                   gesture.index === selectedGestureIndex
-                    ? { ...gesture, duration: value[0] }
+                    ? { ...gesture, duration: Array.isArray(value) ? value[0] : value }
                     : gesture
                 )
               )
@@ -1184,23 +1187,24 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   return (
     <div className="mx-2 mt-2 flex items-center justify-between sm:mx-4">
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button
-            disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
-            className="flex text-lg"
-            variant={'blue'}
-          >
-            {is_addition ? (
-              <>
-                <IoMdAdd className="text-lg" /> {!add_text_data_mut.isPending ? 'Add' : 'Adding...'}
-              </>
-            ) : (
-              <>
-                <FiSave className="text-lg" />{' '}
-                {!update_text_data_mut.isPending ? 'Save' : 'Saving...'}
-              </>
-            )}
-          </Button>
+        <AlertDialogTrigger
+          disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
+          className={cn(
+            buttonVariants({ variant: 'default' }),
+            custom_classes.button.blue,
+            'flex text-lg'
+          )}
+        >
+          {is_addition ? (
+            <>
+              <IoMdAdd className="text-lg" /> {!add_text_data_mut.isPending ? 'Add' : 'Adding...'}
+            </>
+          ) : (
+            <>
+              <FiSave className="text-lg" />{' '}
+              {!update_text_data_mut.isPending ? 'Save' : 'Saving...'}
+            </>
+          )}
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1218,11 +1222,14 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
 
       {!is_addition && (
         <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button className="flex gap-1 px-1 py-0 text-sm" variant="destructive">
-              <MdDeleteOutline className="text-base" />
-              Delete
-            </Button>
+          <AlertDialogTrigger
+            className={cn(
+              buttonVariants({ variant: 'destructive' }),
+              'flex gap-1 px-1 py-0 text-sm'
+            )}
+          >
+            <MdDeleteOutline className="text-base" />
+            Delete
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>

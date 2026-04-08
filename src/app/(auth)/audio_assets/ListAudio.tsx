@@ -35,6 +35,8 @@ import { MdMic, MdPlayArrow, MdStop } from 'react-icons/md';
 import { get_lang_from_id, LANG_LIST, lang_list_obj, type lang_list_type } from '~/state/lang_list';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { cn } from '~/lib/utils';
+import { buttonVariants } from '~/components/ui/button';
 
 export default function ListAudio() {
   const trpc = useTRPC();
@@ -75,6 +77,13 @@ export default function ListAudio() {
 
   const data = list_q?.data;
   const items = data?.list ?? [];
+  const langItems = [
+    { label: 'All', value: 'all' },
+    ...LANG_LIST.map((lang) => ({
+      label: lang,
+      value: String(lang_list_obj[lang as lang_list_type])
+    }))
+  ];
 
   const delete_audio_mut = useMutation(
     trpc.audio_assets.delete_audio_asset.mutationOptions({
@@ -125,6 +134,7 @@ export default function ListAudio() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Select
+              items={langItems}
               value={langFilter === null ? 'all' : String(langFilter)}
               onValueChange={(v) => setLangFilter(v === 'all' ? null : Number(v))}
             >
@@ -243,25 +253,20 @@ export default function ListAudio() {
 
               {/* Dropdown Menu */}
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute top-1 right-1 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                  >
-                    <span className="text-sm">⋮</span>
-                  </Button>
+                <DropdownMenuTrigger
+                  className={cn(
+                    buttonVariants({ variant: 'ghost', size: 'sm' }),
+                    'absolute top-1 right-1 h-6 w-6 p-0 text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                >
+                  <span className="text-sm">⋮</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onSelect={(e) => e.preventDefault()}
-                    className="gap-2"
-                    onClick={() => setDeleteAudioId(item.id)}
-                  >
+                  <DropdownMenuItem className="gap-2" onClick={() => setDeleteAudioId(item.id)}>
                     <MdDeleteOutline className="mr-1 size-4 text-destructive" />
                     <span className="font-semibold">Delete Audio</span>
                   </DropdownMenuItem>

@@ -20,11 +20,12 @@ import {
   AlertDialogTitle,
   AlertDialogAction
 } from '~/components/ui/alert-dialog';
-import { VisuallyHidden } from 'radix-ui';
 import { Button } from '~/components/ui/button';
+import { buttonVariants } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Skeleton } from '~/components/ui/skeleton';
+import { custom_classes } from '~/components/custom_ui';
 import { cn } from '~/lib/utils';
 import {
   DndContext,
@@ -87,6 +88,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { AiOutlineAudio } from 'react-icons/ai';
 import Link from 'next/link';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '~/components/ui/select';
 
 type gestures_list_type = {
   id: number;
@@ -159,29 +167,46 @@ const LessonInfo = (props: Props) => {
     ctx.ready;
   }, [ctx]);
 
+  const langItems = [
+    { label: 'Language', value: null },
+    ...LANG_LIST.map((lang) => ({
+      label: lang,
+      value: String(lang_list_obj[lang as lang_list_type])
+    }))
+  ];
+  const scriptItems = [
+    { label: 'Base Word Script', value: null },
+    ...FONT_SCRIPTS.map((script) => ({
+      label: script,
+      value: String(script_list_obj[script as script_list_type])
+    }))
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-8">
         <Label className="flex items-center gap-2">
           <span className="font-semibold">Language</span>
           {props.location === 'add' && (
-            <select
-              value={lang_id}
-              onChange={(e) => setLangId(Number(e.target.value))}
-              className={cn(
-                'w-32 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm transition-colors',
-                'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-                'text-foreground',
-                'dark:border-border dark:bg-background dark:text-foreground'
-              )}
+            <Select
+              items={langItems}
+              value={String(lang_id)}
+              onValueChange={(val) => {
+                if (!val) return;
+                setLangId(Number(val));
+              }}
             >
-              {LANG_LIST.map((lang) => (
-                <option key={lang} value={lang_list_obj[lang as lang_list_type]}>
-                  {lang}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-32 text-sm">
+                <SelectValue placeholder="Language" />
+              </SelectTrigger>
+              <SelectContent>
+                {LANG_LIST.map((lang) => (
+                  <SelectItem key={lang} value={String(lang_list_obj[lang as lang_list_type])}>
+                    {lang}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           {props.location === 'edit' && (
             <span className="font-bold underline">{get_lang_from_id(lang_id)}</span>
@@ -196,23 +221,28 @@ const LessonInfo = (props: Props) => {
         <Label className="flex items-center gap-2">
           <span className="font-semibold">Base Word Script</span>
           {props.location === 'add' && (
-            <select
-              value={base_word_script_id}
-              onChange={(e) => setBaseWordScriptId(Number(e.target.value))}
-              className={cn(
-                'w-32 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm transition-colors',
-                'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-                'text-foreground',
-                'dark:border-border dark:bg-background dark:text-foreground'
-              )}
+            <Select
+              items={scriptItems}
+              value={String(base_word_script_id)}
+              onValueChange={(val) => {
+                if (!val) return;
+                setBaseWordScriptId(Number(val));
+              }}
             >
-              {FONT_SCRIPTS.map((script) => (
-                <option key={script} value={script_list_obj[script as script_list_type]}>
-                  {script}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-32 text-sm">
+                <SelectValue placeholder="Base Word Script" />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_SCRIPTS.map((script) => (
+                  <SelectItem
+                    key={script}
+                    value={String(script_list_obj[script as script_list_type])}
+                  >
+                    {script}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           {props.location === 'edit' && (
             <span className="font-bold underline">{get_script_from_id(base_word_script_id)}</span>
@@ -343,11 +373,9 @@ const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) =>
         text.trim().length > 0 &&
         (!lesson_id || !get_text_lesson_optional_audio_data_q.isLoading) && (
           <Dialog open={audioDialogOpen} onOpenChange={setAudioDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <AiOutlineAudio className="size-6 text-emerald-400" />
-                Add Audio
-              </Button>
+            <DialogTrigger className={cn(buttonVariants({ variant: 'outline' }), 'gap-2')}>
+              <AiOutlineAudio className="size-6 text-emerald-400" />
+              Add Audio
             </DialogTrigger>
             <DialogContent className="h-[70vh] w-full overflow-y-scroll px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
               <DialogHeader className="sr-only">
@@ -643,10 +671,8 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
           wordItem.word.trim().length > 0 &&
           !get_text_lesson_word_media_data_q.isLoading && (
             <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <RiImageAddLine className="size-6 text-sky-500 dark:text-sky-400" /> Add Image
-                </Button>
+              <DialogTrigger className={cn(buttonVariants({ variant: 'outline' }), 'gap-2')}>
+                <RiImageAddLine className="size-6 text-sky-500 dark:text-sky-400" /> Add Image
               </DialogTrigger>
               <DialogContent className="h-[70vh] w-full overflow-y-scroll px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
                 <DialogHeader className="sr-only">
@@ -678,9 +704,9 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
             <Dialog open={imageViewDialogOpen} onOpenChange={setImageViewDialogOpen}>
               {/* <DialogTrigger asChild className="cursor-pointer"></DialogTrigger> */}
               <DialogContent className="flex items-center justify-center px-8 py-6">
-                <VisuallyHidden.Root>
+                <div className="sr-only">
                   <DialogTitle>View Image</DialogTitle>
-                </VisuallyHidden.Root>
+                </div>
                 <div className="flex flex-col items-center justify-center space-y-4">
                   <span className="text-sm font-semibold text-muted-foreground">
                     {image_asset.description}
@@ -706,11 +732,9 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
           wordItem.word.trim().length > 0 &&
           !get_text_lesson_word_media_data_q.isLoading && (
             <Dialog open={audioDialogOpen} onOpenChange={setAudioDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <AiOutlineAudio className="size-6 text-emerald-400" />
-                  Add Audio
-                </Button>
+              <DialogTrigger className={cn(buttonVariants({ variant: 'outline' }), 'gap-2')}>
+                <AiOutlineAudio className="size-6 text-emerald-400" />
+                Add Audio
               </DialogTrigger>
               <DialogContent className="h-[70vh] w-full overflow-y-scroll px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
                 <DialogHeader className="sr-only">
@@ -880,24 +904,25 @@ const AddEditSave = (props: Props) => {
   return (
     <div className="mt-2 flex items-center justify-between">
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button
-            disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
-            className="flex text-lg"
-            variant={'blue'}
-          >
-            {props.location === 'add' ? (
-              <>
-                <IoMdAdd className="text-lg" />{' '}
-                {!add_text_data_mut.isPending ? 'Add Lesson Info' : 'Adding...'}
-              </>
-            ) : (
-              <>
-                <FiSave className="text-lg" />{' '}
-                {!update_text_data_mut.isPending ? 'Save Lesson Info' : 'Saving...'}
-              </>
-            )}
-          </Button>
+        <AlertDialogTrigger
+          disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
+          className={cn(
+            buttonVariants({ variant: 'default' }),
+            custom_classes.button.blue,
+            'flex text-lg'
+          )}
+        >
+          {props.location === 'add' ? (
+            <>
+              <IoMdAdd className="text-lg" />{' '}
+              {!add_text_data_mut.isPending ? 'Add Lesson Info' : 'Adding...'}
+            </>
+          ) : (
+            <>
+              <FiSave className="text-lg" />{' '}
+              {!update_text_data_mut.isPending ? 'Save Lesson Info' : 'Saving...'}
+            </>
+          )}
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -917,11 +942,14 @@ const AddEditSave = (props: Props) => {
 
       {props.location !== 'add' && (
         <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button className="flex gap-1 px-1 py-0 text-sm" variant="destructive">
-              <MdDeleteOutline className="text-base" />
-              Delete Text Lesson
-            </Button>
+          <AlertDialogTrigger
+            className={cn(
+              buttonVariants({ variant: 'destructive' }),
+              'flex gap-1 px-1 py-0 text-sm'
+            )}
+          >
+            <MdDeleteOutline className="text-base" />
+            Delete Text Lesson
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>

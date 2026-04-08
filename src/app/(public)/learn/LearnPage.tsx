@@ -22,7 +22,8 @@ import { useTRPC } from '~/api/client';
 import { useState, useEffect, useRef, useMemo, useContext } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
 import { Button } from '~/components/ui/button';
-import { Check, ChevronsUpDown } from 'lucide-react';
+import { buttonVariants } from '~/components/ui/button';
+import { ChevronsUpDown } from 'lucide-react';
 import {
   Command,
   CommandEmpty,
@@ -52,12 +53,20 @@ import Link from 'next/link';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { TiTick } from 'react-icons/ti';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '~/components/ui/select';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
   init_lang_id: number;
   init_script_id?: number | null;
   init_lessons_list?: text_lesson_type[];
+  init_lessons_list_transliterated?: text_lesson_type[];
   saved_category_id?: number | null;
   saved_lesson_id?: number | null;
 };
@@ -87,6 +96,26 @@ function LearnPage(props: Props) {
   const [selectedCategoryId, setSelectedCategoryId] = useAtom(selected_category_id_atom);
   const [open, setOpen] = useState(false);
   const [, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
+  const scriptItems = useMemo(
+    () => [
+      { label: 'Script', value: null },
+      ...FONT_SCRIPTS.map((script) => ({
+        label: script,
+        value: String(script_list_obj[script as script_list_type])
+      }))
+    ],
+    []
+  );
+  const langItems = useMemo(
+    () => [
+      { label: 'Language', value: null },
+      ...LANGUAGES_ADDED.map((lang) => ({
+        label: lang,
+        value: String(lang_list_obj[lang as lang_list_type])
+      }))
+    ],
+    []
+  );
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
       { lang_id: selectedLanguageId },
@@ -98,64 +127,65 @@ function LearnPage(props: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-center gap-2 space-x-12 text-sm">
-        <label>
-          <select
-            value={selectedScriptId}
-            onChange={(e) => {
-              setSelectedScriptId(Number(e.target.value));
-              saveLearnPageCookies('script_id', Number(e.target.value));
-            }}
-            className="flex w-32 rounded-md border border-input bg-transparent px-2 py-1 text-sm font-semibold shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-          >
+        <Select
+          items={scriptItems}
+          value={String(selectedScriptId)}
+          onValueChange={(val) => {
+            if (!val) return;
+            setSelectedScriptId(Number(val));
+            saveLearnPageCookies('script_id', Number(val));
+          }}
+        >
+          <SelectTrigger className="w-32 text-sm font-semibold">
+            <SelectValue placeholder="Script" />
+          </SelectTrigger>
+          <SelectContent>
             {FONT_SCRIPTS.map((script) => (
-              <option
-                key={script}
-                value={script_list_obj[script as script_list_type]}
-                className="bg-background text-foreground"
-              >
+              <SelectItem key={script} value={String(script_list_obj[script as script_list_type])}>
                 {script}
-              </option>
+              </SelectItem>
             ))}
-          </select>
-        </label>
-        <label>
-          <select
-            value={selectedLanguageId}
-            onChange={(e) => {
-              setSelectedLanguageId(Number(e.target.value));
-              setSelectedCategoryId(null);
-              setSelectedLessonId(null);
-              saveLearnPageCookies('category_id', null);
-              saveLearnPageCookies('lesson_id', null);
-            }}
-            className="flex w-28 rounded-md border border-input bg-transparent px-2 py-1 text-sm font-semibold shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          </SelectContent>
+        </Select>
+        <Select
+          items={langItems}
+          value={String(selectedLanguageId)}
+          onValueChange={(val) => {
+            if (!val) return;
+            setSelectedLanguageId(Number(val));
+            setSelectedCategoryId(null);
+            setSelectedLessonId(null);
+            saveLearnPageCookies('category_id', null);
+            saveLearnPageCookies('lesson_id', null);
+          }}
+        >
+          <SelectTrigger className="w-28 text-sm font-semibold">
+            <SelectValue placeholder="Language" />
+          </SelectTrigger>
+          <SelectContent>
             {LANGUAGES_ADDED.map((lang) => (
-              <option
-                key={lang}
-                value={lang_list_obj[lang as lang_list_type]}
-                className="bg-background text-foreground"
-              >
+              <SelectItem key={lang} value={String(lang_list_obj[lang as lang_list_type])}>
                 {lang}
-              </option>
+              </SelectItem>
             ))}
-          </select>
-        </label>
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex flex-wrap items-center justify-center">
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="w-[180px] justify-between text-base font-semibold"
-            >
-              {selectedCategoryId !== null &&
-                (categories.find((category) => category.id === selectedCategoryId)?.name ??
-                  'Select category...')}
-              <ChevronsUpDown className="opacity-50" />
-            </Button>
+          <PopoverTrigger
+            role="combobox"
+            aria-expanded={open}
+            className={cn(
+              buttonVariants({ variant: 'outline' }),
+              'w-[180px] justify-between text-base font-semibold'
+            )}
+          >
+            {selectedCategoryId !== null
+              ? (categories.find((category) => category.id === selectedCategoryId)?.name ??
+                'Select category...')
+              : 'Select category...'}
+            <ChevronsUpDown className="opacity-50" />
           </PopoverTrigger>
           <PopoverContent className="w-[200px] p-0">
             <Command>
@@ -166,26 +196,26 @@ function LearnPage(props: Props) {
                   {categories.map((category) => (
                     <CommandItem
                       key={category.id}
-                      value={category.id.toString()}
-                      onSelect={(currentValue) => {
+                      value={category.name}
+                      keywords={[category.id.toString()]}
+                      data-checked={selectedCategoryId === category.id ? 'true' : undefined}
+                      className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
+                      onSelect={() => {
                         // reset lesson id when category is changed
                         setSelectedLessonId(null);
                         setSelectedCategoryId(
-                          Number(currentValue) === selectedCategoryId ? null : Number(currentValue)
+                          selectedCategoryId === category.id ? null : category.id
                         );
                         // saving cookies
                         saveLearnPageCookies('lesson_id', null);
-                        saveLearnPageCookies('category_id', Number(currentValue));
+                        saveLearnPageCookies(
+                          'category_id',
+                          selectedCategoryId === category.id ? null : category.id
+                        );
                         setOpen(false);
                       }}
                     >
                       {category.name}
-                      <Check
-                        className={cn(
-                          'ml-auto',
-                          selectedCategoryId === category.id ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -236,8 +266,9 @@ const LessonsList = (props: Props) => {
 
   const [lessonsTransliterated, setTransliteratedLessons] = useState<
     NonNullable<typeof lessons_q.data>
-  >(lessons_q.data ?? []);
+  >(props.init_lessons_list_transliterated ?? []);
   const transliterationVersion = useRef(0);
+
   useEffect(() => {
     if (!lessons_q.isSuccess) return;
     const data = lessons_q.data;
@@ -300,7 +331,7 @@ const LessonsList = (props: Props) => {
     }
   };
 
-  const carouselBasicClassName = 'basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6';
+  const carouselBasicClassName_akshara = 'basis-1/2 sm:basis-1/3 md:basis-1/4';
   return (
     <div>
       <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
@@ -312,13 +343,13 @@ const LessonsList = (props: Props) => {
           className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
         >
           <CarouselContent className="">
-            {lessons_q.isLoading && LOADING_SKELETONS.lessons(carouselBasicClassName)}
+            {lessons_q.isLoading && LOADING_SKELETONS.lessons(carouselBasicClassName_akshara)}
 
             {!lessons_q.isLoading &&
               lessons_q.isSuccess &&
               lessonsTransliterated.length > 0 &&
               lessonsTransliterated.map((lesson) => (
-                <CarouselItem key={lesson.id} className={carouselBasicClassName}>
+                <CarouselItem key={lesson.id} className={carouselBasicClassName_akshara}>
                   <Button
                     variant={selectedLessonId === lesson.id ? 'default' : 'outline'}
                     className={cn(
@@ -454,8 +485,8 @@ const Lesson = ({
   };
 
   const varnaAudioKey = lesson?.optional_audio?.s3_key;
-  const carouselBasicClassName =
-    'basis-1/3 pl-2 sm:basis-1/4 md:basis-1/5 md:pl-4 lg:basis-1/6 xl:basis-1/7';
+  const carouselBasicClassName_card =
+    'basis-1/3 pl-2 sm:basis-1/4 md:basis-1/5 md:pl-4 lg:basis-1/5';
 
   const PracticeNotFound = () => (
     <motion.div
@@ -517,7 +548,7 @@ const Lesson = ({
           className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
         >
           <CarouselContent className="-ml-2 md:-ml-4">
-            {lesson_info_q.isLoading && LOADING_SKELETONS.lesson_words(carouselBasicClassName)}
+            {lesson_info_q.isLoading && LOADING_SKELETONS.lesson_words(carouselBasicClassName_card)}
 
             {lesson &&
               lesson.words &&
@@ -526,7 +557,7 @@ const Lesson = ({
                 const imageKey = w.image?.s3_key;
                 const audioKey = w.audio?.s3_key;
                 return (
-                  <CarouselItem key={w.id} className={carouselBasicClassName}>
+                  <CarouselItem key={w.id} className={carouselBasicClassName_card}>
                     <div className="rounded-md border p-3 text-center shadow-sm">
                       <div className="mb-2 flex items-center justify-center gap-1">
                         <div className="text-base font-semibold">

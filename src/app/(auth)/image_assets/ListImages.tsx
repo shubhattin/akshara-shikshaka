@@ -39,6 +39,8 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
+import { cn } from '~/lib/utils';
+import { buttonVariants } from '~/components/ui/button';
 
 dayjs.extend(relativeTime);
 
@@ -54,6 +56,18 @@ export default function ListImages() {
   const [limit, setLimit] = useState<number>(DEFAULT_LIMIT);
   const [deleteImageId, setDeleteImageId] = useState<number | null>(null);
   const queryClient = useQueryClient();
+  const sortItems = [
+    { label: 'Created', value: 'created_at' },
+    { label: 'Updated', value: 'updated_at' }
+  ];
+  const orderItems = [
+    { label: 'Latest', value: 'desc' },
+    { label: 'Oldest', value: 'asc' }
+  ];
+  const pageSizeItems = [12, 24, 32, 48].map((sz) => ({
+    label: `${sz} / page`,
+    value: String(sz)
+  }));
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(searchText.trim()), 300);
@@ -115,6 +129,7 @@ export default function ListImages() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <Select
+              items={sortItems}
               value={sortBy}
               onValueChange={(val) => setSortBy(val as 'created_at' | 'updated_at')}
             >
@@ -129,7 +144,11 @@ export default function ListImages() {
           </div>
           <div className="flex items-center gap-2">
             <ArrowUpDown className="size-4 text-muted-foreground" />
-            <Select value={orderBy} onValueChange={(val) => setOrderBy(val as 'asc' | 'desc')}>
+            <Select
+              items={orderItems}
+              value={orderBy}
+              onValueChange={(val) => setOrderBy(val as 'asc' | 'desc')}
+            >
               <SelectTrigger className="w-36">
                 <SelectValue placeholder="Order" />
               </SelectTrigger>
@@ -140,7 +159,11 @@ export default function ListImages() {
             </Select>
           </div>
 
-          <Select value={String(limit)} onValueChange={(val) => setLimit(Number(val))}>
+          <Select
+            items={pageSizeItems}
+            value={String(limit)}
+            onValueChange={(val) => setLimit(Number(val))}
+          >
             <SelectTrigger className="w-32">
               <SelectValue placeholder="Page size" />
             </SelectTrigger>
@@ -188,22 +211,17 @@ export default function ListImages() {
                   </CardContent>
                 </Link>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2 h-8 w-8 p-0"
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
+                  <DropdownMenuTrigger
+                    className={cn(
+                      buttonVariants({ variant: 'ghost', size: 'sm' }),
+                      'absolute top-2 right-2 h-8 w-8 p-0'
+                    )}
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onSelect={(e) => e.preventDefault()}
-                      className="gap-2"
-                      onClick={() => setDeleteImageId(item.id)}
-                    >
+                    <DropdownMenuItem className="gap-2" onClick={() => setDeleteImageId(item.id)}>
                       <MdDeleteOutline className="mr-1 size-5 text-destructive" />
                       <span className="font-semibold">Delete Image</span>
                     </DropdownMenuItem>

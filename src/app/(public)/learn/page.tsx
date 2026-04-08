@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import LearnPage from './LearnPage';
-import { lang_list_obj } from '~/state/lang_list';
+import { get_script_from_id, lang_list_obj, script_list_obj } from '~/state/lang_list';
 import { CACHE } from '~/api/cache';
 import { parseLearnPageCookie, SAVED_COOKIES_KEY } from './learn_page_state';
 import { cookies } from 'next/headers';
 import { getMetadata } from '~/components/tags/getPageMetaTags';
+import { transliterate } from 'lipilekhika';
 
 export default async function page() {
   const lang_id = lang_list_obj['Sanskrit'];
@@ -33,6 +34,15 @@ export default async function page() {
       lesson_categories[0]?.id);
   const init_lessons_list = await CACHE.lessons.category_lesson_list.get({ category_id });
 
+  // await preloadNode();
+  const target_script = get_script_from_id(saved_script_id ?? script_list_obj['Devanagari']);
+  const init_lessons_list_transliterated = await Promise.all(
+    init_lessons_list.map(async (lesson) => ({
+      ...lesson,
+      text: await transliterate(lesson.text, 'Devanagari', target_script)
+    }))
+  );
+
   const lesson_id = !saved_lesson_id_
     ? (init_lessons_list[0]?.id ?? null)
     : (init_lessons_list.find((lesson) => lesson.id === saved_lesson_id_)?.id ??
@@ -46,6 +56,7 @@ export default async function page() {
         init_lang_id={lang_id}
         init_script_id={saved_script_id}
         init_lessons_list={init_lessons_list}
+        init_lessons_list_transliterated={init_lessons_list_transliterated}
         saved_category_id={category_id}
         saved_lesson_id={lesson_id}
       />

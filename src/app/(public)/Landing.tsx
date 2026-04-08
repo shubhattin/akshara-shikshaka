@@ -9,6 +9,8 @@ import { IoLanguage } from 'react-icons/io5';
 import { MdRecordVoiceOver, MdDraw } from 'react-icons/md';
 import { BsStars } from 'react-icons/bs';
 import { lazy, Suspense } from 'react';
+import { cn } from '~/lib/utils';
+import { buttonVariants } from '~/components/ui/button';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -33,16 +35,16 @@ const ManageMenuList = lazy(() => import('./ManageMenuList'));
 
 export default function Home() {
   const StartLearningButton = (
-    <Button
-      size="lg"
-      className="bg-linear-to-r from-amber-500 to-orange-500 text-lg font-semibold text-white shadow-lg hover:from-amber-600 hover:to-orange-600"
-      asChild
+    <Link
+      href="/learn"
+      className={cn(
+        buttonVariants({ size: 'lg' }),
+        'bg-linear-to-r from-amber-500 to-orange-500 text-lg font-semibold text-white shadow-lg hover:from-amber-600 hover:to-orange-600'
+      )}
     >
-      <Link href="/learn">
-        <FaBookOpen className="mr-2" />
-        Start Learning
-      </Link>
-    </Button>
+      <FaBookOpen className="mr-2" />
+      Start Learning
+    </Link>
   );
 
   return (
@@ -381,16 +383,16 @@ export default function Home() {
               learners
             </p>
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                size="lg"
-                className="bg-white text-lg font-semibold text-orange-600 shadow-xl hover:bg-slate-50"
-                asChild
+              <Link
+                href="/learn"
+                className={cn(
+                  buttonVariants({ size: 'lg' }),
+                  'bg-white text-lg font-semibold text-orange-600 shadow-xl hover:bg-slate-50'
+                )}
               >
-                <Link href="/learn">
-                  <FaBookOpen className="mr-2" />
-                  Get Started Now
-                </Link>
-              </Button>
+                <FaBookOpen className="mr-2" />
+                Get Started Now
+              </Link>
             </motion.div>
           </motion.div>
         </div>

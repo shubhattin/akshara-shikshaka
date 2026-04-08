@@ -53,6 +53,13 @@ import Link from 'next/link';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { TiTick } from 'react-icons/ti';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '~/components/ui/select';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
@@ -88,6 +95,26 @@ function LearnPage(props: Props) {
   const [selectedCategoryId, setSelectedCategoryId] = useAtom(selected_category_id_atom);
   const [open, setOpen] = useState(false);
   const [, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
+  const scriptItems = useMemo(
+    () => [
+      { label: 'Script', value: null },
+      ...FONT_SCRIPTS.map((script) => ({
+        label: script,
+        value: String(script_list_obj[script as script_list_type])
+      }))
+    ],
+    []
+  );
+  const langItems = useMemo(
+    () => [
+      { label: 'Language', value: null },
+      ...LANGUAGES_ADDED.map((lang) => ({
+        label: lang,
+        value: String(lang_list_obj[lang as lang_list_type])
+      }))
+    ],
+    []
+  );
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
       { lang_id: selectedLanguageId },
@@ -99,49 +126,49 @@ function LearnPage(props: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-center gap-2 space-x-12 text-sm">
-        <label>
-          <select
-            value={selectedScriptId}
-            onChange={(e) => {
-              setSelectedScriptId(Number(e.target.value));
-              saveLearnPageCookies('script_id', Number(e.target.value));
-            }}
-            className="flex w-32 rounded-md border border-input bg-transparent px-2 py-1 text-sm font-semibold shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-          >
+        <Select
+          items={scriptItems}
+          value={String(selectedScriptId)}
+          onValueChange={(val) => {
+            if (!val) return;
+            setSelectedScriptId(Number(val));
+            saveLearnPageCookies('script_id', Number(val));
+          }}
+        >
+          <SelectTrigger className="w-32 text-sm font-semibold">
+            <SelectValue placeholder="Script" />
+          </SelectTrigger>
+          <SelectContent>
             {FONT_SCRIPTS.map((script) => (
-              <option
-                key={script}
-                value={script_list_obj[script as script_list_type]}
-                className="bg-background text-foreground"
-              >
+              <SelectItem key={script} value={String(script_list_obj[script as script_list_type])}>
                 {script}
-              </option>
+              </SelectItem>
             ))}
-          </select>
-        </label>
-        <label>
-          <select
-            value={selectedLanguageId}
-            onChange={(e) => {
-              setSelectedLanguageId(Number(e.target.value));
-              setSelectedCategoryId(null);
-              setSelectedLessonId(null);
-              saveLearnPageCookies('category_id', null);
-              saveLearnPageCookies('lesson_id', null);
-            }}
-            className="flex w-28 rounded-md border border-input bg-transparent px-2 py-1 text-sm font-semibold shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          </SelectContent>
+        </Select>
+        <Select
+          items={langItems}
+          value={String(selectedLanguageId)}
+          onValueChange={(val) => {
+            if (!val) return;
+            setSelectedLanguageId(Number(val));
+            setSelectedCategoryId(null);
+            setSelectedLessonId(null);
+            saveLearnPageCookies('category_id', null);
+            saveLearnPageCookies('lesson_id', null);
+          }}
+        >
+          <SelectTrigger className="w-28 text-sm font-semibold">
+            <SelectValue placeholder="Language" />
+          </SelectTrigger>
+          <SelectContent>
             {LANGUAGES_ADDED.map((lang) => (
-              <option
-                key={lang}
-                value={lang_list_obj[lang as lang_list_type]}
-                className="bg-background text-foreground"
-              >
+              <SelectItem key={lang} value={String(lang_list_obj[lang as lang_list_type])}>
                 {lang}
-              </option>
+              </SelectItem>
             ))}
-          </select>
-        </label>
+          </SelectContent>
+        </Select>
       </div>
       <div className="flex flex-wrap items-center justify-center">
         <Popover open={open} onOpenChange={setOpen}>

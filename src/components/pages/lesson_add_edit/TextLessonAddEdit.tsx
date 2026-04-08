@@ -87,6 +87,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { AiOutlineAudio } from 'react-icons/ai';
 import Link from 'next/link';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '~/components/ui/select';
 
 type gestures_list_type = {
   id: number;
@@ -159,29 +166,46 @@ const LessonInfo = (props: Props) => {
     ctx.ready;
   }, [ctx]);
 
+  const langItems = [
+    { label: 'Language', value: null },
+    ...LANG_LIST.map((lang) => ({
+      label: lang,
+      value: String(lang_list_obj[lang as lang_list_type])
+    }))
+  ];
+  const scriptItems = [
+    { label: 'Base Word Script', value: null },
+    ...FONT_SCRIPTS.map((script) => ({
+      label: script,
+      value: String(script_list_obj[script as script_list_type])
+    }))
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-8">
         <Label className="flex items-center gap-2">
           <span className="font-semibold">Language</span>
           {props.location === 'add' && (
-            <select
-              value={lang_id}
-              onChange={(e) => setLangId(Number(e.target.value))}
-              className={cn(
-                'w-32 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm transition-colors',
-                'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-                'text-foreground',
-                'dark:border-border dark:bg-background dark:text-foreground'
-              )}
+            <Select
+              items={langItems}
+              value={String(lang_id)}
+              onValueChange={(val) => {
+                if (!val) return;
+                setLangId(Number(val));
+              }}
             >
-              {LANG_LIST.map((lang) => (
-                <option key={lang} value={lang_list_obj[lang as lang_list_type]}>
-                  {lang}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-32 text-sm">
+                <SelectValue placeholder="Language" />
+              </SelectTrigger>
+              <SelectContent>
+                {LANG_LIST.map((lang) => (
+                  <SelectItem key={lang} value={String(lang_list_obj[lang as lang_list_type])}>
+                    {lang}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           {props.location === 'edit' && (
             <span className="font-bold underline">{get_lang_from_id(lang_id)}</span>
@@ -196,23 +220,28 @@ const LessonInfo = (props: Props) => {
         <Label className="flex items-center gap-2">
           <span className="font-semibold">Base Word Script</span>
           {props.location === 'add' && (
-            <select
-              value={base_word_script_id}
-              onChange={(e) => setBaseWordScriptId(Number(e.target.value))}
-              className={cn(
-                'w-32 rounded-md border border-input bg-background px-2 py-1 text-sm shadow-sm transition-colors',
-                'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-50',
-                'text-foreground',
-                'dark:border-border dark:bg-background dark:text-foreground'
-              )}
+            <Select
+              items={scriptItems}
+              value={String(base_word_script_id)}
+              onValueChange={(val) => {
+                if (!val) return;
+                setBaseWordScriptId(Number(val));
+              }}
             >
-              {FONT_SCRIPTS.map((script) => (
-                <option key={script} value={script_list_obj[script as script_list_type]}>
-                  {script}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-32 text-sm">
+                <SelectValue placeholder="Base Word Script" />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_SCRIPTS.map((script) => (
+                  <SelectItem
+                    key={script}
+                    value={String(script_list_obj[script as script_list_type])}
+                  >
+                    {script}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           {props.location === 'edit' && (
             <span className="font-bold underline">{get_script_from_id(base_word_script_id)}</span>

@@ -78,6 +78,7 @@ import { atomWithStorage, useHydrateAtoms } from 'jotai/utils';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import { toast } from 'sonner';
 import { LANGUAGES_ADDED } from '~/state/font_list';
+import { buttonVariants } from '~/components/ui/button';
 
 type Props = {
   init_lang_id: number;
@@ -136,6 +137,7 @@ function ListLessons({ init_lesson_categories }: Props) {
         <Select
           value={langId?.toString()}
           onValueChange={(val) => {
+            if (!val) return;
             setLangId(Number(val));
             setSelectedCategoryID(0);
             Cookie.set(LESSON_LANG_ID_COOKIE_KEY, val, { expires: 30 });
@@ -155,19 +157,16 @@ function ListLessons({ init_lesson_categories }: Props) {
       </div>
       <div className="flex items-center justify-center space-x-4">
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="w-[200px] justify-between"
-            >
-              {selectedCategoryID !== null
-                ? categories.find((category) => category.id === selectedCategoryID)?.name ||
-                  (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
-                : 'Select category...'}
-              <ChevronsUpDown className="opacity-50" />
-            </Button>
+          <PopoverTrigger
+            role="combobox"
+            aria-expanded={open}
+            className={cn(buttonVariants({ variant: 'outline' }), 'w-[200px] justify-between')}
+          >
+            {selectedCategoryID !== null
+              ? categories.find((category) => category.id === selectedCategoryID)?.name ||
+                (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
+              : 'Select category...'}
+            <ChevronsUpDown className="opacity-50" />
           </PopoverTrigger>
           <PopoverContent className="w-[200px] p-0">
             <Command>
@@ -181,7 +180,9 @@ function ListLessons({ init_lesson_categories }: Props) {
                       value={category.id.toString()}
                       onSelect={(currentValue) => {
                         setSelectedCategoryID(
-                          Number(currentValue) === selectedCategoryID ? null : Number(currentValue)
+                          currentValue && Number(currentValue) === selectedCategoryID
+                            ? null
+                            : Number(currentValue)
                         );
                         setOpen(false);
                       }}
@@ -731,7 +732,7 @@ function CategorizedLessonsList({
 
   return (
     <div className="space-y-6">
-      <Accordion type="single" collapsible defaultValue="unordered">
+      <Accordion defaultValue={['unordered']}>
         <AccordionItem value="unordered">
           <AccordionTrigger className="text-base font-semibold">Unordered</AccordionTrigger>
           <AccordionContent>

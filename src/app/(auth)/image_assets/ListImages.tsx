@@ -39,6 +39,8 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
+import { cn } from '~/lib/utils';
+import { buttonVariants } from '~/components/ui/button';
 
 dayjs.extend(relativeTime);
 
@@ -188,19 +190,17 @@ export default function ListImages() {
                   </CardContent>
                 </Link>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2 h-8 w-8 p-0"
-                      onClick={(e) => e.preventDefault()}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
+                  <DropdownMenuTrigger
+                    className={cn(
+                      buttonVariants({ variant: 'ghost', size: 'sm' }),
+                      'absolute top-2 right-2 h-8 w-8 p-0'
+                    )}
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
-                      onSelect={(e) => e.preventDefault()}
                       className="gap-2"
                       onClick={() => setDeleteImageId(item.id)}
                     >

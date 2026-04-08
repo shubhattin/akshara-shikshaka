@@ -20,8 +20,8 @@ import {
   AlertDialogTitle,
   AlertDialogAction
 } from '~/components/ui/alert-dialog';
-import { VisuallyHidden } from 'radix-ui';
 import { Button } from '~/components/ui/button';
+import { buttonVariants } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Skeleton } from '~/components/ui/skeleton';
@@ -343,11 +343,9 @@ const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) =>
         text.trim().length > 0 &&
         (!lesson_id || !get_text_lesson_optional_audio_data_q.isLoading) && (
           <Dialog open={audioDialogOpen} onOpenChange={setAudioDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <AiOutlineAudio className="size-6 text-emerald-400" />
-                Add Audio
-              </Button>
+            <DialogTrigger className={cn(buttonVariants({ variant: 'outline' }), 'gap-2')}>
+              <AiOutlineAudio className="size-6 text-emerald-400" />
+              Add Audio
             </DialogTrigger>
             <DialogContent className="h-[70vh] w-full overflow-y-scroll px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
               <DialogHeader className="sr-only">
@@ -643,10 +641,8 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
           wordItem.word.trim().length > 0 &&
           !get_text_lesson_word_media_data_q.isLoading && (
             <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <RiImageAddLine className="size-6 text-sky-500 dark:text-sky-400" /> Add Image
-                </Button>
+              <DialogTrigger className={cn(buttonVariants({ variant: 'outline' }), 'gap-2')}>
+                <RiImageAddLine className="size-6 text-sky-500 dark:text-sky-400" /> Add Image
               </DialogTrigger>
               <DialogContent className="h-[70vh] w-full overflow-y-scroll px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
                 <DialogHeader className="sr-only">
@@ -678,9 +674,9 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
             <Dialog open={imageViewDialogOpen} onOpenChange={setImageViewDialogOpen}>
               {/* <DialogTrigger asChild className="cursor-pointer"></DialogTrigger> */}
               <DialogContent className="flex items-center justify-center px-8 py-6">
-                <VisuallyHidden.Root>
+                <div className="sr-only">
                   <DialogTitle>View Image</DialogTitle>
-                </VisuallyHidden.Root>
+                </div>
                 <div className="flex flex-col items-center justify-center space-y-4">
                   <span className="text-sm font-semibold text-muted-foreground">
                     {image_asset.description}
@@ -706,11 +702,9 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
           wordItem.word.trim().length > 0 &&
           !get_text_lesson_word_media_data_q.isLoading && (
             <Dialog open={audioDialogOpen} onOpenChange={setAudioDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <AiOutlineAudio className="size-6 text-emerald-400" />
-                  Add Audio
-                </Button>
+              <DialogTrigger className={cn(buttonVariants({ variant: 'outline' }), 'gap-2')}>
+                <AiOutlineAudio className="size-6 text-emerald-400" />
+                Add Audio
               </DialogTrigger>
               <DialogContent className="h-[70vh] w-full overflow-y-scroll px-3 py-2 outline-hidden sm:max-w-4xl lg:max-w-6xl">
                 <DialogHeader className="sr-only">
@@ -880,12 +874,13 @@ const AddEditSave = (props: Props) => {
   return (
     <div className="mt-2 flex items-center justify-between">
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button
-            disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
-            className="flex text-lg"
-            variant={'blue'}
-          >
+        <AlertDialogTrigger
+          disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
+          className={cn(
+            buttonVariants({ variant: 'default' }),
+            'flex text-lg bg-blue-600 hover:bg-blue-500'
+          )}
+        >
             {props.location === 'add' ? (
               <>
                 <IoMdAdd className="text-lg" />{' '}
@@ -897,7 +892,6 @@ const AddEditSave = (props: Props) => {
                 {!update_text_data_mut.isPending ? 'Save Lesson Info' : 'Saving...'}
               </>
             )}
-          </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -917,11 +911,14 @@ const AddEditSave = (props: Props) => {
 
       {props.location !== 'add' && (
         <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button className="flex gap-1 px-1 py-0 text-sm" variant="destructive">
-              <MdDeleteOutline className="text-base" />
-              Delete Text Lesson
-            </Button>
+          <AlertDialogTrigger
+            className={cn(
+              buttonVariants({ variant: 'destructive' }),
+              'flex gap-1 px-1 py-0 text-sm'
+            )}
+          >
+            <MdDeleteOutline className="text-base" />
+            Delete Text Lesson
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>

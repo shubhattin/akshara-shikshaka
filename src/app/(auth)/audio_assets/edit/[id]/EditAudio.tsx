@@ -33,6 +33,8 @@ import { Skeleton } from '~/components/ui/skeleton';
 import { MdDeleteOutline, MdPlayArrow, MdStop, MdEdit } from 'react-icons/md';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { LANG_LIST, lang_list_obj, type lang_list_type, get_lang_from_id } from '~/state/lang_list';
+import { cn } from '~/lib/utils';
+import { buttonVariants } from '~/components/ui/button';
 
 type Props = {
   audio_data: {
@@ -247,7 +249,7 @@ const AudioInfo = () => {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-medium">Language</Label>
-                  <Select value={langId} onValueChange={(v) => setLangId(v)}>
+                  <Select value={langId} onValueChange={(v) => setLangId(v ?? 'all')}>
                     <SelectTrigger className="w-40">
                       <SelectValue placeholder="All" />
                     </SelectTrigger>
@@ -376,11 +378,12 @@ const EditActions = () => {
     <div className="flex justify-between">
       <div></div>
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="destructive" disabled={delete_audio_mut.isPending}>
-            <MdDeleteOutline className="mr-1 h-4 w-4" />
-            {delete_audio_mut.isPending ? 'Deleting...' : 'Delete Audio'}
-          </Button>
+        <AlertDialogTrigger
+          disabled={delete_audio_mut.isPending}
+          className={cn(buttonVariants({ variant: 'destructive' }))}
+        >
+          <MdDeleteOutline className="mr-1 h-4 w-4" />
+          {delete_audio_mut.isPending ? 'Deleting...' : 'Delete Audio'}
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>

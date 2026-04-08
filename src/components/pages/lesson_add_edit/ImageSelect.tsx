@@ -396,9 +396,10 @@ const ImageCreation = ({ wordItem }: Props) => {
             </div>
             <div className="flex items-center justify-center space-x-4">
               <Button
-                variant={'blue'}
+                variant="default"
                 onClick={handleDeleteAndRemake}
                 disabled={delete_image_mut.isPending || !create_image_mut.data?.success}
+                className="bg-blue-600 hover:bg-blue-500"
               >
                 Delete and Make Image
               </Button>

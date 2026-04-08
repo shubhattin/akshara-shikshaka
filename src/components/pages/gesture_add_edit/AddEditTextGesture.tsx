@@ -101,6 +101,7 @@ import { FONT_FAMILY_COOKIE_KEY, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
 import { Provider as JotaiProvider } from 'jotai';
 
 import { useMutation } from '@tanstack/react-query';
+import { buttonVariants } from '~/components/ui/button';
 
 // Dynamic import for KonvaCanvas to avoid SSR issues
 const KonvaCanvas = dynamic(() => import('./AddEditGestureCanvas'), {
@@ -810,7 +811,9 @@ const SelectedGestureControls = ({
             onValueChange={(value) =>
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
-                  gesture.index === selectedGestureIndex ? { ...gesture, width: value[0] } : gesture
+                  gesture.index === selectedGestureIndex
+                    ? { ...gesture, width: Array.isArray(value) ? value[0] : value }
+                    : gesture
                 )
               )
             }
@@ -831,7 +834,7 @@ const SelectedGestureControls = ({
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
                   gesture.index === selectedGestureIndex
-                    ? { ...gesture, duration: value[0] }
+                    ? { ...gesture, duration: Array.isArray(value) ? value[0] : value }
                     : gesture
                 )
               )
@@ -1184,12 +1187,13 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   return (
     <div className="mx-2 mt-2 flex items-center justify-between sm:mx-4">
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button
-            disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
-            className="flex text-lg"
-            variant={'blue'}
-          >
+        <AlertDialogTrigger
+          disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
+          className={cn(
+            buttonVariants({ variant: 'default' }),
+            'flex text-lg bg-blue-600 hover:bg-blue-500'
+          )}
+        >
             {is_addition ? (
               <>
                 <IoMdAdd className="text-lg" /> {!add_text_data_mut.isPending ? 'Add' : 'Adding...'}
@@ -1200,7 +1204,6 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
                 {!update_text_data_mut.isPending ? 'Save' : 'Saving...'}
               </>
             )}
-          </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1218,11 +1221,11 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
 
       {!is_addition && (
         <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button className="flex gap-1 px-1 py-0 text-sm" variant="destructive">
-              <MdDeleteOutline className="text-base" />
-              Delete
-            </Button>
+          <AlertDialogTrigger
+            className={cn(buttonVariants({ variant: 'destructive' }), 'flex gap-1 px-1 py-0 text-sm')}
+          >
+            <MdDeleteOutline className="text-base" />
+            Delete
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>

@@ -7,6 +7,8 @@ import AddEditTextDataWrapper, {
   type text_data_type
 } from '~/components/pages/gesture_add_edit/AddEditTextGesture';
 import { Button } from '~/components/ui/button';
+import { cn } from '~/lib/utils';
+import { buttonVariants } from '~/components/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,11 +36,14 @@ export default function GestureEditClient({
           Text Gesture List
         </Link>
         <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline" className="flex items-center gap-1 text-sm font-semibold">
-              <IoMdAdd className="inline-block size-5 text-yellow-400" />
-              <span className="text-amber-400">Add A New Text Gesture</span>
-            </Button>
+          <AlertDialogTrigger
+            className={cn(
+              buttonVariants({ variant: 'outline' }),
+              'flex items-center gap-1 text-sm font-semibold'
+            )}
+          >
+            <IoMdAdd className="inline-block size-5 text-yellow-400" />
+            <span className="text-amber-400">Add A New Text Gesture</span>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>

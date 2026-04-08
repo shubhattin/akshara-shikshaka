@@ -29,6 +29,8 @@ import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useMutation } from '@tanstack/react-query';
+import { cn } from '~/lib/utils';
+import { buttonVariants } from '~/components/ui/button';
 
 // Atom for image data
 const image_data_atom = atom<{
@@ -315,11 +317,12 @@ const EditActions = ({ words }: { words: Props['image_data']['words'] }) => {
     <div className="flex justify-between">
       <div></div>
       <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="destructive" disabled={delete_image_mut.isPending}>
-            <MdDeleteOutline className="mr-1 h-4 w-4" />
-            {delete_image_mut.isPending ? 'Deleting...' : 'Delete Image'}
-          </Button>
+        <AlertDialogTrigger
+          disabled={delete_image_mut.isPending}
+          className={cn(buttonVariants({ variant: 'destructive' }))}
+        >
+          <MdDeleteOutline className="mr-1 h-4 w-4" />
+          {delete_image_mut.isPending ? 'Deleting...' : 'Delete Image'}
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>

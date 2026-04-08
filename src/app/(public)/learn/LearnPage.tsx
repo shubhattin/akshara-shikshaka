@@ -22,6 +22,7 @@ import { useTRPC } from '~/api/client';
 import { useState, useEffect, useRef, useMemo, useContext } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
 import { Button } from '~/components/ui/button';
+import { buttonVariants } from '~/components/ui/button';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import {
   Command,
@@ -144,18 +145,18 @@ function LearnPage(props: Props) {
       </div>
       <div className="flex flex-wrap items-center justify-center">
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="w-[180px] justify-between text-base font-semibold"
-            >
-              {selectedCategoryId !== null &&
-                (categories.find((category) => category.id === selectedCategoryId)?.name ??
-                  'Select category...')}
-              <ChevronsUpDown className="opacity-50" />
-            </Button>
+          <PopoverTrigger
+            role="combobox"
+            aria-expanded={open}
+            className={cn(
+              buttonVariants({ variant: 'outline' }),
+              'w-[180px] justify-between text-base font-semibold'
+            )}
+          >
+            {selectedCategoryId !== null &&
+              (categories.find((category) => category.id === selectedCategoryId)?.name ??
+                'Select category...')}
+            <ChevronsUpDown className="opacity-50" />
           </PopoverTrigger>
           <PopoverContent className="w-[200px] p-0">
             <Command>

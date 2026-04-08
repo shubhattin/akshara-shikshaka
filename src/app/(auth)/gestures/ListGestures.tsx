@@ -86,6 +86,7 @@ import { toast } from 'sonner';
 import { TiEdit } from 'react-icons/ti';
 import { atomWithStorage } from 'jotai/utils';
 import { cn } from '~/lib/utils';
+import { buttonVariants } from '~/components/ui/button';
 
 type Props = {
   init_script_id: number;
@@ -139,6 +140,7 @@ function ListGestures({ init_gesture_categories }: Props) {
         <Select
           value={scriptId?.toString()}
           onValueChange={(val) => {
+            if (!val) return;
             setScriptId(Number(val));
             Cookie.set(SCRIPT_ID_COOKIE_KEY, val, { expires: 30 });
           }}
@@ -157,19 +159,16 @@ function ListGestures({ init_gesture_categories }: Props) {
       </div>
       <div className="flex items-center justify-center space-x-4">
         <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="w-[200px] justify-between"
-            >
-              {selectedCategoryID !== null
-                ? categories.find((category) => category.id === selectedCategoryID)?.name ||
-                  (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
-                : 'Select category...'}
-              <ChevronsUpDown className="opacity-50" />
-            </Button>
+          <PopoverTrigger
+            role="combobox"
+            aria-expanded={open}
+            className={cn(buttonVariants({ variant: 'outline' }), 'w-[200px] justify-between')}
+          >
+            {selectedCategoryID !== null
+              ? categories.find((category) => category.id === selectedCategoryID)?.name ||
+                (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
+              : 'Select category...'}
+            <ChevronsUpDown className="opacity-50" />
           </PopoverTrigger>
           <PopoverContent className="w-[200px] p-0">
             <Command>
@@ -183,7 +182,9 @@ function ListGestures({ init_gesture_categories }: Props) {
                       value={category.id.toString()}
                       onSelect={(currentValue) => {
                         setSelectedCategoryID(
-                          Number(currentValue) === selectedCategoryID ? null : Number(currentValue)
+                          currentValue && Number(currentValue) === selectedCategoryID
+                            ? null
+                            : Number(currentValue)
                         );
                         setOpen(false);
                       }}
@@ -730,7 +731,7 @@ function CategorizedGesturesList({
 
   return (
     <div className="space-y-6">
-      <Accordion type="single" collapsible defaultValue="unordered">
+      <Accordion defaultValue={['unordered']}>
         <AccordionItem value="unordered">
           <AccordionTrigger className="text-base font-semibold">Unordered</AccordionTrigger>
           <AccordionContent>

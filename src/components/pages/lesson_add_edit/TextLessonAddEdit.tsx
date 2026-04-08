@@ -25,6 +25,7 @@ import { buttonVariants } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Skeleton } from '~/components/ui/skeleton';
+import { custom_classes } from '~/components/custom_ui';
 import { cn } from '~/lib/utils';
 import {
   DndContext,
@@ -907,20 +908,21 @@ const AddEditSave = (props: Props) => {
           disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
           className={cn(
             buttonVariants({ variant: 'default' }),
-            'flex text-lg bg-blue-600 hover:bg-blue-500'
+            custom_classes.button.blue,
+            'flex text-lg'
           )}
         >
-            {props.location === 'add' ? (
-              <>
-                <IoMdAdd className="text-lg" />{' '}
-                {!add_text_data_mut.isPending ? 'Add Lesson Info' : 'Adding...'}
-              </>
-            ) : (
-              <>
-                <FiSave className="text-lg" />{' '}
-                {!update_text_data_mut.isPending ? 'Save Lesson Info' : 'Saving...'}
-              </>
-            )}
+          {props.location === 'add' ? (
+            <>
+              <IoMdAdd className="text-lg" />{' '}
+              {!add_text_data_mut.isPending ? 'Add Lesson Info' : 'Adding...'}
+            </>
+          ) : (
+            <>
+              <FiSave className="text-lg" />{' '}
+              {!update_text_data_mut.isPending ? 'Save Lesson Info' : 'Saving...'}
+            </>
+          )}
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>

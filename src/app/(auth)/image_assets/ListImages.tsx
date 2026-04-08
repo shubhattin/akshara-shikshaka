@@ -64,7 +64,10 @@ export default function ListImages() {
     { label: 'Latest', value: 'desc' },
     { label: 'Oldest', value: 'asc' }
   ];
-  const pageSizeItems = [12, 24, 32, 48].map((sz) => ({ label: `${sz} / page`, value: String(sz) }));
+  const pageSizeItems = [12, 24, 32, 48].map((sz) => ({
+    label: `${sz} / page`,
+    value: String(sz)
+  }));
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(searchText.trim()), 300);
@@ -218,10 +221,7 @@ export default function ListImages() {
                     <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      className="gap-2"
-                      onClick={() => setDeleteImageId(item.id)}
-                    >
+                    <DropdownMenuItem className="gap-2" onClick={() => setDeleteImageId(item.id)}>
                       <MdDeleteOutline className="mr-1 size-5 text-destructive" />
                       <span className="font-semibold">Delete Image</span>
                     </DropdownMenuItem>

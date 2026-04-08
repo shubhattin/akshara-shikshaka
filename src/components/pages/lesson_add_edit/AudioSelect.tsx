@@ -431,7 +431,11 @@ const AudioCreation = ({ text }: Props) => {
         </div>
         <div className="flex items-center gap-2">
           <Label className="text-sm font-semibold">Voice</Label>
-          <Select items={voiceItems} value={voice} onValueChange={(v) => setVoice(v as voice_types)}>
+          <Select
+            items={voiceItems}
+            value={voice}
+            onValueChange={(v) => setVoice(v as voice_types)}
+          >
             <SelectTrigger size="sm" className="w-28">
               <SelectValue placeholder={DEFAULT_VOICE} />
             </SelectTrigger>

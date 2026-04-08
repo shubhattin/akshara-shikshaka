@@ -256,7 +256,11 @@ const AudioInfo = () => {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-medium">Language</Label>
-                  <Select items={langItems} value={langId} onValueChange={(v) => setLangId(v ?? 'all')}>
+                  <Select
+                    items={langItems}
+                    value={langId}
+                    onValueChange={(v) => setLangId(v ?? 'all')}
+                  >
                     <SelectTrigger className="w-40">
                       <SelectValue placeholder="All" />
                     </SelectTrigger>

@@ -38,6 +38,7 @@ import {
   MdReplay
 } from 'react-icons/md';
 import { toast } from 'sonner';
+import { custom_classes } from '~/components/custom_ui';
 import { cn } from '~/lib/utils';
 import {
   DndContext,
@@ -442,9 +443,13 @@ function AddEditTextData({
               onValueChange={(v) => {
                 if (!v) return;
                 setScript(v as script_list_type);
-                Cookie.set(SCRIPT_ID_COOKIE_KEY, script_list_obj[v as script_list_type].toString(), {
-                  expires: 30
-                });
+                Cookie.set(
+                  SCRIPT_ID_COOKIE_KEY,
+                  script_list_obj[v as script_list_type].toString(),
+                  {
+                    expires: 30
+                  }
+                );
               }}
             >
               <SelectTrigger className="w-32 text-sm">
@@ -1186,19 +1191,20 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
           disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
           className={cn(
             buttonVariants({ variant: 'default' }),
-            'flex text-lg bg-blue-600 hover:bg-blue-500'
+            custom_classes.button.blue,
+            'flex text-lg'
           )}
         >
-            {is_addition ? (
-              <>
-                <IoMdAdd className="text-lg" /> {!add_text_data_mut.isPending ? 'Add' : 'Adding...'}
-              </>
-            ) : (
-              <>
-                <FiSave className="text-lg" />{' '}
-                {!update_text_data_mut.isPending ? 'Save' : 'Saving...'}
-              </>
-            )}
+          {is_addition ? (
+            <>
+              <IoMdAdd className="text-lg" /> {!add_text_data_mut.isPending ? 'Add' : 'Adding...'}
+            </>
+          ) : (
+            <>
+              <FiSave className="text-lg" />{' '}
+              {!update_text_data_mut.isPending ? 'Save' : 'Saving...'}
+            </>
+          )}
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1217,7 +1223,10 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
       {!is_addition && (
         <AlertDialog>
           <AlertDialogTrigger
-            className={cn(buttonVariants({ variant: 'destructive' }), 'flex gap-1 px-1 py-0 text-sm')}
+            className={cn(
+              buttonVariants({ variant: 'destructive' }),
+              'flex gap-1 px-1 py-0 text-sm'
+            )}
           >
             <MdDeleteOutline className="text-base" />
             Delete

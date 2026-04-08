@@ -266,10 +266,7 @@ export default function ListAudio() {
                   <span className="text-sm">⋮</span>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    className="gap-2"
-                    onClick={() => setDeleteAudioId(item.id)}
-                  >
+                  <DropdownMenuItem className="gap-2" onClick={() => setDeleteAudioId(item.id)}>
                     <MdDeleteOutline className="mr-1 size-4 text-destructive" />
                     <span className="font-semibold">Delete Audio</span>
                   </DropdownMenuItem>

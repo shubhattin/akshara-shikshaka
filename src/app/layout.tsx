@@ -10,6 +10,10 @@ import { AppContextProvider } from '~/components/AppDataContext';
 import { robotoSans } from '~/components/fonts';
 import AppBar from '~/components/app-bar/AppBar';
 import PosthogInit from '~/components/tags/PosthogInit';
+import { Geist } from "next/font/google";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+
 
 export default async function RootLayout({
   children
@@ -19,7 +23,7 @@ export default async function RootLayout({
   const session = await getCachedSession();
 
   return (
-    <html lang="en" suppressHydrationWarning className="dark" style={{ colorScheme: 'dark' }}>
+    <html lang="en" suppressHydrationWarning className={cn("dark", "font-sans", geist.variable)} style={{ colorScheme: 'dark' }}>
       <body
         className={cn(
           robotoSans.className,

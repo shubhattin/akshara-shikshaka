@@ -55,7 +55,7 @@
         "qrcode": "^1.5.4",
         "react": "^19.2.4",
         "react-day-picker": "^9.14.0",
-        "react-dom": "19.2.0",
+        "react-dom": "^19.2.0",
         "react-icons": "^5.6.0",
         "react-konva": "^19.2.3",
         "react-turnstile": "^1.1.5",
@@ -540,7 +540,7 @@
 
     "@posthog/core": ["@posthog/core@1.25.1", "", {}, "sha512-76enEGwLVtcCTbfAr1wJ6zi4tYzVkGsqJx+H9JiX0K8/VxuKdbOtVShsOJhTD9uvFfTeW3DX+PSCelcqWrRRkw=="],
 
-    "@posthog/types": ["@posthog/types@1.365.3", "", {}, "sha512-dI5EpyEcL58LAsZ6tzpJbRjRaS12ZlWDFwoDLc+BoUP0ROjQTAJGsdB9GPuaD79Pns0hybl6Z5cIdPZQ9xpRmg=="],
+    "@posthog/types": ["@posthog/types@1.365.4", "", {}, "sha512-59ImmdPc+EG0ik6p1XSdqi+ivHZOMR/B0E4054h92mikKA09wn7CCNqM/ieKrSlGgX3nU0g/LlTBsZghYxGUWg=="],
 
     "@protobufjs/aspromise": ["@protobufjs/aspromise@1.1.2", "", {}, "sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ=="],
 
@@ -1610,7 +1610,7 @@
 
     "postgres-interval": ["postgres-interval@1.2.0", "", { "dependencies": { "xtend": "4.0.2" } }, "sha512-9ZhXKM/rw350N1ovuWHbGxnGh/SNJ4cnxHiM0rxE4VN41wsg8P8zWn9hv/buK00RP4WvlOyr/RBDiptyxVbkZQ=="],
 
-    "posthog-js": ["posthog-js@1.365.3", "", { "dependencies": { "@opentelemetry/api": "^1.9.0", "@opentelemetry/api-logs": "^0.208.0", "@opentelemetry/exporter-logs-otlp-http": "^0.208.0", "@opentelemetry/resources": "^2.2.0", "@opentelemetry/sdk-logs": "^0.208.0", "@posthog/core": "1.25.1", "@posthog/types": "1.365.3", "core-js": "^3.38.1", "dompurify": "^3.3.2", "fflate": "^0.4.8", "preact": "^10.28.2", "query-selector-shadow-dom": "^1.0.1", "web-vitals": "^5.1.0" } }, "sha512-cBYaGX40RcWAKWt+IkHalTuk83QIT/oHaARyF34bUGdL37odJPAr/RZ3DVvC83h1V7lHiPPTkc9kOnlI8gjkNA=="],
+    "posthog-js": ["posthog-js@1.365.4", "", { "dependencies": { "@opentelemetry/api": "^1.9.0", "@opentelemetry/api-logs": "^0.208.0", "@opentelemetry/exporter-logs-otlp-http": "^0.208.0", "@opentelemetry/resources": "^2.2.0", "@opentelemetry/sdk-logs": "^0.208.0", "@posthog/core": "1.25.1", "@posthog/types": "1.365.4", "core-js": "^3.38.1", "dompurify": "^3.3.2", "fflate": "^0.4.8", "preact": "^10.28.2", "query-selector-shadow-dom": "^1.0.1", "web-vitals": "^5.1.0" } }, "sha512-PO0iPpRz9z/3k41Rrb/SPW4lX60P3hfYINGI+BaK2V8gP/JOPXSjwDt/6nsAhEvKhR0PtpmUNut4WilS8REvzQ=="],
 
     "powershell-utils": ["powershell-utils@0.1.0", "", {}, "sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A=="],
 
@@ -1650,7 +1650,7 @@
 
     "react-day-picker": ["react-day-picker@9.14.0", "", { "dependencies": { "@date-fns/tz": "1.4.1", "@tabby_ai/hijri-converter": "1.0.5", "date-fns": "4.1.0", "date-fns-jalali": "4.1.0-0" }, "peerDependencies": { "react": "19.2.4" } }, "sha512-tBaoDWjPwe0M5pGrum4H0SR6Lyk+BO9oHnp9JbKpGKW2mlraNPgP9BMfsg5pWpwrssARmeqk7YBl2oXutZTaHA=="],
 
-    "react-dom": ["react-dom@19.2.0", "", { "dependencies": { "scheduler": "0.27.0" }, "peerDependencies": { "react": "19.2.4" } }, "sha512-UlbRu4cAiGaIewkPyiRGJk0imDN2T3JjieT6spoL2UeSf5od4n5LB/mQ4ejmxhCFT1tYe8IvaFulzynWovsEFQ=="],
+    "react-dom": ["react-dom@19.2.4", "", { "dependencies": { "scheduler": "^0.27.0" }, "peerDependencies": { "react": "^19.2.4" } }, "sha512-AXJdLo8kgMbimY95O2aKQqsz2iWi9jMgKJhRBAxECE4IFxfcazB2LmzloIoibJI3C12IlY20+KFaLv+71bUJeQ=="],
 
     "react-icons": ["react-icons@5.6.0", "", { "peerDependencies": { "react": "19.2.4" } }, "sha512-RH93p5ki6LfOiIt0UtDyNg/cee+HLVR6cHHtW3wALfo+eOHTp8RnU2kRkI6E+H19zMIs03DyxUG/GfZMOGvmiA=="],
 
@@ -2155,6 +2155,8 @@
     "express/cookie": ["cookie@0.7.2", "", {}, "sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w=="],
 
     "form-data/mime-types": ["mime-types@2.1.35", "", { "dependencies": { "mime-db": "1.52.0" } }, "sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw=="],
+
+    "framer-motion/react-dom": ["react-dom@19.2.0", "", { "dependencies": { "scheduler": "0.27.0" }, "peerDependencies": { "react": "19.2.4" } }, "sha512-UlbRu4cAiGaIewkPyiRGJk0imDN2T3JjieT6spoL2UeSf5od4n5LB/mQ4ejmxhCFT1tYe8IvaFulzynWovsEFQ=="],
 
     "fs-minipass/minipass": ["minipass@3.3.6", "", { "dependencies": { "yallist": "4.0.0" } }, "sha512-DxiNidxSEK+tHG6zOIklvNOwm3hvCrbUrdtzY74U6HKTJxvIDfOUL5W5P2Ghd3DTkhhKPYGqeNUIh5qcM4YBfw=="],
 

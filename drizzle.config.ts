@@ -9,6 +9,6 @@ export default {
   out: './src/db/migrations',
   dialect: 'postgresql',
   dbCredentials: {
-    url: get_db_url(import.meta.env)
+    url: get_db_url(process.env)
   }
 } satisfies Config;

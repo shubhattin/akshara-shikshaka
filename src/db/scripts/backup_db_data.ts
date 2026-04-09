@@ -29,7 +29,7 @@ const envs_parsed = z
     AWS_SECRET_ACCESS_KEY: z.string(),
     AWS_DB_BACKUP_BUCKET_NAME: z.string()
   })
-  .safeParse(import.meta.env);
+  .safeParse(process.env);
 if (!envs_parsed.success) {
   console.error(envs_parsed.error);
   throw new Error('Invalid environment variables');

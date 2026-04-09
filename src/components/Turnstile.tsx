@@ -6,7 +6,7 @@ type Props = {
 };
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY!;
-const PROD = import.meta.env.PROD;
+const PROD = process.env.PROD;
 
 export const TURNSTILE_ENABLED = SITE_KEY && PROD;
 // export const TURNSTILE_ENABLED = SITE_KEY && !PROD; // for dev mode testing

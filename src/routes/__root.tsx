@@ -111,7 +111,7 @@ function RootProviders({ children }: { children: React.ReactNode }) {
               <Header />
               {children}
             </div>
-            {import.meta.env.DEV && (
+            {process.env.DEV && (
               <TanStackDevtools
                 config={{
                   position: 'bottom-right',

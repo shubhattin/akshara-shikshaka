@@ -1,7 +1,7 @@
 import { OpenAI } from 'openai';
 
 const openai = new OpenAI({
-  apiKey: import.meta.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 export async function generateImageGptImage1(prompt: string) {

@@ -4,8 +4,10 @@ import Landing from '~/components/pages/home/Landing';
 export const Route = createFileRoute('/(public)/')({
   component: PublicIndex,
   head: () => ({
-    title: 'Akshara Shikshaka - Master Sanskrit in Multiple Indian Scripts',
     meta: [
+      {
+        title: 'Akshara Shikshaka - Master Sanskrit in Multiple Indian Scripts'
+      },
       {
         name: 'description',
         content:

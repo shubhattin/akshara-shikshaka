@@ -1,6 +1,6 @@
 'use client';
-import { lazy, useEffect, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -14,7 +14,6 @@ import {
 } from '~/components/ui/select';
 import type Konva from 'konva';
 import { useTRPC } from '~/api/client';
-import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -91,7 +90,7 @@ import {
   handleTypingBeforeInputEvent
 } from 'lipilekhika/typing';
 import { FONT_LIST, FONT_SCRIPTS, type FontFamily } from '~/state/font_list';
-import { script_list_obj, script_list_type } from '~/state/lang_list';
+import { script_list_obj, type script_list_type } from '~/state/lang_list';
 import { get_script_from_id } from '~/state/lang_list';
 import { motion } from 'framer-motion';
 import type { InferSelectModel } from 'drizzle-orm';
@@ -104,18 +103,17 @@ import { Provider as JotaiProvider } from 'jotai';
 import { useMutation } from '@tanstack/react-query';
 import { buttonVariants } from '~/components/ui/button';
 
-// Dynamic import for KonvaCanvas to avoid SSR issues
-const KonvaCanvas = dynamic(() => import('./AddEditGestureCanvas'), {
-  ssr: false,
-  loading: () => (
-    <div
-      className="flex items-center justify-center rounded-lg border-2 bg-gray-50"
-      style={{ width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }}
-    >
-      <div className="text-gray-500">Loading...</div>
-    </div>
-  )
-});
+// Lazy-load Konva canvas (client-only; heavy Konva bundle)
+const KonvaCanvas = lazy(() => import('./AddEditGestureCanvas'));
+
+const konvaCanvasFallback = (
+  <div
+    className="flex items-center justify-center rounded-lg border-2 bg-gray-50"
+    style={{ width: CANVAS_DIMS.width, height: CANVAS_DIMS.height }}
+  >
+    <div className="text-gray-500">Loading...</div>
+  </div>
+);
 
 // Client-side only wrapper to prevent hydration mismatches
 const ClientOnly = ({
@@ -642,7 +640,9 @@ function AddEditTextData({
             isRecording ? 'border-destructive' : 'border-border'
           )}
         >
-          <KonvaCanvas ref={stageRef} />
+          <Suspense fallback={konvaCanvasFallback}>
+            <KonvaCanvas ref={stageRef} />
+          </Suspense>
         </div>
       </div>
     </div>
@@ -1087,13 +1087,13 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
 
   const is_addition = text_data.id === undefined && text_data.uuid === undefined;
 
-  const router = useRouter();
+  const navigate = useNavigate();
   const add_text_data_mut = useMutation(
     trpc.text_gestures.add_text_gesture_data.mutationOptions({
       onSuccess(data) {
         if (data.success) {
           toast.success('Text Added');
-          router.push(`/gestures/edit/${data.id}`);
+          navigate({ to: `/gestures/edit/${data.id}` } as never);
           queryClient.invalidateQueries(
             trpc.text_gestures.categories.get_gestures.queryFilter({
               category_id: text_data.category?.id ?? 0, // 0 -> uncategorized
@@ -1137,7 +1137,7 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
             script_id: scriptID
           })
         );
-        router.push('/gestures');
+        navigate({ to: '/gestures' } as never);
       },
       onError(error) {
         toast.error('Failed to delete text');

@@ -26,7 +26,7 @@ import { Label } from '~/components/ui/label';
 
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 
 type Props = {
   onImageSelect: (image: image_type) => void;
@@ -111,7 +111,7 @@ const ImageList = () => {
           placeholder="Search description..."
           className="max-w-md"
         />
-        <Link href="/image_assets" target="_blank" className="group flex items-center gap-2">
+        <Link to="/image_assets" target="_blank" className="group flex items-center gap-2">
           <FaExternalLinkAlt className="size-4 text-yellow-300 group-hover:text-blue-400" />
           <span className="text-sm text-teal-300 group-hover:text-sky-400">Manage Images</span>
         </Link>

@@ -1,14 +1,14 @@
+import { Link } from '@tanstack/react-router';
 import { MenuButton } from '~/components/app-bar/AppBarMenu';
 import { robotoSans } from '../fonts';
 import SupportOptions from '~/components/app-bar/SupportOptions';
-import Link from 'next/link';
 
 export default function AppBar({ title }: { title: string }) {
   return (
     <header className="w-full border-b border-slate-200/60 bg-linear-to-r from-white via-slate-50 to-blue-50 shadow-lg backdrop-blur-sm dark:border-slate-700/60 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-4 lg:px-6">
         {/* Logo/Title Section */}
-        <Link href="/" className="cursor-default">
+        <Link to="/" className="cursor-default">
           <div className="flex items-center space-x-3">
             <div
               className="flex h-12 w-12 items-center justify-center shadow-lg"

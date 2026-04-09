@@ -41,7 +41,7 @@ import {
   type lang_list_type
 } from '~/state/lang_list';
 import { transliterate } from 'lipilekhika';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 
 type Props = {
   onAudioSelect: (audio: audio_type) => void;
@@ -204,7 +204,7 @@ const AudioList = () => {
             </SelectContent>
           </Select>
         </div>
-        <Link href="/audio_assets" target="_blank" className="group flex items-center gap-2">
+        <Link to="/audio_assets" target="_blank" className="group flex items-center gap-2">
           <FaExternalLinkAlt className="size-4 text-yellow-300 group-hover:text-blue-400" />
           <span className="text-sm text-teal-300 group-hover:text-sky-400">Manage Audio</span>
         </Link>

@@ -87,7 +87,7 @@ import { MdPlayArrow, MdStop } from 'react-icons/md';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { AiOutlineAudio } from 'react-icons/ai';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 import {
   Select,
   SelectContent,
@@ -277,7 +277,7 @@ const LessonInfo = (props: Props) => {
               props.gestures_list.map((gesture) => (
                 <Link
                   target="_blank"
-                  href={`/gestures/edit/${gesture.id}`}
+                  to={`/gestures/edit/${gesture.id}`}
                   key={gesture.id}
                   className={cn(
                     'rounded-md border px-2 py-1 text-center text-base font-semibold transition-all duration-200 ease-in-out outline-none',

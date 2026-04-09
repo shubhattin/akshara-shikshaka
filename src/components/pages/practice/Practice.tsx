@@ -7,18 +7,19 @@ import {
   createContext,
   useContext,
   Children,
-  isValidElement
+  isValidElement,
+  lazy,
+  Suspense
 } from 'react';
-import dynamic from 'next/dynamic';
 import type Konva from 'konva';
 import { cn } from '~/lib/utils';
 import { MdPlayArrow, MdArrowForward, MdRefresh, MdClose, MdReplay } from 'react-icons/md';
 import { evaluateGestureAccuracy, animateGesture } from '~/tools/stroke_data/utils';
 import {
-  GesturePoints,
   CANVAS_DIMS,
-  Gesture,
-  GESTURE_GAP_DURATION
+  GESTURE_GAP_DURATION,
+  type GesturePoints,
+  type Gesture
 } from '~/tools/stroke_data/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AiOutlineSignature } from 'react-icons/ai';
@@ -48,15 +49,11 @@ import { Skeleton } from '~/components/ui/skeleton';
 const ACCURACY_THRESHOLD = 0.75;
 const SCALING_FACTOR_FOR_WIDTH = 0.85;
 
-// Dynamic import for PracticeKonvaCanvas to avoid SSR issues
-const PracticeKonvaCanvas = dynamic(() => import('./PracticeCanvas'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-[400px] w-[400px] max-w-[90vw] items-center justify-center rounded-lg border-2 bg-gray-50">
-      {/* <div className="text-gray-500">Loading canvas...</div> */}
-    </div>
-  )
-});
+const PracticeKonvaCanvas = lazy(() => import('./PracticeCanvas'));
+
+const practiceCanvasFallback = (
+  <div className="flex h-[400px] w-[400px] max-w-[90vw] items-center justify-center rounded-lg border-2 bg-gray-50" />
+);
 
 type text_data_type = {
   id: number;
@@ -525,12 +522,14 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
                 isDrawing ? 'border-blue-500' : 'border-border'
               )}
             >
-              <PracticeKonvaCanvas
-                key={`${text_data.uuid}-${text_data.id}`}
-                ref={stageRef}
-                gestureData={gestureData}
-                onUserStroke={handleUserStroke}
-              />
+              <Suspense fallback={practiceCanvasFallback}>
+                <PracticeKonvaCanvas
+                  key={`${text_data.uuid}-${text_data.id}`}
+                  ref={stageRef}
+                  gestureData={gestureData}
+                  onUserStroke={handleUserStroke}
+                />
+              </Suspense>
             </div>
 
             {(canvasCurrentMode === 'none' || canvasCurrentMode === 'playing') && (

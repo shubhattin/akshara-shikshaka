@@ -10,11 +10,32 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
+import { Route as publicLearnRouteImport } from './routes/(public)/learn'
+import { Route as authAuthRouteImport } from './routes/(auth)/_auth'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
+import { Route as authAuthLessonsIndexRouteImport } from './routes/(auth)/_auth/lessons/index'
+import { Route as authAuthImage_assetsIndexRouteImport } from './routes/(auth)/_auth/image_assets/index'
+import { Route as authAuthGesturesIndexRouteImport } from './routes/(auth)/_auth/gestures/index'
+import { Route as authAuthAudio_assetsIndexRouteImport } from './routes/(auth)/_auth/audio_assets/index'
+import { Route as authAuthLessonsAddRouteImport } from './routes/(auth)/_auth/lessons/add'
+import { Route as authAuthGesturesAddRouteImport } from './routes/(auth)/_auth/gestures/add'
+import { Route as authAuthLessonsEditIdRouteImport } from './routes/(auth)/_auth/lessons/edit/$id'
+import { Route as authAuthImage_assetsEditIdRouteImport } from './routes/(auth)/_auth/image_assets/edit/$id'
+import { Route as authAuthGesturesEditIdRouteImport } from './routes/(auth)/_auth/gestures/edit/$id'
+import { Route as authAuthAudio_assetsEditIdRouteImport } from './routes/(auth)/_auth/audio_assets/edit/$id'
 
 const publicIndexRoute = publicIndexRouteImport.update({
   id: '/(public)/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const publicLearnRoute = publicLearnRouteImport.update({
+  id: '/(public)/learn',
+  path: '/learn',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const authAuthRoute = authAuthRouteImport.update({
+  id: '/(auth)/_auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
@@ -22,29 +43,160 @@ const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
   path: '/api/trpc/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const authAuthLessonsIndexRoute = authAuthLessonsIndexRouteImport.update({
+  id: '/lessons/',
+  path: '/lessons/',
+  getParentRoute: () => authAuthRoute,
+} as any)
+const authAuthImage_assetsIndexRoute =
+  authAuthImage_assetsIndexRouteImport.update({
+    id: '/image_assets/',
+    path: '/image_assets/',
+    getParentRoute: () => authAuthRoute,
+  } as any)
+const authAuthGesturesIndexRoute = authAuthGesturesIndexRouteImport.update({
+  id: '/gestures/',
+  path: '/gestures/',
+  getParentRoute: () => authAuthRoute,
+} as any)
+const authAuthAudio_assetsIndexRoute =
+  authAuthAudio_assetsIndexRouteImport.update({
+    id: '/audio_assets/',
+    path: '/audio_assets/',
+    getParentRoute: () => authAuthRoute,
+  } as any)
+const authAuthLessonsAddRoute = authAuthLessonsAddRouteImport.update({
+  id: '/lessons/add',
+  path: '/lessons/add',
+  getParentRoute: () => authAuthRoute,
+} as any)
+const authAuthGesturesAddRoute = authAuthGesturesAddRouteImport.update({
+  id: '/gestures/add',
+  path: '/gestures/add',
+  getParentRoute: () => authAuthRoute,
+} as any)
+const authAuthLessonsEditIdRoute = authAuthLessonsEditIdRouteImport.update({
+  id: '/lessons/edit/$id',
+  path: '/lessons/edit/$id',
+  getParentRoute: () => authAuthRoute,
+} as any)
+const authAuthImage_assetsEditIdRoute =
+  authAuthImage_assetsEditIdRouteImport.update({
+    id: '/image_assets/edit/$id',
+    path: '/image_assets/edit/$id',
+    getParentRoute: () => authAuthRoute,
+  } as any)
+const authAuthGesturesEditIdRoute = authAuthGesturesEditIdRouteImport.update({
+  id: '/gestures/edit/$id',
+  path: '/gestures/edit/$id',
+  getParentRoute: () => authAuthRoute,
+} as any)
+const authAuthAudio_assetsEditIdRoute =
+  authAuthAudio_assetsEditIdRouteImport.update({
+    id: '/audio_assets/edit/$id',
+    path: '/audio_assets/edit/$id',
+    getParentRoute: () => authAuthRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
+  '/learn': typeof publicLearnRoute
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/gestures/add': typeof authAuthGesturesAddRoute
+  '/lessons/add': typeof authAuthLessonsAddRoute
+  '/audio_assets/': typeof authAuthAudio_assetsIndexRoute
+  '/gestures/': typeof authAuthGesturesIndexRoute
+  '/image_assets/': typeof authAuthImage_assetsIndexRoute
+  '/lessons/': typeof authAuthLessonsIndexRoute
+  '/audio_assets/edit/$id': typeof authAuthAudio_assetsEditIdRoute
+  '/gestures/edit/$id': typeof authAuthGesturesEditIdRoute
+  '/image_assets/edit/$id': typeof authAuthImage_assetsEditIdRoute
+  '/lessons/edit/$id': typeof authAuthLessonsEditIdRoute
 }
 export interface FileRoutesByTo {
+  '/learn': typeof publicLearnRoute
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/gestures/add': typeof authAuthGesturesAddRoute
+  '/lessons/add': typeof authAuthLessonsAddRoute
+  '/audio_assets': typeof authAuthAudio_assetsIndexRoute
+  '/gestures': typeof authAuthGesturesIndexRoute
+  '/image_assets': typeof authAuthImage_assetsIndexRoute
+  '/lessons': typeof authAuthLessonsIndexRoute
+  '/audio_assets/edit/$id': typeof authAuthAudio_assetsEditIdRoute
+  '/gestures/edit/$id': typeof authAuthGesturesEditIdRoute
+  '/image_assets/edit/$id': typeof authAuthImage_assetsEditIdRoute
+  '/lessons/edit/$id': typeof authAuthLessonsEditIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/(auth)/_auth': typeof authAuthRouteWithChildren
+  '/(public)/learn': typeof publicLearnRoute
   '/(public)/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/(auth)/_auth/gestures/add': typeof authAuthGesturesAddRoute
+  '/(auth)/_auth/lessons/add': typeof authAuthLessonsAddRoute
+  '/(auth)/_auth/audio_assets/': typeof authAuthAudio_assetsIndexRoute
+  '/(auth)/_auth/gestures/': typeof authAuthGesturesIndexRoute
+  '/(auth)/_auth/image_assets/': typeof authAuthImage_assetsIndexRoute
+  '/(auth)/_auth/lessons/': typeof authAuthLessonsIndexRoute
+  '/(auth)/_auth/audio_assets/edit/$id': typeof authAuthAudio_assetsEditIdRoute
+  '/(auth)/_auth/gestures/edit/$id': typeof authAuthGesturesEditIdRoute
+  '/(auth)/_auth/image_assets/edit/$id': typeof authAuthImage_assetsEditIdRoute
+  '/(auth)/_auth/lessons/edit/$id': typeof authAuthLessonsEditIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/trpc/$'
+  fullPaths:
+    | '/learn'
+    | '/'
+    | '/api/trpc/$'
+    | '/gestures/add'
+    | '/lessons/add'
+    | '/audio_assets/'
+    | '/gestures/'
+    | '/image_assets/'
+    | '/lessons/'
+    | '/audio_assets/edit/$id'
+    | '/gestures/edit/$id'
+    | '/image_assets/edit/$id'
+    | '/lessons/edit/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/trpc/$'
-  id: '__root__' | '/(public)/' | '/api/trpc/$'
+  to:
+    | '/learn'
+    | '/'
+    | '/api/trpc/$'
+    | '/gestures/add'
+    | '/lessons/add'
+    | '/audio_assets'
+    | '/gestures'
+    | '/image_assets'
+    | '/lessons'
+    | '/audio_assets/edit/$id'
+    | '/gestures/edit/$id'
+    | '/image_assets/edit/$id'
+    | '/lessons/edit/$id'
+  id:
+    | '__root__'
+    | '/(auth)/_auth'
+    | '/(public)/learn'
+    | '/(public)/'
+    | '/api/trpc/$'
+    | '/(auth)/_auth/gestures/add'
+    | '/(auth)/_auth/lessons/add'
+    | '/(auth)/_auth/audio_assets/'
+    | '/(auth)/_auth/gestures/'
+    | '/(auth)/_auth/image_assets/'
+    | '/(auth)/_auth/lessons/'
+    | '/(auth)/_auth/audio_assets/edit/$id'
+    | '/(auth)/_auth/gestures/edit/$id'
+    | '/(auth)/_auth/image_assets/edit/$id'
+    | '/(auth)/_auth/lessons/edit/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  authAuthRoute: typeof authAuthRouteWithChildren
+  publicLearnRoute: typeof publicLearnRoute
   publicIndexRoute: typeof publicIndexRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
 }
@@ -58,6 +210,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof publicIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(public)/learn': {
+      id: '/(public)/learn'
+      path: '/learn'
+      fullPath: '/learn'
+      preLoaderRoute: typeof publicLearnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/_auth': {
+      id: '/(auth)/_auth'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof authAuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/trpc/$': {
       id: '/api/trpc/$'
       path: '/api/trpc/$'
@@ -65,10 +231,112 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTrpcSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/(auth)/_auth/lessons/': {
+      id: '/(auth)/_auth/lessons/'
+      path: '/lessons'
+      fullPath: '/lessons/'
+      preLoaderRoute: typeof authAuthLessonsIndexRouteImport
+      parentRoute: typeof authAuthRoute
+    }
+    '/(auth)/_auth/image_assets/': {
+      id: '/(auth)/_auth/image_assets/'
+      path: '/image_assets'
+      fullPath: '/image_assets/'
+      preLoaderRoute: typeof authAuthImage_assetsIndexRouteImport
+      parentRoute: typeof authAuthRoute
+    }
+    '/(auth)/_auth/gestures/': {
+      id: '/(auth)/_auth/gestures/'
+      path: '/gestures'
+      fullPath: '/gestures/'
+      preLoaderRoute: typeof authAuthGesturesIndexRouteImport
+      parentRoute: typeof authAuthRoute
+    }
+    '/(auth)/_auth/audio_assets/': {
+      id: '/(auth)/_auth/audio_assets/'
+      path: '/audio_assets'
+      fullPath: '/audio_assets/'
+      preLoaderRoute: typeof authAuthAudio_assetsIndexRouteImport
+      parentRoute: typeof authAuthRoute
+    }
+    '/(auth)/_auth/lessons/add': {
+      id: '/(auth)/_auth/lessons/add'
+      path: '/lessons/add'
+      fullPath: '/lessons/add'
+      preLoaderRoute: typeof authAuthLessonsAddRouteImport
+      parentRoute: typeof authAuthRoute
+    }
+    '/(auth)/_auth/gestures/add': {
+      id: '/(auth)/_auth/gestures/add'
+      path: '/gestures/add'
+      fullPath: '/gestures/add'
+      preLoaderRoute: typeof authAuthGesturesAddRouteImport
+      parentRoute: typeof authAuthRoute
+    }
+    '/(auth)/_auth/lessons/edit/$id': {
+      id: '/(auth)/_auth/lessons/edit/$id'
+      path: '/lessons/edit/$id'
+      fullPath: '/lessons/edit/$id'
+      preLoaderRoute: typeof authAuthLessonsEditIdRouteImport
+      parentRoute: typeof authAuthRoute
+    }
+    '/(auth)/_auth/image_assets/edit/$id': {
+      id: '/(auth)/_auth/image_assets/edit/$id'
+      path: '/image_assets/edit/$id'
+      fullPath: '/image_assets/edit/$id'
+      preLoaderRoute: typeof authAuthImage_assetsEditIdRouteImport
+      parentRoute: typeof authAuthRoute
+    }
+    '/(auth)/_auth/gestures/edit/$id': {
+      id: '/(auth)/_auth/gestures/edit/$id'
+      path: '/gestures/edit/$id'
+      fullPath: '/gestures/edit/$id'
+      preLoaderRoute: typeof authAuthGesturesEditIdRouteImport
+      parentRoute: typeof authAuthRoute
+    }
+    '/(auth)/_auth/audio_assets/edit/$id': {
+      id: '/(auth)/_auth/audio_assets/edit/$id'
+      path: '/audio_assets/edit/$id'
+      fullPath: '/audio_assets/edit/$id'
+      preLoaderRoute: typeof authAuthAudio_assetsEditIdRouteImport
+      parentRoute: typeof authAuthRoute
+    }
   }
 }
 
+interface authAuthRouteChildren {
+  authAuthGesturesAddRoute: typeof authAuthGesturesAddRoute
+  authAuthLessonsAddRoute: typeof authAuthLessonsAddRoute
+  authAuthAudio_assetsIndexRoute: typeof authAuthAudio_assetsIndexRoute
+  authAuthGesturesIndexRoute: typeof authAuthGesturesIndexRoute
+  authAuthImage_assetsIndexRoute: typeof authAuthImage_assetsIndexRoute
+  authAuthLessonsIndexRoute: typeof authAuthLessonsIndexRoute
+  authAuthAudio_assetsEditIdRoute: typeof authAuthAudio_assetsEditIdRoute
+  authAuthGesturesEditIdRoute: typeof authAuthGesturesEditIdRoute
+  authAuthImage_assetsEditIdRoute: typeof authAuthImage_assetsEditIdRoute
+  authAuthLessonsEditIdRoute: typeof authAuthLessonsEditIdRoute
+}
+
+const authAuthRouteChildren: authAuthRouteChildren = {
+  authAuthGesturesAddRoute: authAuthGesturesAddRoute,
+  authAuthLessonsAddRoute: authAuthLessonsAddRoute,
+  authAuthAudio_assetsIndexRoute: authAuthAudio_assetsIndexRoute,
+  authAuthGesturesIndexRoute: authAuthGesturesIndexRoute,
+  authAuthImage_assetsIndexRoute: authAuthImage_assetsIndexRoute,
+  authAuthLessonsIndexRoute: authAuthLessonsIndexRoute,
+  authAuthAudio_assetsEditIdRoute: authAuthAudio_assetsEditIdRoute,
+  authAuthGesturesEditIdRoute: authAuthGesturesEditIdRoute,
+  authAuthImage_assetsEditIdRoute: authAuthImage_assetsEditIdRoute,
+  authAuthLessonsEditIdRoute: authAuthLessonsEditIdRoute,
+}
+
+const authAuthRouteWithChildren = authAuthRoute._addFileChildren(
+  authAuthRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
+  authAuthRoute: authAuthRouteWithChildren,
+  publicLearnRoute: publicLearnRoute,
   publicIndexRoute: publicIndexRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
 }

@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Stage, Layer, Line, Text, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { CANVAS_DIMS, GesturePoints } from '~/tools/stroke_data/types';
+import { CANVAS_DIMS, type GesturePoints } from '~/tools/stroke_data/types';
 import { getSmoothenedPoints, pointsToSvgPath } from '~/tools/stroke_data/utils';
 import {
   main_text_path_visible_atom,

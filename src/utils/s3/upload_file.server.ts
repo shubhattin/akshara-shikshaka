@@ -12,7 +12,7 @@ const envs_parsed = z
     AWS_SECRET_ACCESS_KEY: z.string(),
     AWS_S3_FILES_BUCKET_NAME: z.string()
   })
-  .safeParse(process.env);
+  .safeParse(import.meta.env);
 if (!envs_parsed.success) {
   console.error(envs_parsed.error);
   throw new Error('Invalid environment variables');

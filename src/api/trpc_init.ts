@@ -43,7 +43,7 @@ export const verify_cloudflare_turnstile_token = async (token: string) => {
   try {
     const response = await fetch(`https://challenges.cloudflare.com/turnstile/v0/siteverify`, {
       method: 'POST',
-      body: JSON.stringify({ secret: process.env.TURNSTILE_SECRET_KEY, response: token }),
+      body: JSON.stringify({ secret: import.meta.env.TURNSTILE_SECRET_KEY, response: token }),
       headers: {
         'Content-Type': 'application/json'
       }

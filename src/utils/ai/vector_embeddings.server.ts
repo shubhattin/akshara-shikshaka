@@ -2,7 +2,7 @@ import { embed } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 
 const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: import.meta.env.OPENAI_API_KEY
 });
 
 /**

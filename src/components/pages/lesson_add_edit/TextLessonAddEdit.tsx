@@ -1,7 +1,6 @@
 'use client';
 import { useAtomValue, useAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
-import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { FiSave } from 'react-icons/fi';
 import { IoMdAdd } from 'react-icons/io';
@@ -48,10 +47,10 @@ import { FONT_SCRIPTS } from '~/state/font_list';
 import {
   lang_list_obj,
   LANG_LIST,
-  lang_list_type,
+  type lang_list_type,
   get_lang_from_id,
   script_list_obj,
-  script_list_type,
+  type script_list_type,
   get_script_from_id
 } from '~/state/lang_list';
 import { transliterate, preloadScriptData } from 'lipilekhika';
@@ -87,7 +86,7 @@ import { MdPlayArrow, MdStop } from 'react-icons/md';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { AiOutlineAudio } from 'react-icons/ai';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import {
   Select,
   SelectContent,
@@ -138,7 +137,6 @@ export default function TextLessonAddEditComponent(props: Props) {
 }
 
 const LessonInfo = (props: Props) => {
-  const trpc = useTRPC();
   const [lang_id, setLangId] = useAtom(lang_id_atom);
   const [base_word_script_id, setBaseWordScriptId] = useAtom(base_word_script_id_atom);
   const [text, setText] = useAtom(text_atom);
@@ -277,7 +275,7 @@ const LessonInfo = (props: Props) => {
               props.gestures_list.map((gesture) => (
                 <Link
                   target="_blank"
-                  to={`/gestures/edit/${gesture.id}`}
+                  to={`/gestures/edit/${gesture.id}` as never}
                   key={gesture.id}
                   className={cn(
                     'rounded-md border px-2 py-1 text-center text-base font-semibold transition-all duration-200 ease-in-out outline-none',
@@ -309,7 +307,7 @@ type OptionalAudioSectionProps = {
 
 const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) => {
   const trpc = useTRPC();
-  const [audio_id_optional, setAudioIdOptional] = useAtom(audio_id_optional_atom);
+  const [_, setAudioIdOptional] = useAtom(audio_id_optional_atom);
   const [audioDialogOpen, setAudioDialogOpen] = useState(false);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -355,7 +353,7 @@ const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) =>
       audioRef.current.pause();
       audioRef.current = null;
     }
-    const audio = new Audio(`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${asset.s3_key}`);
+    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${asset.s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();
@@ -616,7 +614,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
       audioRef.current.pause();
       audioRef.current = null;
     }
-    const audio = new Audio(`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${asset.s3_key}`);
+    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${asset.s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();
@@ -688,7 +686,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
             <div className="flex items-center justify-center gap-2">
               <img
                 onClick={() => setImageViewDialogOpen(true)}
-                src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${image_asset.s3_key}`}
+                src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${image_asset.s3_key}`}
                 alt={image_asset.description}
                 title={image_asset.description}
                 className="size-14"
@@ -713,7 +711,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
                   </span>
 
                   <img
-                    src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${image_asset.s3_key}`}
+                    src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${image_asset.s3_key}`}
                     alt={image_asset.description}
                     style={{ height: '256px', width: '256px' }}
                   />
@@ -772,7 +770,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
 
 const AddEditSave = (props: Props) => {
   const trpc = useTRPC();
-  const router = useRouter();
+  const navigate = useNavigate();
   const text = useAtomValue(text_atom);
   const lang_id = useAtomValue(lang_id_atom);
   const base_word_script_id = useAtomValue(base_word_script_id_atom);
@@ -786,7 +784,7 @@ const AddEditSave = (props: Props) => {
     trpc.text_lessons.add_text_lesson.mutationOptions({
       onSuccess(data) {
         toast.success('Text Lesson Added');
-        router.push(`/lessons/edit/${data.id}`);
+        navigate({ to: `/lessons/edit/${data.id}` } as never);
         queryClient.invalidateQueries(
           trpc.text_lessons.categories.get_text_lessons.queryFilter({
             category_id: props.text_lesson_info.category_id ?? 0, // 0 -> uncategorized
@@ -808,7 +806,7 @@ const AddEditSave = (props: Props) => {
         const to_be_added_word_indexes = words
           .map((w, idx) => [w, idx] as [text_lesson_word_type, number])
           .filter(([w]) => w.id === undefined || w.id === null)
-          .map(([w, idx]) => idx);
+          .map(([_w, idx]) => idx);
 
         if (to_be_added_word_indexes.length !== data.inserted_words_ids.length) {
           toast.error('Failed to Add Text Lesson');
@@ -843,9 +841,9 @@ const AddEditSave = (props: Props) => {
             lang_id: lang_id
           })
         );
-        router.push('/lessons');
+        navigate({ to: '/lessons' } as never);
       },
-      onError(error) {
+      onError(_error) {
         toast.error('Failed to delete text');
       }
     })

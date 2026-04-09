@@ -4,7 +4,7 @@ on:
   - push
 
 env:
-  NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3000
+  VITE_BETTER_AUTH_URL: http://localhost:3000
   PG_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
   OPENAI_API_KEY: sk_proj_1234567890
   AWS_REGION: region-123

@@ -2,10 +2,15 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools';
 import { TanStackDevtools } from '@tanstack/react-devtools';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { createTRPCClient, httpBatchLink } from '@trpc/client';
+import { useState } from 'react';
 
 import appCss from '../styles.css?url';
 import '../app.scss?url';
-import TRPCProvider from '~/api/TRPCProvider';
+import { TRPCProvider } from '~/api/client';
+import transformer from '~/api/transformer';
+import type { AppRouter } from '~/api/trpc_router';
 import { ThemeProvider } from '~/components/theme-provider';
 import Header from '@/components/Header';
 import { Toaster } from '@/components/ui/sonner';
@@ -13,6 +18,7 @@ import { getUserSession$ } from '~/lib/get_auth_from_cookie';
 import { AppContextProvider } from '@/components/AppDataContext';
 import { robotoSans } from '~/components/fonts';
 import { cn } from '~/lib/utils';
+import { queryClient as queryClientGlobal } from '~/state/queryClient';
 
 export const Route = createRootRoute({
   beforeLoad: async () => {
@@ -54,8 +60,6 @@ export const Route = createRootRoute({
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const { session } = Route.useRouteContext();
-
   return (
     <html
       lang="en"
@@ -73,37 +77,59 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           'overflow-y-scroll sm:px-2 lg:px-3 xl:px-4 2xl:px-4'
         )}
       >
-        <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-          <TRPCProvider>
-            <AppContextProvider initialSession={session}>
-              <div className="container mx-auto mb-12">
-                <Toaster richColors={true} />
-                <Header />
-                {children}
-              </div>
-              {import.meta.env.DEV && (
-                <TanStackDevtools
-                  config={{
-                    position: 'bottom-right',
-                    openHotkey: undefined
-                  }}
-                  plugins={[
-                    {
-                      name: 'Tanstack Router',
-                      render: <TanStackRouterDevtoolsPanel />
-                    },
-                    {
-                      name: 'Tanstack Query',
-                      render: <ReactQueryDevtoolsPanel />
-                    }
-                  ]}
-                />
-              )}
-            </AppContextProvider>
-          </TRPCProvider>
-        </ThemeProvider>
+        <RootProviders>{children}</RootProviders>
         <Scripts />
       </body>
     </html>
+  );
+}
+
+function RootProviders({ children }: { children: React.ReactNode }) {
+  const { session } = Route.useRouteContext();
+
+  const [queryClient] = useState(queryClientGlobal);
+  const [trpcClient] = useState(() =>
+    createTRPCClient<AppRouter>({
+      links: [
+        httpBatchLink({
+          url: '/api/trpc',
+          transformer
+        })
+      ]
+    })
+  );
+
+  return (
+    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+      <QueryClientProvider client={queryClient}>
+        <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+          <AppContextProvider initialSession={session}>
+            <div className="container mx-auto mb-12">
+              <Toaster richColors={true} />
+              <Header />
+              {children}
+            </div>
+            {import.meta.env.DEV && (
+              <TanStackDevtools
+                config={{
+                  position: 'bottom-right',
+                  openHotkey: undefined
+                }}
+                plugins={[
+                  {
+                    name: 'Tanstack Router',
+                    render: <TanStackRouterDevtoolsPanel />
+                  },
+                  {
+                    name: 'Tanstack Query',
+                    render: <ReactQueryDevtoolsPanel />
+                  }
+                ]}
+              />
+            )}
+          </AppContextProvider>
+        </TRPCProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

@@ -23,7 +23,6 @@ export const Route = createRootRoute({
   },
   ssr: true,
   head: () => ({
-    title: 'Akshara',
     meta: [
       {
         charSet: 'utf-8'

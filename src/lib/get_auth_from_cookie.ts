@@ -2,7 +2,8 @@ import type { authClient } from '@/lib/auth-client';
 import { createIsomorphicFn } from '@tanstack/react-start';
 import { getRequestHeader } from '@tanstack/react-start/server';
 
-const get_seesion_from_cookie = async (cookie: string) => {
+/** Server-side session lookup from raw `Cookie` header (e.g. tRPC `createContext`). */
+export async function getSessionFromCookie(cookie: string) {
   try {
     const res = await fetch(`${import.meta.env.VITE_BETTER_AUTH_URL}/api/auth/get-session`, {
       method: 'GET',
@@ -19,7 +20,7 @@ const get_seesion_from_cookie = async (cookie: string) => {
   } catch (e) {
     return null;
   }
-};
+}
 
 export const getUserSession$ = createIsomorphicFn()
   .client(async () => {
@@ -29,6 +30,6 @@ export const getUserSession$ = createIsomorphicFn()
   })
   .server(async () => {
     const cookie = getRequestHeader('cookie');
-    const session = await get_seesion_from_cookie(cookie ?? '');
+    const session = await getSessionFromCookie(cookie ?? '');
     return session;
   });

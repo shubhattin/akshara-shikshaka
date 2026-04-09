@@ -1,14 +1,11 @@
 import { z } from 'zod';
 import mime from 'mime-types';
-import {
-  DeleteObjectCommand,
-  PutObjectCommand,
-  PutObjectCommandInput,
-  S3Client,
-  StorageClass
-} from '@aws-sdk/client-s3';
+import type { PutObjectCommandInput } from '@aws-sdk/client-s3';
+import s3Pkg from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import ms from 'ms';
+
+const { DeleteObjectCommand, PutObjectCommand, S3Client, StorageClass } = s3Pkg;
 
 const envs_parsed = z
   .object({

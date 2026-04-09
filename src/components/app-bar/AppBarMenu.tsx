@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Moon,
   Sun,
@@ -16,9 +16,8 @@ import {
 } from 'lucide-react';
 import { SiGithub } from 'react-icons/si';
 import { FaYoutube, FaInstagram } from 'react-icons/fa';
-import { useTheme } from 'next-themes';
+import { useTheme, type Theme } from '~/components/theme-provider';
 
-import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
@@ -34,7 +33,12 @@ export function MenuButton() {
   const [pwa_state] = useAtom(pwa_state_atom);
   const [isIos] = useAtom(is_ios_atom);
 
-  const themeOptions = [
+  const themeOptions: {
+    value: Theme;
+    label: string;
+    icon: typeof Monitor;
+    description: string;
+  }[] = [
     {
       value: 'system',
       label: 'System',

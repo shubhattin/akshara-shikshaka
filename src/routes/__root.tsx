@@ -19,6 +19,7 @@ import { AppContextProvider } from '@/components/AppDataContext';
 import { robotoSans } from '~/components/fonts';
 import { cn } from '~/lib/utils';
 import { queryClient as queryClientGlobal } from '~/state/queryClient';
+import PosthogInit from '~/components/tags/PosthogInit';
 
 export const Route = createRootRoute({
   beforeLoad: async () => {
@@ -78,6 +79,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         )}
       >
         <RootProviders>{children}</RootProviders>
+        <PosthogInit />
         <Scripts />
       </body>
     </html>

@@ -61,6 +61,7 @@
     "openai": "^6.34.0",
     "perfect-freehand": "^1.2.3",
     "postgres": "^3.4.9",
+    "posthog-js": "^1.366.2",
     "qrcode": "^1.5.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

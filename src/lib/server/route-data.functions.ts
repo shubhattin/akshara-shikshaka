@@ -2,7 +2,6 @@ import { createServerFn } from '@tanstack/react-start';
 import { getRequestHeader } from '@tanstack/react-start/server';
 import { z } from 'zod';
 import { CACHE } from '~/api/cache';
-import { get_text_gesture_categories_func } from '~/api/routers/gesture_categories';
 import {
   get_lesson_lang_id_from_cookie,
   get_script_id_from_cookie,
@@ -14,8 +13,6 @@ import {
 import { lang_list_obj, script_list_obj, get_script_from_id } from '~/state/lang_list';
 import { transliterate } from 'lipilekhika';
 import { DEFAULT_FONT_SIZE } from '~/state/font_list';
-import { getCookieValue } from '~/lib/parse_cookie_header';
-import { parseLearnPageCookie, SAVED_COOKIES_KEY } from '~/components/pages/learn/learn_page_state';
 import {
   loadAudioAssetForEdit,
   loadImageAssetForEdit,
@@ -91,13 +88,6 @@ export const fetchLearnPageData = createServerFn({ method: 'GET' }).handler(asyn
     saved_category_id: category_id,
     saved_lesson_id: lesson_id
   };
-});
-
-export const fetchGesturesListData = createServerFn({ method: 'GET' }).handler(async () => {
-  const cookieHeader = getRequestHeader('cookie');
-  const script_id = get_script_id_from_cookie(getCookieValue(cookieHeader, SCRIPT_ID_COOKIE_KEY));
-  const gesture_categories = await get_text_gesture_categories_func();
-  return { init_script_id: script_id, init_gesture_categories: gesture_categories };
 });
 
 export const fetchGestureAddDefaults = createServerFn({ method: 'GET' }).handler(async () => {

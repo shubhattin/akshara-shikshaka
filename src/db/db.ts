@@ -16,7 +16,7 @@ const get_drizzle_instance_dev = async () => {
   return drizzle(postgres.default(DB_URL), { schema });
 };
 
-export const db = process.env.DEV
+export const db = import.meta.env.DEV
   ? await get_drizzle_instance_dev()
   : // using neon websocket adapter
     drizzle_neon(new Pool({ connectionString: process.env.PG_DATABASE_URL }), { schema });

@@ -7,7 +7,7 @@ export const load_posthog = async (func?: (posthog: PostHog) => void) => {
   if (
     typeof window === 'undefined' ||
     window.location.hostname === 'localhost' ||
-    process.env.DEV ||
+    import.meta.env.DEV ||
     !import.meta.env.VITE_POSTHOG_KEY ||
     !import.meta.env.VITE_POSTHOG_URL
   )

@@ -1,17 +1,14 @@
 import { CACHE } from '@/api/cache';
-import { parseLearnPageCookie, SAVED_COOKIES_KEY } from '@/components/pages/learn/learn_page_state';
-import { getCookieValue } from '@/lib/parse_cookie_header';
 import { get_script_from_id, lang_list_obj, script_list_obj } from '@/state/lang_list';
 import { createFileRoute } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
-import { getRequestHeader } from '@tanstack/react-start/server';
-import LearnPage from '~/components/pages/learn/LearnPage';
+import { parseLearnPageCookie, SAVED_COOKIES_KEY } from './-learn_page_state';
+import LearnPage from './-LearnPage';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { getCookie } from '@tanstack/react-start/server';
 import { transliterate_node } from 'lipilekhika/node';
 
 const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
-  const cookieHeader = getRequestHeader('cookie');
   const lang_id = lang_list_obj['Sanskrit'];
   const lesson_categories_prom = CACHE.lessons.category_list.get({ lang_id });
 
@@ -21,11 +18,11 @@ const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
   );
   const saved_lesson_id_ = parseLearnPageCookie(
     'lesson_id',
-    getCookieValue(cookieHeader, SAVED_COOKIES_KEY.lesson_id.key)
+    getCookie(SAVED_COOKIES_KEY.lesson_id.key)
   );
   const saved_script_id = parseLearnPageCookie(
     'script_id',
-    getCookieValue(cookieHeader, SAVED_COOKIES_KEY.script_id.key)
+    getCookie(SAVED_COOKIES_KEY.script_id.key)
   );
 
   const lesson_categories = await lesson_categories_prom;
@@ -62,7 +59,7 @@ const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
   };
 });
 
-export const Route = createFileRoute('/(public)/learn')({
+export const Route = createFileRoute('/(public)/learn/')({
   loader: async () => await loader$(),
   head: () =>
     routeHeadFromPageMeta({

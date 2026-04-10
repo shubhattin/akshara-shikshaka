@@ -10,8 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
-import { Route as publicLearnRouteImport } from './routes/(public)/learn'
 import { Route as authAuthRouteImport } from './routes/(auth)/_auth'
+import { Route as publicLearnIndexRouteImport } from './routes/(public)/learn/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as authAuthLessonsIndexRouteImport } from './routes/(auth)/_auth/lessons/index'
 import { Route as authAuthImage_assetsIndexRouteImport } from './routes/(auth)/_auth/image_assets/index'
@@ -29,13 +29,13 @@ const publicIndexRoute = publicIndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const publicLearnRoute = publicLearnRouteImport.update({
-  id: '/(public)/learn',
-  path: '/learn',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const authAuthRoute = authAuthRouteImport.update({
   id: '/(auth)/_auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const publicLearnIndexRoute = publicLearnIndexRouteImport.update({
+  id: '/(public)/learn/',
+  path: '/learn/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
@@ -99,9 +99,9 @@ const authAuthAudio_assetsEditIdRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/learn': typeof publicLearnRoute
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/learn/': typeof publicLearnIndexRoute
   '/gestures/add': typeof authAuthGesturesAddRoute
   '/lessons/add': typeof authAuthLessonsAddRoute
   '/audio_assets/': typeof authAuthAudio_assetsIndexRoute
@@ -114,9 +114,9 @@ export interface FileRoutesByFullPath {
   '/lessons/edit/$id': typeof authAuthLessonsEditIdRoute
 }
 export interface FileRoutesByTo {
-  '/learn': typeof publicLearnRoute
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/learn': typeof publicLearnIndexRoute
   '/gestures/add': typeof authAuthGesturesAddRoute
   '/lessons/add': typeof authAuthLessonsAddRoute
   '/audio_assets': typeof authAuthAudio_assetsIndexRoute
@@ -131,9 +131,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(auth)/_auth': typeof authAuthRouteWithChildren
-  '/(public)/learn': typeof publicLearnRoute
   '/(public)/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
+  '/(public)/learn/': typeof publicLearnIndexRoute
   '/(auth)/_auth/gestures/add': typeof authAuthGesturesAddRoute
   '/(auth)/_auth/lessons/add': typeof authAuthLessonsAddRoute
   '/(auth)/_auth/audio_assets/': typeof authAuthAudio_assetsIndexRoute
@@ -148,9 +148,9 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/learn'
     | '/'
     | '/api/trpc/$'
+    | '/learn/'
     | '/gestures/add'
     | '/lessons/add'
     | '/audio_assets/'
@@ -163,9 +163,9 @@ export interface FileRouteTypes {
     | '/lessons/edit/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/learn'
     | '/'
     | '/api/trpc/$'
+    | '/learn'
     | '/gestures/add'
     | '/lessons/add'
     | '/audio_assets'
@@ -179,9 +179,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/(auth)/_auth'
-    | '/(public)/learn'
     | '/(public)/'
     | '/api/trpc/$'
+    | '/(public)/learn/'
     | '/(auth)/_auth/gestures/add'
     | '/(auth)/_auth/lessons/add'
     | '/(auth)/_auth/audio_assets/'
@@ -196,9 +196,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   authAuthRoute: typeof authAuthRouteWithChildren
-  publicLearnRoute: typeof publicLearnRoute
   publicIndexRoute: typeof publicIndexRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
+  publicLearnIndexRoute: typeof publicLearnIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -210,18 +210,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof publicIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/(public)/learn': {
-      id: '/(public)/learn'
-      path: '/learn'
-      fullPath: '/learn'
-      preLoaderRoute: typeof publicLearnRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/(auth)/_auth': {
       id: '/(auth)/_auth'
       path: ''
       fullPath: ''
       preLoaderRoute: typeof authAuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/learn/': {
+      id: '/(public)/learn/'
+      path: '/learn'
+      fullPath: '/learn/'
+      preLoaderRoute: typeof publicLearnIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/trpc/$': {
@@ -336,9 +336,9 @@ const authAuthRouteWithChildren = authAuthRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   authAuthRoute: authAuthRouteWithChildren,
-  publicLearnRoute: publicLearnRoute,
   publicIndexRoute: publicIndexRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
+  publicLearnIndexRoute: publicLearnIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

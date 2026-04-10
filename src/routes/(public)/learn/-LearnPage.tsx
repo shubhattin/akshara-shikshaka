@@ -8,7 +8,7 @@ import {
   selected_script_id_atom,
   saveLearnPageCookies,
   type text_lesson_type
-} from './learn_page_state';
+} from './-learn_page_state';
 import {
   get_lang_from_id,
   get_script_from_id,

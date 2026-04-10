@@ -24,9 +24,6 @@ function LessonsAddRoute() {
     category: undefined
   };
 
-  const key =
-    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'add-lesson';
-
   return (
     <div>
       <div className="my-2 mb-4 px-2">
@@ -35,7 +32,7 @@ function LessonsAddRoute() {
           Text Lesson List
         </Link>
       </div>
-      <JotaiProvider key={`add-lesson-${key}`}>
+      <JotaiProvider key={`add_lesson_page-${crypto.randomUUID()}`}>
         <TextLessonAddEdit
           location="add"
           gestures_list={[]}

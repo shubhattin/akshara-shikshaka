@@ -2,12 +2,73 @@ import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { Provider as JotaiProvider } from 'jotai';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import TextLessonAddEdit from '~/components/pages/lesson_add_edit/TextLessonAddEdit';
-import { fetchLessonEditData } from '~/lib/server/route-data.functions';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
+import { db } from '@/db/db';
+import { createServerFn } from '@tanstack/react-start';
+import { z } from 'zod';
+
+const get_cached_text_lesson_info = async (id: number) => {
+  const text_lesson_info = await db.query.text_lessons.findFirst({
+    where: (tbl, { eq }) => eq(tbl.id, id),
+    columns: {
+      id: true,
+      uuid: true,
+      lang_id: true,
+      text: true,
+      text_key: true,
+      base_word_script_id: true,
+      order: true,
+      category_id: true,
+      audio_id: true
+    },
+    orderBy: (tbl, { asc }) => [asc(tbl.text)],
+    with: {
+      category: {
+        columns: {
+          id: true,
+          name: true
+        }
+      },
+      gestures: {
+        columns: {
+          text_gesture_id: true
+        },
+        with: {
+          text_gesture: {
+            columns: {
+              id: true,
+              text: true,
+              script_id: true
+            }
+          }
+        }
+      },
+      words: {
+        columns: {
+          id: true,
+          word: true,
+          image_id: true,
+          audio_id: true,
+          order: true
+        },
+        orderBy: (tbl, { asc }) => [asc(tbl.order)]
+      }
+    }
+  });
+  return text_lesson_info;
+};
+
+const loader$ = createServerFn({ method: 'GET' })
+  .inputValidator((data: { rawId: string }) => data)
+  .handler(async ({ data }) => {
+    const id = z.coerce.number().int().parse(data.rawId);
+    const text_lesson_info = await get_cached_text_lesson_info(id);
+    return { text_lesson_info };
+  });
 
 export const Route = createFileRoute('/(auth)/_auth/lessons/edit/$id')({
   loader: async ({ params }) => {
-    const { text_lesson_info } = await fetchLessonEditData({ data: { rawId: params.id } });
+    const { text_lesson_info } = await loader$({ data: { rawId: params.id } });
     if (!text_lesson_info) throw notFound();
     return { text_lesson_info };
   },

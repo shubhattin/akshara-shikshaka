@@ -3,7 +3,7 @@
 @import 'shadcn/tailwind.css';
 
 .font-roboto-sans {
-  font-family: 'Roboto', ui-sans-serif, system-ui, sans-serif;
+  font-family: Roboto, ui-sans-serif, system-ui, sans-serif;
 }
 
 @custom-variant dark (&:is(.dark *));

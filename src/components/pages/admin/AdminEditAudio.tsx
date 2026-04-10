@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '~/api/client';
@@ -55,6 +55,17 @@ export default function AdminEditAudio({ audio_data }: { audio_data: AudioData }
 
   const cf = import.meta.env.VITE_AWS_CLOUDFRONT_URL;
 
+  const langSelectItems = useMemo(
+    () => [
+      { label: 'None', value: 'none' },
+      ...LANG_LIST.map((lang) => ({
+        label: lang,
+        value: String(lang_list_obj[lang as lang_list_type])
+      }))
+    ],
+    []
+  );
+
   return (
     <div className="container mx-auto max-w-6xl px-4 py-6">
       <div className="my-2 mb-4">
@@ -75,6 +86,7 @@ export default function AdminEditAudio({ audio_data }: { audio_data: AudioData }
         <div className="space-y-2">
           <Label>Language</Label>
           <Select
+            items={langSelectItems}
             value={langId === null ? 'none' : String(langId)}
             onValueChange={(v) => setLangId(v === 'none' ? null : Number(v))}
           >

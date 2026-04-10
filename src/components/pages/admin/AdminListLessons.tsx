@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '~/api/client';
@@ -42,6 +42,20 @@ export default function AdminListLessons({ init_lang_id }: Props) {
 
   const lessons = lessonsData?.lessons ?? [];
 
+  const langSelectItems = useMemo(
+    () =>
+      LANG_LIST.map((lang) => ({
+        label: lang,
+        value: String(lang_list_obj[lang as lang_list_type])
+      })),
+    []
+  );
+
+  const categorySelectItems = useMemo(() => {
+    const fromDb = categories.map((c) => ({ label: c.name, value: String(c.id) }));
+    return [{ label: 'Uncategorized', value: '0' }, ...fromDb];
+  }, [categories]);
+
   return (
     <div className="container mx-auto p-4">
       <div className="my-2 mb-4 flex items-center justify-start space-x-4 px-2">
@@ -59,7 +73,11 @@ export default function AdminListLessons({ init_lang_id }: Props) {
         </Link>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Language</span>
-          <Select value={String(langId)} onValueChange={(v) => setLangId(Number(v))}>
+          <Select
+            items={langSelectItems}
+            value={String(langId)}
+            onValueChange={(v) => setLangId(Number(v))}
+          >
             <SelectTrigger className="w-[160px]">
               <SelectValue />
             </SelectTrigger>
@@ -74,7 +92,11 @@ export default function AdminListLessons({ init_lang_id }: Props) {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Category</span>
-          <Select value={String(categoryId)} onValueChange={(v) => setCategoryId(Number(v))}>
+          <Select
+            items={categorySelectItems}
+            value={String(categoryId)}
+            onValueChange={(v) => setCategoryId(Number(v))}
+          >
             <SelectTrigger className="w-[200px]">
               <SelectValue />
             </SelectTrigger>

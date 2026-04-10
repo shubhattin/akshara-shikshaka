@@ -57,6 +57,17 @@ export default function AdminListAudio() {
   const items = useMemo(() => list_q.data?.list ?? [], [list_q.data]);
   const pageCount = list_q.data?.pageCount ?? 1;
 
+  const langSelectItems = useMemo(
+    () => [
+      { label: 'All', value: 'all' },
+      ...LANG_LIST.map((lang) => ({
+        label: lang,
+        value: String(lang_list_obj[lang as lang_list_type])
+      }))
+    ],
+    []
+  );
+
   const handlePlay = (id: number, s3_key: string) => {
     if (playingId === id) {
       audioRef.current?.pause();
@@ -90,6 +101,7 @@ export default function AdminListAudio() {
         <div className="flex items-center gap-2">
           <Label className="text-sm font-semibold">Language</Label>
           <Select
+            items={langSelectItems}
             value={langFilter === null ? 'all' : String(langFilter)}
             onValueChange={(v) => setLangFilter(v === 'all' ? null : Number(v))}
           >

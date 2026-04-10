@@ -41,6 +41,19 @@ export default function AdminListGestures({ init_script_id, init_gesture_categor
     return entry?.[0] ?? 'Devanagari';
   }, [scriptId]);
 
+  const scriptSelectItems = useMemo(
+    () => Object.keys(script_list_obj).map((name) => ({ label: name, value: name })),
+    []
+  );
+
+  const categorySelectItems = useMemo(() => {
+    const fromDb = init_gesture_categories.map((c) => ({
+      label: c.name,
+      value: String(c.id)
+    }));
+    return [{ label: 'Uncategorized', value: '0' }, ...fromDb];
+  }, [init_gesture_categories]);
+
   return (
     <div className="container mx-auto p-4">
       <div className="my-2 mb-4 flex items-center justify-start space-x-4 px-2">
@@ -59,6 +72,7 @@ export default function AdminListGestures({ init_script_id, init_gesture_categor
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Script</span>
           <Select
+            items={scriptSelectItems}
             value={scriptLabel}
             onValueChange={(name) => {
               const id = script_list_obj[name as keyof typeof script_list_obj];
@@ -79,7 +93,11 @@ export default function AdminListGestures({ init_script_id, init_gesture_categor
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Category</span>
-          <Select value={String(categoryId)} onValueChange={(v) => setCategoryId(Number(v))}>
+          <Select
+            items={categorySelectItems}
+            value={String(categoryId)}
+            onValueChange={(v) => setCategoryId(Number(v))}
+          >
             <SelectTrigger className="w-[200px]">
               <SelectValue />
             </SelectTrigger>

@@ -2,13 +2,13 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { IoMdAdd, IoMdArrowRoundBack } from 'react-icons/io';
 import { Button } from '~/components/ui/button';
-import { createServerFn } from '@tanstack/react-start';
 import { getCookie } from '@tanstack/react-start/server';
 import { get_script_id_from_cookie, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
 import { get_text_gesture_categories_func } from '~/api/routers/gesture_categories';
 import ListGestures from './-ListGestures';
+import { createAdminServerFn } from '@/lib/adminServerFn';
 
-const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
+const loader$ = createAdminServerFn({ method: 'GET' }).handler(async () => {
   const script_id = get_script_id_from_cookie(getCookie(SCRIPT_ID_COOKIE_KEY));
   const gesture_categories = await get_text_gesture_categories_func();
 

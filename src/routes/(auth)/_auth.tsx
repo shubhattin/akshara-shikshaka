@@ -6,6 +6,7 @@ export const Route = createFileRoute('/(auth)/_auth')({
     const session = context.session;
     if (!session?.user || session.user.role !== 'admin') {
       throw redirect({ to: '/' });
+      // handles redirects for the whole /(auth) route group
     }
   }
 });

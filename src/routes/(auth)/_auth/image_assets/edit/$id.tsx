@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { db } from '@/db/db';
-import { createServerFn } from '@tanstack/react-start';
+import { createAdminServerFn } from '@/lib/adminServerFn';
 import z from 'zod';
 import EditImage from './-EditImage';
 import { IoMdArrowRoundBack } from 'react-icons/io';
@@ -42,7 +42,7 @@ const get_cached_image_data = async (id: number) => {
   return image_data;
 };
 
-const loader$ = createServerFn({ method: 'GET' })
+const loader$ = createAdminServerFn({ method: 'GET' })
   .inputValidator((data: { rawId: string }) => data)
   .handler(async ({ data }) => {
     const id = z.coerce.number().int().parse(data.rawId);

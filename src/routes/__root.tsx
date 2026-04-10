@@ -11,7 +11,7 @@ import '../app.scss';
 import { TRPCProvider } from '~/api/client';
 import transformer from '~/api/transformer';
 import type { AppRouter } from '~/api/trpc_router';
-import { ThemeProvider } from '~/components/theme-provider';
+import { THEME_INIT_SCRIPT, ThemeProvider } from '~/components/theme-provider';
 import Header from '@/components/Header';
 import { Toaster } from '@/components/ui/sonner';
 import { getUserSession$ } from '~/lib/get_auth_from_cookie';
@@ -69,6 +69,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       style={{ colorScheme: 'dark' }}
     >
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        // ^ this fixes flickering on initial page load
         <HeadContent />
       </head>
       <body

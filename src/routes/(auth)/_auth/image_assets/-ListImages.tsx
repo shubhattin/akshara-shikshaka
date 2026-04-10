@@ -204,7 +204,7 @@ export default function ListImages() {
                 >
                   <CardContent className="flex items-start gap-3 p-2">
                     <img
-                      src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${item.s3_key}`}
+                      src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${item.s3_key}`}
                       alt={item.description}
                       className="h-16 w-16 rounded object-cover"
                       loading="lazy"

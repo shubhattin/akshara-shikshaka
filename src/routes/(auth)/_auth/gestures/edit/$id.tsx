@@ -21,6 +21,8 @@ const get_cached_text_data = async (id: number) => {
     )
     .where(eq(text_gestures.id, id))
     .limit(1);
+  if (!text_data_) return null;
+
   const text_data = {
     ...text_data_.text_gestures,
     category: text_data_.gesture_categories

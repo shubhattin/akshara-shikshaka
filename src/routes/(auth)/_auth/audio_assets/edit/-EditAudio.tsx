@@ -209,7 +209,7 @@ const AudioInfo = () => {
             <div className="space-y-2">
               <Label className="text-sm font-medium">Audio Preview</Label>
               <WaveformPlayer
-                audioUrl={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${audio_data.s3_key}`}
+                audioUrl={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${audio_data.s3_key}`}
                 isPlaying={playing}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}

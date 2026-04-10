@@ -42,8 +42,6 @@ export const Route = createFileRoute('/(auth)/_auth/gestures/add/')({
 
 function GesturesAddRoute() {
   const { text_data } = Route.useLoaderData();
-  const key =
-    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'add-gesture';
 
   return (
     <div>

@@ -7,7 +7,7 @@ import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { useState } from 'react';
 
 import appCss from '../styles.css?url';
-import '../app.scss?url';
+import '../app.scss';
 import { TRPCProvider } from '~/api/client';
 import transformer from '~/api/transformer';
 import type { AppRouter } from '~/api/trpc_router';
@@ -18,7 +18,7 @@ import { getUserSession$ } from '~/lib/get_auth_from_cookie';
 import { AppContextProvider } from '@/components/AppDataContext';
 import { robotoSans } from '~/components/fonts';
 import { cn } from '~/lib/utils';
-import { queryClient as queryClientGlobal } from '~/state/queryClient';
+import { makeQueryClient } from '~/state/queryClient';
 import PosthogInit from '~/components/tags/PosthogInit';
 
 export const Route = createRootRoute({
@@ -89,7 +89,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 function RootProviders({ children }: { children: React.ReactNode }) {
   const { session } = Route.useRouteContext();
 
-  const [queryClient] = useState(queryClientGlobal);
+  const [queryClient] = useState(() => makeQueryClient());
   const [trpcClient] = useState(() =>
     createTRPCClient<AppRouter>({
       links: [

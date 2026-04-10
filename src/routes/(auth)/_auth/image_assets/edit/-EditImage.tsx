@@ -117,7 +117,7 @@ const ImageInfo = () => {
                 <Label className="text-sm font-medium">Image Preview</Label>
                 <div className="flex justify-center">
                   <img
-                    src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${image_data.s3_key}`}
+                    src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${image_data.s3_key}`}
                     alt={image_data.description}
                     className="max-h-64 max-w-full cursor-pointer rounded-lg object-contain shadow-md"
                     style={{ height: '256px', width: '256px' }}

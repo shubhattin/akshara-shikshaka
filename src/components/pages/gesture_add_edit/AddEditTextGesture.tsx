@@ -103,7 +103,7 @@ import { Provider as JotaiProvider } from 'jotai';
 import { useMutation } from '@tanstack/react-query';
 import { buttonVariants } from '~/components/ui/button';
 
-// Lazy-load Konva canvas (client-only; heavy Konva bundle)
+// Lazy-load the heavy Konva bundle; SSR is blocked at the render site.
 const KonvaCanvas = lazy(() => import('./AddEditGestureCanvas'));
 
 const konvaCanvasFallback = (
@@ -640,9 +640,11 @@ function AddEditTextData({
             isRecording ? 'border-destructive' : 'border-border'
           )}
         >
-          <Suspense fallback={konvaCanvasFallback}>
-            <KonvaCanvas ref={stageRef} />
-          </Suspense>
+          <ClientOnly fallback={konvaCanvasFallback}>
+            <Suspense fallback={konvaCanvasFallback}>
+              <KonvaCanvas ref={stageRef} />
+            </Suspense>
+          </ClientOnly>
         </div>
       </div>
     </div>

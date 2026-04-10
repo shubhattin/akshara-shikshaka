@@ -204,7 +204,12 @@ const AudioList = () => {
             </SelectContent>
           </Select>
         </div>
-        <Link to="/audio_assets" target="_blank" className="group flex items-center gap-2">
+        <Link
+          to="/audio_assets"
+          rel="noopener noreferrer"
+          target="_blank"
+          className="group flex items-center gap-2"
+        >
           <FaExternalLinkAlt className="size-4 text-yellow-300 group-hover:text-blue-400" />
           <span className="text-sm text-teal-300 group-hover:text-sky-400">Manage Audio</span>
         </Link>

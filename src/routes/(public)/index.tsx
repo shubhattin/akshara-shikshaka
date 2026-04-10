@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import Landing from '~/components/pages/home/Landing';
+import Landing from './-Landing';
 
 export const Route = createFileRoute('/(public)/')({
   component: PublicIndex,

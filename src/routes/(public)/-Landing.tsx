@@ -30,7 +30,7 @@ const itemVariants = {
   }
 };
 
-const ManageMenuList = lazy(() => import('./ManageMenuList'));
+const ManageMenuList = lazy(() => import('./-ManageMenuList'));
 
 export default function Home() {
   const StartLearningButton = (

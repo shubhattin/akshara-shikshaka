@@ -4,8 +4,8 @@ import { IoMdArrowRoundBack } from 'react-icons/io';
 import TextLessonAddEdit from '~/components/pages/lesson_add_edit/TextLessonAddEdit';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { db } from '@/db/db';
-import { createAdminServerFn } from '@/lib/adminServerFn';
 import { z } from 'zod';
+import { createServerFn } from '@tanstack/react-start';
 
 const get_cached_text_lesson_info = async (id: number) => {
   const text_lesson_info = await db.query.text_lessons.findFirst({
@@ -58,7 +58,7 @@ const get_cached_text_lesson_info = async (id: number) => {
   return text_lesson_info;
 };
 
-const loader$ = createAdminServerFn({ method: 'GET' })
+const loader$ = createServerFn({ method: 'GET' })
   .inputValidator((data: { rawId: string }) => data)
   .handler(async ({ data }) => {
     const id = z.coerce.number().int().parse(data.rawId);

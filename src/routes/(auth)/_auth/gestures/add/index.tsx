@@ -11,9 +11,9 @@ import {
   SCRIPT_ID_COOKIE_KEY
 } from '@/state/cookie';
 import { DEFAULT_FONT_SIZE } from '@/state/font_list';
-import { createAdminServerFn } from '@/lib/adminServerFn';
+import { createServerFn } from '@tanstack/react-start';
 
-const loader$ = createAdminServerFn({ method: 'GET' }).handler(async () => {
+const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
   const script_id = get_script_id_from_cookie(getCookie(SCRIPT_ID_COOKIE_KEY));
   const font_family = get_font_family_from_cookie(getCookie(FONT_FAMILY_COOKIE_KEY));
   return { script_id, font_family };

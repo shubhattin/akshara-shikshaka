@@ -6,9 +6,9 @@ import { getCookie } from '@tanstack/react-start/server';
 import { get_script_id_from_cookie, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
 import { get_text_gesture_categories_func } from '~/api/routers/gesture_categories';
 import ListGestures from './-ListGestures';
-import { createAdminServerFn } from '@/lib/adminServerFn';
+import { createServerFn } from '@tanstack/react-start';
 
-const loader$ = createAdminServerFn({ method: 'GET' }).handler(async () => {
+const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
   const script_id = get_script_id_from_cookie(getCookie(SCRIPT_ID_COOKIE_KEY));
   const gesture_categories = await get_text_gesture_categories_func();
 

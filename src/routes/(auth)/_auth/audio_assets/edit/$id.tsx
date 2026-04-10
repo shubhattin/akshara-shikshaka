@@ -1,11 +1,11 @@
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
-import { createAdminServerFn } from '@/lib/adminServerFn';
 import { z } from 'zod';
 import { db } from '@/db/db';
 import EditAudio from './-EditAudio';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { Provider as JotaiProvider } from 'jotai';
+import { createServerFn } from '@tanstack/react-start';
 
 const get_cached_audio_data = async (id: number) => {
   const audio_data = await db.query.audio_assets.findFirst({
@@ -42,7 +42,7 @@ const get_cached_audio_data = async (id: number) => {
   return audio_data;
 };
 
-const loader$ = createAdminServerFn({ method: 'GET' })
+const loader$ = createServerFn({ method: 'GET' })
   .inputValidator((data: { rawId: string }) => data)
   .handler(async ({ data }) => {
     const id = z.coerce.number().int().parse(data.rawId);

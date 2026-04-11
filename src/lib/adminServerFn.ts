@@ -1,25 +1,26 @@
 import { redirect } from '@tanstack/react-router';
-import { createMiddleware, createServerFn } from '@tanstack/react-start';
-import { getRequest } from '@tanstack/react-start/server';
-import { getSessionFromCookie } from './get_auth_from_cookie';
+import { createMiddleware } from '@tanstack/react-start';
+import { getUserSession$ } from './get_auth_from_cookie';
+
+export async function requireAdminAccess() {
+  const session = await getUserSession$();
+
+  if (!session?.user || session.user.role !== 'admin') {
+    throw redirect({ to: '/' });
+  }
+
+  return {
+    session,
+    user: session.user
+  };
+}
 
 export const adminServerFnMiddleware = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
-    const session = await getSessionFromCookie(getRequest().headers.get('cookie') ?? '');
-
-    if (!session?.user || session.user.role !== 'admin') {
-      throw redirect({ to: '/' });
-    }
+    const auth = await requireAdminAccess();
 
     return next({
-      context: {
-        session,
-        user: session.user
-      }
+      context: auth
     });
   }
 );
-
-export function createAdminServerFn(options?: Parameters<typeof createServerFn>[0]) {
-  return createServerFn(options).middleware([adminServerFnMiddleware]);
-}

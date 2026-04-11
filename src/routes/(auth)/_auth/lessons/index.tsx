@@ -9,13 +9,16 @@ import { getCookie } from '@tanstack/react-start/server';
 import { get_lesson_lang_id_from_cookie, LESSON_LANG_ID_COOKIE_KEY } from '@/state/cookie';
 import { CACHE } from '@/api/cache';
 import { createServerFn } from '@tanstack/react-start';
+import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 
-const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
-  const lang_id = get_lesson_lang_id_from_cookie(getCookie(LESSON_LANG_ID_COOKIE_KEY));
+const loader$ = createServerFn({ method: 'GET' })
+  .middleware([adminServerFnMiddleware])
+  .handler(async () => {
+    const lang_id = get_lesson_lang_id_from_cookie(getCookie(LESSON_LANG_ID_COOKIE_KEY));
 
-  const lesson_categories = await CACHE.lessons.category_list.get({ lang_id });
-  return { init_lang_id: lang_id, init_lesson_categories: lesson_categories };
-});
+    const lesson_categories = await CACHE.lessons.category_list.get({ lang_id });
+    return { init_lang_id: lang_id, init_lesson_categories: lesson_categories };
+  });
 
 export const Route = createFileRoute('/(auth)/_auth/lessons/')({
   loader: async () => await loader$(),

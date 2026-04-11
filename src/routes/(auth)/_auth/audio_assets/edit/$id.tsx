@@ -6,6 +6,7 @@ import EditAudio from './-EditAudio';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { Provider as JotaiProvider } from 'jotai';
 import { createServerFn } from '@tanstack/react-start';
+import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 
 const get_cached_audio_data = async (id: number) => {
   const audio_data = await db.query.audio_assets.findFirst({
@@ -43,6 +44,7 @@ const get_cached_audio_data = async (id: number) => {
 };
 
 const loader$ = createServerFn({ method: 'GET' })
+  .middleware([adminServerFnMiddleware])
   .inputValidator((data: { rawId: string }) => data)
   .handler(async ({ data }) => {
     const parsed = z.coerce.number().int().positive().safeParse(data.rawId);

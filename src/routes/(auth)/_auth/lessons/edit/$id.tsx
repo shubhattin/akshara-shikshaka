@@ -6,6 +6,7 @@ import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { db } from '@/db/db';
 import { z } from 'zod';
 import { createServerFn } from '@tanstack/react-start';
+import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 
 const get_cached_text_lesson_info = async (id: number) => {
   const text_lesson_info = await db.query.text_lessons.findFirst({
@@ -59,6 +60,7 @@ const get_cached_text_lesson_info = async (id: number) => {
 };
 
 const loader$ = createServerFn({ method: 'GET' })
+  .middleware([adminServerFnMiddleware])
   .inputValidator((data: { rawId: string }) => data)
   .handler(async ({ data }) => {
     const parsed = z.coerce.number().int().positive().safeParse(data.rawId);

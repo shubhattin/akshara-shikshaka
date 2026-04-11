@@ -6,6 +6,7 @@ import { gesture_categories, gesture_text_key_category_join, text_gestures } fro
 import { db } from '@/db/db';
 import { eq } from 'drizzle-orm';
 import { createServerFn } from '@tanstack/react-start';
+import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 
 const get_cached_text_data = async (id: number) => {
   const [text_data_] = await db
@@ -36,6 +37,7 @@ const get_cached_text_data = async (id: number) => {
 };
 
 const loader$ = createServerFn({ method: 'GET' })
+  .middleware([adminServerFnMiddleware])
   .inputValidator((data: { rawId: string }) => data)
   .handler(async ({ data }) => {
     const parsed = z.coerce.number().int().positive().safeParse(data.rawId);

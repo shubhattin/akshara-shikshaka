@@ -1,5 +1,5 @@
-import type { authClient } from '@/lib/auth-client';
-import { createIsomorphicFn, createServerFn } from '@tanstack/react-start';
+import { authClient } from '@/lib/auth-client';
+import { createIsomorphicFn } from '@tanstack/react-start';
 import { getRequestHeader } from '@tanstack/react-start/server';
 
 /** Server-side session lookup from raw `Cookie` header (e.g. tRPC `createContext`). */
@@ -22,8 +22,19 @@ export async function getSessionFromCookie(cookie: string) {
   }
 }
 
-export const getUserSession$ = createServerFn({ method: 'GET' }).handler(async () => {
-  const cookie = getRequestHeader('cookie');
-  const session = await getSessionFromCookie(cookie ?? '');
-  return session;
-});
+export const getUserSession$ = createIsomorphicFn()
+  .client(async () => {
+    const session = (await authClient.getSession()).data;
+    return session;
+  })
+  .server(async () => {
+    const cookie = getRequestHeader('cookie');
+    const session = await getSessionFromCookie(cookie ?? '');
+    return session;
+  });
+
+// export const getUserSession$ = createServerFn({ method: 'GET' }).handler(async () => {
+//   const cookie = getRequestHeader('cookie');
+//   const session = await getSessionFromCookie(cookie ?? '');
+//   return session;
+// });

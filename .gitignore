@@ -11,6 +11,9 @@ dist-ssr
 .wrangler
 .output
 .vinxi
+.vercel
+.env*.local
+
 __unconfig*
 todos.json
 

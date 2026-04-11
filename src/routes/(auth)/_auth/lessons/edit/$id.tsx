@@ -61,7 +61,7 @@ const get_cached_text_lesson_info = async (id: number) => {
 
 const loader$ = createServerFn({ method: 'GET' })
   .middleware([adminServerFnMiddleware])
-  .inputValidator((data: { rawId: string }) => data)
+  .inputValidator(z.object({ rawId: z.string().min(1) }))
   .handler(async ({ data }) => {
     const parsed = z.coerce.number().int().positive().safeParse(data.rawId);
     if (!parsed.success) {

@@ -1,9 +1,9 @@
 import { redirect } from '@tanstack/react-router';
 import { createMiddleware } from '@tanstack/react-start';
-import { getUserSession$ } from './get_auth_from_cookie';
+import { getServerUserSession$ } from './get_auth_from_cookie';
 
 export async function requireAdminAccess() {
-  const session = await getUserSession$();
+  const session = await getServerUserSession$();
 
   if (!session?.user || session.user.role !== 'admin') {
     throw redirect({ to: '/' });

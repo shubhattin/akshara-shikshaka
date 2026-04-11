@@ -28,7 +28,7 @@ import {
   UserGestureRecordingVectorsSchemaZod
 } from '~/db/schema_zod';
 import { z } from 'zod';
-import { InferInsertModel, sql } from 'drizzle-orm';
+import { type InferInsertModel, sql } from 'drizzle-orm';
 import chalk from 'chalk';
 
 const main = async () => {

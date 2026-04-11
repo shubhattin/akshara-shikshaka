@@ -1,7 +1,7 @@
 import { t, protectedAdminProcedure, publicProcedure } from '../trpc_init';
 import { z } from 'zod';
 import { lesson_categories, text_lessons } from '~/db/schema';
-import { db, transactionType } from '~/db/db';
+import { db, type transactionType } from '~/db/db';
 import { and, eq, max } from 'drizzle-orm';
 import { LessonCategoriesSchemaZod, TextLessonsSchemaZod } from '~/db/schema_zod';
 import { CACHE } from '../cache';

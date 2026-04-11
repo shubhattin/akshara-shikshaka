@@ -2,7 +2,21 @@ node_modules
 build
 .netlify
 .vercel
-.next
+.DS_Store
+dist
+dist-ssr
+*.local
+.env
+.env.*
+.nitro
+.tanstack
+.wrangler
+.output
+.vinxi
+__unconfig*
+todos.json
+
+src/routeTree.gen.ts
 
 # Ignore files for PNPM, NPM and YARN
 pnpm-lock.yaml

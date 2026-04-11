@@ -41,7 +41,7 @@ import {
   type lang_list_type
 } from '~/state/lang_list';
 import { transliterate } from 'lipilekhika';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 
 type Props = {
   onAudioSelect: (audio: audio_type) => void;
@@ -168,7 +168,7 @@ const AudioList = () => {
       audioRef.current.pause();
       audioRef.current = null;
     }
-    const audio = new Audio(`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${s3_key}`);
+    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();
@@ -204,7 +204,12 @@ const AudioList = () => {
             </SelectContent>
           </Select>
         </div>
-        <Link href="/audio_assets" target="_blank" className="group flex items-center gap-2">
+        <Link
+          to="/audio_assets"
+          rel="noopener noreferrer"
+          target="_blank"
+          className="group flex items-center gap-2"
+        >
           <FaExternalLinkAlt className="size-4 text-yellow-300 group-hover:text-blue-400" />
           <span className="text-sm text-teal-300 group-hover:text-sky-400">Manage Audio</span>
         </Link>
@@ -488,7 +493,7 @@ const AudioCreation = ({ text }: Props) => {
             </div>
             <div className="ml-2 w-full max-w-md">
               <WaveformPlayer
-                audioUrl={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${create_audio_mut.data.s3_key}`}
+                audioUrl={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${create_audio_mut.data.s3_key}`}
                 isPlaying={createdPlaying}
                 onPlay={() => setCreatedPlaying(true)}
                 onPause={() => setCreatedPlaying(false)}

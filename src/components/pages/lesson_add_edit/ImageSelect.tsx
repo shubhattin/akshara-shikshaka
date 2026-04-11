@@ -26,7 +26,7 @@ import { Label } from '~/components/ui/label';
 
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
-import Link from 'next/link';
+import { Link } from '@tanstack/react-router';
 
 type Props = {
   onImageSelect: (image: image_type) => void;
@@ -111,7 +111,7 @@ const ImageList = () => {
           placeholder="Search description..."
           className="max-w-md"
         />
-        <Link href="/image_assets" target="_blank" className="group flex items-center gap-2">
+        <Link to="/image_assets" target="_blank" className="group flex items-center gap-2">
           <FaExternalLinkAlt className="size-4 text-yellow-300 group-hover:text-blue-400" />
           <span className="text-sm text-teal-300 group-hover:text-sky-400">Manage Images</span>
         </Link>
@@ -166,7 +166,7 @@ const ImageList = () => {
                       </CardHeader> */}
                       <CardContent className="flex items-start gap-3 p-2">
                         <img
-                          src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${item.s3_key}`}
+                          src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${item.s3_key}`}
                           alt={item.description}
                           className="h-14 w-14 rounded object-cover"
                           loading="lazy"
@@ -354,7 +354,7 @@ const ImageCreation = ({ wordItem }: Props) => {
               {create_image_mut.data.description}
             </span>
             <img
-              src={`${process.env.NEXT_PUBLIC_AWS_CLOUDFRONT_URL}/${create_image_mut.data.s3_key}`}
+              src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${create_image_mut.data.s3_key}`}
               alt={create_image_mut.data.description}
               title={create_image_mut.data.image_prompt}
               className="block rounded object-contain"

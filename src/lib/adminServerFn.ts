@@ -1,0 +1,26 @@
+import { redirect } from '@tanstack/react-router';
+import { createMiddleware } from '@tanstack/react-start';
+import { getUserSession$ } from './get_auth_from_cookie';
+
+export async function requireAdminAccess() {
+  const session = await getUserSession$();
+
+  if (!session?.user || session.user.role !== 'admin') {
+    throw redirect({ to: '/' });
+  }
+
+  return {
+    session,
+    user: session.user
+  };
+}
+
+export const adminServerFnMiddleware = createMiddleware({ type: 'function' }).server(
+  async ({ next }) => {
+    const auth = await requireAdminAccess();
+
+    return next({
+      context: auth
+    });
+  }
+);

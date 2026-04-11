@@ -114,7 +114,7 @@ const list_image_assets_route = protectedAdminProcedure
   });
 
 const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY
+  apiKey: import.meta.env.OPENROUTER_API_KEY
 });
 
 const make_upload_image_asset_route = protectedAdminProcedure

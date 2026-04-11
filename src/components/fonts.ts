@@ -1,7 +1,8 @@
-import { Roboto } from 'next/font/google';
+import '@fontsource/roboto/400.css';
+import '@fontsource/roboto/500.css';
+import '@fontsource/roboto/700.css';
 
-export const robotoSans = Roboto({
-  variable: '--font-roboto-sans',
-  subsets: ['latin', 'latin-ext'],
-  weight: ['400', '500', '700']
-});
+/** Matches prior `next/font` Roboto usage for the app bar title. */
+export const robotoSans = {
+  className: 'font-roboto-sans'
+};

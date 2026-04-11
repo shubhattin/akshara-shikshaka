@@ -4,7 +4,7 @@ on:
   - push
 
 env:
-  NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3000
+  VITE_BETTER_AUTH_URL: http://localhost:3000
   PG_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
   OPENAI_API_KEY: sk_proj_1234567890
   AWS_REGION: region-123
@@ -17,30 +17,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-      - uses: pnpm/action-setup@v3
-        name: Install pnpm
-        with:
-          version: 10
-          run_install: true
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - run: |
-          pnpm check
-          pnpm build
+          bun run build
+          bun run check
   # tests:
   #   runs-on: ubuntu-latest
   #   steps:
   #     - uses: actions/checkout@v4
-  #     - name: Use Node.js
-  #       uses: actions/setup-node@v4
+  #     - name: Setup Bun
+  #       uses: oven-sh/setup-bun@v2
   #       with:
-  #         node-version: 20
-  #     - uses: pnpm/action-setup@v3
-  #       name: Install pnpm
-  #       with:
-  #         version: 10
-  #         run_install: true
+  #         bun-version: latest
+  #     - name: Install dependencies
+  #       run: bun install --frozen-lockfile
   #     - run: |
-  #         pnpm test
+  #         bun run test

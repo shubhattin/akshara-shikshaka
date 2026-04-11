@@ -11,7 +11,12 @@ import '../app.scss';
 import { TRPCProvider } from '~/api/client';
 import transformer from '~/api/transformer';
 import type { AppRouter } from '~/api/trpc_router';
-import { THEME_INIT_SCRIPT, ThemeProvider } from '~/components/theme-provider';
+import {
+  createThemeInitScript,
+  DEFAULT_THEME_STORAGE_KEY,
+  ThemeProvider,
+  type Theme
+} from '~/components/theme-provider';
 import Header from '@/components/Header';
 import { Toaster } from '@/components/ui/sonner';
 import { getUserSession$ } from '~/lib/get_auth_from_cookie';
@@ -60,11 +65,18 @@ export const Route = createRootRoute({
   notFoundComponent: () => <div>Not Found</div>
 });
 
+const DEFAULT_THEME: Theme = 'system';
+const THEME_STORAGE_KEY = DEFAULT_THEME_STORAGE_KEY;
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className={cn('font-sans')}>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: createThemeInitScript(THEME_STORAGE_KEY, DEFAULT_THEME)
+          }}
+        />
         {/* ^ this fixes flickering on initial page load */}
         <HeadContent />
       </head>
@@ -99,7 +111,7 @@ function RootProviders({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme={DEFAULT_THEME} storageKey={THEME_STORAGE_KEY}>
       <QueryClientProvider client={queryClient}>
         <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
           <AppContextProvider initialSession={session}>

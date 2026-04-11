@@ -61,7 +61,11 @@ const get_cached_text_lesson_info = async (id: number) => {
 const loader$ = createServerFn({ method: 'GET' })
   .inputValidator((data: { rawId: string }) => data)
   .handler(async ({ data }) => {
-    const id = z.coerce.number().int().parse(data.rawId);
+    const parsed = z.coerce.number().int().positive().safeParse(data.rawId);
+    if (!parsed.success) {
+      return { text_lesson_info: null };
+    }
+    const id = parsed.data;
     const text_lesson_info = await get_cached_text_lesson_info(id);
     return { text_lesson_info };
   });

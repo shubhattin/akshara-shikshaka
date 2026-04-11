@@ -38,7 +38,11 @@ const get_cached_text_data = async (id: number) => {
 const loader$ = createServerFn({ method: 'GET' })
   .inputValidator((data: { rawId: string }) => data)
   .handler(async ({ data }) => {
-    const id = z.coerce.number().int().parse(data.rawId);
+    const parsed = z.coerce.number().int().positive().safeParse(data.rawId);
+    if (!parsed.success) {
+      return { text_data: null, id: null };
+    }
+    const id = parsed.data;
     const text_data = await get_cached_text_data(id);
 
     return { text_data, id };

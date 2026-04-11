@@ -62,15 +62,10 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={cn('dark', 'font-sans')}
-      style={{ colorScheme: 'dark' }}
-    >
+    <html lang="en" suppressHydrationWarning className={cn('font-sans')}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-        // ^ this fixes flickering on initial page load
+        {/* ^ this fixes flickering on initial page load */}
         <HeadContent />
       </head>
       <body

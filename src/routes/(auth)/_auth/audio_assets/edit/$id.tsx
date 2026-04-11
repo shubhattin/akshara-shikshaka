@@ -45,7 +45,11 @@ const get_cached_audio_data = async (id: number) => {
 const loader$ = createServerFn({ method: 'GET' })
   .inputValidator((data: { rawId: string }) => data)
   .handler(async ({ data }) => {
-    const id = z.coerce.number().int().parse(data.rawId);
+    const parsed = z.coerce.number().int().positive().safeParse(data.rawId);
+    if (!parsed.success) {
+      return { audio_data: null };
+    }
+    const id = parsed.data;
     const audio_data = await get_cached_audio_data(id);
     return { audio_data };
   });

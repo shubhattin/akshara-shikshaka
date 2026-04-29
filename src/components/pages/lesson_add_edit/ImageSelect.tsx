@@ -27,6 +27,7 @@ import { Label } from '~/components/ui/label';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { PROJECT_S3_ALIAS } from '~/constants';
 
 type Props = {
   onImageSelect: (image: image_type) => void;
@@ -120,66 +121,66 @@ const ImageList = () => {
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {isLoading
           ? Array.from({ length: limit }).map((_, i) => (
-              <li key={`skeleton-${i}`}>
-                <Card className="p-2">
-                  <CardContent className="flex items-start gap-3 p-2">
-                    <Skeleton className="h-14 w-14 rounded" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-5/6" />
-                      <Skeleton className="h-4 w-3/5" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </li>
-            ))
+            <li key={`skeleton-${i}`}>
+              <Card className="p-2">
+                <CardContent className="flex items-start gap-3 p-2">
+                  <Skeleton className="h-14 w-14 rounded" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-5/6" />
+                    <Skeleton className="h-4 w-3/5" />
+                  </div>
+                </CardContent>
+              </Card>
+            </li>
+          ))
           : items.map((item) => {
-              const selected = selectedImage?.id === item.id;
-              return (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selected) {
-                        setSelectedImage(null);
-                      } else {
-                        setSelectedImage({
-                          id: item.id,
-                          description: item.description,
-                          s3_key: item.s3_key,
-                          height: 256,
-                          width: 256
-                        });
-                      }
-                    }}
-                    className="w-full text-left"
+            const selected = selectedImage?.id === item.id;
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selected) {
+                      setSelectedImage(null);
+                    } else {
+                      setSelectedImage({
+                        id: item.id,
+                        description: item.description,
+                        s3_key: item.s3_key,
+                        height: 256,
+                        width: 256
+                      });
+                    }
+                  }}
+                  className="w-full text-left"
+                >
+                  <Card
+                    className={cn(
+                      'p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800',
+                      selected && 'ring-2 ring-blue-500'
+                    )}
                   >
-                    <Card
-                      className={cn(
-                        'p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800',
-                        selected && 'ring-2 ring-blue-500'
-                      )}
-                    >
-                      {/* <CardHeader className="p-2">
+                    {/* <CardHeader className="p-2">
                         <CardTitle className="text-xs text-muted-foreground">
                           {new Date(item.created_at).toLocaleDateString()}
                         </CardTitle>
                       </CardHeader> */}
-                      <CardContent className="flex items-start gap-3 p-2">
-                        <img
-                          src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${item.s3_key}`}
-                          alt={item.description}
-                          className="h-14 w-14 rounded object-cover"
-                          loading="lazy"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-xs">{item.description}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </button>
-                </li>
-              );
-            })}
+                    <CardContent className="flex items-start gap-3 p-2">
+                      <img
+                        src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${item.s3_key}`}
+                        alt={item.description}
+                        className="h-14 w-14 rounded object-cover"
+                        loading="lazy"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-xs">{item.description}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </button>
+              </li>
+            );
+          })}
       </ul>
 
       <div className="mx-auto flex w-full items-center justify-between gap-2">
@@ -354,7 +355,7 @@ const ImageCreation = ({ wordItem }: Props) => {
               {create_image_mut.data.description}
             </span>
             <img
-              src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${create_image_mut.data.s3_key}`}
+              src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${create_image_mut.data.s3_key}`}
               alt={create_image_mut.data.description}
               title={create_image_mut.data.image_prompt}
               className="block rounded object-contain"

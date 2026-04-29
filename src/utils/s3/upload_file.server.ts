@@ -4,6 +4,7 @@ import type { PutObjectCommandInput } from '@aws-sdk/client-s3';
 import { DeleteObjectCommand, PutObjectCommand, S3Client, StorageClass } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import ms from 'ms';
+import type { PROJECT_S3_ALIAS } from '@/constants';
 
 const envs_parsed = z
   .object({
@@ -41,9 +42,6 @@ async function uploadFile(bucketName: string, key: string, fileBuffer: Buffer) {
 }
 
 const ASSET_BUCKET_NAME = envs.AWS_S3_FILES_BUCKET_NAME;
-
-/** This is scoped location for this project files in the bucket */
-export const PROJECT_S3_ALIAS = '001_akshara' as const;
 
 type location_types =
   | `${typeof PROJECT_S3_ALIAS}/image_assets/${string}.webp`

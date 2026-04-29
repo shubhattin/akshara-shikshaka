@@ -9,10 +9,11 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { get_lang_from_id, get_script_from_id } from '~/state/lang_list';
 import { generateImageGptImage1 } from '~/utils/ai/image.server';
 import { resizeImage } from '~/utils/sharp/resize.server';
-import { deleteAssetFile, PROJECT_S3_ALIAS, uploadAssetFile } from '~/utils/s3/upload_file.server';
+import { deleteAssetFile, uploadAssetFile } from '~/utils/s3/upload_file.server';
 import { format_string_text } from '~/tools/kry';
 import { waitUntil } from '@vercel/functions';
 import { CACHE } from '../cache';
+import { PROJECT_S3_ALIAS } from '~/constants';
 
 const SYSTEN_PROMPT = `
 You have to generate an image prompt, file name and description for the word provided. 
@@ -33,7 +34,7 @@ const description_file_name_response_schema = z.object({
     .string()
     .describe(
       'A 3-4 word max file name for the image, preferrable 2-3 words. It should not contain any spaces. Do not add any file extension. These files are only for debugging purposes and not actual file names displayed to users. ' +
-        'Words should be in lowercase, separated by underscores and no extra special characters. Eg: good_apple_image, cute_cat_image, etc. '
+      'Words should be in lowercase, separated by underscores and no extra special characters. Eg: good_apple_image, cute_cat_image, etc. '
     ),
 
   description: z

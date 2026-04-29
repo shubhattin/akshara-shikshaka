@@ -41,6 +41,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { cn } from '~/lib/utils';
 import { buttonVariants } from '~/components/ui/button';
+import { PROJECT_S3_ALIAS } from '~/constants';
 
 dayjs.extend(relativeTime);
 
@@ -204,7 +205,7 @@ export default function ListImages() {
                 >
                   <CardContent className="flex items-start gap-3 p-2">
                     <img
-                      src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${item.s3_key}`}
+                      src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${item.s3_key}`}
                       alt={item.description}
                       className="h-16 w-16 rounded object-cover"
                       loading="lazy"

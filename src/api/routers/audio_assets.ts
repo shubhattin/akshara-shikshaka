@@ -9,11 +9,11 @@ import {
   uploadAssetFile,
   deleteAssetFile,
   getAudioAssetUploadUrl,
-  PROJECT_S3_ALIAS
 } from '~/utils/s3/upload_file.server';
 import { get_lang_from_id } from '~/state/lang_list';
 import { waitUntil } from '@vercel/functions';
 import { CACHE } from '../cache';
+import { PROJECT_S3_ALIAS } from '~/constants';
 
 const list_audio_assets_route = protectedAdminProcedure
   .input(

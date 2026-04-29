@@ -42,6 +42,7 @@ import {
 } from '~/state/lang_list';
 import { transliterate } from 'lipilekhika';
 import { Link } from '@tanstack/react-router';
+import { PROJECT_S3_ALIAS } from '~/constants';
 
 type Props = {
   onAudioSelect: (audio: audio_type) => void;
@@ -168,7 +169,7 @@ const AudioList = () => {
       audioRef.current.pause();
       audioRef.current = null;
     }
-    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${s3_key}`);
+    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();
@@ -218,75 +219,75 @@ const AudioList = () => {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {isLoading
           ? Array.from({ length: limit }).map((_, i) => (
-              <Card className="p-2">
-                <CardContent className="flex items-start gap-3 p-2">
-                  <Skeleton className="h-14 w-14 rounded" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-5/6" />
-                    <Skeleton className="h-4 w-3/5" />
+            <Card className="p-2">
+              <CardContent className="flex items-start gap-3 p-2">
+                <Skeleton className="h-14 w-14 rounded" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-5/6" />
+                  <Skeleton className="h-4 w-3/5" />
+                </div>
+              </CardContent>
+            </Card>
+          ))
+          : items.map((item) => {
+            const selected = selectedAudio?.id === item.id;
+            return (
+              <Card
+                key={item.id}
+                onClick={(e) => {
+                  // avoid toggling on play button click
+                  if ((e.target as HTMLElement).closest('[data-audio-action]')) return;
+                  if (selected) setSelectedAudio(null);
+                  else
+                    setSelectedAudio({
+                      id: item.id,
+                      description: item.description,
+                      s3_key: item.s3_key
+                    });
+                }}
+                className={cn(
+                  'p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800',
+                  selected && 'ring-2 ring-blue-500'
+                )}
+              >
+                <CardContent className="flex items-center gap-3 p-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 text-xs">{item.description}</p>
+                    {langFilter === null && item.lang_id != null && (
+                      <p className="text-[10px] text-muted-foreground">
+                        {get_lang_from_id(item.lang_id)}
+                      </p>
+                    )}
+                  </div>
+                  <div data-audio-action>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => handlePlay(item.id, item.s3_key)}
+                    >
+                      {playingId === item.id ? (
+                        <span className="flex items-center gap-1">
+                          <MdStop /> Stop
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1">
+                          <MdPlayArrow /> Play
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                  <div className="flex size-4 items-center justify-center rounded bg-muted">
+                    {item.type === 'ai_generated' ? (
+                      <FaRobot className="size-4 text-yellow-600" />
+                    ) : (
+                      <MdMic className="size-4 text-emerald-600 dark:text-emerald-400" />
+                    )}
                   </div>
                 </CardContent>
               </Card>
-            ))
-          : items.map((item) => {
-              const selected = selectedAudio?.id === item.id;
-              return (
-                <Card
-                  key={item.id}
-                  onClick={(e) => {
-                    // avoid toggling on play button click
-                    if ((e.target as HTMLElement).closest('[data-audio-action]')) return;
-                    if (selected) setSelectedAudio(null);
-                    else
-                      setSelectedAudio({
-                        id: item.id,
-                        description: item.description,
-                        s3_key: item.s3_key
-                      });
-                  }}
-                  className={cn(
-                    'p-2 transition duration-200 hover:bg-gray-100 hover:dark:bg-gray-800',
-                    selected && 'ring-2 ring-blue-500'
-                  )}
-                >
-                  <CardContent className="flex items-center gap-3 p-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-xs">{item.description}</p>
-                      {langFilter === null && item.lang_id != null && (
-                        <p className="text-[10px] text-muted-foreground">
-                          {get_lang_from_id(item.lang_id)}
-                        </p>
-                      )}
-                    </div>
-                    <div data-audio-action>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-7 px-2 text-xs"
-                        onClick={() => handlePlay(item.id, item.s3_key)}
-                      >
-                        {playingId === item.id ? (
-                          <span className="flex items-center gap-1">
-                            <MdStop /> Stop
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1">
-                            <MdPlayArrow /> Play
-                          </span>
-                        )}
-                      </Button>
-                    </div>
-                    <div className="flex size-4 items-center justify-center rounded bg-muted">
-                      {item.type === 'ai_generated' ? (
-                        <FaRobot className="size-4 text-yellow-600" />
-                      ) : (
-                        <MdMic className="size-4 text-emerald-600 dark:text-emerald-400" />
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+            );
+          })}
       </div>
 
       <div className="mx-auto flex w-full items-center justify-between gap-2">
@@ -493,7 +494,7 @@ const AudioCreation = ({ text }: Props) => {
             </div>
             <div className="ml-2 w-full max-w-md">
               <WaveformPlayer
-                audioUrl={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${create_audio_mut.data.s3_key}`}
+                audioUrl={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${create_audio_mut.data.s3_key}`}
                 isPlaying={createdPlaying}
                 onPlay={() => setCreatedPlaying(true)}
                 onPause={() => setCreatedPlaying(false)}
@@ -695,7 +696,7 @@ const AudioRecord = ({ text }: Props) => {
           tempAudio.onloadedmetadata = () => {
             setRecordedDurationSec(tempAudio.duration);
           };
-        } catch {}
+        } catch { }
         setRecStatus('recorded');
       };
       recorder.start();

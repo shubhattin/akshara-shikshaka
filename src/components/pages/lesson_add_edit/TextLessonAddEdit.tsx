@@ -94,6 +94,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '~/components/ui/select';
+import { PROJECT_S3_ALIAS } from '~/constants';
 
 type gestures_list_type = {
   id: number;
@@ -103,20 +104,20 @@ type gestures_list_type = {
 
 type Props =
   | {
-      location: 'add';
-      text_lesson_info: text_lesson_info_type & {
-        id?: number;
-        uuid?: string;
-      };
-      gestures_list: gestures_list_type[]; // []
-      words: text_lesson_word_type[]; // []
-    }
-  | {
-      location: 'edit';
-      text_lesson_info: text_lesson_info_type;
-      gestures_list: gestures_list_type[];
-      words: text_lesson_word_type[];
+    location: 'add';
+    text_lesson_info: text_lesson_info_type & {
+      id?: number;
+      uuid?: string;
     };
+    gestures_list: gestures_list_type[]; // []
+    words: text_lesson_word_type[]; // []
+  }
+  | {
+    location: 'edit';
+    text_lesson_info: text_lesson_info_type;
+    gestures_list: gestures_list_type[];
+    words: text_lesson_word_type[];
+  };
 
 export default function TextLessonAddEditComponent(props: Props) {
   useHydrateAtoms([
@@ -353,7 +354,7 @@ const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) =>
       audioRef.current.pause();
       audioRef.current = null;
     }
-    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${asset.s3_key}`);
+    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${asset.s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();
@@ -614,7 +615,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
       audioRef.current.pause();
       audioRef.current = null;
     }
-    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${asset.s3_key}`);
+    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${asset.s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();
@@ -686,7 +687,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
             <div className="flex items-center justify-center gap-2">
               <img
                 onClick={() => setImageViewDialogOpen(true)}
-                src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${image_asset.s3_key}`}
+                src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${image_asset.s3_key}`}
                 alt={image_asset.description}
                 title={image_asset.description}
                 className="size-14"
@@ -711,7 +712,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
                   </span>
 
                   <img
-                    src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${image_asset.s3_key}`}
+                    src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${image_asset.s3_key}`}
                     alt={image_asset.description}
                     style={{ height: '256px', width: '256px' }}
                   />

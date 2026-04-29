@@ -60,6 +60,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '~/components/ui/select';
+import { PROJECT_S3_ALIAS } from '@/constants';
 
 type Props = {
   init_lesson_categories: lesson_category_type[];
@@ -251,10 +252,10 @@ const LessonsList = (props: Props) => {
           selectedCategoryId === null
             ? undefined
             : ((queryClient.getQueryData(
-                trpc.text_lessons.categories.get_category_text_lesson_list.queryKey({
-                  category_id: selectedCategoryId
-                })
-              ) as typeof props.init_lessons_list | undefined) ??
+              trpc.text_lessons.categories.get_category_text_lesson_list.queryKey({
+                category_id: selectedCategoryId
+              })
+            ) as typeof props.init_lessons_list | undefined) ??
               (selectedCategoryId === props.saved_category_id
                 ? props.init_lessons_list
                 : undefined))
@@ -455,7 +456,7 @@ const Lesson = ({
     if (playingVarnaAudio) {
       setPlayingVarnaAudio(false);
     }
-    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${s3_key}`);
+    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingIndex(null);
     audio.play();
@@ -477,7 +478,7 @@ const Lesson = ({
     if (playingIndex !== null) {
       setPlayingIndex(null);
     }
-    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${s3_key}`);
+    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingVarnaAudio(false);
     audio.play();
@@ -589,7 +590,7 @@ const Lesson = ({
                       </div>
                       {imageKey && (
                         <img
-                          src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${imageKey}`}
+                          src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${imageKey}`}
                           alt={w.word}
                           className="mx-auto size-20 object-contain"
                         />

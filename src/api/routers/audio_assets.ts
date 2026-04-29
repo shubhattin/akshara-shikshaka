@@ -8,7 +8,8 @@ import { generateGpt4oMiniTtsSpeech, VoiceTypeEnum } from '~/utils/ai/text_to_sp
 import {
   uploadAssetFile,
   deleteAssetFile,
-  getAudioAssetUploadUrl
+  getAudioAssetUploadUrl,
+  PROJECT_S3_ALIAS
 } from '~/utils/s3/upload_file.server';
 import { get_lang_from_id } from '~/state/lang_list';
 import { waitUntil } from '@vercel/functions';
@@ -111,7 +112,7 @@ const make_upload_audio_asset_route = protectedAdminProcedure
     console.log('audio generated');
 
     const s3_key =
-      `audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
+      `${PROJECT_S3_ALIAS}/audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
     await uploadAssetFile(s3_key, audioBuffer.fileBuffer);
     console.log('audio uploaded');
 
@@ -218,7 +219,7 @@ const get_upload_audio_asset_url_route = protectedAdminProcedure
   )
   .mutation(async ({ input }) => {
     const s3_key =
-      `audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
+      `${PROJECT_S3_ALIAS}/audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
     const upload_url = await getAudioAssetUploadUrl(s3_key);
     return {
       upload_url,

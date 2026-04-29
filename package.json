@@ -19,7 +19,7 @@
     "migration:push": "drizzle-kit push"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^3.0.53",
+    "@ai-sdk/openai": "^3.0.54",
     "@aws-sdk/client-s3": "^3.1034.0",
     "@aws-sdk/s3-request-presigner": "^3.1034.0",
     "@base-ui/react": "^1.4.1",
@@ -28,7 +28,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@fontsource/roboto": "^5.2.10",
     "@neondatabase/serverless": "^1.1.0",
-    "@openrouter/ai-sdk-provider": "^2.8.0",
+    "@openrouter/ai-sdk-provider": "^2.9.0",
     "@tailwindcss/vite": "^4.2.4",
     "@tanstack/react-devtools": "0.10.2",
     "@tanstack/react-query": "^5.99.2",
@@ -43,6 +43,7 @@
     "@upstash/redis": "^1.37.0",
     "@vercel/functions": "^3.4.4",
     "@wavesurfer/react": "^1.0.12",
+    "ai": "^6.0.169",
     "audiomotion-analyzer": "^4.5.4",
     "better-auth": "^1.6.7",
     "buffer": "^6.0.3",

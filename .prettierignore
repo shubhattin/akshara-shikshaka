@@ -15,6 +15,7 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+.agents
 
 src/routeTree.gen.ts
 

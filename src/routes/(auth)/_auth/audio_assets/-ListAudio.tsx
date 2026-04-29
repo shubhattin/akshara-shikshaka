@@ -114,7 +114,9 @@ export default function ListAudio() {
       audioRef.current.pause();
       audioRef.current = null;
     }
-    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${s3_key}`);
+    const audio = new Audio(
+      `${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${s3_key}`
+    );
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();

@@ -34,7 +34,7 @@ const description_file_name_response_schema = z.object({
     .string()
     .describe(
       'A 3-4 word max file name for the image, preferrable 2-3 words. It should not contain any spaces. Do not add any file extension. These files are only for debugging purposes and not actual file names displayed to users. ' +
-      'Words should be in lowercase, separated by underscores and no extra special characters. Eg: good_apple_image, cute_cat_image, etc. '
+        'Words should be in lowercase, separated by underscores and no extra special characters. Eg: good_apple_image, cute_cat_image, etc. '
     ),
 
   description: z

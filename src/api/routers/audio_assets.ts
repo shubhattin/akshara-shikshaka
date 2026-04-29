@@ -8,7 +8,7 @@ import { generateGpt4oMiniTtsSpeech, VoiceTypeEnum } from '~/utils/ai/text_to_sp
 import {
   uploadAssetFile,
   deleteAssetFile,
-  getAudioAssetUploadUrl,
+  getAudioAssetUploadUrl
 } from '~/utils/s3/upload_file.server';
 import { get_lang_from_id } from '~/state/lang_list';
 import { waitUntil } from '@vercel/functions';

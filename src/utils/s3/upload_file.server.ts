@@ -43,9 +43,11 @@ async function uploadFile(bucketName: string, key: string, fileBuffer: Buffer) {
 const ASSET_BUCKET_NAME = envs.AWS_S3_FILES_BUCKET_NAME;
 
 /** This is scoped location for this project files in the bucket */
-export const PROJECT_ALIAS = 'akshara_001' as const;
+export const PROJECT_S3_ALIAS = 'akshara_001' as const;
 
-type location_types = `${typeof PROJECT_ALIAS}/image_assets/${string}.webp` | `${typeof PROJECT_ALIAS}/audio_assets/${string}.webm`;
+type location_types =
+  | `${typeof PROJECT_S3_ALIAS}/image_assets/${string}.webp`
+  | `${typeof PROJECT_S3_ALIAS}/audio_assets/${string}.webm`;
 export const uploadAssetFile = async (key: location_types, fileBuffer: Buffer) => {
   const data = await uploadFile(ASSET_BUCKET_NAME, key, fileBuffer);
   return data;
@@ -61,7 +63,9 @@ export const deleteAssetFile = async (key: string) => {
   return data;
 };
 
-export const getAudioAssetUploadUrl = async (key: `${typeof PROJECT_ALIAS}/audio_assets/${string}.webm`) => {
+export const getAudioAssetUploadUrl = async (
+  key: `${typeof PROJECT_S3_ALIAS}/audio_assets/${string}.webm`
+) => {
   // Generate presigned URL for upload
   const command = new PutObjectCommand({
     Bucket: envs.AWS_S3_FILES_BUCKET_NAME,

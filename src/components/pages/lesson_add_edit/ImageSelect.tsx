@@ -27,7 +27,6 @@ import { Label } from '~/components/ui/label';
 import { useQuery } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { PROJECT_S3_ALIAS } from '~/constants';
 
 type Props = {
   onImageSelect: (image: image_type) => void;
@@ -167,7 +166,7 @@ const ImageList = () => {
                       </CardHeader> */}
                       <CardContent className="flex items-start gap-3 p-2">
                         <img
-                          src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${item.s3_key}`}
+                          src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${item.s3_key}`}
                           alt={item.description}
                           className="h-14 w-14 rounded object-cover"
                           loading="lazy"
@@ -355,7 +354,7 @@ const ImageCreation = ({ wordItem }: Props) => {
               {create_image_mut.data.description}
             </span>
             <img
-              src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${create_image_mut.data.s3_key}`}
+              src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${create_image_mut.data.s3_key}`}
               alt={create_image_mut.data.description}
               title={create_image_mut.data.image_prompt}
               className="block rounded object-contain"

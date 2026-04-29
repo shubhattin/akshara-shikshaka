@@ -35,7 +35,6 @@ import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { LANG_LIST, lang_list_obj, type lang_list_type, get_lang_from_id } from '~/state/lang_list';
 import { cn } from '~/lib/utils';
 import { buttonVariants } from '~/components/ui/button';
-import { PROJECT_S3_ALIAS } from '~/constants';
 
 type Props = {
   audio_data: {
@@ -210,7 +209,7 @@ const AudioInfo = () => {
             <div className="space-y-2">
               <Label className="text-sm font-medium">Audio Preview</Label>
               <WaveformPlayer
-                audioUrl={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${audio_data.s3_key}`}
+                audioUrl={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${audio_data.s3_key}`}
                 isPlaying={playing}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}

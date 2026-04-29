@@ -31,7 +31,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { cn } from '~/lib/utils';
 import { buttonVariants } from '~/components/ui/button';
-import { PROJECT_S3_ALIAS } from '~/constants';
 
 // Atom for image data
 const image_data_atom = atom<{
@@ -118,7 +117,7 @@ const ImageInfo = () => {
                 <Label className="text-sm font-medium">Image Preview</Label>
                 <div className="flex justify-center">
                   <img
-                    src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${image_data.s3_key}`}
+                    src={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${image_data.s3_key}`}
                     alt={image_data.description}
                     className="max-h-64 max-w-full cursor-pointer rounded-lg object-contain shadow-md"
                     style={{ height: '256px', width: '256px' }}

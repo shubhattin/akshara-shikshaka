@@ -42,7 +42,6 @@ import {
 } from '~/state/lang_list';
 import { transliterate } from 'lipilekhika';
 import { Link } from '@tanstack/react-router';
-import { PROJECT_S3_ALIAS } from '~/constants';
 
 type Props = {
   onAudioSelect: (audio: audio_type) => void;
@@ -169,9 +168,7 @@ const AudioList = () => {
       audioRef.current.pause();
       audioRef.current = null;
     }
-    const audio = new Audio(
-      `${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${s3_key}`
-    );
+    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();
@@ -496,7 +493,7 @@ const AudioCreation = ({ text }: Props) => {
             </div>
             <div className="ml-2 w-full max-w-md">
               <WaveformPlayer
-                audioUrl={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${create_audio_mut.data.s3_key}`}
+                audioUrl={`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${create_audio_mut.data.s3_key}`}
                 isPlaying={createdPlaying}
                 onPlay={() => setCreatedPlaying(true)}
                 onPause={() => setCreatedPlaying(false)}

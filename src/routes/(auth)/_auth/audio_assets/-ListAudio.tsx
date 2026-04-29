@@ -37,7 +37,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '~/lib/utils';
 import { buttonVariants } from '~/components/ui/button';
-import { PROJECT_S3_ALIAS } from '~/constants';
 
 export default function ListAudio() {
   const trpc = useTRPC();
@@ -114,9 +113,7 @@ export default function ListAudio() {
       audioRef.current.pause();
       audioRef.current = null;
     }
-    const audio = new Audio(
-      `${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${PROJECT_S3_ALIAS}/${s3_key}`
-    );
+    const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${s3_key}`);
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();

@@ -6,7 +6,7 @@ import { parseLearnPageCookie, SAVED_COOKIES_KEY } from './-learn_page_state';
 import LearnPage from './-LearnPage';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { getCookie } from '@tanstack/react-start/server';
-import { transliterate_wasm } from 'lipilekhika';
+import { transliterate_node } from 'lipilekhika/node';
 
 const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
   const lang_id = lang_list_obj['Sanskrit'];
@@ -38,7 +38,7 @@ const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
   const init_lessons_list_transliterated = await Promise.all(
     init_lessons_list.map(async (lesson) => ({
       ...lesson,
-      text: await transliterate_wasm(lesson.text, 'Devanagari', target_script)
+      text: await transliterate_node(lesson.text, 'Devanagari', target_script)
     }))
   );
 

@@ -40,7 +40,7 @@ async function backup_data() {
   if (!fs.existsSync(OUT_FOLDER)) fs.mkdirSync(OUT_FOLDER);
 
   function backup(command: string, file_name: string, temp_file_name: string) {
-    execSync(command);
+    execSync(command, { stdio: 'inherit' });
     const backup_file_data = fs.readFileSync(temp_file_name).toString('utf-8');
     fs.writeFileSync(`${OUT_FOLDER}/${file_name}`, backup_file_data, {
       encoding: 'utf-8'
@@ -69,35 +69,72 @@ async function backup_data() {
 
   console.log('Zipping backup files');
   execSync(
-    'zip backup/backup.zip backup/db_dump_schema.sql backup/db_dump_data.sql backup/db_data.json'
+    'zip backup/backup.zip backup/db_dump_schema.sql backup/db_dump_data.sql backup/db_data.json',
+    { stdio: 'inherit' }
   );
   console.log('Backup complete');
 }
 
 const s3 = new S3Client({
   region: envs.AWS_REGION,
+  maxAttempts: 3,
   credentials: {
     accessKeyId: envs.AWS_ACCESS_KEY_ID,
     secretAccessKey: envs.AWS_SECRET_ACCESS_KEY
   }
 });
 
-async function uploadFile(bucketName: string, key: string, filePath: string) {
-  const fileStream = fs.createReadStream(filePath);
+function logS3Failure(operation: string, err: unknown) {
+  console.error(`[S3 ${operation}] failed`);
+  console.error(err);
+  if (err && typeof err === 'object') {
+    const e = err as {
+      name?: string;
+      message?: string;
+      Code?: string;
+      $fault?: string;
+      $metadata?: { httpStatusCode?: number; requestId?: string; extendedRequestId?: string };
+    };
+    if (e.name || e.message) {
+      console.error(`[S3 ${operation}] ${e.name ?? 'Error'}: ${e.message ?? '(no message)'}`);
+    }
+    if (e.Code) console.error(`[S3 ${operation}] Code: ${e.Code}`);
+    if (e.$metadata) console.error(`[S3 ${operation}] metadata: ${JSON.stringify(e.$metadata)}`);
+  }
+}
 
+async function uploadFile(bucketName: string, key: string, filePath: string) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Backup artifact missing at "${filePath}" (cwd: ${process.cwd()})`);
+  }
+
+  const stat = fs.statSync(filePath);
+  const mb = Math.round((stat.size / 1024 / 1024) * 100) / 100;
+
+  console.log('\n--- S3 PutObject ---');
+  console.log(`Region: ${envs.AWS_REGION}`);
+  console.log(`Bucket: ${bucketName}`);
+  console.log(`Key: ${key}`);
+  console.log(`File: ${filePath} (${stat.size} bytes, ~${mb} MiB)`);
+
+  const fileBuffer = fs.readFileSync(filePath);
   const uploadParams: PutObjectCommandInput = {
     Bucket: bucketName,
     Key: key,
-    Body: fileStream,
+    Body: fileBuffer,
+    ContentLength: fileBuffer.byteLength,
     ContentType: mime.lookup(filePath) || 'application/octet-stream',
     StorageClass: StorageClass.GLACIER_IR
   };
 
   try {
-    const data = await s3.send(new PutObjectCommand(uploadParams));
-    console.log('Upload success');
+    const data = await s3.send(new PutObjectCommand(uploadParams), {
+      abortSignal: AbortSignal.timeout(ms('30 minutes'))
+    });
+    console.log(`PutObject succeeded${data.ETag ? ` (ETag ${data.ETag})` : ''}`);
   } catch (err) {
-    console.error('Error uploading file:', err);
+    logS3Failure('PutObject', err);
+    throw err;
   }
 }
 
@@ -184,12 +221,18 @@ async function cleanupOldBackups(
 
     for (let i = 0; i < keysToDelete.length; i += 1000) {
       const batch = keysToDelete.slice(i, i + 1000);
-      await s3.send(
+      const delResp = await s3.send(
         new DeleteObjectsCommand({
           Bucket: bucketName,
           Delete: { Objects: batch, Quiet: false }
         })
       );
+      if (delResp.Errors?.length) {
+        console.error('DeleteObjects partial failures:', delResp.Errors);
+        throw new Error(
+          `DeleteObjects reported ${delResp.Errors.length} error(s); first: ${delResp.Errors[0]?.Code ?? '?'} ${delResp.Errors[0]?.Message ?? ''}`
+        );
+      }
       console.log(`Deleted batch of ${batch.length} backups`);
     }
 
@@ -206,7 +249,8 @@ const BACKUP_FOLDER_NAME = 'akshara_backups';
 async function main() {
   await backup_data();
   const current_date_key = new Date().toISOString();
-  console.log(current_date_key);
+  console.log(`\nBackup timestamp (object key suffix): ${current_date_key}`);
+
   await uploadFile(
     envs.AWS_DB_BACKUP_BUCKET_NAME,
     `${BACKUP_FOLDER_NAME}/${current_date_key}.zip`,
@@ -220,6 +264,12 @@ async function main() {
     ms('45days'),
     MIN_BACKUPS_TO_KEEP
   );
+
+  console.log('\n✓ Backup and S3 steps finished successfully');
 }
 
-main();
+main().catch((err) => {
+  console.error('\n✗ backup_db_data.ts exited with failure');
+  logS3Failure('workflow', err);
+  process.exit(1);
+});

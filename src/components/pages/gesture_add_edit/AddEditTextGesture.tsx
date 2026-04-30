@@ -1,5 +1,5 @@
 'use client';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
@@ -420,10 +420,10 @@ function AddEditTextData({
     );
   }, [gestureData, selectedGestureIndex]);
 
-  const ctx = createTypingContext(script);
+  const ctx = useMemo(() => createTypingContext(script), [script]);
 
   useEffect(() => {
-    ctx.ready;
+    void ctx.ready;
   }, [ctx]);
 
   return (

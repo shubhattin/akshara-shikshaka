@@ -1,7 +1,7 @@
 'use client';
 import { useAtomValue, useAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FiSave } from 'react-icons/fi';
 import { IoMdAdd } from 'react-icons/io';
 import { MdClose, MdDeleteOutline, MdDragHandle } from 'react-icons/md';
@@ -160,9 +160,9 @@ const LessonInfo = (props: Props) => {
     preloadScriptData(get_script_from_id(base_word_script_id));
   }, [lang_id, base_word_script_id]);
 
-  const ctx = createTypingContext(get_lang_from_id(lang_id));
+  const ctx = useMemo(() => createTypingContext(get_lang_from_id(lang_id)), [lang_id]);
   useEffect(() => {
-    ctx.ready;
+    void ctx.ready;
   }, [ctx]);
 
   const langItems = [
@@ -621,9 +621,12 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
     setPlayingId(wordItem.order);
   };
 
-  const ctx = createTypingContext(get_script_from_id(base_word_script_id));
+  const ctx = useMemo(
+    () => createTypingContext(get_script_from_id(base_word_script_id)),
+    [base_word_script_id]
+  );
   useEffect(() => {
-    ctx.ready;
+    void ctx.ready;
   }, [ctx]);
 
   return (

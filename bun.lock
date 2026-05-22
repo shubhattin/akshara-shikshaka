@@ -12,6 +12,16 @@
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/sortable": "^10.0.0",
         "@dnd-kit/utilities": "^3.2.2",
+        "@fontsource-variable/noto-sans-devanagari": "^5.2.8",
+        "@fontsource-variable/noto-sans-kannada": "^5.2.9",
+        "@fontsource-variable/noto-sans-malayalam": "^5.2.8",
+        "@fontsource-variable/noto-sans-oriya": "^5.2.9",
+        "@fontsource-variable/noto-sans-telugu": "^5.2.8",
+        "@fontsource-variable/noto-serif-devanagari": "^5.2.10",
+        "@fontsource-variable/noto-serif-kannada": "^5.2.8",
+        "@fontsource-variable/noto-serif-malayalam": "^5.2.8",
+        "@fontsource-variable/noto-serif-oriya": "^5.2.8",
+        "@fontsource-variable/noto-serif-telugu": "^5.2.8",
         "@fontsource/roboto": "^5.2.10",
         "@neondatabase/serverless": "^1.1.0",
         "@openrouter/ai-sdk-provider": "^2.9.0",
@@ -43,7 +53,7 @@
         "jotai": "^2.19.1",
         "js-cookie": "^3.0.5",
         "konva": "^10.2.5",
-        "lipilekhika": "^1.0.11",
+        "lipilekhika": "^1.0.12",
         "lucide-react": "^0.545.0",
         "mime-types": "^3.0.2",
         "ms": "^2.1.3",
@@ -388,6 +398,26 @@
     "@floating-ui/react-dom": ["@floating-ui/react-dom@2.1.8", "", { "dependencies": { "@floating-ui/dom": "^1.7.6" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-cC52bHwM/n/CxS87FH0yWdngEZrjdtLW/qVruo68qg+prK7ZQ4YGdut2GyDVpoGeAYe/h899rVeOVm6Oi40k2A=="],
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.11", "", {}, "sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg=="],
+
+    "@fontsource-variable/noto-sans-devanagari": ["@fontsource-variable/noto-sans-devanagari@5.2.8", "", {}, "sha512-KogMgbXfY/gGtuubU+Pc/vV5Tc4zggObUppNKcSKIRixGUBM1gZdBTpEtS6Q6Cyr9kaIH7081npaxEx3zLlBnA=="],
+
+    "@fontsource-variable/noto-sans-kannada": ["@fontsource-variable/noto-sans-kannada@5.2.9", "", {}, "sha512-EjSAB0jdQMzJD5vQ5RkAPPHuonxoQHDf7Oe/wOOFlu2+5LD5lOmzlutCnA+1QwwDsMBAlc8A94vXM2qC9nKfDA=="],
+
+    "@fontsource-variable/noto-sans-malayalam": ["@fontsource-variable/noto-sans-malayalam@5.2.8", "", {}, "sha512-JpDL648/mUiFsyoEu+LWxQeinc7RCaoQsY+opeBOmp61zzA2IhX0oOkh236cX6DCfymd83/96w/5Zc2GdomLCw=="],
+
+    "@fontsource-variable/noto-sans-oriya": ["@fontsource-variable/noto-sans-oriya@5.2.9", "", {}, "sha512-lKncPgndI7mvluiFD9KWn6SpmPv5t5Kv2sg+GD9bVxc5v9ivYVa0vMQng7uLNAD9Tr4VFolujMXpt4NUl6sSOw=="],
+
+    "@fontsource-variable/noto-sans-telugu": ["@fontsource-variable/noto-sans-telugu@5.2.8", "", {}, "sha512-ymoid6RObCEZdf7YBqpFKplPt6Pf4j11MSxG5vFqSBekUck9VM6BrtRjkPtGDWvpOoYHR19vt6RHz7s/9zOxwA=="],
+
+    "@fontsource-variable/noto-serif-devanagari": ["@fontsource-variable/noto-serif-devanagari@5.2.10", "", {}, "sha512-EisxLoM8yj+Dd7p19MmWHX7NYTcccOVCHEiKWVbhtc3dxv7NDy8hrfsSdykKt7tAjp65jv7QcslEkVHb5zsWvg=="],
+
+    "@fontsource-variable/noto-serif-kannada": ["@fontsource-variable/noto-serif-kannada@5.2.8", "", {}, "sha512-31gun7V9VDaXAZjbHJvT4V3uLw2xB1ooNp6hcDj6s9SqZvcvODcA1hwAMSDZhzk+tEL2nr5E7Mt8JB/VPQeuEQ=="],
+
+    "@fontsource-variable/noto-serif-malayalam": ["@fontsource-variable/noto-serif-malayalam@5.2.8", "", {}, "sha512-HwIZATtitv928e2KRw4LX1LpMtXVPAl/8U2rRYZfEhIFwsSfWlL7o61s0u85yur9dX/+B37YMR2jMHdblS5R2Q=="],
+
+    "@fontsource-variable/noto-serif-oriya": ["@fontsource-variable/noto-serif-oriya@5.2.8", "", {}, "sha512-2o0wxP46JXunmiBEE3rCupNq95rmY6ZXxrkjq2Sv29UxYsEs2KDzCFi3ALb6zYIYRcyU7RTbTnlB2bqJ7ItKDw=="],
+
+    "@fontsource-variable/noto-serif-telugu": ["@fontsource-variable/noto-serif-telugu@5.2.8", "", {}, "sha512-tkEN2/4xz2Do4gNoFGZTdyI73LOLCqLcYqfpkGdw+jA2q5QL+xiW8BOXQFIIsxOjbdoZc4QPKyAYWyhhgupKsg=="],
 
     "@fontsource/roboto": ["@fontsource/roboto@5.2.10", "", {}, "sha512-8HlA5FtSfz//oFSr2eL7GFXAiE7eIkcGOtx7tjsLKq+as702x9+GU7K95iDeWFapHC4M2hv9RrpXKRTGGBI8Zg=="],
 
@@ -1557,7 +1587,7 @@
 
     "lines-and-columns": ["lines-and-columns@1.2.4", "", {}, "sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg=="],
 
-    "lipilekhika": ["lipilekhika@1.0.11", "", {}, "sha512-XgdJVyShkvfcDwYx1zoN2v+JuCQFBtwqnq9OzIX4Rb5vKObqRZyOqD5jri/Ysy9/nykTqhrboXwRZKKUpAHjfg=="],
+    "lipilekhika": ["lipilekhika@1.0.12", "", {}, "sha512-C26LoXOz5I/taeN+vDBNfgV8/R+zV11CBHFMRmznoTP6zs1VeJG4ML6bWpJ2t1gIMC+JAYkjbrZV86J2GTrelg=="],
 
     "locate-path": ["locate-path@5.0.0", "", { "dependencies": { "p-locate": "^4.1.0" } }, "sha512-t7hw9pI+WvuwNJXwk5zVHpyhIqzg2qTlklJOf0mVxGSbe3Fp2VieZcduNYjaLDoy6p9uGpQEGWG87WpMKlNq8g=="],
 

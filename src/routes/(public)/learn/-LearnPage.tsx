@@ -274,19 +274,16 @@ const LessonsList = (props: Props) => {
     const data = lessons_q.data;
     transliterationVersion.current += 1;
     const currentVersion = transliterationVersion.current;
-    Promise.all(
-      data.map(async (lesson) => ({
-        ...lesson,
-        text: await transliterate(
-          lesson.text,
-          get_lang_from_id(selectedLanguageId),
-          get_script_from_id(selectedScriptId)
-        )
-      }))
-    ).then((transliterated_data) => {
+    transliterate(
+      data.map((lesson) => lesson.text),
+      get_lang_from_id(selectedLanguageId),
+      get_script_from_id(selectedScriptId)
+    ).then((transliterated_texts) => {
       // avoid race condition by checking if this is still the latest transliteration request
       if (currentVersion !== transliterationVersion.current) return;
-      setTransliteratedLessons(transliterated_data);
+      setTransliteratedLessons(
+        data.map((lesson, i) => ({ ...lesson, text: transliterated_texts[i] }))
+      );
     });
   }, [lessons_q.isSuccess, lessons_q.data, selectedLanguageId, selectedScriptId]);
 
@@ -407,15 +404,10 @@ const Lesson = ({
   const [varnaTransliterated, setVarnaTransliterated] = useState<string | null>(null);
   useEffect(() => {
     if (lesson?.words && scriptId) {
-      Promise.all(
-        lesson.words.map(
-          async (w) =>
-            await transliterate(
-              w.word,
-              get_script_from_id(lesson.base_word_script_id),
-              get_script_from_id(scriptId)
-            )
-        )
+      transliterate(
+        lesson.words.map((w) => w.word),
+        get_script_from_id(lesson.base_word_script_id),
+        get_script_from_id(scriptId)
       ).then((transliterated_words) => setWordsTransliterated(transliterated_words));
       transliterate(
         lesson.text,

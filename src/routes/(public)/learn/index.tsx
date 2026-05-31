@@ -35,12 +35,15 @@ const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
 
   const init_lessons_list = await CACHE.lessons.category_lesson_list.get({ category_id });
   const target_script = get_script_from_id(saved_script_id ?? script_list_obj['Devanagari']);
-  const init_lessons_list_transliterated = await Promise.all(
-    init_lessons_list.map(async (lesson) => ({
-      ...lesson,
-      text: await transliterate_wasm(lesson.text, 'Devanagari', target_script)
-    }))
+  const transliterated_texts = await transliterate_wasm(
+    init_lessons_list.map((lesson) => lesson.text),
+    'Devanagari',
+    target_script
   );
+  const init_lessons_list_transliterated = init_lessons_list.map((lesson, i) => ({
+    ...lesson,
+    text: transliterated_texts[i]
+  }));
 
   const lesson_id = !saved_lesson_id_
     ? (init_lessons_list[0]?.id ?? null)

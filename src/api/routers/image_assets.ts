@@ -4,16 +4,23 @@ import { db } from '~/db/db';
 import { image_assets } from '~/db/schema';
 import { dev_delay } from '~/tools/delay';
 import { asc, count, desc, eq, ilike } from 'drizzle-orm';
-import { generateText, Output } from 'ai';
+import { generateImage, generateText, Output } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { get_lang_from_id, get_script_from_id } from '~/state/lang_list';
-import { generateImageGptImage1 } from '~/utils/ai/image.server';
 import { resizeImage } from '~/utils/sharp/resize.server';
 import { deleteAssetFile, uploadAssetFile } from '~/utils/s3/upload_file.server';
 import { format_string_text } from '~/tools/kry';
 import { waitUntil } from '@vercel/functions';
 import { CACHE } from '../cache';
 import { PROJECT_S3_ALIAS } from '~/constants';
+import { createOpenAI, type OpenAIImageModelGenerationOptions } from '@ai-sdk/openai';
+
+const openrouter = createOpenRouter({
+  apiKey: import.meta.env.OPENROUTER_API_KEY
+});
+const openai = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 const SYSTEN_PROMPT = `
 You have to generate an image prompt, file name and description for the word provided. 
@@ -114,10 +121,6 @@ const list_image_assets_route = protectedAdminProcedure
     };
   });
 
-const openrouter = createOpenRouter({
-  apiKey: import.meta.env.OPENROUTER_API_KEY
-});
-
 const make_upload_image_asset_route = protectedAdminProcedure
   .input(
     z.object({
@@ -174,11 +177,21 @@ const make_upload_image_asset_route = protectedAdminProcedure
     const s3_image_key =
       `${PROJECT_S3_ALIAS}/image_assets/${file_name}_${crypto.randomUUID()}.webp` as const;
     // ^ prefer the existing image prompt if provided
-    const generated_image = await generateImageGptImage1(image_prompt);
+    const generated_image = await generateImage({
+      model: openai.imageModel('gpt-image-2'),
+      prompt: image_prompt,
+      size: '1024x1024',
+      aspectRatio: '1:1',
+      providerOptions: {
+        openai: {
+          quality: 'low'
+        } satisfies OpenAIImageModelGenerationOptions
+      }
+    });
     console.log('image generated');
 
     const IMAGE_DIMENSIONS = 256;
-    const image_buffer = Buffer.from(generated_image.b64_json, 'base64');
+    const image_buffer = Buffer.from(generated_image.image.base64, 'base64');
     const resized_image_buffer = await resizeImage(
       image_buffer,
       IMAGE_DIMENSIONS,

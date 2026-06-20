@@ -7,7 +7,6 @@ import { IoAddOutline } from 'react-icons/io5';
 import { Input } from '~/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
-import { Progress } from '~/components/ui/progress';
 import { Textarea } from '~/components/ui/textarea';
 import { IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
 import { custom_classes } from '~/components/custom_ui';
@@ -69,7 +68,7 @@ export default function ImageSelect(props: Props) {
   );
 }
 
-const IMAGE_AVERAGE_TIME_MS = ms('28s');
+const IMAGE_AVERAGE_TIME_MS = ms('35s');
 
 const ImageList = () => {
   const trpc = useTRPC();
@@ -332,18 +331,14 @@ const ImageCreation = ({ wordItem }: Props) => {
       </div>
       {create_image_mut.isPending && (
         <div className="flex flex-col items-center justify-center space-y-4">
-          <div className="flex items-center justify-center">
-            <Skeleton style={{ height: '256px', width: '256px' }} />
-          </div>
-          <div className="w-64 space-y-2">
-            <Progress
-              value={Math.min((elapsedTime / IMAGE_AVERAGE_TIME_MS) * 100, 100)}
-              className="h-2"
+          <Skeleton className="h-64 w-64 shrink-0 rounded border border-border bg-secondary/60" />
+          <div className="h-2 w-64 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full bg-primary transition-all"
+              style={{
+                width: `${Math.min((elapsedTime / IMAGE_AVERAGE_TIME_MS) * 100, 100)}%`
+              }}
             />
-            {/* <p className="text-center text-sm text-muted-foreground">
-              Creating image... {Math.round(elapsedTime / 1000)}s /{' '}
-              {Math.round(IMAGE_AVERAGE_TIME_MS / 1000)}s
-            </p> */}
           </div>
         </div>
       )}

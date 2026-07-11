@@ -12,16 +12,16 @@ import { Link } from '@tanstack/react-router';
 import { useContext } from 'react';
 import { FaRegHandPaper, FaBookOpen, FaVolumeUp, FaRegImage, FaSignInAlt } from 'react-icons/fa';
 import { signIn } from '~/lib/auth-client';
-import { AppContext } from '~/components/AppDataContext';
+import { useSession } from '~/lib/auth-client';
 
 export default function ManageMenuList({ children }: { children: React.ReactNode }) {
-  const { user_info } = useContext(AppContext);
+  const session = useSession();
 
   return (
     <ContextMenu>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
       <ContextMenuContent>
-        {!user_info && (
+        {!session.data?.user && (
           <ContextMenuItem
             className="flex items-center gap-2 p-2"
             onClick={() =>
@@ -35,12 +35,12 @@ export default function ManageMenuList({ children }: { children: React.ReactNode
             Login
           </ContextMenuItem>
         )}
-        {user_info && user_info.role !== 'admin' && (
+        {session.data?.user && session.data.user.role !== 'admin' && (
           <>
             <ContextMenuLabel>You are not authorized to Edit Data</ContextMenuLabel>
           </>
         )}
-        {user_info?.role === 'admin' && (
+        {session.data?.user?.role === 'admin' && (
           <>
             {/* <ContextMenuLabel>Manage</ContextMenuLabel> */}
             <Link to="/lessons" className="flex items-center gap-2">

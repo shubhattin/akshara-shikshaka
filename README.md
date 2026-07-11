@@ -1,6 +1,6 @@
 # 🪶 Akshara (अक्षर)
 
-**Akshara** is an interactive, immersive, and hands-on learning platform designed to help users master Indian language scripts (such as Devanagari, Kannada, Telugu, Malayalam, Odia, Bengali, Gujarati, Tamil, Gurumukhi, and Sinhala). 
+**Akshara** is an interactive, immersive, and hands-on learning platform designed to help users master Indian language scripts (such as Devanagari, Kannada, Telugu, Malayalam, Odia, Bengali, Gujarati, Tamil, Gurumukhi, and Sinhala).
 
 Through real-time stroke/gesture recognition, audio feedback, and structured lessons, users can practice writing letters correctly, listen to authentic pronunciations, and learn vocabulary associated with each character.
 
@@ -86,15 +86,15 @@ cp .env.example .env
 
 Fill in your environmental variables:
 
-| Variable | Description |
-| :--- | :--- |
-| `PG_DATABASE_URL` | PostgreSQL connection string. |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Credentials for S3 bucket asset storage. |
-| `AWS_S3_FILES_BUCKET_NAME` / `AWS_REGION` | Target S3 bucket name and its AWS region. |
-| `VITE_AWS_CLOUDFRONT_URL` | CloudFront Distribution URL linked to your S3 bucket. |
-| `OPENAI_API_KEY` / `OPENROUTER_API_KEY` | API keys for Vercel AI SDK integrations. |
-| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis credentials for caching. |
-| `VITE_BASE_URL` / `VITE_BETTER_AUTH_URL` | Host addresses for application and Better Auth endpoints. |
+| Variable                                              | Description                                               |
+| :---------------------------------------------------- | :-------------------------------------------------------- |
+| `PG_DATABASE_URL`                                     | PostgreSQL connection string.                             |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`         | Credentials for S3 bucket asset storage.                  |
+| `AWS_S3_FILES_BUCKET_NAME` / `AWS_REGION`             | Target S3 bucket name and its AWS region.                 |
+| `VITE_AWS_CLOUDFRONT_URL`                             | CloudFront Distribution URL linked to your S3 bucket.     |
+| `OPENAI_API_KEY` / `OPENROUTER_API_KEY`               | API keys for Vercel AI SDK integrations.                  |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis credentials for caching.                    |
+| `VITE_BASE_URL` / `VITE_BETTER_AUTH_URL`              | Host addresses for application and Better Auth endpoints. |
 
 ### Database Setup & Migrations
 

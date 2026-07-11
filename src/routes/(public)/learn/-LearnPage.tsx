@@ -19,7 +19,7 @@ import {
 } from '~/state/lang_list';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '~/api/client';
-import { useState, useEffect, useRef, useMemo, useContext } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
 import { Button } from '~/components/ui/button';
 import { buttonVariants } from '~/components/ui/button';
@@ -48,7 +48,7 @@ import {
   CarouselPrevious
 } from '~/components/ui/carousel';
 import { HiSpeakerWave } from 'react-icons/hi2';
-import { AppContext } from '~/components/AppDataContext';
+import { useSession } from '~/lib/auth-client';
 import { Link } from '@tanstack/react-router';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { motion } from 'framer-motion';
@@ -96,6 +96,7 @@ function LearnPage(props: Props) {
   const [selectedCategoryId, setSelectedCategoryId] = useAtom(selected_category_id_atom);
   const [open, setOpen] = useState(false);
   const [, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
+  const session = useSession();
   const scriptItems = useMemo(
     () => [
       { label: 'Script', value: null },
@@ -391,7 +392,7 @@ const Lesson = ({
   const scriptId = useAtomValue(selected_script_id_atom);
   const selectedLanguageId = useAtomValue(selected_language_id_atom);
   const trpc = useTRPC();
-  const { user_info } = useContext(AppContext);
+  const session = useSession();
 
   const lesson_info_q = useQuery(
     trpc.text_lessons.get_text_lesson_info.queryOptions(
@@ -684,7 +685,7 @@ const Lesson = ({
             </JotaiProvider>
           )}
       </div>
-      {user_info && user_info.role === 'admin' && (
+      {session.data?.user && session.data.user.role === 'admin' && (
         <div className="mt-16 flex items-center justify-center">
           <Link
             to="/lessons/edit/$id"

@@ -19,20 +19,12 @@ import {
 } from '~/components/theme-provider';
 import Header from '@/components/Header';
 import { Toaster } from '@/components/ui/sonner';
-import { getUserSession$ } from '~/lib/get_auth_from_cookie';
-import { AppContextProvider } from '@/components/AppDataContext';
 import { robotoSans } from '~/components/fonts';
 import { cn } from '~/lib/utils';
 import { makeQueryClient } from '~/state/queryClient';
 import PosthogInit from '~/components/tags/PosthogInit';
 
 export const Route = createRootRoute({
-  beforeLoad: async () => {
-    const session = await getUserSession$();
-    return {
-      session
-    };
-  },
   ssr: true,
   head: () => ({
     meta: [
@@ -96,8 +88,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootProviders({ children }: { children: React.ReactNode }) {
-  const { session } = Route.useRouteContext();
-
   const [queryClient] = useState(() => makeQueryClient());
   const [trpcClient] = useState(() =>
     createTRPCClient<AppRouter>({
@@ -114,31 +104,29 @@ function RootProviders({ children }: { children: React.ReactNode }) {
     <ThemeProvider defaultTheme={DEFAULT_THEME} storageKey={THEME_STORAGE_KEY}>
       <QueryClientProvider client={queryClient}>
         <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-          <AppContextProvider initialSession={session}>
-            <div className="container mx-auto mb-12">
-              <Toaster richColors={true} />
-              <Header />
-              {children}
-            </div>
-            {import.meta.env.DEV && (
-              <TanStackDevtools
-                config={{
-                  position: 'bottom-right',
-                  openHotkey: undefined
-                }}
-                plugins={[
-                  {
-                    name: 'Tanstack Router',
-                    render: <TanStackRouterDevtoolsPanel />
-                  },
-                  {
-                    name: 'Tanstack Query',
-                    render: <ReactQueryDevtoolsPanel />
-                  }
-                ]}
-              />
-            )}
-          </AppContextProvider>
+          <div className="container mx-auto mb-12">
+            <Toaster richColors={true} />
+            <Header />
+            {children}
+          </div>
+          {import.meta.env.DEV && (
+            <TanStackDevtools
+              config={{
+                position: 'bottom-right',
+                openHotkey: undefined
+              }}
+              plugins={[
+                {
+                  name: 'Tanstack Router',
+                  render: <TanStackRouterDevtoolsPanel />
+                },
+                {
+                  name: 'Tanstack Query',
+                  render: <ReactQueryDevtoolsPanel />
+                }
+              ]}
+            />
+          )}
         </TRPCProvider>
       </QueryClientProvider>
     </ThemeProvider>

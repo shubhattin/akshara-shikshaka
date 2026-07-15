@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { t, protectedAdminProcedure } from '~/api/trpc_init';
 import { db, type transactionType } from '~/db/db';
 import { gesture_categories, gesture_text_key_category_join, text_gestures } from '~/db/schema';
-import { and, asc, eq, exists, isNull, max, ne } from 'drizzle-orm';
+import { and, asc, eq, isNull, max, ne, sql } from 'drizzle-orm';
 import { GestureCategoriesSchemaZod, TextGesturesSchemaZod } from '~/db/schema_zod';
 
 /**
@@ -44,15 +44,18 @@ export const reorder_text_gesture_in_category_func = async (
       order: index + 1
     }));
 
-  // inside a transaction we do not use  `allSettled` as it swallows write failures and the transaction cannot do its intended job
-  await Promise.all(
-    reordered_gestures.map((gesture) =>
-      dbConn
-        .update(text_gestures)
-        .set({ order: gesture.order })
-        .where(eq(text_gestures.id, gesture.id))
-    )
+  if (reordered_gestures.length === 0) return;
+
+  // inside a transaction we do not use `allSettled` as it swallows write failures and the transaction cannot do its intended job
+  const value_rows = reordered_gestures.map(
+    (gesture) => sql`(${gesture.id}::int, ${gesture.order}::smallint)`
   );
+  await dbConn.execute(sql`
+    UPDATE ${text_gestures} AS t
+    SET "order" = v."order", updated_at = NOW()
+    FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
+    WHERE t.id = v.id
+  `);
 };
 
 export const get_text_gesture_categories_func = async () => {
@@ -97,16 +100,18 @@ const update_list_route = protectedAdminProcedure
   )
   .mutation(async ({ input: { categories } }) => {
     await db.transaction(async (tx) => {
-      // Run updates in parallel within a transaction
-      // as order of these categories are dependent on each other
-      await Promise.all(
-        categories.map((category) =>
-          tx
-            .update(gesture_categories)
-            .set({ name: category.name, order: category.order })
-            .where(eq(gesture_categories.id, category.id))
-        )
+      // single UPDATE FROM VALUES — order of these categories are dependent on each other
+      if (categories.length === 0) return;
+
+      const value_rows = categories.map(
+        (category) => sql`(${category.id}::int, ${category.name}, ${category.order}::smallint)`
       );
+      await tx.execute(sql`
+        UPDATE ${gesture_categories} AS t
+        SET name = v.name, "order" = v."order", updated_at = NOW()
+        FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, name, "order")
+        WHERE t.id = v.id
+      `);
     });
 
     return {
@@ -136,14 +141,17 @@ const delete_category_route = protectedAdminProcedure
         order: index + 1
       }));
       // Update the order of the categories
-      await Promise.all(
-        reordered_categories.map((category) =>
-          tx
-            .update(gesture_categories)
-            .set({ order: category.order })
-            .where(eq(gesture_categories.id, category.id))
-        )
-      );
+      if (reordered_categories.length > 0) {
+        const value_rows = reordered_categories.map(
+          (category) => sql`(${category.id}::int, ${category.order}::smallint)`
+        );
+        await tx.execute(sql`
+          UPDATE ${gesture_categories} AS t
+          SET "order" = v."order", updated_at = NOW()
+          FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
+          WHERE t.id = v.id
+        `);
+      }
     });
 
     return {
@@ -217,30 +225,23 @@ const update_gestures_order_route = protectedAdminProcedure
     await db.transaction(async (tx) => {
       // a transaction is not necessary here but fine to use too
       // also the order of these gestures are dependent on each other
-      await Promise.all(
-        gestures.map((gesture) =>
-          tx
-            .update(text_gestures)
-            .set({ order: gesture.order })
-            .where(
-              and(
-                eq(text_gestures.id, gesture.id),
-                // security check
-                exists(
-                  tx
-                    .select()
-                    .from(gesture_text_key_category_join)
-                    .where(
-                      and(
-                        eq(gesture_text_key_category_join.gesture_text_key, text_gestures.text_key),
-                        eq(gesture_text_key_category_join.category_id, category_id)
-                      )
-                    )
-                )
-              )
-            )
-        )
+      if (gestures.length === 0) return;
+
+      const value_rows = gestures.map(
+        (gesture) => sql`(${gesture.id}::int, ${gesture.order}::smallint)`
       );
+      await tx.execute(sql`
+        UPDATE ${text_gestures} AS t
+        SET "order" = v."order", updated_at = NOW()
+        FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
+        WHERE t.id = v.id
+          AND EXISTS (
+            SELECT 1
+            FROM ${gesture_text_key_category_join} AS j
+            WHERE j.gesture_text_key = t.text_key
+              AND j.category_id = ${category_id}
+          )
+      `);
     });
     return {
       updated: true

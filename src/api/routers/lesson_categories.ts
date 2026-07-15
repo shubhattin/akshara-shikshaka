@@ -2,7 +2,7 @@ import { t, protectedAdminProcedure, publicProcedure } from '../trpc_init';
 import { z } from 'zod';
 import { lesson_categories, text_lessons } from '~/db/schema';
 import { db, type transactionType } from '~/db/db';
-import { and, eq, max } from 'drizzle-orm';
+import { and, eq, max, sql } from 'drizzle-orm';
 import { LessonCategoriesSchemaZod, TextLessonsSchemaZod } from '~/db/schema_zod';
 import { CACHE } from '../cache';
 import { waitUntil } from '@vercel/functions';
@@ -31,14 +31,18 @@ export const reorder_text_lesson_in_category_func = async (
       order: index + 1
     }));
 
-  await Promise.all(
-    reordered_lessons.map((lesson) =>
-      dbConn
-        .update(text_lessons)
-        .set({ order: lesson.order })
-        .where(and(eq(text_lessons.id, lesson.id), eq(text_lessons.category_id, category_id)))
-    )
+  if (reordered_lessons.length === 0) return;
+
+  const value_rows = reordered_lessons.map(
+    (lesson) => sql`(${lesson.id}::int, ${lesson.order}::smallint)`
   );
+  await dbConn.execute(sql`
+    UPDATE ${text_lessons} AS t
+    SET "order" = v."order", updated_at = NOW()
+    FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
+    WHERE t.id = v.id
+      AND t.category_id = ${category_id}
+  `);
 };
 
 const get_categories_route = publicProcedure
@@ -81,17 +85,19 @@ const update_category_list_route = protectedAdminProcedure
   )
   .mutation(async ({ input: { categories, lang_id } }) => {
     await db.transaction(async (tx) => {
-      // transaction is good to have here  as the order of these categories are dependent on each other
-      await Promise.all([
-        ...categories.map((category) =>
-          tx
-            .update(lesson_categories)
-            .set({ name: category.name, order: category.order })
-            .where(
-              and(eq(lesson_categories.id, category.id), eq(lesson_categories.lang_id, lang_id))
-            )
-        )
-      ]);
+      // transaction is good to have here as the order of these categories are dependent on each other
+      if (categories.length === 0) return;
+
+      const value_rows = categories.map(
+        (category) => sql`(${category.id}::int, ${category.name}, ${category.order}::smallint)`
+      );
+      await tx.execute(sql`
+        UPDATE ${lesson_categories} AS t
+        SET name = v.name, "order" = v."order", updated_at = NOW()
+        FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, name, "order")
+        WHERE t.id = v.id
+          AND t.lang_id = ${lang_id}
+      `);
     });
     // invalidate category list cache
     // as being referched onSuccess
@@ -126,14 +132,17 @@ const delete_category_route = protectedAdminProcedure
         order: index + 1
       }));
       // Update the order of the categories
-      await Promise.all([
-        ...reordered_categories.map((category) =>
-          tx
-            .update(lesson_categories)
-            .set({ order: category.order })
-            .where(eq(lesson_categories.id, category.id))
-        )
-      ]);
+      if (reordered_categories.length > 0) {
+        const value_rows = reordered_categories.map(
+          (category) => sql`(${category.id}::int, ${category.order}::smallint)`
+        );
+        await tx.execute(sql`
+          UPDATE ${lesson_categories} AS t
+          SET "order" = v."order", updated_at = NOW()
+          FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
+          WHERE t.id = v.id
+        `);
+      }
     });
     // invalidate lessons category list cache
     await CACHE.lessons.category_list.delete({ lang_id });
@@ -187,14 +196,18 @@ const update_text_lessons_order_route = protectedAdminProcedure
   )
   .mutation(async ({ input: { lessons, category_id } }) => {
     await db.transaction(async (tx) => {
-      await Promise.all([
-        ...lessons.map((lesson) =>
-          tx
-            .update(text_lessons)
-            .set({ order: lesson.order })
-            .where(and(eq(text_lessons.id, lesson.id), eq(text_lessons.category_id, category_id)))
-        )
-      ]);
+      if (lessons.length === 0) return;
+
+      const value_rows = lessons.map(
+        (lesson) => sql`(${lesson.id}::int, ${lesson.order}::smallint)`
+      );
+      await tx.execute(sql`
+        UPDATE ${text_lessons} AS t
+        SET "order" = v."order", updated_at = NOW()
+        FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
+        WHERE t.id = v.id
+          AND t.category_id = ${category_id}
+      `);
     });
 
     // as this routes data invalidation does not depend on cached data so we revaidate the cache in background

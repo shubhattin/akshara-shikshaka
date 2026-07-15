@@ -2,7 +2,7 @@ import { t, protectedAdminProcedure, publicProcedure } from '../trpc_init';
 import { z } from 'zod';
 import { lesson_gestures, text_lesson_words, text_lessons } from '~/db/schema';
 import { db, type transactionType } from '~/db/db';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { TextLessonsSchemaZod, TextLessonWordsSchemaZod } from '~/db/schema_zod';
 import { TRPCError } from '@trpc/server';
 import {
@@ -188,14 +188,25 @@ const update_text_lesson_route = protectedAdminProcedure
                 .values(to_add_words.map((word) => ({ ...word, text_lesson_id: id })))
                 .returning()
             : [],
-          ...to_update_words.map((word) =>
-            tx
-              .update(text_lesson_words)
-              .set(word)
-              .where(
-                and(eq(text_lesson_words.id, word.id), eq(text_lesson_words.text_lesson_id, id))
-              )
-          )
+          to_update_words.length > 0 &&
+            tx.execute(sql`
+              UPDATE ${text_lesson_words} AS t
+              SET
+                word = v.word,
+                "order" = v."order",
+                image_id = v.image_id,
+                audio_id = v.audio_id,
+                updated_at = NOW()
+              FROM (VALUES ${sql.join(
+                to_update_words.map(
+                  (word) =>
+                    sql`(${word.id}::int, ${word.word}, ${word.order}::smallint, ${word.image_id}::int, ${word.audio_id}::int)`
+                ),
+                sql`, `
+              )}) AS v(id, word, "order", image_id, audio_id)
+              WHERE t.id = v.id
+                AND t.text_lesson_id = ${id}
+            `)
         ]);
 
         return inserted;

@@ -121,7 +121,6 @@
     "sass": "^1.99.0",
     "typescript": "^5.9.3",
     "vite": "^8.0.10",
-    "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4"
   }
 }

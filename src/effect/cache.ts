@@ -1,28 +1,31 @@
 import { Effect } from 'effect';
 import ms from 'ms';
-import { z, type ZodSchema } from 'zod';
-import { db } from '~/db/db';
+import { z } from 'zod';
 import { RedisClient } from './redis';
 import { CacheError } from './errors';
 import { BackgroundWork } from './background';
+import { Database, type DbClient } from './database';
 
 const CACHE_EXPIRE_S = ms('30days') / 1000;
 
-type CacheEnv = RedisClient | BackgroundWork;
+type CacheEnv = RedisClient | BackgroundWork | Database;
 
 export interface CacheItem<TData, TParams> {
   key: (params: TParams) => string;
   get: (params: TParams) => Effect.Effect<TData, CacheError, CacheEnv>;
   set: (data: TData, params: TParams) => Effect.Effect<void, CacheError, RedisClient>;
   delete: (params: TParams) => Effect.Effect<void, CacheError, RedisClient>;
-  refresh: (params: TParams, del?: boolean) => Effect.Effect<void, CacheError, RedisClient>;
+  refresh: (
+    params: TParams,
+    del?: boolean
+  ) => Effect.Effect<void, CacheError, RedisClient | Database>;
 }
 
-function createCache<TSchema extends ZodSchema, TData>(
+export function createCache<TSchema extends z.ZodType, TData>(
   keyPrefix: string,
   schema: TSchema,
   keyBuilder: (params: z.infer<TSchema>) => string,
-  fetchFn: (params: z.infer<TSchema>) => Effect.Effect<TData, CacheError>,
+  fetchFn: (params: z.infer<TSchema>) => Effect.Effect<TData, CacheError, Database>,
   ttl = CACHE_EXPIRE_S
 ): CacheItem<TData, z.infer<TSchema>> {
   type TParams = z.infer<TSchema>;
@@ -42,10 +45,12 @@ function createCache<TSchema extends ZodSchema, TData>(
       const redis = yield* RedisClient;
       const background = yield* BackgroundWork;
 
-      const cached = yield* redis.get<TData>(key).pipe(
-        Effect.mapError(toCacheError('get', key)),
-        Effect.annotateLogs({ category: 'cache', operation: 'get', key })
-      );
+      const cached = yield* redis
+        .get<TData>(key)
+        .pipe(
+          Effect.mapError(toCacheError('get', key)),
+          Effect.annotateLogs({ category: 'cache', operation: 'get', key })
+        );
       if (cached) return cached;
 
       const data = yield* fetchFn(parsed);
@@ -55,7 +60,7 @@ function createCache<TSchema extends ZodSchema, TData>(
           Effect.logWarning('cache set failed', { key, error }).pipe(Effect.asVoid)
         )
       );
-      yield* background.enqueue(Effect.runPromise(setProgram));
+      yield* background.enqueue(() => Effect.runPromise(setProgram));
       return data;
     }),
 
@@ -63,20 +68,24 @@ function createCache<TSchema extends ZodSchema, TData>(
       const parsed = validate(params);
       const key = getKey(parsed);
       const redis = yield* RedisClient;
-      yield* redis.set(key, data, { ex: ttl }).pipe(
-        Effect.mapError(toCacheError('set', key)),
-        Effect.annotateLogs({ category: 'cache', operation: 'set', key })
-      );
+      yield* redis
+        .set(key, data, { ex: ttl })
+        .pipe(
+          Effect.mapError(toCacheError('set', key)),
+          Effect.annotateLogs({ category: 'cache', operation: 'set', key })
+        );
     }),
 
     delete: Effect.fn('cache.delete')(function* (params: TParams) {
       const parsed = validate(params);
       const key = getKey(parsed);
       const redis = yield* RedisClient;
-      yield* redis.del(key).pipe(
-        Effect.mapError(toCacheError('delete', key)),
-        Effect.annotateLogs({ category: 'cache', operation: 'delete', key })
-      );
+      yield* redis
+        .del(key)
+        .pipe(
+          Effect.mapError(toCacheError('delete', key)),
+          Effect.annotateLogs({ category: 'cache', operation: 'delete', key })
+        );
     }),
 
     refresh: Effect.fn('cache.refresh')(function* (params: TParams, del = true) {
@@ -88,21 +97,26 @@ function createCache<TSchema extends ZodSchema, TData>(
       if (del) {
         yield* redis.del(key).pipe(Effect.mapError(toCacheError('refresh-delete', key)));
       }
-      yield* redis.set(key, data, { ex: ttl }).pipe(
-        Effect.mapError(toCacheError('refresh', key)),
-        Effect.annotateLogs({ category: 'cache', operation: 'refresh', key })
-      );
+      yield* redis
+        .set(key, data, { ex: ttl })
+        .pipe(
+          Effect.mapError(toCacheError('refresh', key)),
+          Effect.annotateLogs({ category: 'cache', operation: 'refresh', key })
+        );
     })
   };
 
   return cache;
 }
 
-const fromDb = <A>(operation: string, run: () => Promise<A>) =>
-  Effect.tryPromise({
-    try: run,
-    catch: (cause) => CacheError.make({ operation, cause })
-  }).pipe(Effect.annotateLogs({ category: 'db', operation }));
+const fromDb = <A>(operation: string, run: (client: DbClient) => Promise<A>) =>
+  Effect.gen(function* () {
+    const database = yield* Database;
+    return yield* database.run(operation, run).pipe(
+      Effect.mapError((cause) => CacheError.make({ operation, cause })),
+      Effect.annotateLogs({ category: 'db', operation })
+    );
+  });
 
 export const CACHE = {
   lessons: {
@@ -113,7 +127,7 @@ export const CACHE = {
       }),
       ({ lang_id }) => `${lang_id}`,
       ({ lang_id }) =>
-        fromDb('category_list', () =>
+        fromDb('category_list', (db) =>
           db.query.lesson_categories.findMany({
             where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
             columns: { id: true, name: true, order: true },
@@ -128,7 +142,7 @@ export const CACHE = {
       }),
       ({ category_id }) => `${category_id}`,
       ({ category_id }) =>
-        fromDb('category_lesson_list', () =>
+        fromDb('category_lesson_list', (db) =>
           db.query.text_lessons.findMany({
             columns: {
               id: true,
@@ -149,7 +163,7 @@ export const CACHE = {
       }),
       ({ lesson_id }) => `${lesson_id}`,
       ({ lesson_id }) =>
-        fromDb('text_lesson_info', () =>
+        fromDb('text_lesson_info', (db) =>
           db.query.text_lessons.findFirst({
             where: (tbl, { eq }) => eq(tbl.id, lesson_id),
             columns: {
@@ -211,7 +225,7 @@ export const CACHE = {
       }),
       ({ gesture_id, gesture_uuid }) => `${gesture_id}:${gesture_uuid}`,
       ({ gesture_id, gesture_uuid }) =>
-        fromDb('gesture_data', () =>
+        fromDb('gesture_data', (db) =>
           db.query.text_gestures.findFirst({
             where: (table, { eq, and }) =>
               and(eq(table.id, gesture_id), eq(table.uuid, gesture_uuid)),

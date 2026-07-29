@@ -10,6 +10,7 @@ import {
   updateGestureCategoryList,
   updateGesturesOrder
 } from '~/effect/workflows/text_gestures';
+import { appRuntime } from '~/effect/runtime';
 
 const get_categories_route = protectedAdminProcedure.query(async () =>
   runTrpcEffect(getGestureCategories())
@@ -68,5 +69,5 @@ export const gesture_categories_router = t.router({
 
 export { reorder_text_gesture_in_category as reorder_text_gesture_in_category_func } from '~/effect/workflows/text_gestures';
 
-export const get_text_gesture_categories_func = async () =>
-  runTrpcEffect(getGestureCategories());
+/** Route-loader helper — use runtime directly (not TRPC error mapping). */
+export const get_text_gesture_categories_func = () => appRuntime.runPromise(getGestureCategories());

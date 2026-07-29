@@ -9,6 +9,7 @@ import { Database } from '../database';
 import { BackgroundWork } from '../background';
 import { CACHE } from '../cache';
 import { appRuntime } from '../runtime';
+import { DatabaseError } from '../errors';
 
 export const uploadAudioAsset = Effect.fn('uploadAudioAsset')(function* (input: {
   lang_id?: number | null;
@@ -33,10 +34,11 @@ export const uploadAudioAsset = Effect.fn('uploadAudioAsset')(function* (input: 
   });
   yield* Effect.logInfo('audio generated');
 
+  const { fileBuffer, fileType } = audioBuffer;
   const s3_key =
-    `${PROJECT_S3_ALIAS}/audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
+    `${PROJECT_S3_ALIAS}/audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.${fileType}` as `${typeof PROJECT_S3_ALIAS}/audio_assets/${string}.webm`;
 
-  yield* storage.uploadAssetFile(s3_key, audioBuffer.fileBuffer);
+  yield* storage.uploadAssetFile(s3_key, fileBuffer);
   yield* Effect.logInfo('audio uploaded', { s3_key });
 
   const description = `${input.text} (${input.text_key})`;
@@ -55,10 +57,18 @@ export const uploadAudioAsset = Effect.fn('uploadAudioAsset')(function* (input: 
       return row;
     })
     .pipe(
-      Effect.tapError(() =>
-        storage.deleteAssetFile(s3_key).pipe(Effect.catch(() => Effect.void))
-      )
+      Effect.tapError(() => storage.deleteAssetFile(s3_key).pipe(Effect.catch(() => Effect.void)))
     );
+
+  if (!result) {
+    yield* storage.deleteAssetFile(s3_key).pipe(Effect.catch(() => Effect.void));
+    return yield* Effect.fail(
+      DatabaseError.make({
+        operation: 'insert_audio_asset',
+        cause: new Error('Insert returned no row')
+      })
+    );
+  }
 
   return {
     id: result.id,
@@ -130,16 +140,18 @@ export const deleteAudioAsset = Effect.fn('deleteAudioAsset')(function* (input: 
     const refresh = Effect.forEach(
       Array.from(lesson_ids),
       (lesson_id) =>
-        CACHE.lessons.text_lesson_info.refresh({ lesson_id }).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning('lesson cache refresh failed', { lesson_id, error }).pipe(
-              Effect.asVoid
+        CACHE.lessons.text_lesson_info
+          .refresh({ lesson_id })
+          .pipe(
+            Effect.catch((error) =>
+              Effect.logWarning('lesson cache refresh failed', { lesson_id, error }).pipe(
+                Effect.asVoid
+              )
             )
-          )
-        ),
+          ),
       { concurrency: 4 }
     );
-    yield* background.enqueue(appRuntime.runPromise(refresh));
+    yield* background.enqueue(() => appRuntime.runPromise(refresh));
   }
 
   return { deleted: true as const };

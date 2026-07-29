@@ -47,7 +47,7 @@ const toTrpcError = (error: KnownError): TRPCError => {
     default:
       return new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
-        message: `${error._tag}: ${'operation' in error ? error.operation : 'failed'}`,
+        message: 'Unexpected server error',
         cause: error
       });
   }
@@ -75,9 +75,7 @@ const isKnownError = (error: unknown): error is KnownError =>
  * Run an Effect at the tRPC boundary. This is the only place routers should
  * call into the Effect runtime.
  */
-export const runTrpcEffect = async <A, E, R>(
-  effect: Effect.Effect<A, E, R>
-): Promise<A> => {
+export const runTrpcEffect = async <A, E, R>(effect: Effect.Effect<A, E, R>): Promise<A> => {
   const exit = await appRuntime.runPromiseExit(
     effect.pipe(Effect.annotateLogs({ boundary: 'trpc' })) as Effect.Effect<A, E>
   );

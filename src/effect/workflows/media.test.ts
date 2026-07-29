@@ -30,8 +30,7 @@ const ImageTest = Layer.succeed(ImageProcessor)({
 });
 
 const DatabaseUnused = Layer.succeed(Database)({
-  run: (operation) =>
-    Effect.fail(DatabaseError.make({ operation, cause: new Error('db unused') })),
+  run: (operation) => Effect.fail(DatabaseError.make({ operation, cause: new Error('db unused') })),
   transaction: (operation) =>
     Effect.fail(DatabaseError.make({ operation, cause: new Error('tx unused') }))
 });
@@ -141,11 +140,7 @@ describe('audio upload workflow', () => {
           text_key: 'raama',
           voice: 'alloy',
           voice_language: 'Sanskrit'
-        }).pipe(
-          Effect.provide(AiFail),
-          Effect.provide(StorageTest),
-          Effect.provide(DatabaseUnused)
-        )
+        }).pipe(Effect.provide(AiFail), Effect.provide(StorageTest), Effect.provide(DatabaseUnused))
       );
       expect(Exit.isFailure(exit)).toBe(true);
     })

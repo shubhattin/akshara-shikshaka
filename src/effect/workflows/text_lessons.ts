@@ -82,12 +82,10 @@ export const addTextLesson = Effect.fn('addTextLesson')(function* (input: {
   });
 
   if (!outcome.ok) {
-    return yield* Effect.fail(
-      BadRequestError.make({ message: 'Text lesson already exists' })
-    );
+    return yield* Effect.fail(BadRequestError.make({ message: 'Text lesson already exists' }));
   }
 
-  yield* background.enqueue(
+  yield* background.enqueue(() =>
     appRuntime.runPromise(CACHE.lessons.text_lesson_info.refresh({ lesson_id: outcome.result.id }))
   );
 
@@ -137,44 +135,45 @@ export const updateTextLesson = Effect.fn('updateTextLesson')(function* (input: 
       (word_id) => !input.words.some((word) => word.id === word_id)
     );
 
-    const [, inserted] = await Promise.all([
-      to_delete_word_ids.length > 0
-        ? tx
-            .delete(text_lesson_words)
-            .where(
-              and(
-                inArray(text_lesson_words.id, to_delete_word_ids),
-                eq(text_lesson_words.text_lesson_id, id)
-              )
-            )
-        : Promise.resolve(),
+    if (to_delete_word_ids.length > 0) {
+      await tx
+        .delete(text_lesson_words)
+        .where(
+          and(
+            inArray(text_lesson_words.id, to_delete_word_ids),
+            eq(text_lesson_words.text_lesson_id, id)
+          )
+        );
+    }
+
+    const inserted =
       to_add_words.length > 0
-        ? tx
+        ? await tx
             .insert(text_lesson_words)
             .values(to_add_words.map((word) => ({ ...word, text_lesson_id: id })))
             .returning()
-        : Promise.resolve([]),
-      to_update_words.length > 0
-        ? tx.execute(sql`
-            UPDATE ${text_lesson_words} AS t
-            SET
-              word = v.word,
-              "order" = v."order",
-              image_id = v.image_id,
-              audio_id = v.audio_id,
-              updated_at = NOW()
-            FROM (VALUES ${sql.join(
-              to_update_words.map(
-                (word) =>
-                  sql`(${word.id}::int, ${word.word}, ${word.order}::smallint, ${word.image_id}::int, ${word.audio_id}::int)`
-              ),
-              sql`, `
-            )}) AS v(id, word, "order", image_id, audio_id)
-            WHERE t.id = v.id
-              AND t.text_lesson_id = ${id}
-          `)
-        : Promise.resolve()
-    ]);
+        : [];
+
+    if (to_update_words.length > 0) {
+      await tx.execute(sql`
+        UPDATE ${text_lesson_words} AS t
+        SET
+          word = v.word,
+          "order" = v."order",
+          image_id = v.image_id,
+          audio_id = v.audio_id,
+          updated_at = NOW()
+        FROM (VALUES ${sql.join(
+          to_update_words.map(
+            (word) =>
+              sql`(${word.id}::int, ${word.word}::text, ${word.order}::smallint, ${word.image_id}::int, ${word.audio_id}::int)`
+          ),
+          sql`, `
+        )}) AS v(id, word, "order", image_id, audio_id)
+        WHERE t.id = v.id
+          AND t.text_lesson_id = ${id}
+      `);
+    }
 
     return { ok: true as const, inserted };
   });
@@ -185,7 +184,7 @@ export const updateTextLesson = Effect.fn('updateTextLesson')(function* (input: 
     );
   }
 
-  yield* background.enqueue(
+  yield* background.enqueue(() =>
     appRuntime.runPromise(CACHE.lessons.text_lesson_info.refresh({ lesson_id: id }))
   );
   yield* CACHE.lessons.text_lesson_info.delete({ lesson_id: id });
@@ -226,10 +225,9 @@ export const deleteTextLesson = Effect.fn('deleteTextLesson')(function* (input: 
   }
 
   if (outcome.category_id) {
-    yield* background.enqueue(
-      appRuntime.runPromise(
-        CACHE.lessons.category_lesson_list.refresh({ category_id: outcome.category_id })
-      )
+    const category_id = outcome.category_id;
+    yield* background.enqueue(() =>
+      appRuntime.runPromise(CACHE.lessons.category_lesson_list.refresh({ category_id }))
     );
   }
   yield* CACHE.lessons.text_lesson_info.delete({ lesson_id: id });
@@ -237,39 +235,39 @@ export const deleteTextLesson = Effect.fn('deleteTextLesson')(function* (input: 
   return { deleted: true as const };
 });
 
-export const getTextLessonWordMediaData = Effect.fn('getTextLessonWordMediaData')(function* (input: {
-  word_id: number;
-  lesson_id: number;
-}) {
-  return yield* dbRun('get_text_lesson_word_media_data', async (db) => {
-    const word = await db.query.text_lesson_words.findFirst({
-      where: (tbl, { eq }) => and(eq(tbl.id, input.word_id), eq(tbl.text_lesson_id, input.lesson_id)),
-      columns: { id: true },
-      with: {
-        image: {
-          columns: {
-            id: true,
-            description: true,
-            s3_key: true,
-            height: true,
-            width: true
-          }
-        },
-        audio: {
-          columns: {
-            id: true,
-            description: true,
-            s3_key: true
+export const getTextLessonWordMediaData = Effect.fn('getTextLessonWordMediaData')(
+  function* (input: { word_id: number; lesson_id: number }) {
+    return yield* dbRun('get_text_lesson_word_media_data', async (db) => {
+      const word = await db.query.text_lesson_words.findFirst({
+        where: (tbl, { eq }) =>
+          and(eq(tbl.id, input.word_id), eq(tbl.text_lesson_id, input.lesson_id)),
+        columns: { id: true },
+        with: {
+          image: {
+            columns: {
+              id: true,
+              description: true,
+              s3_key: true,
+              height: true,
+              width: true
+            }
+          },
+          audio: {
+            columns: {
+              id: true,
+              description: true,
+              s3_key: true
+            }
           }
         }
-      }
+      });
+      return {
+        image_asset: word?.image,
+        audio_asset: word?.audio
+      };
     });
-    return {
-      image_asset: word?.image,
-      audio_asset: word?.audio
-    };
-  });
-});
+  }
+);
 
 export const getTextLessonOptionalAudioData = Effect.fn('getTextLessonOptionalAudioData')(
   function* (input: { lesson_id: number }) {

@@ -25,14 +25,16 @@ const submit_user_gesture_recording_route = publicProcedure
   .mutation(async ({ input }) =>
     runTrpcEffect(
       Effect.gen(function* () {
-        const is_valid = yield* Effect.promise(() =>
-          verify_cloudflare_turnstile_token(input.turnstile_token)
-        ).pipe(Effect.catch(() => Effect.succeed(false)));
+        const is_valid = yield* Effect.tryPromise({
+          try: () => verify_cloudflare_turnstile_token(input.turnstile_token),
+          catch: (cause) => cause
+        }).pipe(
+          Effect.map((success) => success === true),
+          Effect.catch(() => Effect.succeed(false))
+        );
 
         if (!is_valid) {
-          return yield* Effect.fail(
-            BadRequestError.make({ message: 'Invalid turnstile token' })
-          );
+          return yield* Effect.fail(BadRequestError.make({ message: 'Invalid turnstile token' }));
         }
 
         const { id } = yield* dbTransaction('submit_user_gesture_recording', async (tx) => {

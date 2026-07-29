@@ -7,11 +7,7 @@ import { AiProvider } from './ai';
 import { ImageProcessor } from './image';
 import { BackgroundWork } from './background';
 
-const InfrastructureLayer = Layer.mergeAll(
-  Database.Live,
-  ImageProcessor.Live,
-  BackgroundWork.Live
-);
+const InfrastructureLayer = Layer.mergeAll(Database.Live, ImageProcessor.Live, BackgroundWork.Live);
 
 const ConfigDependentLayer = Layer.mergeAll(
   RedisClient.Live,
@@ -19,11 +15,7 @@ const ConfigDependentLayer = Layer.mergeAll(
   AiProvider.Live
 ).pipe(Layer.provide(AppConfig.Live));
 
-export const AppLayer = Layer.mergeAll(
-  InfrastructureLayer,
-  ConfigDependentLayer,
-  AppConfig.Live
-);
+export const AppLayer = Layer.mergeAll(InfrastructureLayer, ConfigDependentLayer, AppConfig.Live);
 
 export const appRuntime = ManagedRuntime.make(AppLayer);
 

@@ -66,9 +66,7 @@ export class AiProvider extends Context.Service<
       const openaiSdk = new OpenAI({ apiKey: openaiKey });
       const openai = createOpenAI({ apiKey: openaiKey });
       const openrouter = createOpenRouter({
-        apiKey: config.openrouterApiKey
-          ? Redacted.value(config.openrouterApiKey)
-          : openaiKey
+        apiKey: config.openrouterApiKey ? Redacted.value(config.openrouterApiKey) : openaiKey
       });
 
       return {
@@ -141,7 +139,9 @@ export class AiProvider extends Context.Service<
         embedText: (input) =>
           tryAi('embedText', 'openai', async () => {
             const { embedding } = await embed({
-              model: openai.textEmbeddingModel(input.model as Parameters<typeof openai.textEmbeddingModel>[0]),
+              model: openai.textEmbeddingModel(
+                input.model as Parameters<typeof openai.textEmbeddingModel>[0]
+              ),
               value: input.value,
               providerOptions: {
                 openai: {

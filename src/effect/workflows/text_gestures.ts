@@ -106,10 +106,11 @@ export const addTextGestureData = Effect.fn('addTextGestureData')(function* (inp
     );
   }
 
+  const textKey = input.textKey.trim();
+
   const result = yield* dbTransaction('add_text_gesture', async (tx) => {
     const existingText = await tx.query.text_gestures.findFirst({
-      where: (tbl, { and, eq }) =>
-        and(eq(tbl.text, input.text), eq(tbl.script_id, input.scriptID)),
+      where: (tbl, { and, eq }) => and(eq(tbl.text, input.text), eq(tbl.script_id, input.scriptID)),
       columns: { id: true }
     });
 
@@ -121,7 +122,7 @@ export const addTextGestureData = Effect.fn('addTextGestureData')(function* (inp
       .insert(text_gestures)
       .values({
         text: input.text,
-        text_key: input.textKey,
+        text_key: textKey,
         gestures: input.gestures,
         script_id: input.scriptID,
         font_family: fontFamily,
@@ -130,13 +131,13 @@ export const addTextGestureData = Effect.fn('addTextGestureData')(function* (inp
       })
       .returning();
 
-    await connect_gestures_to_text_lessons(input.textKey.trim(), inserted.id, tx);
+    await connect_gestures_to_text_lessons(textKey, inserted.id, tx);
     return { success: true as const, id: inserted.id, uuid: inserted.uuid };
   });
 
   if (!result.success) return result;
 
-  yield* background.enqueue(
+  yield* background.enqueue(() =>
     appRuntime.runPromise(
       CACHE.gestures.gesture_data.refresh({
         gesture_id: result.id,
@@ -162,19 +163,28 @@ export const editTextGestureData = Effect.fn('editTextGestureData')(function* (i
       BadRequestError.make({ message: `Invalid font family: ${input.fontFamily}` })
     );
   }
-  yield* dbRun('edit_text_gesture', async (db) => {
-    await db
+  const updated = yield* dbRun('edit_text_gesture', async (db) => {
+    const rows = await db
       .update(text_gestures)
       .set({
         gestures: input.gestures,
         font_family: fontFamily,
         font_size: input.fontSize,
-        text_center_offset: input.textCenterOffset
+        text_center_offset: input.textCenterOffset,
+        updated_at: new Date()
       })
-      .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)));
+      .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)))
+      .returning();
+    return rows;
   });
 
-  yield* background.enqueue(
+  if (updated.length === 0) {
+    return yield* Effect.fail(
+      NotFoundError.make({ resource: 'text_gesture', message: 'Text gesture not found' })
+    );
+  }
+
+  yield* background.enqueue(() =>
     appRuntime.runPromise(
       CACHE.gestures.gesture_data.refresh({
         gesture_id: input.id,
@@ -260,16 +270,18 @@ export const deleteTextGestureData = Effect.fn('deleteTextGestureData')(function
     const refresh = Effect.forEach(
       outcome.lessons,
       ({ text_lesson_id }) =>
-        CACHE.lessons.text_lesson_info.refresh({ lesson_id: text_lesson_id }).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning('lesson cache refresh failed', { text_lesson_id, error }).pipe(
-              Effect.asVoid
+        CACHE.lessons.text_lesson_info
+          .refresh({ lesson_id: text_lesson_id })
+          .pipe(
+            Effect.catch((error) =>
+              Effect.logWarning('lesson cache refresh failed', { text_lesson_id, error }).pipe(
+                Effect.asVoid
+              )
             )
-          )
-        ),
+          ),
       { concurrency: 4 }
     );
-    yield* background.enqueue(appRuntime.runPromise(refresh));
+    yield* background.enqueue(() => appRuntime.runPromise(refresh));
   }
 
   yield* CACHE.gestures.gesture_data.delete({
@@ -307,7 +319,10 @@ export const addGestureCategory = Effect.fn('addGestureCategory')(function* (inp
       .select({ max_order: max(gesture_categories.order) })
       .from(gesture_categories);
     const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
-    const rows = await tx.insert(gesture_categories).values({ name: input.name, order }).returning();
+    const rows = await tx
+      .insert(gesture_categories)
+      .values({ name: input.name, order })
+      .returning();
     return rows[0];
   });
   return { id: result.id, order: result.order };
@@ -319,7 +334,7 @@ export const updateGestureCategoryList = Effect.fn('updateGestureCategoryList')(
   yield* dbTransaction('update_gesture_category_list', async (tx) => {
     if (input.categories.length === 0) return;
     const value_rows = input.categories.map(
-      (category) => sql`(${category.id}::int, ${category.name}, ${category.order}::smallint)`
+      (category) => sql`(${category.id}::int, ${category.name}::text, ${category.order}::smallint)`
     );
     await tx.execute(sql`
       UPDATE ${gesture_categories} AS t

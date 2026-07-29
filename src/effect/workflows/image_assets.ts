@@ -12,6 +12,7 @@ import { Database } from '../database';
 import { BackgroundWork } from '../background';
 import { CACHE } from '../cache';
 import { appRuntime } from '../runtime';
+import { BadRequestError } from '../errors';
 
 const SYSTEM_PROMPT = `
 You have to generate an image prompt, file name and description for the word provided. 
@@ -86,6 +87,11 @@ export const makeUploadImageAsset = Effect.fn('makeUploadImageAsset')(function* 
     input.existing_image_prompt ||
     '';
   const { file_name, description } = promptResult;
+  if (!image_prompt.trim()) {
+    return yield* Effect.fail(
+      BadRequestError.make({ message: 'Image prompt is empty; cannot generate image' })
+    );
+  }
   yield* Effect.logInfo('image prompt generated');
 
   const s3_image_key =
@@ -209,16 +215,18 @@ export const deleteImageAsset = Effect.fn('deleteImageAsset')(function* (input: 
     const refresh = Effect.forEach(
       Array.from(lesson_ids),
       (lesson_id) =>
-        CACHE.lessons.text_lesson_info.refresh({ lesson_id }).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning('lesson cache refresh failed', { lesson_id, error }).pipe(
-              Effect.asVoid
+        CACHE.lessons.text_lesson_info
+          .refresh({ lesson_id })
+          .pipe(
+            Effect.catch((error) =>
+              Effect.logWarning('lesson cache refresh failed', { lesson_id, error }).pipe(
+                Effect.asVoid
+              )
             )
-          )
-        ),
+          ),
       { concurrency: 4 }
     );
-    yield* background.enqueue(appRuntime.runPromise(refresh));
+    yield* background.enqueue(() => appRuntime.runPromise(refresh));
   }
 
   return { deleted: true as const };

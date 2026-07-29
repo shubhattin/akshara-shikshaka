@@ -26,10 +26,7 @@ export class Database extends Context.Service<
 >()('Database') {
   static readonly Live = Layer.succeed(Database)({
     run: (operation, run) => tryDb(operation, () => run(db)),
-    transaction: (operation, run) =>
-      tryDb(operation, () =>
-        db.transaction(async (tx) => run(tx))
-      )
+    transaction: (operation, run) => tryDb(operation, () => db.transaction(async (tx) => run(tx)))
   });
 }
 
@@ -39,10 +36,7 @@ export const dbRun = <A>(operation: string, run: (client: DbClient) => Promise<A
     return yield* database.run(operation, run);
   });
 
-export const dbTransaction = <A>(
-  operation: string,
-  run: (tx: DbTransaction) => Promise<A>
-) =>
+export const dbTransaction = <A>(operation: string, run: (tx: DbTransaction) => Promise<A>) =>
   Effect.gen(function* () {
     const database = yield* Database;
     return yield* database.transaction(operation, run);

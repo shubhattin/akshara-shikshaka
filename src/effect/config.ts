@@ -16,7 +16,7 @@ const AppConfigSchema = Schema.Struct({
 });
 
 export type AppConfigShape = {
-  readonly dbUrl: string;
+  readonly dbUrl: Redacted.Redacted<string>;
   readonly upstashRedisUrl: string;
   readonly upstashRedisToken: Redacted.Redacted<string>;
   readonly awsRegion: string;
@@ -62,7 +62,7 @@ const loadConfig = Effect.fn('loadConfig')(function* () {
 
   const data = parsed.value;
   return {
-    dbUrl: data.dbUrl,
+    dbUrl: Redacted.make(data.dbUrl),
     upstashRedisUrl: data.upstashRedisUrl,
     upstashRedisToken: Redacted.make(data.upstashRedisToken),
     awsRegion: data.awsRegion,
@@ -70,9 +70,7 @@ const loadConfig = Effect.fn('loadConfig')(function* () {
     awsSecretAccessKey: Redacted.make(data.awsSecretAccessKey),
     awsS3BucketName: data.awsS3BucketName,
     openaiApiKey: Redacted.make(data.openaiApiKey),
-    openrouterApiKey: data.openrouterApiKey
-      ? Redacted.make(data.openrouterApiKey)
-      : undefined,
+    openrouterApiKey: data.openrouterApiKey ? Redacted.make(data.openrouterApiKey) : undefined,
     turnstileSecretKey: data.turnstileSecretKey
       ? Redacted.make(data.turnstileSecretKey)
       : undefined,

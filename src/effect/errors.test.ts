@@ -1,9 +1,11 @@
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { describe, expect, it } from '@effect/vitest';
+import { z } from 'zod';
 import { DatabaseError, NotFoundError, StorageError } from './errors';
 import { RedisClient } from './redis';
 import { BackgroundWork } from './background';
-import { Layer } from 'effect';
+import { Database } from './database';
+import { createCache } from './cache';
 
 describe('Effect infrastructure', () => {
   it.effect('maps StorageError tags', () =>
@@ -29,34 +31,44 @@ describe('Effect infrastructure', () => {
   );
 });
 
-const RedisTest = Layer.succeed(RedisClient)({
-  get: () => Effect.succeed(null),
-  set: () => Effect.succeed('OK'),
-  del: () => Effect.succeed(1)
-});
-
 describe('cache refresh', () => {
-  it.effect('refresh writes after optional delete without Promise.all boolean mix', () =>
+  it.effect('refresh writes after optional delete via createCache', () =>
     Effect.gen(function* () {
-      let deleted = false;
-      let setCount = 0;
+      const ops: string[] = [];
+      let stored: unknown = null;
 
-      const testRedis = {
-        set: (_key: string, _value: unknown, _options?: { ex?: number }) => {
-          setCount += 1;
-          return Effect.succeed('OK' as const);
+      const TrackingRedis = Layer.succeed(RedisClient)({
+        get: () => Effect.succeed(null),
+        set: (_key, value) => {
+          ops.push('set');
+          stored = value;
+          return Effect.succeed('OK');
         },
-        del: (_key: string) => {
-          deleted = true;
+        del: () => {
+          ops.push('del');
           return Effect.succeed(1);
         }
-      };
+      });
 
-      yield* testRedis.del('k');
-      yield* testRedis.set('k', { ok: true }, { ex: 10 });
-      expect(deleted).toBe(true);
-      expect(setCount).toBe(1);
-    }).pipe(Effect.provide(RedisTest), Effect.provide(BackgroundWork.Test))
+      const UnusedDb = Layer.succeed(Database)({
+        run: () => Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' })),
+        transaction: () => Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' }))
+      });
+
+      const cache = createCache(
+        'test_list',
+        z.object({ lang_id: z.number() }),
+        ({ lang_id }) => `${lang_id}`,
+        () => Effect.succeed([{ id: 1, name: 'A' }])
+      );
+
+      yield* cache
+        .refresh({ lang_id: 1 }, true)
+        .pipe(Effect.provide(TrackingRedis), Effect.provide(UnusedDb));
+
+      expect(ops).toEqual(['del', 'set']);
+      expect(stored).toEqual([{ id: 1, name: 'A' }]);
+    }).pipe(Effect.provide(BackgroundWork.Test))
   );
 });
 

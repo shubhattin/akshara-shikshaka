@@ -75,7 +75,7 @@ export const updateLessonCategoryList = Effect.fn('updateLessonCategoryList')(fu
   yield* dbTransaction('update_lesson_category_list', async (tx) => {
     if (input.categories.length === 0) return;
     const value_rows = input.categories.map(
-      (category) => sql`(${category.id}::int, ${category.name}, ${category.order}::smallint)`
+      (category) => sql`(${category.id}::int, ${category.name}::text, ${category.order}::smallint)`
     );
     await tx.execute(sql`
       UPDATE ${lesson_categories} AS t
@@ -143,8 +143,7 @@ export const getTextLessonsByCategory = Effect.fn('getTextLessonsByCategory')(fu
     }
     const lessons = await db.query.text_lessons.findMany({
       columns: { id: true, text: true, order: true },
-      where: (tbl, { isNull, and }) =>
-        and(isNull(tbl.category_id), eq(tbl.lang_id, input.lang_id)),
+      where: (tbl, { isNull, and }) => and(isNull(tbl.category_id), eq(tbl.lang_id, input.lang_id)),
       orderBy: (text_lessons, { asc }) => [asc(text_lessons.text)]
     });
     return { lessons, type: 'uncategorized' as const };
@@ -169,7 +168,7 @@ export const updateTextLessonsOrder = Effect.fn('updateTextLessonsOrder')(functi
         AND t.category_id = ${input.category_id}
     `);
   });
-  yield* background.enqueue(
+  yield* background.enqueue(() =>
     appRuntime.runPromise(
       CACHE.lessons.category_lesson_list.refresh({ category_id: input.category_id })
     )
@@ -194,17 +193,15 @@ export const addUpdateLessonCategory = Effect.fn('addUpdateLessonCategory')(func
   });
 
   if (input.category_id) {
-    yield* background.enqueue(
-      appRuntime.runPromise(
-        CACHE.lessons.category_lesson_list.refresh({ category_id: input.category_id })
-      )
+    const category_id = input.category_id;
+    yield* background.enqueue(() =>
+      appRuntime.runPromise(CACHE.lessons.category_lesson_list.refresh({ category_id }))
     );
   }
   if (input.prev_category_id) {
-    yield* background.enqueue(
-      appRuntime.runPromise(
-        CACHE.lessons.category_lesson_list.refresh({ category_id: input.prev_category_id })
-      )
+    const category_id = input.prev_category_id;
+    yield* background.enqueue(() =>
+      appRuntime.runPromise(CACHE.lessons.category_lesson_list.refresh({ category_id }))
     );
   }
   return { added: true as const };

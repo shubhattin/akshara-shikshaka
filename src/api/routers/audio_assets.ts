@@ -9,10 +9,7 @@ import { ObjectStorage } from '~/effect/storage';
 import { get_lang_from_id } from '~/state/lang_list';
 import { PROJECT_S3_ALIAS } from '~/constants';
 import { dev_delay } from '~/tools/delay';
-import {
-  deleteAudioAsset,
-  uploadAudioAsset
-} from '~/effect/workflows/audio_assets';
+import { deleteAudioAsset, uploadAudioAsset } from '~/effect/workflows/audio_assets';
 
 const list_audio_assets_route = protectedAdminProcedure
   .input(

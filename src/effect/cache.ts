@@ -1,0 +1,229 @@
+import { Effect } from 'effect';
+import ms from 'ms';
+import { z, type ZodSchema } from 'zod';
+import { db } from '~/db/db';
+import { RedisClient } from './redis';
+import { CacheError } from './errors';
+import { BackgroundWork } from './background';
+
+const CACHE_EXPIRE_S = ms('30days') / 1000;
+
+type CacheEnv = RedisClient | BackgroundWork;
+
+export interface CacheItem<TData, TParams> {
+  key: (params: TParams) => string;
+  get: (params: TParams) => Effect.Effect<TData, CacheError, CacheEnv>;
+  set: (data: TData, params: TParams) => Effect.Effect<void, CacheError, RedisClient>;
+  delete: (params: TParams) => Effect.Effect<void, CacheError, RedisClient>;
+  refresh: (params: TParams, del?: boolean) => Effect.Effect<void, CacheError, RedisClient>;
+}
+
+function createCache<TSchema extends ZodSchema, TData>(
+  keyPrefix: string,
+  schema: TSchema,
+  keyBuilder: (params: z.infer<TSchema>) => string,
+  fetchFn: (params: z.infer<TSchema>) => Effect.Effect<TData, CacheError>,
+  ttl = CACHE_EXPIRE_S
+): CacheItem<TData, z.infer<TSchema>> {
+  type TParams = z.infer<TSchema>;
+
+  const validate = (params: TParams): TParams => schema.parse(params);
+  const getKey = (params: TParams): string => `${keyPrefix}:${keyBuilder(validate(params))}`;
+
+  const toCacheError = (operation: string, key?: string) => (cause: unknown) =>
+    CacheError.make({ operation, key, cause });
+
+  const cache: CacheItem<TData, TParams> = {
+    key: getKey,
+
+    get: Effect.fn('cache.get')(function* (params: TParams) {
+      const parsed = validate(params);
+      const key = getKey(parsed);
+      const redis = yield* RedisClient;
+      const background = yield* BackgroundWork;
+
+      const cached = yield* redis.get<TData>(key).pipe(
+        Effect.mapError(toCacheError('get', key)),
+        Effect.annotateLogs({ category: 'cache', operation: 'get', key })
+      );
+      if (cached) return cached;
+
+      const data = yield* fetchFn(parsed);
+      const setProgram = cache.set(data, parsed).pipe(
+        Effect.provideService(RedisClient, redis),
+        Effect.catch((error) =>
+          Effect.logWarning('cache set failed', { key, error }).pipe(Effect.asVoid)
+        )
+      );
+      yield* background.enqueue(Effect.runPromise(setProgram));
+      return data;
+    }),
+
+    set: Effect.fn('cache.set')(function* (data: TData, params: TParams) {
+      const parsed = validate(params);
+      const key = getKey(parsed);
+      const redis = yield* RedisClient;
+      yield* redis.set(key, data, { ex: ttl }).pipe(
+        Effect.mapError(toCacheError('set', key)),
+        Effect.annotateLogs({ category: 'cache', operation: 'set', key })
+      );
+    }),
+
+    delete: Effect.fn('cache.delete')(function* (params: TParams) {
+      const parsed = validate(params);
+      const key = getKey(parsed);
+      const redis = yield* RedisClient;
+      yield* redis.del(key).pipe(
+        Effect.mapError(toCacheError('delete', key)),
+        Effect.annotateLogs({ category: 'cache', operation: 'delete', key })
+      );
+    }),
+
+    refresh: Effect.fn('cache.refresh')(function* (params: TParams, del = true) {
+      const parsed = validate(params);
+      const key = getKey(parsed);
+      const redis = yield* RedisClient;
+
+      const data = yield* fetchFn(parsed);
+      if (del) {
+        yield* redis.del(key).pipe(Effect.mapError(toCacheError('refresh-delete', key)));
+      }
+      yield* redis.set(key, data, { ex: ttl }).pipe(
+        Effect.mapError(toCacheError('refresh', key)),
+        Effect.annotateLogs({ category: 'cache', operation: 'refresh', key })
+      );
+    })
+  };
+
+  return cache;
+}
+
+const fromDb = <A>(operation: string, run: () => Promise<A>) =>
+  Effect.tryPromise({
+    try: run,
+    catch: (cause) => CacheError.make({ operation, cause })
+  }).pipe(Effect.annotateLogs({ category: 'db', operation }));
+
+export const CACHE = {
+  lessons: {
+    category_list: createCache(
+      'text_lesson_category_list',
+      z.object({
+        lang_id: z.int().positive()
+      }),
+      ({ lang_id }) => `${lang_id}`,
+      ({ lang_id }) =>
+        fromDb('category_list', () =>
+          db.query.lesson_categories.findMany({
+            where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
+            columns: { id: true, name: true, order: true },
+            orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
+          })
+        )
+    ),
+    category_lesson_list: createCache(
+      'text_lesson_category_lessons_list',
+      z.object({
+        category_id: z.int()
+      }),
+      ({ category_id }) => `${category_id}`,
+      ({ category_id }) =>
+        fromDb('category_lesson_list', () =>
+          db.query.text_lessons.findMany({
+            columns: {
+              id: true,
+              text: true,
+              order: true,
+              uuid: true
+            },
+            orderBy: (tbl, { asc }) => [asc(tbl.order)],
+            where: (tbl, { eq, isNotNull, and }) =>
+              and(eq(tbl.category_id, category_id), isNotNull(tbl.order))
+          })
+        )
+    ),
+    text_lesson_info: createCache(
+      'text_lesson_info',
+      z.object({
+        lesson_id: z.int()
+      }),
+      ({ lesson_id }) => `${lesson_id}`,
+      ({ lesson_id }) =>
+        fromDb('text_lesson_info', () =>
+          db.query.text_lessons.findFirst({
+            where: (tbl, { eq }) => eq(tbl.id, lesson_id),
+            columns: {
+              id: true,
+              base_word_script_id: true,
+              text: true
+            },
+            with: {
+              gestures: {
+                columns: {
+                  text_gesture_id: true
+                },
+                with: {
+                  text_gesture: {
+                    columns: {
+                      id: true,
+                      uuid: true,
+                      script_id: true
+                    }
+                  }
+                }
+              },
+              words: {
+                columns: {
+                  id: true,
+                  word: true,
+                  order: true
+                },
+                orderBy: (tbl, { asc }) => [asc(tbl.order)],
+                with: {
+                  image: {
+                    columns: {
+                      s3_key: true
+                    }
+                  },
+                  audio: {
+                    columns: {
+                      s3_key: true
+                    }
+                  }
+                }
+              },
+              optional_audio: {
+                columns: {
+                  s3_key: true
+                }
+              }
+            }
+          })
+        )
+    )
+  },
+  gestures: {
+    gesture_data: createCache(
+      'text_gesture_data',
+      z.object({
+        gesture_id: z.int(),
+        gesture_uuid: z.uuid()
+      }),
+      ({ gesture_id, gesture_uuid }) => `${gesture_id}:${gesture_uuid}`,
+      ({ gesture_id, gesture_uuid }) =>
+        fromDb('gesture_data', () =>
+          db.query.text_gestures.findFirst({
+            where: (table, { eq, and }) =>
+              and(eq(table.id, gesture_id), eq(table.uuid, gesture_uuid)),
+            columns: {
+              id: true,
+              uuid: true,
+              text: true,
+              gestures: true,
+              script_id: true
+            }
+          })
+        )
+    )
+  }
+};

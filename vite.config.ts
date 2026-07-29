@@ -20,7 +20,18 @@ const config = defineConfig({
         plugins: ['babel-plugin-react-compiler']
       }
     })
-  ]
+  ],
+  test: {
+    environment: 'node',
+    include: ['src/**/*.{test,spec}.ts'],
+    setupFiles: ['./src/effect/test_setup.ts'],
+    globals: false,
+    pool: 'forks',
+    fileParallelism: false,
+    // DB module / ManagedRuntime can keep the event loop alive after suites
+    teardownTimeout: 2000,
+    hookTimeout: 5000
+  }
 });
 
 export default config;

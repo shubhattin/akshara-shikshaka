@@ -18,8 +18,8 @@ const get_drizzle_instance_dev = async () => {
 
 export const db = import.meta.env.DEV
   ? await get_drizzle_instance_dev()
-  : // using neon websocket adapter
-    drizzle_neon(new Pool({ connectionString: process.env.PG_DATABASE_URL }), { schema });
+  : // using neon websocket adapter — use the same DB_MODE-aware URL as local
+    drizzle_neon(new Pool({ connectionString: DB_URL }), { schema });
 
 export type transactionType =
   | PgTransaction<NeonQueryResultHKT, typeof schema, ExtractTablesWithRelations<typeof schema>>

@@ -62,7 +62,7 @@
     "cmdk": "^1.1.1",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
-    "effect": "^3.22.0",
+    "effect": "^4.0.0-beta.101",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.38.0",
     "jotai": "^2.19.1",
@@ -98,6 +98,7 @@
     "zod": "^4.4.1"
   },
   "devDependencies": {
+    "@effect/vitest": "^4.0.0-beta.101",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/devtools-vite": "0.6.0",
     "@tanstack/react-query-devtools": "^5.100.6",

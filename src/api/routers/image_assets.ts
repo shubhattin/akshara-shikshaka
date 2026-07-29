@@ -1,59 +1,12 @@
 import { z } from 'zod';
-import { t, protectedAdminProcedure } from '../trpc_init';
-import { db } from '~/db/db';
-import { image_assets } from '~/db/schema';
+import { t, protectedAdminProcedure, runTrpcEffect } from '../trpc_init';
 import { dev_delay } from '~/tools/delay';
-import { asc, count, desc, eq, ilike } from 'drizzle-orm';
-import { generateImage, generateText, Output } from 'ai';
-import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { get_lang_from_id, get_script_from_id } from '~/state/lang_list';
-import { resizeImage } from '~/utils/sharp/resize.server';
-import { deleteAssetFile, uploadAssetFile } from '~/utils/s3/upload_file.server';
-import { format_string_text } from '~/tools/kry';
-import { waitUntil } from '@vercel/functions';
-import { CACHE } from '../cache';
-import { PROJECT_S3_ALIAS } from '~/constants';
-import { createOpenAI, type OpenAIImageModelGenerationOptions } from '@ai-sdk/openai';
-
-const openrouter = createOpenRouter({
-  apiKey: import.meta.env.OPENROUTER_API_KEY
-});
-const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-const SYSTEN_PROMPT = `
-You have to generate an image prompt, file name and description for the word provided. 
-Keep the image prompt, file names and description in Indian context even if in English. Use Indian concepts and Visualizations for the Words provided for respective Indian Languages. 
-Only include references to Hindu Dharma, lifestyle, cities, culture, traditions, kings, etc and Indian culture in the image prompt. 
-There can be helping objects in the image alongside with the image describing the main word, But the focus should be only the main word's image 
-The image should be in picture book style, image used for illustations in books. No text should be added to the image. 
-So Generate an image prompt and a file name for the provided word which we can then feed into gpt-image-1 model to generate the image. 
-As the model GPT-Image-1 can understand the details well, so also include the deatils provided here in the image prompt alongside the prompt generated. 
-Generate the image prompt, file name and description for the word as per the details provided above. These are the word details
-` as const;
-const PROMPT = `
-The word is "{word}" in the language {lang}, the word provided is written in script {word_script}. 
-`;
-
-const description_file_name_response_schema = z.object({
-  file_name: z
-    .string()
-    .describe(
-      'A 3-4 word max file name for the image, preferrable 2-3 words. It should not contain any spaces. Do not add any file extension. These files are only for debugging purposes and not actual file names displayed to users. ' +
-        'Words should be in lowercase, separated by underscores and no extra special characters. Eg: good_apple_image, cute_cat_image, etc. '
-    ),
-
-  description: z
-    .string()
-    .describe(
-      'A short description of the image in English in a few words (max 4-5 words, preferrable 3 words). This will be used for searching, so keep it short and concise.'
-    )
-});
-const description_file_name_image_prompt_response_schema =
-  description_file_name_response_schema.extend({
-    image_prompt: z.string().describe('Image prompt for the word in English')
-  });
+import {
+  deleteImageAsset,
+  listImageAssets,
+  makeUploadImageAsset,
+  updateImageAsset
+} from '~/effect/workflows/image_assets';
 
 const list_image_assets_route = protectedAdminProcedure
   .input(
@@ -67,58 +20,7 @@ const list_image_assets_route = protectedAdminProcedure
   )
   .query(async ({ input }) => {
     await dev_delay(500);
-
-    const trimmed = input.search_text?.trim();
-
-    const whereClause =
-      trimmed && trimmed.length > 0 ? ilike(image_assets.description, `%${trimmed}%`) : undefined;
-
-    const offset = (input.page - 1) * input.limit;
-
-    // Run count and list queries in parallel to reduce overall latency
-    const [countResult, list] = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(image_assets)
-        .where(whereClause ?? undefined),
-      db
-        .select({
-          id: image_assets.id,
-          description: image_assets.description,
-          width: image_assets.width,
-          height: image_assets.height,
-          s3_key: image_assets.s3_key,
-          created_at: image_assets.created_at,
-          updated_at: image_assets.updated_at
-        })
-        .from(image_assets)
-        .where(whereClause ?? undefined)
-        .orderBy((t) => {
-          return [
-            (input.order_by === 'asc' ? asc : desc)(
-              (input.sort_by ?? 'created_at') === 'updated_at'
-                ? image_assets.updated_at
-                : image_assets.created_at
-            )
-          ];
-        })
-        .limit(input.limit)
-        .offset(offset)
-    ]);
-
-    const total = Number(countResult[0]?.count ?? 0);
-    const pageCount = Math.max(1, Math.ceil(total / input.limit));
-    const hasPrev = input.page > 1;
-    const hasNext = input.page < pageCount;
-
-    return {
-      list,
-      total,
-      page: input.page,
-      pageCount,
-      hasPrev,
-      hasNext
-    };
+    return runTrpcEffect(listImageAssets(input));
   });
 
 const make_upload_image_asset_route = protectedAdminProcedure
@@ -146,170 +48,15 @@ const make_upload_image_asset_route = protectedAdminProcedure
       })
     ])
   )
-  .mutation(async ({ input }) => {
-    const { lang_id, word_script_id, word } = input;
-
-    const start_time = Date.now();
-    const lang = get_lang_from_id(lang_id);
-    const word_script = get_script_from_id(word_script_id);
-
-    const get_prompt_result = async () => {
-      if (input.existing_image_prompt) {
-        const response = await generateText({
-          model: openrouter('openai/gpt-4.1'),
-          output: Output.object({ schema: description_file_name_response_schema }),
-          system: 'Generate a file name and description for the image prompt provided',
-          prompt: input.existing_image_prompt
-        });
-        return { ...response.output, image_prompt: input.existing_image_prompt };
-      }
-      const response = await generateText({
-        model: openrouter('openai/gpt-4.1'),
-        output: Output.object({ schema: description_file_name_image_prompt_response_schema }),
-        system: SYSTEN_PROMPT,
-        prompt: format_string_text(PROMPT, { word, lang, word_script })
-      });
-      return response.output;
-    };
-    const { image_prompt, file_name, description } = await get_prompt_result();
-    console.log('image prompt generated');
-
-    const s3_image_key =
-      `${PROJECT_S3_ALIAS}/image_assets/${file_name}_${crypto.randomUUID()}.webp` as const;
-    // ^ prefer the existing image prompt if provided
-    const generated_image = await generateImage({
-      model: openai.imageModel('gpt-image-2'),
-      prompt: image_prompt,
-      size: '1024x1024',
-      aspectRatio: '1:1',
-      providerOptions: {
-        openai: {
-          quality: 'low'
-        } satisfies OpenAIImageModelGenerationOptions
-      }
-    });
-    console.log('image generated');
-
-    const IMAGE_DIMENSIONS = 256;
-    const image_buffer = Buffer.from(generated_image.image.base64, 'base64');
-    const resized_image_buffer = await resizeImage(
-      image_buffer,
-      IMAGE_DIMENSIONS,
-      IMAGE_DIMENSIONS
-    );
-    console.log('image resized/compressed');
-
-    try {
-      await uploadAssetFile(s3_image_key, resized_image_buffer);
-      console.log('image uploaded');
-    } catch (e) {
-      await deleteAssetFile(s3_image_key);
-      return {
-        success: false,
-        err_code: 'image_upload_failed'
-      };
-    }
-
-    let result;
-    try {
-      [result] = await db
-        .insert(image_assets)
-        .values({
-          description: description,
-          width: IMAGE_DIMENSIONS,
-          height: IMAGE_DIMENSIONS,
-          s3_key: s3_image_key
-        })
-        .returning();
-    } catch (e) {
-      // DB insert failed after upload; cleanup S3 object and rethrow
-      await deleteAssetFile(s3_image_key);
-      throw e;
-    }
-
-    return {
-      success: true,
-      time_ms: Date.now() - start_time,
-      id: result.id,
-      s3_key: s3_image_key,
-      description: description,
-      image_prompt: image_prompt
-    };
-  });
+  .mutation(async ({ input }) => runTrpcEffect(makeUploadImageAsset(input)));
 
 const delete_image_asset_route = protectedAdminProcedure
   .input(z.object({ id: z.int() }))
-  .mutation(async ({ input }) => {
-    const result = await db.query.image_assets.findFirst({
-      where: eq(image_assets.id, input.id),
-      columns: {
-        s3_key: true,
-        id: true
-      },
-      with: {
-        words: {
-          columns: {
-            id: true
-          },
-          with: {
-            lesson: {
-              columns: {
-                id: true
-              }
-            }
-          }
-        }
-      }
-    });
-    if (!result) {
-      return {
-        deleted: false,
-        err_code: 'image_asset_not_found' as const
-      };
-    }
-
-    await Promise.allSettled([
-      deleteAssetFile(result.s3_key),
-      db.delete(image_assets).where(eq(image_assets.id, input.id))
-    ]);
-
-    waitUntil(
-      (async () => {
-        // finding the lessons connected to this image asset
-        // and refresh the cache for each lesson in background
-        const lesson_ids_to_invalidate = new Set<number>();
-        result.words.forEach((word) => {
-          lesson_ids_to_invalidate.add(word.lesson.id);
-        });
-        if (lesson_ids_to_invalidate.size > 0) {
-          await Promise.allSettled(
-            Array.from(lesson_ids_to_invalidate).map((lesson_id) =>
-              CACHE.lessons.text_lesson_info.refresh({ lesson_id })
-            )
-          );
-        }
-      })()
-    );
-
-    return {
-      deleted: true
-    };
-  });
+  .mutation(async ({ input }) => runTrpcEffect(deleteImageAsset(input)));
 
 const update_image_asset_route = protectedAdminProcedure
   .input(z.object({ id: z.int(), description: z.string() }))
-  .mutation(async ({ input }) => {
-    await db
-      .update(image_assets)
-      .set({
-        description: input.description
-      })
-      .where(eq(image_assets.id, input.id));
-
-    return {
-      updated: true
-    };
-  });
+  .mutation(async ({ input }) => runTrpcEffect(updateImageAsset(input)));
 
 export const image_assets_router = t.router({
   list_image_assets: list_image_assets_route,

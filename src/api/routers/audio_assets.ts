@@ -1,19 +1,18 @@
 import { z } from 'zod';
-import { t, protectedAdminProcedure } from '../trpc_init';
-import { dev_delay } from '~/tools/delay';
+import { t, protectedAdminProcedure, runTrpcEffect } from '../trpc_init';
+import { Effect } from 'effect';
 import { and, asc, count, desc, eq, ilike } from 'drizzle-orm';
-import { db } from '~/db/db';
 import { audio_assets } from '~/db/schema';
-import { generateGpt4oMiniTtsSpeech, VoiceTypeEnum } from '~/utils/ai/text_to_speech.server';
-import {
-  uploadAssetFile,
-  deleteAssetFile,
-  getAudioAssetUploadUrl
-} from '~/utils/s3/upload_file.server';
+import { VoiceTypeEnum } from '~/effect/ai';
+import { Database } from '~/effect/database';
+import { ObjectStorage } from '~/effect/storage';
 import { get_lang_from_id } from '~/state/lang_list';
-import { waitUntil } from '@vercel/functions';
-import { CACHE } from '../cache';
 import { PROJECT_S3_ALIAS } from '~/constants';
+import { dev_delay } from '~/tools/delay';
+import {
+  deleteAudioAsset,
+  uploadAudioAsset
+} from '~/effect/workflows/audio_assets';
 
 const list_audio_assets_route = protectedAdminProcedure
   .input(
@@ -28,64 +27,67 @@ const list_audio_assets_route = protectedAdminProcedure
   )
   .query(async ({ input }) => {
     await dev_delay(400);
+    return runTrpcEffect(
+      Effect.gen(function* () {
+        const database = yield* Database;
+        const whereClause = (() => {
+          const conds = [];
+          const trimmed = input.search_text?.trim();
+          if (trimmed && trimmed.length > 0) {
+            conds.push(ilike(audio_assets.description, `%${trimmed}%`));
+          }
+          if (input.lang_id !== null && input.lang_id !== undefined) {
+            conds.push(eq(audio_assets.lang_id, input.lang_id));
+          }
+          return and(...conds);
+        })();
+        const offset = (input.page - 1) * input.limit;
 
-    const whereClause = (() => {
-      const conds: ReturnType<typeof and>[] = [];
-      const trimmed = input.search_text?.trim();
-      const whereClause =
-        trimmed && trimmed.length > 0 ? ilike(audio_assets.description, `%${trimmed}%`) : undefined;
-      if (whereClause) {
-        conds.push(whereClause);
-      }
-      if (input.lang_id !== null && input.lang_id !== undefined) {
-        conds.push(eq(audio_assets.lang_id, input.lang_id));
-      }
-      return and(...conds);
-    })();
-    const offset = (input.page - 1) * input.limit;
+        const countEffect = database.run('count_audio_assets', async (db) =>
+          db
+            .select({ count: count() })
+            .from(audio_assets)
+            .where(whereClause ?? undefined)
+        );
+        const listEffect = database.run('list_audio_assets', async (db) =>
+          db
+            .select({
+              id: audio_assets.id,
+              description: audio_assets.description,
+              type: audio_assets.type,
+              lang_id: audio_assets.lang_id,
+              s3_key: audio_assets.s3_key,
+              created_at: audio_assets.created_at,
+              updated_at: audio_assets.updated_at
+            })
+            .from(audio_assets)
+            .where(whereClause ?? undefined)
+            .orderBy(() => [
+              (input.order_by === 'asc' ? asc : desc)(
+                (input.sort_by ?? 'created_at') === 'updated_at'
+                  ? audio_assets.updated_at
+                  : audio_assets.created_at
+              )
+            ])
+            .limit(input.limit)
+            .offset(offset)
+        );
 
-    // Run count and list queries in parallel to reduce overall latency
-    const [countResult, list] = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(audio_assets)
-        .where(whereClause ?? undefined),
-      db
-        .select({
-          id: audio_assets.id,
-          description: audio_assets.description,
-          type: audio_assets.type,
-          lang_id: audio_assets.lang_id,
-          s3_key: audio_assets.s3_key,
-          created_at: audio_assets.created_at,
-          updated_at: audio_assets.updated_at
-        })
-        .from(audio_assets)
-        .where(whereClause ?? undefined)
-        .orderBy((t) => {
-          return [
-            (input.order_by === 'asc' ? asc : desc)(
-              (input.sort_by ?? 'created_at') === 'updated_at'
-                ? audio_assets.updated_at
-                : audio_assets.created_at
-            )
-          ];
-        })
-        .limit(input.limit)
-        .offset(offset)
-    ]);
-    const total = Number(countResult[0]?.count ?? 0);
-    const pageCount = Math.max(1, Math.ceil(total / input.limit));
-    const hasPrev = input.page > 1;
-    const hasNext = input.page < pageCount;
-    return {
-      list,
-      total,
-      page: input.page,
-      pageCount,
-      hasPrev,
-      hasNext
-    };
+        const [countResult, list] = yield* Effect.all([countEffect, listEffect], {
+          concurrency: 2
+        });
+        const total = Number(countResult[0]?.count ?? 0);
+        const pageCount = Math.max(1, Math.ceil(total / input.limit));
+        return {
+          list,
+          total,
+          page: input.page,
+          pageCount,
+          hasPrev: input.page > 1,
+          hasNext: input.page < pageCount
+        };
+      })
+    );
   });
 
 const make_upload_audio_asset_route = protectedAdminProcedure
@@ -93,121 +95,19 @@ const make_upload_audio_asset_route = protectedAdminProcedure
     z.object({
       lang_id: z.int().optional().nullable(),
       text: z.string(),
-      text_key: z.string(), // The "Normal" Transliterated version
+      text_key: z.string(),
       voice: VoiceTypeEnum,
       voice_language: z.string()
     })
   )
   .mutation(async ({ input }) => {
     await dev_delay(400);
-    const start_time = Date.now(); // ^ for tracking the time taken to generate the audio
-
-    const audioBuffer = await generateGpt4oMiniTtsSpeech({
-      text: input.text,
-      instructions:
-        `Speak in a cheerful and friendly tone. Slowly and clearly. The accent of speech should be Indian. ` +
-        `The Text is in ${input.voice_language} language. The word is ${input.text} (${input.text_key}).`,
-      voice: input.voice
-    });
-    console.log('audio generated');
-
-    const s3_key =
-      `${PROJECT_S3_ALIAS}/audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
-    await uploadAssetFile(s3_key, audioBuffer.fileBuffer);
-    console.log('audio uploaded');
-
-    const description = `${input.text} (${input.text_key})`;
-    let result;
-    try {
-      [result] = await db
-        .insert(audio_assets)
-        .values({
-          description,
-          lang_id: input.lang_id,
-          s3_key: s3_key,
-          type: 'ai_generated'
-        })
-        .returning();
-    } catch (e) {
-      // DB insert failed after upload; cleanup uploaded S3 object and rethrow
-      await deleteAssetFile(s3_key);
-      throw e;
-    }
-
-    return {
-      id: result.id,
-      description,
-      s3_key,
-      type: 'ai_generated' as const,
-      time_ms: Date.now() - start_time
-    };
+    return runTrpcEffect(uploadAudioAsset(input));
   });
 
 const delete_audio_asset_route = protectedAdminProcedure
   .input(z.object({ id: z.int() }))
-  .mutation(async ({ input }) => {
-    const result = await db.query.audio_assets.findFirst({
-      where: (tbl) => eq(tbl.id, input.id),
-      columns: {
-        s3_key: true,
-        id: true
-      },
-      with: {
-        optional_lessons: {
-          columns: {
-            id: true
-          }
-        },
-        words: {
-          columns: {
-            id: true
-          },
-          with: {
-            lesson: {
-              columns: {
-                id: true
-              }
-            }
-          }
-        }
-      }
-    });
-    if (!result) {
-      return {
-        deleted: false,
-        err_code: 'audio_asset_not_found' as const
-      };
-    }
-
-    await Promise.allSettled([
-      deleteAssetFile(result.s3_key),
-      db.delete(audio_assets).where(eq(audio_assets.id, input.id))
-    ]);
-
-    waitUntil(
-      (async () => {
-        // finding the lessons connected to this audio asset
-        const lesson_ids_to_invalidate = new Set<number>();
-        result.optional_lessons.forEach((lesson) => {
-          lesson_ids_to_invalidate.add(lesson.id);
-        });
-        result.words.forEach((word) => {
-          lesson_ids_to_invalidate.add(word.lesson.id);
-        });
-        if (lesson_ids_to_invalidate.size > 0) {
-          await Promise.allSettled(
-            Array.from(lesson_ids_to_invalidate).map((lesson_id) =>
-              CACHE.lessons.text_lesson_info.refresh({ lesson_id })
-            )
-          );
-        }
-      })()
-    );
-
-    return {
-      deleted: true
-    };
-  });
+  .mutation(async ({ input }) => runTrpcEffect(deleteAudioAsset(input)));
 
 const get_upload_audio_asset_url_route = protectedAdminProcedure
   .input(
@@ -217,15 +117,17 @@ const get_upload_audio_asset_url_route = protectedAdminProcedure
       text_key: z.string()
     })
   )
-  .mutation(async ({ input }) => {
-    const s3_key =
-      `${PROJECT_S3_ALIAS}/audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
-    const upload_url = await getAudioAssetUploadUrl(s3_key);
-    return {
-      upload_url,
-      s3_key
-    };
-  });
+  .mutation(async ({ input }) =>
+    runTrpcEffect(
+      Effect.gen(function* () {
+        const storage = yield* ObjectStorage;
+        const s3_key =
+          `${PROJECT_S3_ALIAS}/audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.webm` as const;
+        const upload_url = yield* storage.getAudioAssetUploadUrl(s3_key);
+        return { upload_url, s3_key };
+      })
+    )
+  );
 
 const complete_upload_audio_asset_route = protectedAdminProcedure
   .input(
@@ -236,26 +138,33 @@ const complete_upload_audio_asset_route = protectedAdminProcedure
       s3_key: z.string()
     })
   )
-  .mutation(async ({ input }) => {
-    const description = `${input.text} (${input.text_key})`;
-    const [result] = await db
-      .insert(audio_assets)
-      .values({
-        description: description,
-        lang_id: input.lang_id,
-        s3_key: input.s3_key,
-        type: 'recorded'
+  .mutation(async ({ input }) =>
+    runTrpcEffect(
+      Effect.gen(function* () {
+        const database = yield* Database;
+        const description = `${input.text} (${input.text_key})`;
+        const result = yield* database.run('complete_upload_audio_asset', async (db) => {
+          const [row] = await db
+            .insert(audio_assets)
+            .values({
+              description,
+              lang_id: input.lang_id,
+              s3_key: input.s3_key,
+              type: 'recorded'
+            })
+            .returning();
+          return row;
+        });
+        return {
+          completed: true as const,
+          id: result.id,
+          s3_key: input.s3_key,
+          description,
+          type: 'recorded' as const
+        };
       })
-      .returning();
-
-    return {
-      completed: true,
-      id: result.id,
-      s3_key: input.s3_key,
-      description: description,
-      type: 'recorded' as const
-    };
-  });
+    )
+  );
 
 const update_audio_asset_route = protectedAdminProcedure
   .input(
@@ -265,15 +174,20 @@ const update_audio_asset_route = protectedAdminProcedure
       lang_id: z.int().optional().nullable()
     })
   )
-  .mutation(async ({ input: { id, description, lang_id } }) => {
-    await db
-      .update(audio_assets)
-      .set({ description: description, lang_id: lang_id })
-      .where(eq(audio_assets.id, id));
-    return {
-      updated: true
-    };
-  });
+  .mutation(async ({ input: { id, description, lang_id } }) =>
+    runTrpcEffect(
+      Effect.gen(function* () {
+        const database = yield* Database;
+        yield* database.run('update_audio_asset', async (db) => {
+          await db
+            .update(audio_assets)
+            .set({ description, lang_id })
+            .where(eq(audio_assets.id, id));
+        });
+        return { updated: true as const };
+      })
+    )
+  );
 
 export const audio_assets_router = t.router({
   list_audio_assets: list_audio_assets_route,

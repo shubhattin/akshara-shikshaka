@@ -11,6 +11,8 @@ env:
   AWS_ACCESS_KEY_ID: access-123
   AWS_SECRET_ACCESS_KEY: secret-123
   AWS_S3_FILES_BUCKET_NAME: bucket-123
+  UPSTASH_REDIS_REST_URL: https://example.upstash.io
+  UPSTASH_REDIS_REST_TOKEN: token-123
 
 jobs:
   type_build_check:
@@ -26,15 +28,15 @@ jobs:
       - run: |
           bun run build
           bun run check
-  # tests:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Setup Bun
-  #       uses: oven-sh/setup-bun@v2
-  #       with:
-  #         bun-version: latest
-  #     - name: Install dependencies
-  #       run: bun install --frozen-lockfile
-  #     - run: |
-  #         bun run test
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - run: |
+          bun run test

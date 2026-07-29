@@ -1,43 +1,22 @@
-import OpenAI from 'openai';
-import { z } from 'zod';
+/**
+ * Legacy Promise wrappers — prefer Effect services via `~/effect/*`.
+ * Kept for any remaining non-Effect callers.
+ */
+export { VoiceTypeEnum } from '~/effect/ai';
+export type { VoiceType } from '~/effect/ai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+import { Effect } from 'effect';
+import { appRuntime } from '~/effect/runtime';
+import { AiProvider, type VoiceType } from '~/effect/ai';
 
-const VOICE_TYPE_LIST = [
-  'alloy',
-  'ash',
-  'ballad',
-  'coral',
-  'echo',
-  'fable',
-  'nova',
-  'onyx',
-  'sage',
-  'shimmer'
-] as const;
-
-type voice_types = (typeof VOICE_TYPE_LIST)[number];
-export const VoiceTypeEnum = z.enum(VOICE_TYPE_LIST);
-
-type Input = {
+export const generateGpt4oMiniTtsSpeech = async (input: {
   text: string;
   instructions: string;
-  voice: voice_types;
-};
-export const generateGpt4oMiniTtsSpeech = async (input: Input) => {
-  const audio = await openai.audio.speech.create({
-    model: 'gpt-4o-mini-tts',
-    voice: input.voice,
-    input: input.text,
-    instructions: input.instructions,
-    response_format: 'opus'
-  });
-
-  const buffer = Buffer.from(await audio.arrayBuffer());
-  return {
-    fileBuffer: buffer,
-    fileType: 'webm' as const
-  };
-};
+  voice: VoiceType;
+}) =>
+  appRuntime.runPromise(
+    Effect.gen(function* () {
+      const ai = yield* AiProvider;
+      return yield* ai.generateSpeech(input);
+    })
+  );

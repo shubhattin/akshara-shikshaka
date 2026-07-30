@@ -24,6 +24,8 @@ export class RedisClient extends Context.Service<
   static readonly Live = Layer.effect(RedisClient)(
     Effect.gen(function* () {
       const config = yield* AppConfig;
+      // Here as we using redis(upstash) via the REST API (unlike traditional redis which uses open TCP connection)
+      // So we can recreate it on every call to the effect
       const redis = new Redis({
         url: config.upstashRedisUrl,
         token: Redacted.value(config.upstashRedisToken)

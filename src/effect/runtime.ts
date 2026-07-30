@@ -7,14 +7,18 @@ import { AiProvider } from './ai';
 import { ImageProcessor } from './image';
 import { BackgroundWork } from './background';
 
-const InfrastructureLayer = Layer.mergeAll(Database.Live, ImageProcessor.Live, BackgroundWork.Live);
+const InfrastructureLayer = Layer.mergeAll(ImageProcessor.Live, BackgroundWork.Live);
 
 const ConfigDependentLayer = Layer.mergeAll(
+  // db pool is released on scope end of the layer
+  Database.Live,
   RedisClient.Live,
   ObjectStorage.Live,
   AiProvider.Live
 ).pipe(Layer.provide(AppConfig.Live));
 
+// the layers are cached and so do not run on every call to the effect
+// and are executed lazily when needed
 export const AppLayer = Layer.mergeAll(InfrastructureLayer, ConfigDependentLayer, AppConfig.Live);
 
 export const appRuntime = ManagedRuntime.make(AppLayer);

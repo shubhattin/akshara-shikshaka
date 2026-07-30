@@ -12,7 +12,8 @@ const AppConfigSchema = Schema.Struct({
   openaiApiKey: Schema.String,
   openrouterApiKey: Schema.optional(Schema.String),
   turnstileSecretKey: Schema.optional(Schema.String),
-  isDev: Schema.Boolean
+  isDev: Schema.Boolean,
+  isProd: Schema.Boolean
 });
 
 export type AppConfigShape = {
@@ -27,6 +28,7 @@ export type AppConfigShape = {
   readonly openrouterApiKey: Redacted.Redacted<string> | undefined;
   readonly turnstileSecretKey: Redacted.Redacted<string> | undefined;
   readonly isDev: boolean;
+  readonly isProd: boolean;
 };
 
 const resolveDbUrl = (env: NodeJS.ProcessEnv): string | undefined => {
@@ -48,7 +50,8 @@ const loadConfig = Effect.fn('loadConfig')(function* () {
     openaiApiKey: env.OPENAI_API_KEY,
     openrouterApiKey: env.OPENROUTER_API_KEY ?? import.meta.env?.OPENROUTER_API_KEY,
     turnstileSecretKey: env.TURNSTILE_SECRET_KEY,
-    isDev: import.meta.env?.DEV === true || env.NODE_ENV === 'development'
+    isDev: import.meta.env?.DEV === true || env.NODE_ENV === 'development',
+    isProd: import.meta.env?.PROD === true || env.NODE_ENV === 'production'
   });
 
   if (parsed._tag === 'Failure') {
@@ -74,7 +77,8 @@ const loadConfig = Effect.fn('loadConfig')(function* () {
     turnstileSecretKey: data.turnstileSecretKey
       ? Redacted.make(data.turnstileSecretKey)
       : undefined,
-    isDev: data.isDev
+    isDev: data.isDev,
+    isProd: data.isProd
   } satisfies AppConfigShape;
 });
 

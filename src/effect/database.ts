@@ -30,12 +30,14 @@ export class Database extends Context.Service<
   });
 }
 
+/** Directly run a database operation without the database service */
 export const dbRun = <A>(operation: string, run: (client: DbClient) => Promise<A>) =>
   Effect.gen(function* () {
     const database = yield* Database;
     return yield* database.run(operation, run);
   });
 
+/** Directly run a database transaction without the database service */
 export const dbTransaction = <A>(operation: string, run: (tx: DbTransaction) => Promise<A>) =>
   Effect.gen(function* () {
     const database = yield* Database;

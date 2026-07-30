@@ -9,7 +9,8 @@ import { BackgroundWork } from '~/effect/background';
 import { appRuntime } from '~/effect/runtime';
 import { FONT_FAMILIES, type FontFamily } from '~/state/font_list';
 import { GestureSchema } from '~/tools/stroke_data/types';
-import { t, protectedAdminProcedure, publicProcedure, runTrpcEffect } from '~/api/trpc_init';
+import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
+import { runTrpcEffect } from '~/effect/run';
 import { gesture_categories_router, reorder_text_gesture_in_category } from './gesture_categories';
 
 type Gesture = z.infer<typeof GestureSchema>;

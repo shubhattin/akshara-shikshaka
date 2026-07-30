@@ -11,7 +11,8 @@ import { BackgroundWork } from '~/effect/background';
 import { CACHE } from '~/effect/cache';
 import { appRuntime } from '~/effect/runtime';
 import { DatabaseError } from '~/effect/errors';
-import { t, protectedAdminProcedure, runTrpcEffect } from '../trpc_init';
+import { t, protectedAdminProcedure } from '../trpc_init';
+import { runTrpcEffect } from '~/effect/run';
 import { dev_delay } from '~/tools/delay';
 
 export const uploadAudioAsset = Effect.fn('uploadAudioAsset')(function* (input: {
@@ -39,7 +40,7 @@ export const uploadAudioAsset = Effect.fn('uploadAudioAsset')(function* (input: 
 
   const { fileBuffer, fileType } = audioBuffer;
   const s3_key =
-    `${PROJECT_S3_ALIAS}/audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.${fileType}` as `${typeof PROJECT_S3_ALIAS}/audio_assets/${string}.webm`;
+    `${PROJECT_S3_ALIAS}/audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.${fileType}` as `${typeof PROJECT_S3_ALIAS}/audio_assets/${string}.opus`;
 
   yield* storage.uploadAssetFile(s3_key, fileBuffer);
   yield* Effect.logInfo('audio uploaded', { s3_key });
@@ -301,6 +302,14 @@ const complete_upload_audio_asset_route = protectedAdminProcedure
             .returning();
           return row;
         });
+        if (!result) {
+          return yield* Effect.fail(
+            DatabaseError.make({
+              operation: 'complete_upload_audio_asset',
+              cause: new Error('Insert returned no row')
+            })
+          );
+        }
         return {
           completed: true as const,
           id: result.id,

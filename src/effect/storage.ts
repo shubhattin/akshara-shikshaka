@@ -15,7 +15,8 @@ import { StorageError } from './errors';
 
 export type AssetLocation =
   | `${typeof PROJECT_S3_ALIAS}/image_assets/${string}.webp`
-  | `${typeof PROJECT_S3_ALIAS}/audio_assets/${string}.webm`;
+  | `${typeof PROJECT_S3_ALIAS}/audio_assets/${string}.webm`
+  | `${typeof PROJECT_S3_ALIAS}/audio_assets/${string}.opus`;
 
 const tryStorage = <A>(operation: string, key: string | undefined, run: () => Promise<A>) =>
   Effect.tryPromise({

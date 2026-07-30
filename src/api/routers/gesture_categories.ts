@@ -3,7 +3,8 @@ import { Effect } from 'effect';
 import { and, asc, eq, isNull, max, ne, sql } from 'drizzle-orm';
 import { gesture_categories, gesture_text_key_category_join, text_gestures } from '~/db/schema';
 import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
-import { t, protectedAdminProcedure, runTrpcEffect } from '~/api/trpc_init';
+import { t, protectedAdminProcedure } from '~/api/trpc_init';
+import { runTrpcEffect } from '~/effect/run';
 import { GestureCategoriesSchemaZod, TextGesturesSchemaZod } from '~/db/schema_zod';
 
 /**
@@ -316,6 +317,3 @@ export const gesture_categories_router = t.router({
   update_gestures_order: update_gestures_order_route,
   add_update_gesture_category: add_update_gesture_category_route
 });
-
-/** @deprecated Prefer `reorder_text_gesture_in_category` */
-export const reorder_text_gesture_in_category_func = reorder_text_gesture_in_category;

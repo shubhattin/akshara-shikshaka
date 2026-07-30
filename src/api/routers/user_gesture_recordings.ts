@@ -1,5 +1,6 @@
 import z from 'zod';
-import { publicProcedure, t, runTrpcEffect, verify_cloudflare_turnstile_token } from '../trpc_init';
+import { publicProcedure, t, verify_cloudflare_turnstile_token } from '../trpc_init';
+import { runTrpcEffect } from '~/effect/run';
 import { user_gesture_recording_vectors, user_gesture_recordings } from '~/db/schema';
 import { Effect } from 'effect';
 import { dbTransaction } from '~/effect/database';

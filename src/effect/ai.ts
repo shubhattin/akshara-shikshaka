@@ -81,7 +81,7 @@ export class AiProvider extends Context.Service<
       text: string;
       instructions: string;
       voice: VoiceType;
-    }) => Effect.Effect<{ fileBuffer: Buffer; fileType: 'webm' }, AiProviderError>;
+    }) => Effect.Effect<{ fileBuffer: Buffer; fileType: 'opus' }, AiProviderError>;
     readonly generatePromptMetadata: (
       input: GeneratePromptMetadataInput
     ) => Effect.Effect<PromptMetadata, AiProviderError>;
@@ -102,11 +102,10 @@ export class AiProvider extends Context.Service<
     Effect.gen(function* () {
       const config = yield* AppConfig;
       const openaiKey = Redacted.value(config.openaiApiKey);
+      const openrouterKey = Redacted.value(config.openrouterApiKey);
       const openaiSdk = new OpenAI({ apiKey: openaiKey });
       const openai = createOpenAI({ apiKey: openaiKey });
-      const openrouter = createOpenRouter({
-        apiKey: config.openrouterApiKey ? Redacted.value(config.openrouterApiKey) : openaiKey
-      });
+      const openrouter = createOpenRouter({ apiKey: openrouterKey });
 
       return {
         generateSpeech: (input) =>
@@ -119,7 +118,7 @@ export class AiProvider extends Context.Service<
               response_format: 'opus'
             });
             const buffer = Buffer.from(await audio.arrayBuffer());
-            return { fileBuffer: buffer, fileType: 'webm' as const };
+            return { fileBuffer: buffer, fileType: 'opus' as const };
           }),
 
         generatePromptMetadata: (input) =>

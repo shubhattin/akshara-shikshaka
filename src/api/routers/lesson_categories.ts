@@ -6,7 +6,8 @@ import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
 import { CACHE } from '~/effect/cache';
 import { BackgroundWork } from '~/effect/background';
 import { appRuntime } from '~/effect/runtime';
-import { t, protectedAdminProcedure, publicProcedure, runTrpcEffect } from '~/api/trpc_init';
+import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
+import { runTrpcEffect } from '~/effect/run';
 import { LessonCategoriesSchemaZod, TextLessonsSchemaZod } from '~/db/schema_zod';
 
 /**
@@ -93,13 +94,13 @@ export const updateLessonCategoryList = Effect.fn('updateLessonCategoryList')(fu
 });
 
 export const deleteLessonCategory = Effect.fn('deleteLessonCategory')(function* (input: {
-  lesson_id: number;
+  category_id: number;
   lang_id: number;
 }) {
   yield* dbTransaction('delete_lesson_category', async (tx) => {
     const categories = await tx.query.lesson_categories.findMany({
       where: (tbl, { eq, ne, and }) =>
-        and(eq(tbl.lang_id, input.lang_id), ne(tbl.id, input.lesson_id)),
+        and(eq(tbl.lang_id, input.lang_id), ne(tbl.id, input.category_id)),
       columns: { id: true, order: true },
       orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
     });
@@ -107,7 +108,10 @@ export const deleteLessonCategory = Effect.fn('deleteLessonCategory')(function* 
     await tx
       .delete(lesson_categories)
       .where(
-        and(eq(lesson_categories.id, input.lesson_id), eq(lesson_categories.lang_id, input.lang_id))
+        and(
+          eq(lesson_categories.id, input.category_id),
+          eq(lesson_categories.lang_id, input.lang_id)
+        )
       );
 
     const reordered_categories = categories.map((category, index) => ({
@@ -234,7 +238,7 @@ const update_category_list_route = protectedAdminProcedure
   .mutation(async ({ input }) => runTrpcEffect(updateLessonCategoryList(input)));
 
 const delete_category_route = protectedAdminProcedure
-  .input(z.object({ lesson_id: z.int(), lang_id: z.int() }))
+  .input(z.object({ category_id: z.int(), lang_id: z.int() }))
   .mutation(async ({ input }) => runTrpcEffect(deleteLessonCategory(input)));
 
 const get_text_lessons_route = protectedAdminProcedure
@@ -274,6 +278,3 @@ export const lesson_categories_router = t.router({
   add_update_lesson_category: add_update_lesson_category_route,
   get_category_text_lesson_list: get_category_text_lesson_list_route
 });
-
-/** @deprecated Prefer `reorder_text_lesson_in_category` */
-export const reorder_text_lesson_in_category_func = reorder_text_lesson_in_category;

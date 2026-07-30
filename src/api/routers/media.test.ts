@@ -13,7 +13,7 @@ const AiTest = Layer.succeed(AiProvider)({
   generateSpeech: () =>
     Effect.succeed({
       fileBuffer: Buffer.from('audio'),
-      fileType: 'webm'
+      fileType: 'opus'
     }),
   generatePromptMetadata: () =>
     Effect.succeed({

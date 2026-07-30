@@ -7,7 +7,8 @@ import { CACHE } from '~/effect/cache';
 import { BackgroundWork } from '~/effect/background';
 import { appRuntime } from '~/effect/runtime';
 import { reorder_text_lesson_in_category, lesson_categories_router } from './lesson_categories';
-import { t, protectedAdminProcedure, publicProcedure, runTrpcEffect } from '../trpc_init';
+import { t, protectedAdminProcedure, publicProcedure } from '../trpc_init';
+import { runTrpcEffect } from '~/effect/run';
 import { TextLessonsSchemaZod, TextLessonWordsSchemaZod } from '~/db/schema_zod';
 import { z } from 'zod';
 
@@ -95,8 +96,7 @@ export const addTextLesson = Effect.fn('addTextLesson')(function* (input: {
   return {
     id: outcome.result.id,
     uuid: outcome.result.uuid,
-    added_word_ids: outcome.added_word_ids,
-    success: true as const
+    added_word_ids: outcome.added_word_ids
   };
 });
 
@@ -190,7 +190,6 @@ export const updateTextLesson = Effect.fn('updateTextLesson')(function* (input: 
   yield* background.enqueue(() =>
     appRuntime.runPromise(CACHE.lessons.text_lesson_info.refresh({ lesson_id: id }))
   );
-  yield* CACHE.lessons.text_lesson_info.delete({ lesson_id: id });
 
   return {
     updated: true as const,

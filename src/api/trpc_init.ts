@@ -1,7 +1,6 @@
 import type { Context } from './context';
 import { TRPCError, initTRPC } from '@trpc/server';
 import transformer from './transformer';
-export { runTrpcEffect, runTrpcEffectResult } from '~/effect/run';
 
 export const t = initTRPC.context<Context>().create({
   transformer

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Effect } from 'effect';
-import { t, protectedAdminProcedure, runTrpcEffect } from '../trpc_init';
+import { t, protectedAdminProcedure } from '../trpc_init';
+import { runTrpcEffect } from '~/effect/run';
 import { dev_delay } from '~/tools/delay';
 import { asc, count, desc, eq, ilike } from 'drizzle-orm';
 import { image_assets } from '~/db/schema';
@@ -13,7 +14,7 @@ import { Database } from '~/effect/database';
 import { BackgroundWork } from '~/effect/background';
 import { CACHE } from '~/effect/cache';
 import { appRuntime } from '~/effect/runtime';
-import { BadRequestError } from '~/effect/errors';
+import { BadRequestError, DatabaseError } from '~/effect/errors';
 
 const IMAGE_DIMENSIONS = 256;
 
@@ -105,6 +106,16 @@ export const makeUploadImageAsset = Effect.fn('makeUploadImageAsset')(function* 
         storage.deleteAssetFile(s3_image_key).pipe(Effect.catch(() => Effect.void))
       )
     );
+
+  if (!result) {
+    yield* storage.deleteAssetFile(s3_image_key).pipe(Effect.catch(() => Effect.void));
+    return yield* Effect.fail(
+      DatabaseError.make({
+        operation: 'insert_image_asset',
+        cause: new Error('Insert returned no row')
+      })
+    );
+  }
 
   return {
     success: true as const,

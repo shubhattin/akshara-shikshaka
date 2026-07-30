@@ -45,7 +45,7 @@ const loadLearnPage = Effect.fn('loadLearnPage')(function* () {
         target_script
       ),
     catch: (cause) => cause
-  });
+  }).pipe(Effect.catch(() => Effect.succeed(init_lessons_list.map((lesson) => lesson.text))));
   const init_lessons_list_transliterated = init_lessons_list.map((lesson, i) => ({
     ...lesson,
     text: transliterated_texts[i]

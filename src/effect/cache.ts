@@ -33,6 +33,15 @@ export function createCache<TSchema extends z.ZodType, TData>(
   const validate = (params: TParams): TParams => schema.parse(params);
   const getKey = (params: TParams): string => `${keyPrefix}:${keyBuilder(validate(params))}`;
 
+  /** Per-key generation so stale background fills cannot overwrite newer refresh/delete. */
+  const generations = new Map<string, number>();
+  const bumpGeneration = (key: string): number => {
+    const next = (generations.get(key) ?? 0) + 1;
+    generations.set(key, next);
+    return next;
+  };
+  const currentGeneration = (key: string): number => generations.get(key) ?? 0;
+
   const toCacheError = (operation: string, key?: string) => (cause: unknown) =>
     CacheError.make({ operation, key, cause });
 
@@ -51,11 +60,18 @@ export function createCache<TSchema extends z.ZodType, TData>(
           Effect.mapError(toCacheError('get', key)),
           Effect.annotateLogs({ category: 'cache', operation: 'get', key })
         );
-      if (cached) return cached;
+      // Only null is a miss — preserve false / 0 / '' as valid cached values.
+      if (cached !== null) return cached;
 
+      const generationAtMiss = currentGeneration(key);
       const data = yield* fetchFn(parsed);
-      const setProgram = cache.set(data, parsed).pipe(
-        Effect.provideService(RedisClient, redis),
+      const setProgram = Effect.gen(function* () {
+        if (currentGeneration(key) !== generationAtMiss) {
+          yield* Effect.logDebug('skipping stale cache fill', { key, generationAtMiss });
+          return;
+        }
+        yield* cache.set(data, parsed).pipe(Effect.provideService(RedisClient, redis));
+      }).pipe(
         Effect.catch((error) =>
           Effect.logWarning('cache set failed', { key, error }).pipe(Effect.asVoid)
         )
@@ -79,6 +95,7 @@ export function createCache<TSchema extends z.ZodType, TData>(
     delete: Effect.fn('cache.delete')(function* (params: TParams) {
       const parsed = validate(params);
       const key = getKey(parsed);
+      bumpGeneration(key);
       const redis = yield* RedisClient;
       yield* redis
         .del(key)
@@ -91,6 +108,7 @@ export function createCache<TSchema extends z.ZodType, TData>(
     refresh: Effect.fn('cache.refresh')(function* (params: TParams, del = true) {
       const parsed = validate(params);
       const key = getKey(parsed);
+      bumpGeneration(key);
       const redis = yield* RedisClient;
 
       const data = yield* fetchFn(parsed);
@@ -108,7 +126,6 @@ export function createCache<TSchema extends z.ZodType, TData>(
 
   return cache;
 }
-
 const fromDb = <A>(operation: string, run: (client: DbClient) => Promise<A>) =>
   Effect.gen(function* () {
     const database = yield* Database;

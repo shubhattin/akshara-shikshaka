@@ -17,7 +17,7 @@ export class ImageProcessor extends Context.Service<
     resizeImage: (inputPng, width, height, webp_options) =>
       Effect.tryPromise({
         try: async () => {
-          const webpBuffer = await sharp(inputPng, { limitInputPixels: false })
+          const webpBuffer = await sharp(inputPng)
             .resize({
               width,
               height,

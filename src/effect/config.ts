@@ -10,7 +10,7 @@ const AppConfigSchema = Schema.Struct({
   awsSecretAccessKey: Schema.String,
   awsS3BucketName: Schema.String,
   openaiApiKey: Schema.String,
-  openrouterApiKey: Schema.optional(Schema.String),
+  openrouterApiKey: Schema.String,
   turnstileSecretKey: Schema.optional(Schema.String),
   isDev: Schema.Boolean,
   isProd: Schema.Boolean
@@ -25,7 +25,7 @@ export type AppConfigShape = {
   readonly awsSecretAccessKey: Redacted.Redacted<string>;
   readonly awsS3BucketName: string;
   readonly openaiApiKey: Redacted.Redacted<string>;
-  readonly openrouterApiKey: Redacted.Redacted<string> | undefined;
+  readonly openrouterApiKey: Redacted.Redacted<string>;
   readonly turnstileSecretKey: Redacted.Redacted<string> | undefined;
   readonly isDev: boolean;
   readonly isProd: boolean;
@@ -73,7 +73,7 @@ const loadConfig = Effect.fn('loadConfig')(function* () {
     awsSecretAccessKey: Redacted.make(data.awsSecretAccessKey),
     awsS3BucketName: data.awsS3BucketName,
     openaiApiKey: Redacted.make(data.openaiApiKey),
-    openrouterApiKey: data.openrouterApiKey ? Redacted.make(data.openrouterApiKey) : undefined,
+    openrouterApiKey: Redacted.make(data.openrouterApiKey),
     turnstileSecretKey: data.turnstileSecretKey
       ? Redacted.make(data.turnstileSecretKey)
       : undefined,

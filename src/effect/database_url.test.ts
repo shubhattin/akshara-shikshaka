@@ -4,11 +4,18 @@ import { get_db_url } from '~/db/db_utils';
 
 describe('database URL selection', () => {
   it('uses PG_DATABASE_URL by default', () => {
-    expect(
-      get_db_url({
-        PG_DATABASE_URL: 'postgres://local/db'
-      })
-    ).toBe('postgres://local/db');
+    const prev = process.env.DB_MODE;
+    delete process.env.DB_MODE;
+    try {
+      expect(
+        get_db_url({
+          PG_DATABASE_URL: 'postgres://local/db'
+        })
+      ).toBe('postgres://local/db');
+    } finally {
+      if (prev === undefined) delete process.env.DB_MODE;
+      else process.env.DB_MODE = prev;
+    }
   });
 
   it('uses PG_DATABASE_URL1 when DB_MODE=PROD', () => {

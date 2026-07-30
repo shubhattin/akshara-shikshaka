@@ -1,11 +1,11 @@
 import { Effect, Exit, Layer } from 'effect';
 import { describe, expect, it } from '@effect/vitest';
-import { AiProvider } from '../ai';
-import { ObjectStorage } from '../storage';
-import { Database } from '../database';
-import { ImageProcessor } from '../image';
-import { BackgroundWork } from '../background';
-import { StorageError, AiProviderError, DatabaseError } from '../errors';
+import { AiProvider } from '~/effect/ai';
+import { ObjectStorage } from '~/effect/storage';
+import { Database } from '~/effect/database';
+import { ImageProcessor } from '~/effect/image';
+import { BackgroundWork } from '~/effect/background';
+import { StorageError, AiProviderError, DatabaseError } from '~/effect/errors';
 import { makeUploadImageAsset } from './image_assets';
 import { uploadAudioAsset } from './audio_assets';
 

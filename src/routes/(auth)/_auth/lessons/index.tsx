@@ -10,7 +10,7 @@ import { get_lesson_lang_id_from_cookie, LESSON_LANG_ID_COOKIE_KEY } from '@/sta
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 import { Effect } from 'effect';
-import { getLessonCategories } from '~/effect/workflows/lesson_categories';
+import { getLessonCategories } from '~/api/routers/lesson_categories';
 import { runLoaderEffect } from '~/effect/run';
 
 const loadLessonsIndex = Effect.fn('loadLessonsIndex')(function* () {

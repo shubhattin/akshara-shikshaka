@@ -7,10 +7,7 @@ import LearnPage from './-LearnPage';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { getCookie } from '@tanstack/react-start/server';
 import { transliterate_wasm } from 'lipilekhika';
-import {
-  getCategoryTextLessonList,
-  getLessonCategories
-} from '~/effect/workflows/lesson_categories';
+import { getCategoryTextLessonList, getLessonCategories } from '~/api/routers/lesson_categories';
 import { runLoaderEffect } from '~/effect/run';
 
 const loadLearnPage = Effect.fn('loadLearnPage')(function* () {

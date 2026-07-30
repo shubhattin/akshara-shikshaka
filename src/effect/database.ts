@@ -1,7 +1,6 @@
 import { Context, Effect, Layer } from 'effect';
 import { db, type transactionType } from '~/db/db';
 import { DatabaseError } from './errors';
-import { Dna } from 'lucide-react';
 
 export type DbClient = typeof db;
 export type DbTransaction = transactionType;

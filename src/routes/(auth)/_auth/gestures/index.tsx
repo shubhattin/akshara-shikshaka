@@ -8,7 +8,7 @@ import ListGestures from './-ListGestures';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 import { Effect } from 'effect';
-import { getGestureCategories } from '~/effect/workflows/text_gestures';
+import { getGestureCategories } from '~/api/routers/gesture_categories';
 import { runLoaderEffect } from '~/effect/run';
 
 const loadGesturesIndex = Effect.fn('loadGesturesIndex')(function* () {

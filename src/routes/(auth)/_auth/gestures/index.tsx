@@ -4,19 +4,22 @@ import { IoMdAdd, IoMdArrowRoundBack } from 'react-icons/io';
 import { Button } from '~/components/ui/button';
 import { getCookie } from '@tanstack/react-start/server';
 import { get_script_id_from_cookie, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
-import { get_text_gesture_categories_func } from '~/api/routers/gesture_categories';
 import ListGestures from './-ListGestures';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
+import { Effect } from 'effect';
+import { getGestureCategories } from '~/effect/workflows/text_gestures';
+import { runLoaderEffect } from '~/effect/run';
+
+const loadGesturesIndex = Effect.fn('loadGesturesIndex')(function* () {
+  const script_id = get_script_id_from_cookie(getCookie(SCRIPT_ID_COOKIE_KEY));
+  const gesture_categories = yield* getGestureCategories();
+  return { init_script_id: script_id, init_gesture_categories: gesture_categories };
+});
 
 const loader$ = createServerFn({ method: 'GET' })
   .middleware([adminServerFnMiddleware])
-  .handler(async () => {
-    const script_id = get_script_id_from_cookie(getCookie(SCRIPT_ID_COOKIE_KEY));
-    const gesture_categories = await get_text_gesture_categories_func();
-
-    return { init_script_id: script_id, init_gesture_categories: gesture_categories };
-  });
+  .handler(() => runLoaderEffect(loadGesturesIndex()));
 
 export const Route = createFileRoute('/(auth)/_auth/gestures/')({
   loader: async () => await loader$(),

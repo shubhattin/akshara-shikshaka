@@ -1,6 +1,7 @@
 import { Context, Effect, Layer } from 'effect';
 import { db, type transactionType } from '~/db/db';
 import { DatabaseError } from './errors';
+import { Dna } from 'lucide-react';
 
 export type DbClient = typeof db;
 export type DbTransaction = transactionType;
@@ -22,22 +23,22 @@ export class Database extends Context.Service<
       operation: string,
       run: (tx: DbTransaction) => Promise<A>
     ) => Effect.Effect<A, DatabaseError>;
+    // readonly db: DbClient;
   }
 >()('Database') {
   static readonly Live = Layer.succeed(Database)({
+    // db: db,
     run: (operation, run) => tryDb(operation, () => run(db)),
     transaction: (operation, run) => tryDb(operation, () => db.transaction(async (tx) => run(tx)))
   });
 }
 
-/** Directly run a database operation without the database service */
 export const dbRun = <A>(operation: string, run: (client: DbClient) => Promise<A>) =>
   Effect.gen(function* () {
     const database = yield* Database;
     return yield* database.run(operation, run);
   });
 
-/** Directly run a database transaction without the database service */
 export const dbTransaction = <A>(operation: string, run: (tx: DbTransaction) => Promise<A>) =>
   Effect.gen(function* () {
     const database = yield* Database;

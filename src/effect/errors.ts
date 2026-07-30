@@ -56,3 +56,21 @@ export class UnauthorizedError extends Schema.TaggedErrorClass<UnauthorizedError
     message: Schema.optional(Schema.String)
   }
 ) {}
+
+/** All application tagged errors — single source for boundary recognition. */
+export const KnownErrorSchema = Schema.Union([
+  DatabaseError,
+  RedisError,
+  CacheError,
+  StorageError,
+  AiProviderError,
+  ImageProcessingError,
+  ConfigError,
+  NotFoundError,
+  BadRequestError,
+  UnauthorizedError
+]);
+
+export type KnownError = typeof KnownErrorSchema.Type;
+
+export const isKnownError = Schema.is(KnownErrorSchema);

@@ -1,60 +1,65 @@
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
-import { db } from '@/db/db';
 import z from 'zod';
 import EditImage from './-EditImage';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { Provider as JotaiProvider } from 'jotai';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
+import { Effect } from 'effect';
+import { dbRun } from '~/effect/database';
+import { runLoaderEffect } from '~/effect/run';
 
-const get_cached_image_data = async (id: number) => {
-  const image_data = await db.query.image_assets.findFirst({
-    where: (table, { eq }) => eq(table.id, id),
-    columns: {
-      id: true,
-      description: true,
-      s3_key: true,
-      height: true,
-      width: true,
-      created_at: true,
-      updated_at: true
-    },
-    with: {
-      words: {
-        columns: {
-          id: true,
-          word: true,
-          text_lesson_id: true,
-          order: true
-        },
-        with: {
-          lesson: {
-            columns: {
-              text: true
+const getImageAssetForEdit = Effect.fn('getImageAssetForEdit')(function* (id: number) {
+  return yield* dbRun('get_image_asset_for_edit', async (db) =>
+    db.query.image_assets.findFirst({
+      where: (table, { eq }) => eq(table.id, id),
+      columns: {
+        id: true,
+        description: true,
+        s3_key: true,
+        height: true,
+        width: true,
+        created_at: true,
+        updated_at: true
+      },
+      with: {
+        words: {
+          columns: {
+            id: true,
+            word: true,
+            text_lesson_id: true,
+            order: true
+          },
+          with: {
+            lesson: {
+              columns: {
+                text: true
+              }
             }
-          }
-        },
-        orderBy: (tbl, { asc }) => [asc(tbl.text_lesson_id), asc(tbl.order)]
+          },
+          orderBy: (tbl, { asc }) => [asc(tbl.text_lesson_id), asc(tbl.order)]
+        }
       }
-    }
-  });
-
-  return image_data;
-};
+    })
+  );
+});
 
 const loader$ = createServerFn({ method: 'GET' })
   .middleware([adminServerFnMiddleware])
   .inputValidator(z.object({ rawId: z.string().min(1) }))
-  .handler(async ({ data }) => {
-    const parsed = z.coerce.number().int().positive().safeParse(data.rawId);
-    if (!parsed.success) {
-      return { image_data: null };
-    }
-    const id = parsed.data;
-    const image_data = await get_cached_image_data(id);
-    return { image_data };
-  });
+  .handler(({ data }) =>
+    runLoaderEffect(
+      Effect.gen(function* () {
+        const parsed = z.coerce.number().int().positive().safeParse(data.rawId);
+        if (!parsed.success) {
+          return { image_data: null };
+        }
+        const image_data = yield* getImageAssetForEdit(parsed.data);
+        return { image_data };
+      })
+    )
+  );
 
 export const Route = createFileRoute('/(auth)/_auth/image_assets/edit/$id')({
   loader: async ({ params }) => {

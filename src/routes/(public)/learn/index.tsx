@@ -1,16 +1,21 @@
-import { CACHE } from '@/api/cache';
 import { get_script_from_id, lang_list_obj, script_list_obj } from '@/state/lang_list';
 import { createFileRoute } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
+import { Effect } from 'effect';
 import { parseLearnPageCookie, SAVED_COOKIES_KEY } from './-learn_page_state';
 import LearnPage from './-LearnPage';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { getCookie } from '@tanstack/react-start/server';
 import { transliterate_wasm } from 'lipilekhika';
+import {
+  getCategoryTextLessonList,
+  getLessonCategories
+} from '~/effect/workflows/lesson_categories';
+import { runLoaderEffect } from '~/effect/run';
 
-const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
+const loadLearnPage = Effect.fn('loadLearnPage')(function* () {
   const lang_id = lang_list_obj['Sanskrit'];
-  const lesson_categories_prom = CACHE.lessons.category_list.get({ lang_id });
+  const lesson_categories = yield* getLessonCategories({ lang_id });
 
   const saved_category_id_ = parseLearnPageCookie(
     'category_id',
@@ -25,21 +30,25 @@ const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
     getCookie(SAVED_COOKIES_KEY.script_id.key)
   );
 
-  const lesson_categories = await lesson_categories_prom;
-
   const category_id = !saved_category_id_
     ? (lesson_categories[0]?.id ?? null)
     : (lesson_categories.find((c) => c.id === saved_category_id_)?.id ??
       lesson_categories[0]?.id ??
       null);
 
-  const init_lessons_list = await CACHE.lessons.category_lesson_list.get({ category_id });
+  const init_lessons_list =
+    category_id == null ? [] : yield* getCategoryTextLessonList({ category_id });
+
   const target_script = get_script_from_id(saved_script_id ?? script_list_obj['Devanagari']);
-  const transliterated_texts = await transliterate_wasm(
-    init_lessons_list.map((lesson) => lesson.text),
-    'Devanagari',
-    target_script
-  );
+  const transliterated_texts = yield* Effect.tryPromise({
+    try: () =>
+      transliterate_wasm(
+        init_lessons_list.map((lesson) => lesson.text),
+        'Devanagari',
+        target_script
+      ),
+    catch: (cause) => cause
+  });
   const init_lessons_list_transliterated = init_lessons_list.map((lesson, i) => ({
     ...lesson,
     text: transliterated_texts[i]
@@ -61,6 +70,8 @@ const loader$ = createServerFn({ method: 'GET' }).handler(async () => {
     saved_lesson_id: lesson_id
   };
 });
+
+const loader$ = createServerFn({ method: 'GET' }).handler(() => runLoaderEffect(loadLearnPage()));
 
 export const Route = createFileRoute('/(public)/learn/')({
   loader: async () => await loader$(),

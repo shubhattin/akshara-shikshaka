@@ -1,7 +1,7 @@
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from '@effect/vitest';
 import { z } from 'zod';
-import { DatabaseError, NotFoundError, StorageError } from './errors';
+import { DatabaseError, NotFoundError, StorageError, isKnownError } from './errors';
 import { RedisClient } from './redis';
 import { BackgroundWork } from './background';
 import { Database } from './database';
@@ -27,6 +27,23 @@ describe('Effect infrastructure', () => {
         message: 'Text lesson not found'
       });
       expect(error._tag).toBe('NotFoundError');
+    })
+  );
+
+  it.effect('recognizes known errors via Schema.is', () =>
+    Effect.gen(function* () {
+      const found = NotFoundError.make({
+        resource: 'text_lesson',
+        message: 'Text lesson not found'
+      });
+      const storage = StorageError.make({
+        operation: 'uploadAssetFile',
+        cause: new Error('network')
+      });
+      expect(isKnownError(found)).toBe(true);
+      expect(isKnownError(storage)).toBe(true);
+      expect(isKnownError(new Error('plain'))).toBe(false);
+      expect(isKnownError({ _tag: 'NotFoundError', resource: 'x', message: 'y' })).toBe(false);
     })
   );
 });

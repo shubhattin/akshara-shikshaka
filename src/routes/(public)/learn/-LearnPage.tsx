@@ -61,6 +61,9 @@ import {
   SelectValue
 } from '~/components/ui/select';
 
+// Kept off until react-konva's production renderer issue is resolved.
+const PRACTICE_CANVAS_ENABLED = false;
+
 type Props = {
   init_lesson_categories: lesson_category_type[];
   init_lang_id: number;
@@ -497,6 +500,12 @@ const Lesson = ({
     // - Or gesture record for that script does not exist
   );
 
+  const PracticeUnavailable = () => (
+    <div className="mt-16 text-center text-lg font-semibold text-muted-foreground">
+      Gesture practice is temporarily unavailable. Please try another lesson.
+    </div>
+  );
+
   return (
     <div className="mt-2 space-y-4">
       {/* Varna text with optional audio */}
@@ -605,6 +614,11 @@ const Lesson = ({
           <PracticeNotFound />
         )}
         {selected_gesture &&
+          !text_gesture_data_q.isLoading &&
+          text_gesture_data_q.isSuccess &&
+          text_gesture_data_q.data && <PracticeUnavailable />}
+        {PRACTICE_CANVAS_ENABLED &&
+          selected_gesture &&
           !text_gesture_data_q.isLoading &&
           text_gesture_data_q.isSuccess &&
           text_gesture_data_q.data && (

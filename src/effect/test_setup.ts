@@ -12,10 +12,6 @@ process.env.UPSTASH_REDIS_REST_TOKEN = 'token-test';
 import { afterAll } from 'vitest';
 
 afterAll(async () => {
-  try {
-    const { appRuntime } = await import('./runtime');
-    await appRuntime.dispose();
-  } catch {
-    // ignore dispose errors in unit tests
-  }
+  const { appRuntime } = await import('./runtime');
+  await appRuntime.dispose();
 });

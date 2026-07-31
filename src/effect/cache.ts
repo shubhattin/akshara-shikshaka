@@ -42,6 +42,21 @@ export function createCache<TSchema extends z.ZodType, TData>(
   };
   const currentGeneration = (key: string): number => generations.get(key) ?? 0;
 
+  /** Serialize invalidate/write per key so generation check + Redis write stay atomic. */
+  const keyOpTails = new Map<string, Promise<void>>();
+  const enqueueKeyOp = <A>(key: string, op: () => Promise<A>): Promise<A> => {
+    const previous = keyOpTails.get(key) ?? Promise.resolve();
+    const current = previous.then(op, op);
+    keyOpTails.set(
+      key,
+      current.then(
+        () => undefined,
+        () => undefined
+      )
+    );
+    return current;
+  };
+
   const toCacheError = (operation: string, key?: string) => (cause: unknown) =>
     CacheError.make({ operation, key, cause });
 
@@ -65,12 +80,15 @@ export function createCache<TSchema extends z.ZodType, TData>(
 
       const generationAtMiss = currentGeneration(key);
       const data = yield* fetchFn(parsed);
-      const setProgram = Effect.gen(function* () {
-        if (currentGeneration(key) !== generationAtMiss) {
-          yield* Effect.logDebug('skipping stale cache fill', { key, generationAtMiss });
-          return;
-        }
-        yield* cache.set(data, parsed).pipe(Effect.provideService(RedisClient, redis));
+      const setProgram = Effect.tryPromise({
+        try: () =>
+          enqueueKeyOp(key, async () => {
+            if (currentGeneration(key) !== generationAtMiss) return;
+            await Effect.runPromise(
+              cache.set(data, parsed).pipe(Effect.provideService(RedisClient, redis))
+            );
+          }),
+        catch: (error) => error
       }).pipe(
         Effect.catch((error) =>
           Effect.logWarning('cache set failed', { key, error }).pipe(Effect.asVoid)
@@ -97,30 +115,41 @@ export function createCache<TSchema extends z.ZodType, TData>(
       const key = getKey(parsed);
       bumpGeneration(key);
       const redis = yield* RedisClient;
-      yield* redis
-        .del(key)
-        .pipe(
-          Effect.mapError(toCacheError('delete', key)),
-          Effect.annotateLogs({ category: 'cache', operation: 'delete', key })
-        );
+      yield* Effect.tryPromise({
+        try: () =>
+          enqueueKeyOp(key, () =>
+            Effect.runPromise(
+              redis
+                .del(key)
+                .pipe(Effect.annotateLogs({ category: 'cache', operation: 'delete', key }))
+            )
+          ),
+        catch: toCacheError('delete', key)
+      });
     }),
 
     refresh: Effect.fn('cache.refresh')(function* (params: TParams, del = true) {
       const parsed = validate(params);
       const key = getKey(parsed);
-      bumpGeneration(key);
+      const generation = bumpGeneration(key);
       const redis = yield* RedisClient;
 
       const data = yield* fetchFn(parsed);
-      if (del) {
-        yield* redis.del(key).pipe(Effect.mapError(toCacheError('refresh-delete', key)));
-      }
-      yield* redis
-        .set(key, data, { ex: ttl })
-        .pipe(
-          Effect.mapError(toCacheError('refresh', key)),
-          Effect.annotateLogs({ category: 'cache', operation: 'refresh', key })
-        );
+      yield* Effect.tryPromise({
+        try: () =>
+          enqueueKeyOp(key, async () => {
+            if (currentGeneration(key) !== generation) return;
+            if (del) {
+              await Effect.runPromise(redis.del(key));
+            }
+            await Effect.runPromise(
+              redis
+                .set(key, data, { ex: ttl })
+                .pipe(Effect.annotateLogs({ category: 'cache', operation: 'refresh', key }))
+            );
+          }),
+        catch: toCacheError('refresh', key)
+      });
     })
   };
 

@@ -125,7 +125,7 @@ export class AiProvider extends Context.Service<
           tryAi('generatePromptMetadata', 'openrouter', async () => {
             if ('existingImagePrompt' in input) {
               const response = await generateText({
-                model: openrouter('openai/gpt-4.1'),
+                model: openrouter('openai/gpt-5.4-nano'),
                 output: Output.object({ schema: promptFileMetaSchema }),
                 system: EXISTING_PROMPT_SYSTEM,
                 prompt: input.existingImagePrompt
@@ -141,7 +141,7 @@ export class AiProvider extends Context.Service<
             }
 
             const response = await generateText({
-              model: openrouter('openai/gpt-4.1'),
+              model: openrouter('openai/gpt-5.6-luna'),
               output: Output.object({ schema: promptMetadataSchema }),
               system: IMAGE_PROMPT_SYSTEM,
               prompt: imagePromptUserMessage(input)
@@ -171,7 +171,7 @@ export class AiProvider extends Context.Service<
         embedText: (input) =>
           tryAi('embedText', 'openai', async () => {
             const { embedding } = await embed({
-              model: openai.textEmbeddingModel(
+              model: openai.embeddingModel(
                 input.model as Parameters<typeof openai.textEmbeddingModel>[0]
               ),
               value: input.value,

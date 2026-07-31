@@ -1,4 +1,5 @@
-import Turnstile from 'react-turnstile';
+// Default export is a CJS namespace object; named export is the component.
+import { Turnstile } from 'react-turnstile';
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 
 type Props = {

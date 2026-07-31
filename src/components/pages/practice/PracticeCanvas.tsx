@@ -27,9 +27,6 @@ interface PracticeKonvaCanvasProps {
 
 const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
   ({ gestureData, onUserStroke }, ref) => {
-    // react-konva's custom renderer is incompatible with React Compiler memoization.
-    'use no memo';
-
     // Canvas state from atoms
     // as we are restricting the parent to render this untill the scaling factor is set
     // we can safely assume that the scaling factor is not null

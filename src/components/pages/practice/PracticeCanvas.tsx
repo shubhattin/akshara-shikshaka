@@ -1,7 +1,9 @@
 'use client';
 
-import { forwardRef, useEffect, useRef, useState } from 'react';
-import { Stage, Layer, Path } from 'react-konva';
+import { createElement, forwardRef, useEffect, useRef, useState } from 'react';
+// Keep explicit aliases: React Compiler can otherwise lower a repeated `Path`
+// reference to a host element, which breaks react-konva during hydration.
+import { Stage as KonvaStage, Layer as KonvaLayer, Path as KonvaPath } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue } from 'jotai';
 import type { GesturePoints, Gesture } from '~/tools/stroke_data/types';
@@ -236,7 +238,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
         }}
         data-drawing-canvas="true"
       >
-        <Stage
+        <KonvaStage
           width={canvasWidth}
           height={canvasHeight}
           scale={{ x: scalingFactor, y: scalingFactor }}
@@ -249,41 +251,41 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
           onTouchEnd={handleStageMouseUp}
           className="bg-white"
         >
-          <Layer>
+          <KonvaLayer>
             {/* Animated Gesture Paths (guidance and completed strokes) */}
             {animatedGestureLines.map((line, index) => (
-              <Path
-                key={`gesture-path-${line.index}-${index}`}
-                data={pointsToSvgPath(
+              createElement(KonvaPath, {
+                key: `gesture-path-${line.index}-${index}`,
+                data: pointsToSvgPath(
                   line.isAnimatedPath
                     ? line.points
                     : getSmoothenedPoints(line.points, {
                         size: line.width,
                         simulatePressure: line.simulate_pressure
                       })
-                )}
-                fill={line.color}
-                strokeEnabled={false}
-                listening={false}
-              />
+                ),
+                fill: line.color,
+                strokeEnabled: false,
+                listening: false
+              })
             ))}
 
             {/* Current Drawing Stroke (while user is drawing) */}
             {currentGesturePoints.length > 2 && currentGesture && (
-              <Path
-                data={pointsToSvgPath(
+              createElement(KonvaPath, {
+                data: pointsToSvgPath(
                   getSmoothenedPoints(currentGesturePoints, {
                     size: currentGesture.width || 6,
                     simulatePressure: currentGesture.simulate_pressure
                   }) as GesturePoints[]
-                )}
-                fill={USER_GESTURE_COLOR}
-                strokeEnabled={false}
-                listening={false}
-              />
+                ),
+                fill: USER_GESTURE_COLOR,
+                strokeEnabled: false,
+                listening: false
+              })
             )}
-          </Layer>
-        </Stage>
+          </KonvaLayer>
+        </KonvaStage>
       </div>
     );
   }

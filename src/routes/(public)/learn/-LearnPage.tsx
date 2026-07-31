@@ -61,9 +61,6 @@ import {
   SelectValue
 } from '~/components/ui/select';
 
-// Temporary switch for validating the canvas with React Compiler disabled.
-const PRACTICE_CANVAS_ENABLED = true;
-
 type Props = {
   init_lesson_categories: lesson_category_type[];
   init_lang_id: number;
@@ -182,7 +179,7 @@ function LearnPage(props: Props) {
             aria-expanded={open}
             className={cn(
               buttonVariants({ variant: 'outline' }),
-              'w-[180px] justify-between text-base font-semibold'
+              'w-45 justify-between text-base font-semibold'
             )}
           >
             {selectedCategoryId !== null
@@ -191,7 +188,7 @@ function LearnPage(props: Props) {
               : 'Select category...'}
             <ChevronsUpDown className="opacity-50" />
           </PopoverTrigger>
-          <PopoverContent className="w-[200px] p-0">
+          <PopoverContent className="w-50 p-0">
             <Command>
               <CommandInput placeholder="Search category..." className="h-9" />
               <CommandList>
@@ -607,8 +604,7 @@ const Lesson = ({
         {lesson?.gestures && !selected_gesture && !text_gesture_data_q.isLoading && (
           <PracticeNotFound />
         )}
-        {PRACTICE_CANVAS_ENABLED &&
-          selected_gesture &&
+        {selected_gesture &&
           !text_gesture_data_q.isLoading &&
           text_gesture_data_q.isSuccess &&
           text_gesture_data_q.data && (

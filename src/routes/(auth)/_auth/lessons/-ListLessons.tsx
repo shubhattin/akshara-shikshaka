@@ -165,7 +165,7 @@ function ListLessons({ init_lesson_categories }: Props) {
           <PopoverTrigger
             role="combobox"
             aria-expanded={open}
-            className={cn(buttonVariants({ variant: 'outline' }), 'w-[200px] justify-between')}
+            className={cn(buttonVariants({ variant: 'outline' }), 'w-50 justify-between')}
           >
             {selectedCategoryID !== null
               ? categories.find((category) => category.id === selectedCategoryID)?.name ||
@@ -173,7 +173,7 @@ function ListLessons({ init_lesson_categories }: Props) {
               : 'Select category...'}
             <ChevronsUpDown className="opacity-50" />
           </PopoverTrigger>
-          <PopoverContent className="w-[200px] p-0">
+          <PopoverContent className="w-50 p-0">
             <Command>
               <CommandInput placeholder="Search category..." className="h-9" />
               <CommandList>
@@ -445,7 +445,10 @@ function ManageCategoriesDialog({
               <AlertDialogAction
                 onClick={async () => {
                   if (deleteId !== null) {
-                    await delete_category_mut.mutateAsync({ lesson_id: deleteId, lang_id: langId });
+                    await delete_category_mut.mutateAsync({
+                      category_id: deleteId,
+                      lang_id: langId
+                    });
                   }
                 }}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

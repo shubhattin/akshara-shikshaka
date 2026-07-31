@@ -1,60 +1,65 @@
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { z } from 'zod';
-import { db } from '@/db/db';
 import EditAudio from './-EditAudio';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { Provider as JotaiProvider } from 'jotai';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
+import { Effect } from 'effect';
+import { dbRun } from '~/effect/database';
+import { runLoaderEffect } from '~/effect/run';
 
-const get_cached_audio_data = async (id: number) => {
-  const audio_data = await db.query.audio_assets.findFirst({
-    where: (table, { eq }) => eq(table.id, id),
-    columns: {
-      id: true,
-      description: true,
-      s3_key: true,
-      type: true,
-      lang_id: true,
-      created_at: true,
-      updated_at: true
-    },
-    with: {
-      words: {
-        columns: {
-          id: true,
-          word: true,
-          text_lesson_id: true,
-          order: true
-        },
-        with: {
-          lesson: {
-            columns: {
-              text: true
+const getAudioAssetForEdit = Effect.fn('getAudioAssetForEdit')(function* (id: number) {
+  return yield* dbRun('get_audio_asset_for_edit', async (db) =>
+    db.query.audio_assets.findFirst({
+      where: (table, { eq }) => eq(table.id, id),
+      columns: {
+        id: true,
+        description: true,
+        s3_key: true,
+        type: true,
+        lang_id: true,
+        created_at: true,
+        updated_at: true
+      },
+      with: {
+        words: {
+          columns: {
+            id: true,
+            word: true,
+            text_lesson_id: true,
+            order: true
+          },
+          with: {
+            lesson: {
+              columns: {
+                text: true
+              }
             }
-          }
-        },
-        orderBy: (tbl, { asc }) => [asc(tbl.text_lesson_id), asc(tbl.order)]
+          },
+          orderBy: (tbl, { asc }) => [asc(tbl.text_lesson_id), asc(tbl.order)]
+        }
       }
-    }
-  });
-
-  return audio_data;
-};
+    })
+  );
+});
 
 const loader$ = createServerFn({ method: 'GET' })
   .middleware([adminServerFnMiddleware])
   .inputValidator(z.object({ rawId: z.string().min(1) }))
-  .handler(async ({ data }) => {
-    const parsed = z.coerce.number().int().positive().safeParse(data.rawId);
-    if (!parsed.success) {
-      return { audio_data: null };
-    }
-    const id = parsed.data;
-    const audio_data = await get_cached_audio_data(id);
-    return { audio_data };
-  });
+  .handler(({ data }) =>
+    runLoaderEffect(
+      Effect.gen(function* () {
+        const parsed = z.coerce.number().int().positive().safeParse(data.rawId);
+        if (!parsed.success) {
+          return { audio_data: null };
+        }
+        const audio_data = yield* getAudioAssetForEdit(parsed.data);
+        return { audio_data };
+      })
+    )
+  );
 
 export const Route = createFileRoute('/(auth)/_auth/audio_assets/edit/$id')({
   loader: async ({ params }) => {

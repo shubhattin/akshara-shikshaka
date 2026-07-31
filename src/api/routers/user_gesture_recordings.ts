@@ -1,8 +1,10 @@
 import z from 'zod';
 import { publicProcedure, t, verify_cloudflare_turnstile_token } from '../trpc_init';
+import { runTrpcEffect } from '~/effect/run';
 import { user_gesture_recording_vectors, user_gesture_recordings } from '~/db/schema';
-import { db } from '~/db/db';
-import { TRPCError } from '@trpc/server';
+import { Effect } from 'effect';
+import { dbTransaction } from '~/effect/database';
+import { BadRequestError } from '~/effect/errors';
 
 const submit_user_gesture_recording_route = publicProcedure
   .input(
@@ -21,36 +23,48 @@ const submit_user_gesture_recording_route = publicProcedure
       )
     })
   )
-  .mutation(async ({ input }) => {
-    const is_valid = await verify_cloudflare_turnstile_token(input.turnstile_token);
-    if (!is_valid) {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid turnstile token' });
-    }
-    const { id } = await db.transaction(async (tx) => {
-      const [{ id }] = await tx
-        .insert(user_gesture_recordings)
-        .values({
-          text: input.text,
-          script_id: input.script_id,
-          completed: input.completed
-        })
-        .returning();
+  .mutation(async ({ input }) =>
+    runTrpcEffect(
+      Effect.gen(function* () {
+        const is_valid = yield* Effect.tryPromise({
+          try: () => verify_cloudflare_turnstile_token(input.turnstile_token),
+          catch: (cause) => cause
+        }).pipe(
+          Effect.map((success) => success === true),
+          Effect.catch(() => Effect.succeed(false))
+        );
 
-      await tx.insert(user_gesture_recording_vectors).values(
-        input.vectors.map((vector) => ({
-          ...vector,
-          user_gesture_recording_id: id
-        }))
-      );
+        if (!is_valid) {
+          return yield* Effect.fail(BadRequestError.make({ message: 'Invalid turnstile token' }));
+        }
 
-      return { id };
-    });
+        const { id } = yield* dbTransaction('submit_user_gesture_recording', async (tx) => {
+          const [{ id }] = await tx
+            .insert(user_gesture_recordings)
+            .values({
+              text: input.text,
+              script_id: input.script_id,
+              completed: input.completed
+            })
+            .returning();
 
-    return {
-      success: true,
-      recording_id: id
-    };
-  });
+          await tx.insert(user_gesture_recording_vectors).values(
+            input.vectors.map((vector) => ({
+              ...vector,
+              user_gesture_recording_id: id
+            }))
+          );
+
+          return { id };
+        });
+
+        return {
+          success: true as const,
+          recording_id: id
+        };
+      })
+    )
+  );
 
 export const user_gesture_recordings_router = t.router({
   submit_user_gesture_recording: submit_user_gesture_recording_route

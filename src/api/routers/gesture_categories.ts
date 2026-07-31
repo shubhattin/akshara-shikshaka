@@ -1,19 +1,20 @@
 import { z } from 'zod';
-import { t, protectedAdminProcedure } from '~/api/trpc_init';
-import { db, type transactionType } from '~/db/db';
-import { gesture_categories, gesture_text_key_category_join, text_gestures } from '~/db/schema';
+import { Effect } from 'effect';
 import { and, asc, eq, isNull, max, ne, sql } from 'drizzle-orm';
+import { gesture_categories, gesture_text_key_category_join, text_gestures } from '~/db/schema';
+import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
+import { t, protectedAdminProcedure } from '~/api/trpc_init';
+import { runTrpcEffect } from '~/effect/run';
 import { GestureCategoriesSchemaZod, TextGesturesSchemaZod } from '~/db/schema_zod';
 
 /**
- *
- * @param gesture_id_to_ignore This is to allow this function to run in parallel with other operations
+ * @param gesture_id_to_ignore Allow this function to run in parallel with deletes/moves.
  */
-export const reorder_text_gesture_in_category_func = async (
+export const reorder_text_gesture_in_category = async (
   category_id: number,
   script_id: number,
   gesture_id_to_ignore: number,
-  dbConn: transactionType
+  dbConn: DbTransaction
 ) => {
   const gestures_ = await dbConn
     .select()
@@ -25,7 +26,6 @@ export const reorder_text_gesture_in_category_func = async (
     .where(
       and(
         eq(text_gestures.script_id, script_id),
-        // script id to filter out common text keys shared accross multiple scripts
         eq(gesture_text_key_category_join.category_id, category_id),
         ne(text_gestures.id, gesture_id_to_ignore)
       )
@@ -46,7 +46,6 @@ export const reorder_text_gesture_in_category_func = async (
 
   if (reordered_gestures.length === 0) return;
 
-  // inside a transaction we do not use `allSettled` as it swallows write failures and the transaction cannot do its intended job
   const value_rows = reordered_gestures.map(
     (gesture) => sql`(${gesture.id}::int, ${gesture.order}::smallint)`
   );
@@ -58,111 +57,86 @@ export const reorder_text_gesture_in_category_func = async (
   `);
 };
 
-export const get_text_gesture_categories_func = async () => {
-  const categories = await db.query.gesture_categories.findMany({
-    columns: {
-      id: true,
-      name: true,
-      order: true
-    },
-    orderBy: (tbl, { asc }) => [asc(tbl.order)]
-  });
-  return categories;
-};
-
-const get_categories_route = protectedAdminProcedure.query(async () => {
-  return await get_text_gesture_categories_func();
+export const getGestureCategories = Effect.fn('getGestureCategories')(function* () {
+  return yield* dbRun('get_gesture_categories', async (db) =>
+    db.query.gesture_categories.findMany({
+      columns: { id: true, name: true, order: true },
+      orderBy: (tbl, { asc }) => [asc(tbl.order)]
+    })
+  );
 });
 
-const add_category_route = protectedAdminProcedure
-  .input(GestureCategoriesSchemaZod.pick({ name: true }))
-  .mutation(async ({ input: { name } }) => {
-    const result = await db.transaction(async (tx) => {
-      const last_order = await tx
-        .select({ max_order: max(gesture_categories.order) })
-        .from(gesture_categories);
-      const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
-      const result = await tx.insert(gesture_categories).values({ name, order }).returning();
-      return result[0];
-    });
-
-    return {
-      id: result.id,
-      order: result.order
-    };
+export const addGestureCategory = Effect.fn('addGestureCategory')(function* (input: {
+  name: string;
+}) {
+  const result = yield* dbTransaction('add_gesture_category', async (tx) => {
+    const last_order = await tx
+      .select({ max_order: max(gesture_categories.order) })
+      .from(gesture_categories);
+    const order = last_order[0].max_order ? last_order[0].max_order + 1 : 1;
+    const rows = await tx
+      .insert(gesture_categories)
+      .values({ name: input.name, order })
+      .returning();
+    return rows[0];
   });
+  return { id: result.id, order: result.order };
+});
 
-const update_list_route = protectedAdminProcedure
-  .input(
-    z.object({
-      categories: GestureCategoriesSchemaZod.pick({ id: true, name: true, order: true }).array()
-    })
-  )
-  .mutation(async ({ input: { categories } }) => {
-    await db.transaction(async (tx) => {
-      // single UPDATE FROM VALUES — order of these categories are dependent on each other
-      if (categories.length === 0) return;
+export const updateGestureCategoryList = Effect.fn('updateGestureCategoryList')(function* (input: {
+  categories: Array<{ id: number; name: string; order: number }>;
+}) {
+  yield* dbTransaction('update_gesture_category_list', async (tx) => {
+    if (input.categories.length === 0) return;
+    const value_rows = input.categories.map(
+      (category) => sql`(${category.id}::int, ${category.name}::text, ${category.order}::smallint)`
+    );
+    await tx.execute(sql`
+      UPDATE ${gesture_categories} AS t
+      SET name = v.name, "order" = v."order", updated_at = NOW()
+      FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, name, "order")
+      WHERE t.id = v.id
+    `);
+  });
+  return { updated: true as const };
+});
 
-      const value_rows = categories.map(
-        (category) => sql`(${category.id}::int, ${category.name}, ${category.order}::smallint)`
+export const deleteGestureCategory = Effect.fn('deleteGestureCategory')(function* (input: {
+  category_id: number;
+}) {
+  yield* dbTransaction('delete_gesture_category', async (tx) => {
+    const categories = await tx.query.gesture_categories.findMany({
+      columns: { id: true, order: true },
+      where: (tbl, { ne }) => ne(tbl.id, input.category_id),
+      orderBy: (gesture_categories, { asc }) => [asc(gesture_categories.order)]
+    });
+    await tx.delete(gesture_categories).where(eq(gesture_categories.id, input.category_id));
+
+    const reordered_categories = categories.map((category, index) => ({
+      ...category,
+      order: index + 1
+    }));
+    if (reordered_categories.length > 0) {
+      const value_rows = reordered_categories.map(
+        (category) => sql`(${category.id}::int, ${category.order}::smallint)`
       );
       await tx.execute(sql`
         UPDATE ${gesture_categories} AS t
-        SET name = v.name, "order" = v."order", updated_at = NOW()
-        FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, name, "order")
+        SET "order" = v."order", updated_at = NOW()
+        FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
         WHERE t.id = v.id
       `);
-    });
-
-    return {
-      updated: true
-    };
+    }
   });
+  return { deleted: true as const };
+});
 
-const delete_category_route = protectedAdminProcedure
-  .input(z.object({ category_id: z.int() }))
-  .mutation(async ({ input: { category_id } }) => {
-    await db.transaction(async (tx) => {
-      const [, categories] = await Promise.all([
-        tx.delete(gesture_categories).where(eq(gesture_categories.id, category_id)),
-        tx.query.gesture_categories.findMany({
-          columns: {
-            id: true,
-            order: true
-          },
-          // ignore the category to be deleted
-          where: (tbl, { ne }) => ne(tbl.id, category_id),
-          orderBy: (gesture_categories, { asc }) => [asc(gesture_categories.order)]
-        })
-      ]);
-
-      const reordered_categories = categories.map((category, index) => ({
-        ...category,
-        order: index + 1
-      }));
-      // Update the order of the categories
-      if (reordered_categories.length > 0) {
-        const value_rows = reordered_categories.map(
-          (category) => sql`(${category.id}::int, ${category.order}::smallint)`
-        );
-        await tx.execute(sql`
-          UPDATE ${gesture_categories} AS t
-          SET "order" = v."order", updated_at = NOW()
-          FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
-          WHERE t.id = v.id
-        `);
-      }
-    });
-
-    return {
-      deleted: true
-    };
-  });
-
-const get_gestures_route = protectedAdminProcedure
-  .input(z.object({ category_id: z.int().min(0), script_id: z.int() }))
-  .query(async ({ input: { category_id, script_id } }) => {
-    if (category_id > 0) {
+export const getGesturesByCategory = Effect.fn('getGesturesByCategory')(function* (input: {
+  category_id: number;
+  script_id: number;
+}) {
+  return yield* dbRun('get_gestures_by_category', async (db) => {
+    if (input.category_id > 0) {
       const gestures = await db
         .select({
           id: text_gestures.id,
@@ -177,17 +151,13 @@ const get_gestures_route = protectedAdminProcedure
         )
         .where(
           and(
-            eq(gesture_text_key_category_join.category_id, category_id),
-            eq(text_gestures.script_id, script_id)
+            eq(gesture_text_key_category_join.category_id, input.category_id),
+            eq(text_gestures.script_id, input.script_id)
           )
         )
         .orderBy(asc(text_gestures.order), asc(text_gestures.text));
-      return {
-        gestures,
-        type: 'categorized'
-      };
+      return { gestures, type: 'categorized' as const };
     }
-    // uncategorized -> 0, null in DB
 
     const gestures = await db
       .select({
@@ -203,16 +173,119 @@ const get_gestures_route = protectedAdminProcedure
       )
       .where(
         and(
-          isNull(gesture_text_key_category_join.category_id), // No match in join table
-          eq(text_gestures.script_id, script_id)
+          isNull(gesture_text_key_category_join.category_id),
+          eq(text_gestures.script_id, input.script_id)
         )
       )
       .orderBy(asc(text_gestures.text));
-    return {
-      gestures,
-      type: 'uncategorized'
-    };
+    return { gestures, type: 'uncategorized' as const };
   });
+});
+
+export const updateGesturesOrder = Effect.fn('updateGesturesOrder')(function* (input: {
+  gestures: Array<{ id: number; order: number | null }>;
+  category_id: number;
+}) {
+  yield* dbTransaction('update_gestures_order', async (tx) => {
+    if (input.gestures.length === 0) return;
+    const value_rows = input.gestures.map(
+      (gesture) => sql`(${gesture.id}::int, ${gesture.order}::smallint)`
+    );
+    await tx.execute(sql`
+      UPDATE ${text_gestures} AS t
+      SET "order" = v."order", updated_at = NOW()
+      FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
+      WHERE t.id = v.id
+        AND EXISTS (
+          SELECT 1
+          FROM ${gesture_text_key_category_join} AS j
+          WHERE j.gesture_text_key = t.text_key
+            AND j.category_id = ${input.category_id}
+        )
+    `);
+  });
+  return { updated: true as const };
+});
+
+export const addUpdateGestureCategory = Effect.fn('addUpdateGestureCategory')(function* (input: {
+  category_id: number | null;
+  prev_category_id?: number;
+  gesture_text_key: string;
+  gesture_id: number;
+  script_id: number;
+}) {
+  yield* dbTransaction('add_update_gesture_category', async (tx) => {
+    const prev_join = await tx.query.gesture_text_key_category_join.findFirst({
+      where: (tbl, { and, eq }) =>
+        input.prev_category_id
+          ? and(
+              eq(tbl.gesture_text_key, input.gesture_text_key),
+              eq(tbl.category_id, input.prev_category_id)
+            )
+          : eq(tbl.gesture_text_key, input.gesture_text_key)
+    });
+
+    await tx
+      .update(text_gestures)
+      .set({ order: null })
+      .where(
+        and(eq(text_gestures.id, input.gesture_id), eq(text_gestures.script_id, input.script_id))
+      );
+
+    if (input.category_id) {
+      if (prev_join) {
+        await tx
+          .update(gesture_text_key_category_join)
+          .set({ category_id: input.category_id })
+          .where(eq(gesture_text_key_category_join.id, prev_join.id));
+      } else {
+        await tx.insert(gesture_text_key_category_join).values({
+          gesture_text_key: input.gesture_text_key,
+          category_id: input.category_id
+        });
+      }
+    } else {
+      await tx
+        .delete(gesture_text_key_category_join)
+        .where(eq(gesture_text_key_category_join.gesture_text_key, input.gesture_text_key));
+    }
+
+    if (input.prev_category_id && input.prev_category_id !== input.category_id) {
+      await reorder_text_gesture_in_category(
+        input.prev_category_id,
+        input.script_id,
+        input.gesture_id,
+        tx
+      );
+    }
+  });
+
+  return { added: true as const };
+});
+
+const get_categories_route = protectedAdminProcedure.query(async () =>
+  runTrpcEffect(getGestureCategories())
+);
+
+const add_category_route = protectedAdminProcedure
+  .input(GestureCategoriesSchemaZod.pick({ name: true }))
+  .mutation(async ({ input }) => runTrpcEffect(addGestureCategory(input)));
+
+const update_list_route = protectedAdminProcedure
+  .input(
+    z.object({
+      categories: GestureCategoriesSchemaZod.pick({ id: true, name: true, order: true }).array()
+    })
+  )
+  .mutation(async ({ input }) => runTrpcEffect(updateGestureCategoryList(input)));
+
+const delete_category_route = protectedAdminProcedure
+  .input(z.object({ category_id: z.int() }))
+  .mutation(async ({ input }) => runTrpcEffect(deleteGestureCategory(input)));
+
+const get_gestures_route = protectedAdminProcedure
+  .input(z.object({ category_id: z.int().min(0), script_id: z.int() }))
+  .query(async ({ input }) => runTrpcEffect(getGesturesByCategory(input)));
 
 const update_gestures_order_route = protectedAdminProcedure
   .input(
@@ -221,32 +294,7 @@ const update_gestures_order_route = protectedAdminProcedure
       category_id: z.int()
     })
   )
-  .mutation(async ({ input: { gestures, category_id } }) => {
-    await db.transaction(async (tx) => {
-      // a transaction is not necessary here but fine to use too
-      // also the order of these gestures are dependent on each other
-      if (gestures.length === 0) return;
-
-      const value_rows = gestures.map(
-        (gesture) => sql`(${gesture.id}::int, ${gesture.order}::smallint)`
-      );
-      await tx.execute(sql`
-        UPDATE ${text_gestures} AS t
-        SET "order" = v."order", updated_at = NOW()
-        FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
-        WHERE t.id = v.id
-          AND EXISTS (
-            SELECT 1
-            FROM ${gesture_text_key_category_join} AS j
-            WHERE j.gesture_text_key = t.text_key
-              AND j.category_id = ${category_id}
-          )
-      `);
-    });
-    return {
-      updated: true
-    };
-  });
+  .mutation(async ({ input }) => runTrpcEffect(updateGesturesOrder(input)));
 
 const add_update_gesture_category_route = protectedAdminProcedure
   .input(
@@ -258,52 +306,7 @@ const add_update_gesture_category_route = protectedAdminProcedure
       script_id: z.int()
     })
   )
-  .mutation(
-    async ({
-      input: { category_id, prev_category_id, gesture_id, gesture_text_key, script_id }
-    }) => {
-      await db.transaction(async (tx) => {
-        const prev_join = await tx.query.gesture_text_key_category_join.findFirst({
-          where: (tbl, { and, eq }) =>
-            prev_category_id
-              ? and(
-                  eq(tbl.gesture_text_key, gesture_text_key),
-                  eq(tbl.category_id, prev_category_id)
-                )
-              : eq(tbl.gesture_text_key, gesture_text_key)
-        });
-
-        await Promise.all([
-          tx
-            .update(text_gestures)
-            .set({ order: null })
-            // reset the order to null on add/update to a category
-            .where(and(eq(text_gestures.id, gesture_id), eq(text_gestures.script_id, script_id))),
-          category_id
-            ? prev_join
-              ? tx
-                  .update(gesture_text_key_category_join)
-                  .set({ category_id: category_id })
-                  .where(eq(gesture_text_key_category_join.id, prev_join.id))
-              : tx
-                  .insert(gesture_text_key_category_join)
-                  .values({ gesture_text_key, category_id: category_id })
-            : tx
-                .delete(gesture_text_key_category_join)
-                .where(and(eq(gesture_text_key_category_join.gesture_text_key, gesture_text_key))),
-          // removing the category join, thus making it uncategorized
-          prev_category_id &&
-            prev_category_id !== category_id &&
-            reorder_text_gesture_in_category_func(prev_category_id, script_id, gesture_id, tx)
-          // no need to reorder the current category as order is set to null which does not affect the concerned order
-        ]);
-      });
-
-      return {
-        added: true
-      };
-    }
-  );
+  .mutation(async ({ input }) => runTrpcEffect(addUpdateGestureCategory(input)));
 
 export const gesture_categories_router = t.router({
   get_categories: get_categories_route,

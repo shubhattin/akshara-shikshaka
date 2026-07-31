@@ -3,74 +3,80 @@ import { Provider as JotaiProvider } from 'jotai';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import TextLessonAddEdit from '~/components/pages/lesson_add_edit/TextLessonAddEdit';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
-import { db } from '@/db/db';
 import { z } from 'zod';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
+import { Effect } from 'effect';
+import { dbRun } from '~/effect/database';
+import { runLoaderEffect } from '~/effect/run';
 
-const get_cached_text_lesson_info = async (id: number) => {
-  const text_lesson_info = await db.query.text_lessons.findFirst({
-    where: (tbl, { eq }) => eq(tbl.id, id),
-    columns: {
-      id: true,
-      uuid: true,
-      lang_id: true,
-      text: true,
-      text_key: true,
-      base_word_script_id: true,
-      order: true,
-      category_id: true,
-      audio_id: true
-    },
-    orderBy: (tbl, { asc }) => [asc(tbl.text)],
-    with: {
-      category: {
-        columns: {
-          id: true,
-          name: true
-        }
+const getTextLessonForEdit = Effect.fn('getTextLessonForEdit')(function* (id: number) {
+  return yield* dbRun('get_text_lesson_for_edit', async (db) =>
+    db.query.text_lessons.findFirst({
+      where: (tbl, { eq }) => eq(tbl.id, id),
+      columns: {
+        id: true,
+        uuid: true,
+        lang_id: true,
+        text: true,
+        text_key: true,
+        base_word_script_id: true,
+        order: true,
+        category_id: true,
+        audio_id: true
       },
-      gestures: {
-        columns: {
-          text_gesture_id: true
+      orderBy: (tbl, { asc }) => [asc(tbl.text)],
+      with: {
+        category: {
+          columns: {
+            id: true,
+            name: true
+          }
         },
-        with: {
-          text_gesture: {
-            columns: {
-              id: true,
-              text: true,
-              script_id: true
+        gestures: {
+          columns: {
+            text_gesture_id: true
+          },
+          with: {
+            text_gesture: {
+              columns: {
+                id: true,
+                text: true,
+                script_id: true
+              }
             }
           }
-        }
-      },
-      words: {
-        columns: {
-          id: true,
-          word: true,
-          image_id: true,
-          audio_id: true,
-          order: true
         },
-        orderBy: (tbl, { asc }) => [asc(tbl.order)]
+        words: {
+          columns: {
+            id: true,
+            word: true,
+            image_id: true,
+            audio_id: true,
+            order: true
+          },
+          orderBy: (tbl, { asc }) => [asc(tbl.order)]
+        }
       }
-    }
-  });
-  return text_lesson_info;
-};
+    })
+  );
+});
 
 const loader$ = createServerFn({ method: 'GET' })
   .middleware([adminServerFnMiddleware])
   .inputValidator(z.object({ rawId: z.string().min(1) }))
-  .handler(async ({ data }) => {
-    const parsed = z.coerce.number().int().positive().safeParse(data.rawId);
-    if (!parsed.success) {
-      return { text_lesson_info: null };
-    }
-    const id = parsed.data;
-    const text_lesson_info = await get_cached_text_lesson_info(id);
-    return { text_lesson_info };
-  });
+  .handler(({ data }) =>
+    runLoaderEffect(
+      Effect.gen(function* () {
+        const parsed = z.coerce.number().int().positive().safeParse(data.rawId);
+        if (!parsed.success) {
+          return { text_lesson_info: null };
+        }
+        const text_lesson_info = yield* getTextLessonForEdit(parsed.data);
+        return { text_lesson_info };
+      })
+    )
+  );
 
 export const Route = createFileRoute('/(auth)/_auth/lessons/edit/$id')({
   loader: async ({ params }) => {

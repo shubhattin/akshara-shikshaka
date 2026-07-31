@@ -7,18 +7,21 @@ import { IoMdAdd } from 'react-icons/io';
 import ListLessons from './-ListLessons';
 import { getCookie } from '@tanstack/react-start/server';
 import { get_lesson_lang_id_from_cookie, LESSON_LANG_ID_COOKIE_KEY } from '@/state/cookie';
-import { CACHE } from '@/api/cache';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
+import { Effect } from 'effect';
+import { getLessonCategories } from '~/api/routers/lesson_categories';
+import { runLoaderEffect } from '~/effect/run';
+
+const loadLessonsIndex = Effect.fn('loadLessonsIndex')(function* () {
+  const lang_id = get_lesson_lang_id_from_cookie(getCookie(LESSON_LANG_ID_COOKIE_KEY));
+  const lesson_categories = yield* getLessonCategories({ lang_id });
+  return { init_lang_id: lang_id, init_lesson_categories: lesson_categories };
+});
 
 const loader$ = createServerFn({ method: 'GET' })
   .middleware([adminServerFnMiddleware])
-  .handler(async () => {
-    const lang_id = get_lesson_lang_id_from_cookie(getCookie(LESSON_LANG_ID_COOKIE_KEY));
-
-    const lesson_categories = await CACHE.lessons.category_list.get({ lang_id });
-    return { init_lang_id: lang_id, init_lesson_categories: lesson_categories };
-  });
+  .handler(() => runLoaderEffect(loadLessonsIndex()));
 
 export const Route = createFileRoute('/(auth)/_auth/lessons/')({
   loader: async () => await loader$(),

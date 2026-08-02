@@ -17,8 +17,6 @@ import { Route as authAuthLessonsIndexRouteImport } from './routes/(auth)/_auth/
 import { Route as authAuthImage_assetsIndexRouteImport } from './routes/(auth)/_auth/image_assets/index'
 import { Route as authAuthGesturesIndexRouteImport } from './routes/(auth)/_auth/gestures/index'
 import { Route as authAuthAudio_assetsIndexRouteImport } from './routes/(auth)/_auth/audio_assets/index'
-import { Route as authAuthLessonsAddRouteImport } from './routes/(auth)/_auth/lessons/add'
-import { Route as authAuthGesturesAddIndexRouteImport } from './routes/(auth)/_auth/gestures/add/index'
 import { Route as authAuthLessonsEditIdRouteImport } from './routes/(auth)/_auth/lessons/edit/$id'
 import { Route as authAuthImage_assetsEditIdRouteImport } from './routes/(auth)/_auth/image_assets/edit/$id'
 import { Route as authAuthGesturesEditIdRouteImport } from './routes/(auth)/_auth/gestures/edit/$id'
@@ -65,17 +63,6 @@ const authAuthAudio_assetsIndexRoute =
     path: '/audio_assets/',
     getParentRoute: () => authAuthRoute,
   } as any)
-const authAuthLessonsAddRoute = authAuthLessonsAddRouteImport.update({
-  id: '/lessons/add',
-  path: '/lessons/add',
-  getParentRoute: () => authAuthRoute,
-} as any)
-const authAuthGesturesAddIndexRoute =
-  authAuthGesturesAddIndexRouteImport.update({
-    id: '/gestures/add/',
-    path: '/gestures/add/',
-    getParentRoute: () => authAuthRoute,
-  } as any)
 const authAuthLessonsEditIdRoute = authAuthLessonsEditIdRouteImport.update({
   id: '/lessons/edit/$id',
   path: '/lessons/edit/$id',
@@ -103,7 +90,6 @@ export interface FileRoutesByFullPath {
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn/': typeof publicLearnIndexRoute
-  '/lessons/add': typeof authAuthLessonsAddRoute
   '/audio_assets/': typeof authAuthAudio_assetsIndexRoute
   '/gestures/': typeof authAuthGesturesIndexRoute
   '/image_assets/': typeof authAuthImage_assetsIndexRoute
@@ -112,13 +98,11 @@ export interface FileRoutesByFullPath {
   '/gestures/edit/$id': typeof authAuthGesturesEditIdRoute
   '/image_assets/edit/$id': typeof authAuthImage_assetsEditIdRoute
   '/lessons/edit/$id': typeof authAuthLessonsEditIdRoute
-  '/gestures/add/': typeof authAuthGesturesAddIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn': typeof publicLearnIndexRoute
-  '/lessons/add': typeof authAuthLessonsAddRoute
   '/audio_assets': typeof authAuthAudio_assetsIndexRoute
   '/gestures': typeof authAuthGesturesIndexRoute
   '/image_assets': typeof authAuthImage_assetsIndexRoute
@@ -127,7 +111,6 @@ export interface FileRoutesByTo {
   '/gestures/edit/$id': typeof authAuthGesturesEditIdRoute
   '/image_assets/edit/$id': typeof authAuthImage_assetsEditIdRoute
   '/lessons/edit/$id': typeof authAuthLessonsEditIdRoute
-  '/gestures/add': typeof authAuthGesturesAddIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -135,7 +118,6 @@ export interface FileRoutesById {
   '/(public)/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/(public)/learn/': typeof publicLearnIndexRoute
-  '/(auth)/_auth/lessons/add': typeof authAuthLessonsAddRoute
   '/(auth)/_auth/audio_assets/': typeof authAuthAudio_assetsIndexRoute
   '/(auth)/_auth/gestures/': typeof authAuthGesturesIndexRoute
   '/(auth)/_auth/image_assets/': typeof authAuthImage_assetsIndexRoute
@@ -144,7 +126,6 @@ export interface FileRoutesById {
   '/(auth)/_auth/gestures/edit/$id': typeof authAuthGesturesEditIdRoute
   '/(auth)/_auth/image_assets/edit/$id': typeof authAuthImage_assetsEditIdRoute
   '/(auth)/_auth/lessons/edit/$id': typeof authAuthLessonsEditIdRoute
-  '/(auth)/_auth/gestures/add/': typeof authAuthGesturesAddIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -152,7 +133,6 @@ export interface FileRouteTypes {
     | '/'
     | '/api/trpc/$'
     | '/learn/'
-    | '/lessons/add'
     | '/audio_assets/'
     | '/gestures/'
     | '/image_assets/'
@@ -161,13 +141,11 @@ export interface FileRouteTypes {
     | '/gestures/edit/$id'
     | '/image_assets/edit/$id'
     | '/lessons/edit/$id'
-    | '/gestures/add/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/api/trpc/$'
     | '/learn'
-    | '/lessons/add'
     | '/audio_assets'
     | '/gestures'
     | '/image_assets'
@@ -176,14 +154,12 @@ export interface FileRouteTypes {
     | '/gestures/edit/$id'
     | '/image_assets/edit/$id'
     | '/lessons/edit/$id'
-    | '/gestures/add'
   id:
     | '__root__'
     | '/(auth)/_auth'
     | '/(public)/'
     | '/api/trpc/$'
     | '/(public)/learn/'
-    | '/(auth)/_auth/lessons/add'
     | '/(auth)/_auth/audio_assets/'
     | '/(auth)/_auth/gestures/'
     | '/(auth)/_auth/image_assets/'
@@ -192,7 +168,6 @@ export interface FileRouteTypes {
     | '/(auth)/_auth/gestures/edit/$id'
     | '/(auth)/_auth/image_assets/edit/$id'
     | '/(auth)/_auth/lessons/edit/$id'
-    | '/(auth)/_auth/gestures/add/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -260,20 +235,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authAuthAudio_assetsIndexRouteImport
       parentRoute: typeof authAuthRoute
     }
-    '/(auth)/_auth/lessons/add': {
-      id: '/(auth)/_auth/lessons/add'
-      path: '/lessons/add'
-      fullPath: '/lessons/add'
-      preLoaderRoute: typeof authAuthLessonsAddRouteImport
-      parentRoute: typeof authAuthRoute
-    }
-    '/(auth)/_auth/gestures/add/': {
-      id: '/(auth)/_auth/gestures/add/'
-      path: '/gestures/add'
-      fullPath: '/gestures/add/'
-      preLoaderRoute: typeof authAuthGesturesAddIndexRouteImport
-      parentRoute: typeof authAuthRoute
-    }
     '/(auth)/_auth/lessons/edit/$id': {
       id: '/(auth)/_auth/lessons/edit/$id'
       path: '/lessons/edit/$id'
@@ -306,7 +267,6 @@ declare module '@tanstack/react-router' {
 }
 
 interface authAuthRouteChildren {
-  authAuthLessonsAddRoute: typeof authAuthLessonsAddRoute
   authAuthAudio_assetsIndexRoute: typeof authAuthAudio_assetsIndexRoute
   authAuthGesturesIndexRoute: typeof authAuthGesturesIndexRoute
   authAuthImage_assetsIndexRoute: typeof authAuthImage_assetsIndexRoute
@@ -315,11 +275,9 @@ interface authAuthRouteChildren {
   authAuthGesturesEditIdRoute: typeof authAuthGesturesEditIdRoute
   authAuthImage_assetsEditIdRoute: typeof authAuthImage_assetsEditIdRoute
   authAuthLessonsEditIdRoute: typeof authAuthLessonsEditIdRoute
-  authAuthGesturesAddIndexRoute: typeof authAuthGesturesAddIndexRoute
 }
 
 const authAuthRouteChildren: authAuthRouteChildren = {
-  authAuthLessonsAddRoute: authAuthLessonsAddRoute,
   authAuthAudio_assetsIndexRoute: authAuthAudio_assetsIndexRoute,
   authAuthGesturesIndexRoute: authAuthGesturesIndexRoute,
   authAuthImage_assetsIndexRoute: authAuthImage_assetsIndexRoute,
@@ -328,7 +286,6 @@ const authAuthRouteChildren: authAuthRouteChildren = {
   authAuthGesturesEditIdRoute: authAuthGesturesEditIdRoute,
   authAuthImage_assetsEditIdRoute: authAuthImage_assetsEditIdRoute,
   authAuthLessonsEditIdRoute: authAuthLessonsEditIdRoute,
-  authAuthGesturesAddIndexRoute: authAuthGesturesAddIndexRoute,
 }
 
 const authAuthRouteWithChildren = authAuthRoute._addFileChildren(

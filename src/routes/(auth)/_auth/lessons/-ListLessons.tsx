@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTRPC } from '~/api/client';
 import { Skeleton } from '~/components/ui/skeleton';
-import { ArrowRightLeft, ChevronsUpDown } from 'lucide-react';
+import { ArrowRightLeft, ChevronsUpDown, CircleHelp, Pencil, Undo2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -27,12 +27,20 @@ import {
   CommandItem,
   CommandList
 } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger
+} from '@/components/ui/popover';
 import { cn } from '~/lib/utils';
 import { TiEdit } from 'react-icons/ti';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter
@@ -105,6 +113,7 @@ function ListLessons({ init_lesson_categories }: Props) {
   const trpc = useTRPC();
   const [langId, setLangId] = useAtom(lang_id_atom);
   const [manageOpen, setManageOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const langOptions = LANGUAGES_ADDED.map((name) => ({
     name,
@@ -116,7 +125,6 @@ function ListLessons({ init_lesson_categories }: Props) {
   ];
 
   const [open, setOpen] = useState(false);
-  // 0 will be for uncategorized
   const [selectedCategoryID, setSelectedCategoryID] = useAtom(selected_category_id_atom);
 
   const categories_q = useQuery(
@@ -135,8 +143,13 @@ function ListLessons({ init_lesson_categories }: Props) {
     )
   );
 
+  const categoryName =
+    selectedCategoryID === 0
+      ? 'Uncategorized'
+      : (categories.find((c) => c.id === selectedCategoryID)?.name ?? 'Category');
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3">
         <Select
           items={langItems}
@@ -160,7 +173,7 @@ function ListLessons({ init_lesson_categories }: Props) {
           </SelectContent>
         </Select>
       </div>
-      <div className="flex items-center justify-center space-x-4">
+      <div className="flex flex-wrap items-center justify-center gap-4">
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger
             role="combobox"
@@ -227,15 +240,37 @@ function ListLessons({ init_lesson_categories }: Props) {
         />
       ) : null}
 
-      {/* Category Lessons Rendering */}
+      {selectedCategoryID !== null && category_lessons_q.data ? (
+        <EditCategoryLessonsDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          category_id={selectedCategoryID}
+          categoryName={categoryName}
+          lessons={category_lessons_q.data.lessons}
+          type={category_lessons_q.data.type as 'categorized' | 'uncategorized'}
+          categories={categories}
+        />
+      ) : null}
+
       {selectedCategoryID === null ? (
         <div className="mx-auto w-full max-w-5xl text-center font-semibold text-muted-foreground">
           Please select a category to view lessons.
         </div>
       ) : (
-        <div className="mx-auto w-full max-w-5xl">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(true)}
+              disabled={category_lessons_q.isLoading || !category_lessons_q.data}
+              className="border-sky-500 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-200"
+            >
+              <Pencil data-icon="inline-start" />
+              Edit Order
+            </Button>
+          </div>
           {category_lessons_q.isLoading ? (
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 rounded-md border p-3">
                   <Skeleton className="h-5 w-1/3" />
@@ -244,10 +279,7 @@ function ListLessons({ init_lesson_categories }: Props) {
               ))}
             </div>
           ) : category_lessons_q.data ? (
-            <CategoryLessonsSection
-              category_id={selectedCategoryID!}
-              data={category_lessons_q.data}
-            />
+            <DisplayLessonsSection data={category_lessons_q.data} />
           ) : null}
         </div>
       )}
@@ -278,7 +310,6 @@ function ManageCategoriesDialog({
 
   useEffect(() => {
     setCategoryList(categories);
-    // on refetch reassign
   }, [categories]);
 
   const add_category_mut = useMutation(
@@ -298,17 +329,14 @@ function ManageCategoriesDialog({
     trpc.text_lessons.categories.delete_category.mutationOptions({
       onSuccess: async () => {
         setDeleteId(null);
-        // reordering is done on server on delete
         queryClient.invalidateQueries(trpc.text_lessons.categories.get_categories.queryFilter());
-        // invalidate the uncategorized lessons list
         queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_category_text_lesson_list.queryFilter({
+          trpc.text_lessons.categories.get_text_lessons.queryFilter({
             category_id: 0
           })
         );
-        // invalidate the lessons list for the deleted category
         queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_category_text_lesson_list.queryFilter({
+          trpc.text_lessons.categories.get_text_lessons.queryFilter({
             category_id: deleteId!
           })
         );
@@ -359,13 +387,13 @@ function ManageCategoriesDialog({
 
         <div className="mb-3 flex items-center justify-between">
           <Button onClick={() => setAddOpen(true)} size="sm">
-            <Plus className="mr-2 size-4" /> Add Category
+            <Plus data-icon="inline-start" /> Add Category
           </Button>
         </div>
 
         <div className="max-h-[50vh] overflow-y-auto rounded-md border p-2">
           {isLoading ? (
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <Skeleton className="h-8 w-6" />
@@ -384,7 +412,7 @@ function ManageCategoriesDialog({
                 items={categoryList.map((c) => String(c.id))}
                 strategy={verticalListSortingStrategy}
               >
-                <ul className="space-y-2">
+                <ul className="flex flex-col gap-2">
                   {categoryList.map((c) => (
                     <DraggableCategoryRow
                       key={c.id}
@@ -414,7 +442,6 @@ function ManageCategoriesDialog({
           </Button>
         </DialogFooter>
 
-        {/* Add Category Dialog */}
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogContent>
             <DialogHeader>
@@ -427,17 +454,13 @@ function ManageCategoriesDialog({
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation */}
         <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Category</AlertDialogTitle>
               <AlertDialogDescription>
-                <span>Are you sure you want to delete this category?</span>
-                <br />
-                <span className="mt-2 text-muted-foreground">
-                  Lessons within this category will become uncategorized.
-                </span>
+                Are you sure you want to delete this category? Lessons within this category will
+                become uncategorized.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -472,7 +495,7 @@ function AddCategoryForm({
 }) {
   const [name, setName] = useState('');
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       <Input placeholder="Category name" value={name} onChange={(e) => setName(e.target.value)} />
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={() => setName('')} disabled={isSubmitting}>
@@ -512,11 +535,11 @@ function DraggableCategoryRow({
         {...listeners}
         aria-label="Drag"
       >
-        <GripVertical className="size-4" />
+        <GripVertical />
       </button>
       <Input value={item.name} onChange={(e) => onChangeName(e.target.value)} className="flex-1" />
       <Button variant="ghost" size="icon" onClick={onDelete} className="text-destructive">
-        <Trash2 className="size-5" />
+        <Trash2 />
       </Button>
     </li>
   );
@@ -524,38 +547,469 @@ function DraggableCategoryRow({
 
 type LessonItem = { id: number; text: string; order: number | null };
 
-function CategoryLessonsSection({
-  data,
-  category_id
-}: {
-  data: { type: string; lessons: LessonItem[] };
-  category_id: number;
-}) {
-  if (data.type === 'uncategorized') {
-    return <UncatLessonsList lessons={data.lessons} />;
-  }
-  return <CategorizedLessonsList lessons={data.lessons} category_id={category_id} />;
+type PendingMove = {
+  id: number;
+  text: string;
+  target_category_id: number | null;
+};
+
+function splitLessons(lessons: LessonItem[]) {
+  const unordered = lessons.filter((l) => l.order === null);
+  const ordered = lessons
+    .filter((l) => l.order !== null)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  return { ordered, unordered };
 }
 
-function UncatLessonsList({ lessons }: { lessons: LessonItem[] }) {
+function draftSignature(
+  ordered: LessonItem[],
+  unordered: LessonItem[],
+  pendingMoves: PendingMove[]
+) {
+  return JSON.stringify({
+    ordered: ordered.map((l) => ({ id: l.id, order: l.order })),
+    unordered: unordered.map((l) => l.id),
+    pendingMoves: pendingMoves.map((m) => ({
+      id: m.id,
+      target_category_id: m.target_category_id
+    }))
+  });
+}
+
+function DisplayLessonsSection({ data }: { data: { type: string; lessons: LessonItem[] } }) {
+  if (data.type === 'uncategorized') {
+    return (
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+        {data.lessons.map((l) => (
+          <Card key={l.id} className="p-0 transition-colors hover:bg-muted/60">
+            <Link
+              to="/lessons/edit/$id"
+              params={{ id: String(l.id) }}
+              className="block truncate p-2.5 font-medium"
+            >
+              {l.text}
+            </Link>
+          </Card>
+        ))}
+        {data.lessons.length === 0 && (
+          <div className="col-span-full text-sm text-muted-foreground">No lessons.</div>
+        )}
+      </div>
+    );
+  }
+
+  const { ordered, unordered } = splitLessons(data.lessons);
+
   return (
-    <div className="grid grid-cols-3 gap-4 space-y-2 sm:grid-cols-4 md:grid-cols-6">
-      {lessons.map((l) => (
-        <UncatLessonCard key={l.id} lesson={l} />
-      ))}
-      {lessons.length === 0 && <div className="text-sm text-muted-foreground">No lessons.</div>}
+    <div className="flex flex-col gap-8">
+      {unordered.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold text-muted-foreground">Unordered</h3>
+            <span className="rounded-md border border-yellow-600/40 bg-yellow-500/15 px-1.5 py-0.5 text-xs font-medium text-yellow-700 dark:border-yellow-500/40 dark:text-yellow-400">
+              unlisted
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            {unordered.map((l) => (
+              <Card key={l.id} className="p-0 transition-colors hover:bg-muted/60">
+                <Link
+                  to="/lessons/edit/$id"
+                  params={{ id: String(l.id) }}
+                  className="block truncate p-2.5 font-medium"
+                >
+                  {l.text}
+                </Link>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-semibold">Ordered</h3>
+          <span className="rounded-md border border-green-600/40 bg-green-500/15 px-1.5 py-0.5 text-xs font-medium text-green-700 dark:border-green-500/40 dark:text-green-400">
+            listed
+          </span>
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="About listed lessons"
+                />
+              }
+            >
+              <CircleHelp />
+            </PopoverTrigger>
+            <PopoverContent className="w-64" side="top">
+              <PopoverHeader>
+                <PopoverTitle>Listed lessons</PopoverTitle>
+                <PopoverDescription>
+                  Only listed lessons will be visible to the user.
+                </PopoverDescription>
+              </PopoverHeader>
+            </PopoverContent>
+          </Popover>
+        </div>
+        {ordered.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {ordered.map((l) => (
+              <Card key={l.id} className="p-0 transition-colors hover:bg-muted/60">
+                <Link
+                  to="/lessons/edit/$id"
+                  params={{ id: String(l.id) }}
+                  className="flex items-center gap-2 p-2"
+                >
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
+                    {l.order}
+                  </span>
+                  <span className="truncate font-medium">{l.text}</span>
+                </Link>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground">No ordered lessons.</div>
+        )}
+      </section>
     </div>
   );
 }
 
-function AddToCategoryDialog({
-  lesson_id,
-  prev_category_id,
-  onAdded
+function EditCategoryLessonsDialog({
+  open,
+  onOpenChange,
+  category_id,
+  categoryName,
+  lessons,
+  type,
+  categories
 }: {
-  lesson_id: number;
-  prev_category_id?: number;
-  onAdded?: () => void;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  category_id: number;
+  categoryName: string;
+  lessons: LessonItem[];
+  type: 'categorized' | 'uncategorized';
+  categories: CategoryModel[];
+}) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const langId = useAtomValue(lang_id_atom);
+
+  const [ordered, setOrdered] = useState<LessonItem[]>([]);
+  const [unordered, setUnordered] = useState<LessonItem[]>([]);
+  const [pendingMoves, setPendingMoves] = useState<PendingMove[]>([]);
+  const [baselineSig, setBaselineSig] = useState('');
+  const [baselineOrdered, setBaselineOrdered] = useState<LessonItem[]>([]);
+  const [baselineUnordered, setBaselineUnordered] = useState<LessonItem[]>([]);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (type === 'uncategorized') {
+      setOrdered([]);
+      setUnordered(lessons.map((l) => ({ ...l })));
+      setBaselineOrdered([]);
+      setBaselineUnordered(lessons.map((l) => ({ ...l })));
+      setPendingMoves([]);
+      setBaselineSig(draftSignature([], lessons, []));
+    } else {
+      const split = splitLessons(lessons);
+      const o = split.ordered.map((l) => ({ ...l }));
+      const u = split.unordered.map((l) => ({ ...l }));
+      setOrdered(o);
+      setUnordered(u);
+      setBaselineOrdered(o.map((l) => ({ ...l })));
+      setBaselineUnordered(u.map((l) => ({ ...l })));
+      setPendingMoves([]);
+      setBaselineSig(draftSignature(o, u, []));
+    }
+    setDiscardOpen(false);
+    setConfirmSaveOpen(false);
+    // Only seed draft when the dialog opens — ignore mid-edit query updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional open-only sync
+  }, [open]);
+
+  const isDirty = useMemo(
+    () => draftSignature(ordered, unordered, pendingMoves) !== baselineSig,
+    [ordered, unordered, pendingMoves, baselineSig]
+  );
+
+  const categoryNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const c of categories) map.set(c.id, c.name);
+    map.set(0, 'Uncategorized');
+    return map;
+  }, [categories]);
+
+  function requestClose() {
+    if (saving) return;
+    if (isDirty) {
+      setDiscardOpen(true);
+      return;
+    }
+    onOpenChange(false);
+  }
+
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      onOpenChange(true);
+      return;
+    }
+    requestClose();
+  }
+
+  function handleUndoAll() {
+    setOrdered(baselineOrdered.map((l) => ({ ...l })));
+    setUnordered(baselineUnordered.map((l) => ({ ...l })));
+    setPendingMoves([]);
+  }
+
+  function removeFromLists(id: number) {
+    setOrdered((prev) => prev.filter((x) => x.id !== id).map((x, i) => ({ ...x, order: i + 1 })));
+    setUnordered((prev) => prev.filter((x) => x.id !== id));
+  }
+
+  function handleMoveToCategory(item: LessonItem, target_category_id: number | null) {
+    removeFromLists(item.id);
+    setPendingMoves((prev) => [
+      ...prev.filter((m) => m.id !== item.id),
+      {
+        id: item.id,
+        text: item.text,
+        target_category_id
+      }
+    ]);
+  }
+
+  function undoPendingMove(move: PendingMove) {
+    setPendingMoves((prev) => prev.filter((m) => m.id !== move.id));
+    setUnordered((prev) => [{ id: move.id, text: move.text, order: null }, ...prev]);
+  }
+
+  const add_to_category_mut = useMutation(
+    trpc.text_lessons.categories.add_update_lesson_category.mutationOptions()
+  );
+  const save_order_mut = useMutation(
+    trpc.text_lessons.categories.update_text_lessons_order.mutationOptions()
+  );
+
+  async function runSave() {
+    setSaving(true);
+    try {
+      for (const move of pendingMoves) {
+        await add_to_category_mut.mutateAsync({
+          category_id: move.target_category_id,
+          prev_category_id: category_id > 0 ? category_id : undefined,
+          lesson_id: move.id
+        });
+      }
+
+      if (category_id > 0) {
+        const remaining = [...ordered, ...unordered];
+        if (remaining.length > 0) {
+          const orderChanged =
+            draftSignature(ordered, unordered, []) !==
+            draftSignature(baselineOrdered, baselineUnordered, []);
+          if (orderChanged || pendingMoves.length > 0) {
+            await save_order_mut.mutateAsync({
+              category_id,
+              lessons: remaining.map((l) => ({ id: l.id, order: l.order }))
+            });
+          }
+        }
+      }
+
+      const targetIds = new Set<number>([category_id]);
+      for (const move of pendingMoves) {
+        targetIds.add(move.target_category_id ?? 0);
+      }
+
+      const remainingForCache = [...ordered, ...unordered];
+      queryClient.setQueryData(
+        trpc.text_lessons.categories.get_text_lessons.queryKey({
+          category_id,
+          lang_id: langId
+        }),
+        {
+          type: category_id === 0 ? 'uncategorized' : 'categorized',
+          lessons: remainingForCache
+        }
+      );
+
+      await Promise.all(
+        [...targetIds].map((id) =>
+          queryClient.invalidateQueries(
+            trpc.text_lessons.categories.get_text_lessons.queryFilter({ category_id: id })
+          )
+        )
+      );
+
+      toast.success('Changes saved');
+      setConfirmSaveOpen(false);
+      onOpenChange(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      toast.error('Failed to save changes' + (message ? `: ${message}` : ''));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="flex h-[min(90vh,720px)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl lg:max-w-5xl">
+          <DialogHeader className="shrink-0 border-b p-4 pr-12">
+            <DialogTitle>Edit {categoryName}</DialogTitle>
+            <DialogDescription>
+              Reorder, unorder, or move lessons. Changes are draft until you save.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="flex flex-col gap-6">
+              {pendingMoves.length > 0 && (
+                <PendingMovesPanel
+                  moves={pendingMoves}
+                  categoryNameById={categoryNameById}
+                  onUndo={undoPendingMove}
+                />
+              )}
+
+              {type === 'uncategorized' ? (
+                <DraftUncatLessonsEditor
+                  items={unordered}
+                  onMove={handleMoveToCategory}
+                  excludeCategoryId={0}
+                />
+              ) : (
+                <DraftCategorizedLessonsEditor
+                  ordered={ordered}
+                  unordered={unordered}
+                  setOrdered={setOrdered}
+                  setUnordered={setUnordered}
+                  category_id={category_id}
+                  onMove={handleMoveToCategory}
+                />
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="shrink-0 sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={handleUndoAll}
+              disabled={!isDirty || saving}
+              className="sm:mr-auto"
+            >
+              <Undo2 data-icon="inline-start" />
+              Undo
+            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button variant="secondary" onClick={requestClose} disabled={saving}>
+                Cancel
+              </Button>
+              <Button onClick={() => setConfirmSaveOpen(true)} disabled={!isDirty || saving}>
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Are you sure you want to discard them?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setDiscardOpen(false);
+                onOpenChange(false);
+              }}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmSaveOpen} onOpenChange={setConfirmSaveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save these changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will apply order and category changes for this list.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={runSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function PendingMovesPanel({
+  moves,
+  categoryNameById,
+  onUndo
+}: {
+  moves: PendingMove[];
+  categoryNameById: Map<number, string>;
+  onUndo: (move: PendingMove) => void;
+}) {
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
+      <h3 className="text-sm font-semibold">Leaving this category</h3>
+      <ul className="flex flex-col gap-2">
+        {moves.map((m) => (
+          <li
+            key={m.id}
+            className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-3 py-2"
+          >
+            <div className="min-w-0">
+              <div className="truncate font-medium">{m.text}</div>
+              <div className="text-xs text-muted-foreground">
+                → {categoryNameById.get(m.target_category_id ?? 0) ?? 'Uncategorized'}
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => onUndo(m)}>
+              Undo
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function DraftAssignCategoryDialog({
+  itemId,
+  excludeCategoryId,
+  onSelect,
+  isMove
+}: {
+  itemId: number;
+  excludeCategoryId?: number;
+  onSelect: (target_category_id: number | null) => void;
+  isMove?: boolean;
 }) {
   const trpc = useTRPC();
   const langId = useAtomValue(lang_id_atom);
@@ -563,61 +1017,42 @@ function AddToCategoryDialog({
     trpc.text_lessons.categories.get_categories.queryOptions({ lang_id: langId })
   );
   const categories = [
-    ...(categories_q.data ? categories_q.data.filter((c) => c.id !== prev_category_id) : []),
-    ...(prev_category_id ? [{ id: 0, name: 'Uncategorized', order: 0 }] : [])
+    ...(categories_q.data ? categories_q.data.filter((c) => c.id !== excludeCategoryId) : []),
+    ...(excludeCategoryId && excludeCategoryId > 0
+      ? [{ id: 0, name: 'Uncategorized', order: 0 }]
+      : [])
   ];
-  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
 
-  const add_to_category_mut = useMutation(
-    trpc.text_lessons.categories.add_update_lesson_category.mutationOptions({
-      onSuccess: async (out, data) => {
-        if (!out.added) return;
-        await queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_text_lessons.queryFilter({
-            category_id: selectedCategory!
-          })
-        );
-        await queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_text_lessons.queryFilter({
-            category_id: prev_category_id ?? 0
-          })
-        );
-        setOpen(false);
-        setSelectedCategory(null);
-        const category_name = categories.find((c) => c.id === data.category_id)?.name;
-        toast.success(
-          `Lesson added to category '${data.category_id === 0 ? 'Uncategorized' : category_name}'`
-        );
-        onAdded?.();
-      },
-      onError: (err) => {
-        toast.error('Failed to add lesson to category' + (err?.message ? `: ${err.message}` : ''));
-      }
-    })
-  );
-
-  const canAdd = selectedCategory !== null && !add_to_category_mut.isPending;
-
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) setSelectedCategory(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Select Category</DialogTitle>
+            <DialogDescription>Choose where this lesson should move.</DialogDescription>
           </DialogHeader>
           {categories.length > 0 ? (
             <RadioGroup
               value={selectedCategory?.toString() ?? ''}
               onValueChange={(v) => setSelectedCategory(Number(v))}
-              className="space-y-2"
+              className="flex flex-col gap-2"
             >
               {categories.map((cat) => (
                 <div key={cat.id} className="flex items-center gap-2">
-                  <RadioGroupItem id={`cat-${lesson_id}-${cat.id}`} value={String(cat.id)} />
+                  <RadioGroupItem
+                    id={`draft-cat-lesson-${itemId}-${cat.id}`}
+                    value={String(cat.id)}
+                  />
                   <Label
-                    htmlFor={`cat-${lesson_id}-${cat.id}`}
+                    htmlFor={`draft-cat-lesson-${itemId}-${cat.id}`}
                     className={cn(cat.id === 0 && 'text-muted-foreground')}
                   >
                     {cat.name}
@@ -633,67 +1068,71 @@ function AddToCategoryDialog({
               Cancel
             </Button>
             <Button
-              onClick={() =>
-                selectedCategory !== null &&
-                add_to_category_mut.mutate({
-                  category_id: selectedCategory === 0 ? null : selectedCategory,
-                  lesson_id: lesson_id,
-                  prev_category_id
-                })
-              }
-              disabled={!canAdd}
+              onClick={() => {
+                if (selectedCategory === null) return;
+                onSelect(selectedCategory === 0 ? null : selectedCategory);
+                setOpen(false);
+                setSelectedCategory(null);
+              }}
+              disabled={selectedCategory === null}
             >
-              {add_to_category_mut.isPending ? 'Adding…' : 'Add to Category'}
+              Add to Category
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Button size="icon" variant="ghost" onClick={() => setOpen(true)} className="-p-2">
-        {prev_category_id ? <ArrowRightLeft className="size-4" /> : <Plus className="size-4" />}
+      <Button size="icon" variant="ghost" onClick={() => setOpen(true)}>
+        {isMove ? <ArrowRightLeft /> : <Plus />}
       </Button>
     </>
   );
 }
 
-function UncatLessonCard({ lesson }: { lesson: LessonItem }) {
+function DraftUncatLessonsEditor({
+  items,
+  onMove,
+  excludeCategoryId
+}: {
+  items: LessonItem[];
+  onMove: (item: LessonItem, target: number | null) => void;
+  excludeCategoryId: number;
+}) {
   return (
-    <Card className="p-0">
-      <CardContent className="flex items-center justify-between gap-2 p-3">
-        <Link
-          to={`/lessons/edit/$id`}
-          params={{ id: String(lesson.id) }}
-          className="truncate font-medium hover:underline"
-        >
-          {lesson.text}
-        </Link>
-        <AddToCategoryDialog lesson_id={lesson.id} prev_category_id={undefined} />
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-2">
+      {items.map((l) => (
+        <Card key={l.id} className="p-0">
+          <CardContent className="flex items-center justify-between gap-3 p-3">
+            <span className="truncate font-medium">{l.text}</span>
+            <DraftAssignCategoryDialog
+              itemId={l.id}
+              excludeCategoryId={excludeCategoryId}
+              onSelect={(target) => onMove(l, target)}
+            />
+          </CardContent>
+        </Card>
+      ))}
+      {items.length === 0 && (
+        <div className="text-sm text-muted-foreground">No lessons in this list.</div>
+      )}
+    </div>
   );
 }
 
-function CategorizedLessonsList({
-  lessons,
-  category_id
+function DraftCategorizedLessonsEditor({
+  ordered,
+  unordered,
+  setOrdered,
+  setUnordered,
+  category_id,
+  onMove
 }: {
-  lessons: LessonItem[];
+  ordered: LessonItem[];
+  unordered: LessonItem[];
+  setOrdered: React.Dispatch<React.SetStateAction<LessonItem[]>>;
+  setUnordered: React.Dispatch<React.SetStateAction<LessonItem[]>>;
   category_id: number;
+  onMove: (item: LessonItem, target: number | null) => void;
 }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const [unordered, setUnordered] = useState<LessonItem[]>([]);
-  const [ordered, setOrdered] = useState<LessonItem[]>([]);
-  const langId = useAtomValue(lang_id_atom);
-
-  useEffect(() => {
-    const unorderedInit = (lessons ?? []).filter((l) => l.order === null);
-    const orderedInit = (lessons ?? [])
-      .filter((l) => l.order !== null)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)) as LessonItem[];
-    setUnordered(unorderedInit);
-    setOrdered(orderedInit);
-  }, [lessons]);
-
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
 
   function onDragEnd(e: DragEndEvent) {
@@ -718,47 +1157,30 @@ function CategorizedLessonsList({
     setOrdered((prev) => [...prev, { ...item, order: prev.length + 1 }]);
   }
 
-  const save_order_mut = useMutation(
-    trpc.text_lessons.categories.update_text_lessons_order.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_text_lessons.queryFilter({
-            category_id: category_id
-          })
-        );
-        toast.success('Order saved');
-      },
-      onError: (err) => {
-        toast.error('Failed to save order' + (err?.message ? `: ${err.message}` : ''));
-      }
-    })
-  );
-
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <Accordion defaultValue={['unordered']}>
         <AccordionItem value="unordered">
           <AccordionTrigger className="text-base font-semibold">Unordered</AccordionTrigger>
           <AccordionContent>
-            <div className="space-y-2">
+            <div className="flex max-h-[40vh] flex-col gap-2 overflow-y-auto pr-1">
               {unordered.map((l) => (
                 <Card key={l.id} className="p-0">
-                  <CardContent className="flex items-center justify-between gap-3 p-3">
-                    <Link
-                      to="/lessons/edit/$id"
-                      params={{ id: String(l.id) }}
-                      className="font-medium hover:underline"
-                    >
-                      {l.text}
-                    </Link>
+                  <CardContent className="flex flex-wrap items-center justify-between gap-3 p-3">
+                    <span className="font-medium">{l.text}</span>
                     <div className="flex items-center gap-2">
                       <Button size="sm" variant="outline" onClick={() => sendToTop(l)}>
-                        <ArrowUpFromLine className="mr-1 size-4" /> To Top
+                        <ArrowUpFromLine data-icon="inline-start" /> To Top
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => sendToBottom(l)}>
-                        <ArrowDownToLine className="mr-1 size-4" /> To Bottom
+                        <ArrowDownToLine data-icon="inline-start" /> To Bottom
                       </Button>
-                      <AddToCategoryDialog lesson_id={l.id} prev_category_id={category_id} />
+                      <DraftAssignCategoryDialog
+                        itemId={l.id}
+                        excludeCategoryId={category_id}
+                        isMove
+                        onSelect={(target) => onMove(l, target)}
+                      />
                     </div>
                   </CardContent>
                 </Card>
@@ -771,28 +1193,10 @@ function CategorizedLessonsList({
         </AccordionItem>
       </Accordion>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold">Ordered</h3>
-          <Button
-            size="sm"
-            onClick={() => {
-              const all_lessons = [...ordered, ...unordered];
-              save_order_mut.mutate({
-                category_id: category_id,
-                lessons: all_lessons.map((l) => ({
-                  id: l.id,
-                  order: l.order!
-                }))
-              });
-            }}
-            disabled={save_order_mut.isPending}
-          >
-            {save_order_mut.isPending ? 'Saving…' : 'Save Current Order'}
-          </Button>
-        </div>
+      <div className="flex flex-col gap-3">
+        <h3 className="text-base font-semibold">Ordered</h3>
         {ordered.length > 0 ? (
-          <div className="max-h-[50vh] overflow-y-auto pr-1">
+          <div className="max-h-[40vh] overflow-y-auto pr-1">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <SortableContext
                 items={ordered.map((l) => String(l.id))}
@@ -800,16 +1204,17 @@ function CategorizedLessonsList({
               >
                 <ul className="flex flex-col gap-2">
                   {ordered.map((l) => (
-                    <OrderedLessonCard
+                    <DraftOrderedLessonCard
                       key={l.id}
                       item={l}
+                      category_id={category_id}
                       onUnorder={() => {
                         setOrdered((prev) =>
                           prev.filter((x) => x.id !== l.id).map((x, i) => ({ ...x, order: i + 1 }))
                         );
                         setUnordered((prev) => [{ ...l, order: null }, ...prev]);
                       }}
-                      prev_category_id={category_id}
+                      onMove={onMove}
                     />
                   ))}
                 </ul>
@@ -824,14 +1229,16 @@ function CategorizedLessonsList({
   );
 }
 
-function OrderedLessonCard({
+function DraftOrderedLessonCard({
   item,
+  category_id,
   onUnorder,
-  prev_category_id
+  onMove
 }: {
   item: LessonItem;
+  category_id: number;
   onUnorder: () => void;
-  prev_category_id: number;
+  onMove: (item: LessonItem, target: number | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(item.id)
@@ -855,20 +1262,19 @@ function OrderedLessonCard({
             {...attributes}
             {...listeners}
           >
-            <GripVertical className="size-4" />
+            <GripVertical />
           </button>
-          <Link
-            to="/lessons/edit/$id"
-            params={{ id: String(item.id) }}
-            className="truncate hover:underline"
-          >
-            {item.text}
-          </Link>
+          <span className="truncate">{item.text}</span>
           <div className="ml-auto flex items-center gap-1">
-            <Button size="icon" variant="ghost" className="-p-2" onClick={onUnorder}>
-              <Minus className="size-4" />
+            <Button size="icon" variant="ghost" onClick={onUnorder}>
+              <Minus />
             </Button>
-            <AddToCategoryDialog lesson_id={item.id} prev_category_id={prev_category_id} />
+            <DraftAssignCategoryDialog
+              itemId={item.id}
+              excludeCategoryId={category_id}
+              isMove
+              onSelect={(target) => onMove(item, target)}
+            />
           </div>
         </CardContent>
       </Card>

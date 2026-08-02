@@ -32,6 +32,112 @@ const itemVariants = {
 
 const ManageMenuList = lazy(() => import('./-ManageMenuList'));
 
+/** Decorative Indic glyphs — mid + edges; limited set on small screens. */
+const floatingChars = [
+  // Mobile+: mid-field so the hero isn't empty in the center
+  {
+    char: 'अ',
+    className: 'top-4 left-[18%] text-3xl opacity-[0.18] sm:top-8 sm:left-[12%] sm:text-4xl sm:opacity-20',
+    duration: 3,
+    delay: 0
+  },
+  {
+    char: 'క',
+    className: 'top-6 right-[16%] text-3xl opacity-[0.18] sm:top-10 sm:right-[12%] sm:text-4xl sm:opacity-20',
+    duration: 3.2,
+    delay: 0.6
+  },
+  {
+    char: 'ॐ',
+    className:
+      'top-[42%] left-1/2 -translate-x-1/2 text-4xl opacity-[0.12] sm:top-[38%] sm:text-5xl sm:opacity-[0.14]',
+    duration: 3.5,
+    delay: 1.2
+  },
+  {
+    char: 'ಅ',
+    className: 'bottom-8 left-[22%] text-3xl opacity-[0.16] sm:bottom-12 sm:left-[18%] sm:text-4xl sm:opacity-20',
+    duration: 2.9,
+    delay: 0.9
+  },
+  {
+    char: 'അ',
+    className:
+      'right-[20%] bottom-6 text-3xl opacity-[0.16] sm:right-[16%] sm:bottom-10 sm:text-4xl sm:opacity-20',
+    duration: 3.1,
+    delay: 0.3
+  },
+  // sm+: fill the mid band beside the copy
+  {
+    char: 'অ',
+    className: 'top-[30%] left-[8%] hidden text-4xl opacity-[0.16] sm:block md:left-[14%]',
+    duration: 3.3,
+    delay: 1.4
+  },
+  {
+    char: 'அ',
+    className: 'top-[32%] right-[8%] hidden text-4xl opacity-[0.16] sm:block md:right-[14%]',
+    duration: 2.7,
+    delay: 1.7
+  },
+  {
+    char: 'श',
+    className: 'top-[58%] left-[28%] hidden -translate-x-1/2 text-4xl opacity-[0.12] sm:block',
+    duration: 2.6,
+    delay: 2.0
+  },
+  {
+    char: 'க',
+    className: 'top-[55%] right-[26%] hidden text-4xl opacity-[0.12] sm:block',
+    duration: 2.8,
+    delay: 0.5
+  },
+  // md+: more around the content column
+  {
+    char: 'ଅ',
+    className: 'top-[22%] left-[32%] hidden text-4xl opacity-[0.14] md:block',
+    duration: 3,
+    delay: 2.2
+  },
+  {
+    char: 'અ',
+    className: 'top-[24%] right-[30%] hidden text-4xl opacity-[0.14] md:block',
+    duration: 2.8,
+    delay: 1.1
+  },
+  {
+    char: 'ਅ',
+    className: 'bottom-[22%] left-[36%] hidden text-5xl opacity-[0.11] md:block',
+    duration: 3.4,
+    delay: 1.8
+  },
+  // lg+: outer edges + extras
+  {
+    char: 'क',
+    className: 'top-16 left-6 hidden text-4xl opacity-[0.16] lg:block',
+    duration: 3.1,
+    delay: 0.8
+  },
+  {
+    char: 'మ',
+    className: 'top-20 right-8 hidden text-4xl opacity-[0.16] lg:block',
+    duration: 2.9,
+    delay: 2.4
+  },
+  {
+    char: 'സ',
+    className: 'bottom-20 left-10 hidden text-4xl opacity-[0.14] lg:block',
+    duration: 3.2,
+    delay: 1.5
+  },
+  {
+    char: 'ஸ',
+    className: 'right-10 bottom-24 hidden text-4xl opacity-[0.14] lg:block',
+    duration: 2.7,
+    delay: 2.6
+  }
+] as const;
+
 export default function Home() {
   const StartLearningButton = (
     <Link
@@ -50,7 +156,20 @@ export default function Home() {
     <div className="min-h-screen overflow-hidden">
       {/* Hero Section */}
       <section className="relative px-4 py-16 md:py-20">
-        <div className="mx-auto max-w-6xl">
+        <div className="pointer-events-none absolute inset-0 select-none" aria-hidden>
+          {floatingChars.map(({ char, className, duration, delay }) => (
+            <motion.div
+              key={`${char}-${className}`}
+              animate={{ y: [-6, 6, -6] }}
+              transition={{ duration, repeat: Infinity, ease: 'easeInOut', delay }}
+              className={cn('absolute text-amber-800/80 dark:text-amber-200/70', className)}
+            >
+              {char}
+            </motion.div>
+          ))}
+        </div>
+
+        <div className="relative z-10 mx-auto max-w-6xl">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -90,58 +209,6 @@ export default function Home() {
                 <ManageMenuList>{StartLearningButton}</ManageMenuList>
               </Suspense>
             </motion.div>
-          </motion.div>
-        </div>
-
-        <div className="select-none">
-          {/* Decorative Floating Characters */}
-          <motion.div
-            animate={{ y: [-6, 6, -6] }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute top-12 left-6 hidden text-4xl opacity-20 md:block lg:left-10"
-          >
-            अ
-          </motion.div>
-
-          <motion.div
-            animate={{ y: [-6, 6, -6] }}
-            transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
-            className="absolute top-20 right-6 hidden text-4xl opacity-20 md:block lg:right-12"
-          >
-            క
-          </motion.div>
-
-          {/* <motion.div
-            animate={{ y: [-6, 6, -6] }}
-            transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut', delay: 1.6 }}
-            className="absolute top-32 left-1/2 hidden -translate-x-1/2 text-4xl opacity-20 md:block"
-          >
-            অ
-          </motion.div> */}
-
-          {/* Additional floats for larger screens (kept subtle) */}
-          <motion.div
-            animate={{ y: [-6, 6, -6] }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 2.4 }}
-            className="absolute right-10 bottom-20 hidden text-4xl opacity-16 lg:block"
-          >
-            ଅ
-          </motion.div>
-
-          <motion.div
-            animate={{ y: [-6, 6, -6] }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
-            className="absolute bottom-12 left-20 hidden text-4xl opacity-16 lg:block"
-          >
-            અ
-          </motion.div>
-
-          <motion.div
-            animate={{ y: [-6, 6, -6] }}
-            transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut', delay: 0.4 }}
-            className="absolute top-8 right-1/4 hidden text-4xl opacity-16 lg:block"
-          >
-            அ
           </motion.div>
         </div>
       </section>

@@ -3,9 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { lesson_gestures, text_lesson_words, text_lessons } from '~/db/schema';
 import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
 import { BadRequestError, NotFoundError } from '~/effect/errors';
-import { CACHE } from '~/effect/cache';
-import { BackgroundWork } from '~/effect/background';
-import { appRuntime } from '~/effect/runtime';
+import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
 import { reorder_text_lesson_in_category, lesson_categories_router } from './lesson_categories';
 import { t, protectedAdminProcedure, publicProcedure } from '../trpc_init';
 import { runTrpcEffect } from '~/effect/run';
@@ -45,7 +43,6 @@ export const addTextLesson = Effect.fn('addTextLesson')(function* (input: {
     audio_id: number | null;
   }>;
 }) {
-  const background = yield* BackgroundWork;
   const { lang_id, base_word_script_id, audio_id, text } = input.lesson_info;
   const text_key = input.text_key.trim();
 
@@ -89,9 +86,10 @@ export const addTextLesson = Effect.fn('addTextLesson')(function* (input: {
     return yield* Effect.fail(BadRequestError.make({ message: 'Text lesson already exists' }));
   }
 
-  yield* background.enqueue(() =>
-    appRuntime.runPromise(CACHE.lessons.text_lesson_info.refresh({ lesson_id: outcome.result.id }))
-  );
+  yield* invalidateAndRefreshCache({
+    cache: CACHE.lessons.text_lesson_info,
+    params: { lesson_id: outcome.result.id }
+  });
 
   return {
     id: outcome.result.id,
@@ -110,7 +108,6 @@ export const updateTextLesson = Effect.fn('updateTextLesson')(function* (input: 
     audio_id: number | null;
   }>;
 }) {
-  const background = yield* BackgroundWork;
   const { id, audio_id, uuid } = input.lesson_info;
 
   const outcome = yield* dbTransaction('update_text_lesson', async (tx) => {
@@ -187,9 +184,10 @@ export const updateTextLesson = Effect.fn('updateTextLesson')(function* (input: 
     );
   }
 
-  yield* background.enqueue(() =>
-    appRuntime.runPromise(CACHE.lessons.text_lesson_info.refresh({ lesson_id: id }))
-  );
+  yield* invalidateAndRefreshCache({
+    cache: CACHE.lessons.text_lesson_info,
+    params: { lesson_id: id }
+  });
 
   return {
     updated: true as const,
@@ -201,7 +199,6 @@ export const deleteTextLesson = Effect.fn('deleteTextLesson')(function* (input: 
   id: number;
   uuid: string;
 }) {
-  const background = yield* BackgroundWork;
   const { id, uuid } = input;
 
   const outcome = yield* dbTransaction('delete_text_lesson', async (tx) => {
@@ -227,10 +224,10 @@ export const deleteTextLesson = Effect.fn('deleteTextLesson')(function* (input: 
   }
 
   if (outcome.category_id) {
-    const category_id = outcome.category_id;
-    yield* background.enqueue(() =>
-      appRuntime.runPromise(CACHE.lessons.category_lesson_list.refresh({ category_id }))
-    );
+    yield* invalidateAndRefreshCache({
+      cache: CACHE.lessons.category_lesson_list,
+      params: { category_id: outcome.category_id }
+    });
   }
   yield* CACHE.lessons.text_lesson_info.delete({ lesson_id: id });
 

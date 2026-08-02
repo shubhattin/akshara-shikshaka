@@ -23,6 +23,7 @@ import { robotoSans } from '~/components/fonts';
 import { cn } from '~/lib/utils';
 import { makeQueryClient } from '~/state/queryClient';
 import PosthogInit from '~/components/tags/PosthogInit';
+import NotFound from './-NotFound';
 
 export const Route = createRootRoute({
   ssr: true,
@@ -54,7 +55,7 @@ export const Route = createRootRoute({
   }),
 
   shellComponent: RootDocument,
-  notFoundComponent: () => <div>Not Found</div>
+  notFoundComponent: NotFound
 });
 
 const DEFAULT_THEME: Theme = 'system';

@@ -572,18 +572,16 @@ function draftSignature(
 function DisplayLessonsSection({ data }: { data: { type: string; lessons: LessonItem[] } }) {
   if (data.type === 'uncategorized') {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
         {data.lessons.map((l) => (
-          <Card key={l.id} className="p-0">
-            <CardContent className="p-3">
-              <Link
-                to="/lessons/edit/$id"
-                params={{ id: String(l.id) }}
-                className="block truncate font-medium hover:underline"
-              >
-                {l.text}
-              </Link>
-            </CardContent>
+          <Card key={l.id} className="p-0 transition-colors hover:bg-muted/60">
+            <Link
+              to="/lessons/edit/$id"
+              params={{ id: String(l.id) }}
+              className="block truncate p-2.5 font-medium"
+            >
+              {l.text}
+            </Link>
           </Card>
         ))}
         {data.lessons.length === 0 && (
@@ -600,18 +598,16 @@ function DisplayLessonsSection({ data }: { data: { type: string; lessons: Lesson
       {unordered.length > 0 && (
         <section className="flex flex-col gap-3">
           <h3 className="text-base font-semibold text-muted-foreground">Unordered</h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             {unordered.map((l) => (
-              <Card key={l.id} className="p-0">
-                <CardContent className="p-3">
-                  <Link
-                    to="/lessons/edit/$id"
-                    params={{ id: String(l.id) }}
-                    className="block truncate font-medium hover:underline"
-                  >
-                    {l.text}
-                  </Link>
-                </CardContent>
+              <Card key={l.id} className="p-0 transition-colors hover:bg-muted/60">
+                <Link
+                  to="/lessons/edit/$id"
+                  params={{ id: String(l.id) }}
+                  className="block truncate p-2.5 font-medium"
+                >
+                  {l.text}
+                </Link>
               </Card>
             ))}
           </div>
@@ -620,21 +616,19 @@ function DisplayLessonsSection({ data }: { data: { type: string; lessons: Lesson
       <section className="flex flex-col gap-3">
         <h3 className="text-base font-semibold">Ordered</h3>
         {ordered.length > 0 ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {ordered.map((l) => (
-              <Card key={l.id} className="p-0">
-                <CardContent className="flex items-center gap-3 p-3">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
+              <Card key={l.id} className="p-0 transition-colors hover:bg-muted/60">
+                <Link
+                  to="/lessons/edit/$id"
+                  params={{ id: String(l.id) }}
+                  className="flex items-center gap-2 p-2"
+                >
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
                     {l.order}
                   </span>
-                  <Link
-                    to="/lessons/edit/$id"
-                    params={{ id: String(l.id) }}
-                    className="truncate font-medium hover:underline"
-                  >
-                    {l.text}
-                  </Link>
-                </CardContent>
+                  <span className="truncate font-medium">{l.text}</span>
+                </Link>
               </Card>
             ))}
           </div>

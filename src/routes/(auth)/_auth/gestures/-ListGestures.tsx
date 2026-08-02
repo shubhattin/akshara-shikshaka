@@ -576,18 +576,16 @@ function draftSignature(
 function DisplayGesturesSection({ data }: { data: { type: string; gestures: GestureItem[] } }) {
   if (data.type === 'uncategorized') {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10">
         {data.gestures.map((g) => (
-          <Card key={g.id} className="p-0">
-            <CardContent className="p-3">
-              <Link
-                to="/gestures/edit/$id"
-                params={{ id: String(g.id) }}
-                className="block truncate font-medium hover:underline"
-              >
-                {g.text}
-              </Link>
-            </CardContent>
+          <Card key={g.id} className="p-0 transition-colors hover:bg-muted/60">
+            <Link
+              to="/gestures/edit/$id"
+              params={{ id: String(g.id) }}
+              className="block truncate p-2.5 text-center font-medium"
+            >
+              {g.text}
+            </Link>
           </Card>
         ))}
         {data.gestures.length === 0 && (
@@ -604,18 +602,16 @@ function DisplayGesturesSection({ data }: { data: { type: string; gestures: Gest
       {unordered.length > 0 && (
         <section className="flex flex-col gap-3">
           <h3 className="text-base font-semibold text-muted-foreground">Unordered</h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
             {unordered.map((g) => (
-              <Card key={g.id} className="p-0">
-                <CardContent className="p-3">
-                  <Link
-                    to="/gestures/edit/$id"
-                    params={{ id: String(g.id) }}
-                    className="block truncate font-medium hover:underline"
-                  >
-                    {g.text}
-                  </Link>
-                </CardContent>
+              <Card key={g.id} className="p-0 transition-colors hover:bg-muted/60">
+                <Link
+                  to="/gestures/edit/$id"
+                  params={{ id: String(g.id) }}
+                  className="block truncate p-2.5 text-center font-medium"
+                >
+                  {g.text}
+                </Link>
               </Card>
             ))}
           </div>
@@ -624,21 +620,19 @@ function DisplayGesturesSection({ data }: { data: { type: string; gestures: Gest
       <section className="flex flex-col gap-3">
         <h3 className="text-base font-semibold">Ordered</h3>
         {ordered.length > 0 ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
             {ordered.map((g) => (
-              <Card key={g.id} className="p-0">
-                <CardContent className="flex items-center gap-3 p-3">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
+              <Card key={g.id} className="p-0 transition-colors hover:bg-muted/60">
+                <Link
+                  to="/gestures/edit/$id"
+                  params={{ id: String(g.id) }}
+                  className="flex items-center gap-2 p-2"
+                >
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
                     {g.order}
                   </span>
-                  <Link
-                    to="/gestures/edit/$id"
-                    params={{ id: String(g.id) }}
-                    className="truncate font-medium hover:underline"
-                  >
-                    {g.text}
-                  </Link>
-                </CardContent>
+                  <span className="truncate font-medium">{g.text}</span>
+                </Link>
               </Card>
             ))}
           </div>

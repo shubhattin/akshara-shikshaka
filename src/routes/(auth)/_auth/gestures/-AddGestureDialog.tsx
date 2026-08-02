@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Cookie from 'js-cookie';
@@ -99,21 +99,36 @@ export default function AddGestureDialog({ open, onOpenChange, init_script_id }:
     })
   );
 
+  const submittingRef = useRef(false);
   const canSubmit = text.trim().length > 0 && !add_mut.isPending;
 
   async function handleConfirm() {
+    if (submittingRef.current || add_mut.isPending) return;
     const trimmed = text.trim();
     if (!trimmed) return;
-    const textKey = await transliterate(trimmed, script, 'Normal');
-    add_mut.mutate({
-      text: trimmed,
-      textKey,
-      gestures: [],
-      scriptID: script_list_obj[script],
-      fontFamily: DEFAULT_FONT_FAMILY,
-      fontSize: DEFAULT_FONT_SIZE,
-      textCenterOffset: [0, 0]
-    });
+    submittingRef.current = true;
+    try {
+      const textKey = await transliterate(trimmed, script, 'Normal');
+      add_mut.mutate(
+        {
+          text: trimmed,
+          textKey,
+          gestures: [],
+          scriptID: script_list_obj[script],
+          fontFamily: DEFAULT_FONT_FAMILY,
+          fontSize: DEFAULT_FONT_SIZE,
+          textCenterOffset: [0, 0]
+        },
+        {
+          onSettled: () => {
+            submittingRef.current = false;
+          }
+        }
+      );
+    } catch {
+      submittingRef.current = false;
+      toast.error('Failed to prepare gesture');
+    }
   }
 
   return (
@@ -129,7 +144,7 @@ export default function AddGestureDialog({ open, onOpenChange, init_script_id }:
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <Label>Script</Label>
+              <Label htmlFor="add-gesture-script">Script</Label>
               <Select
                 items={[
                   { label: 'Script', value: null },
@@ -145,7 +160,7 @@ export default function AddGestureDialog({ open, onOpenChange, init_script_id }:
                   });
                 }}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="add-gesture-script" className="w-full">
                   <SelectValue placeholder="Script" />
                 </SelectTrigger>
                 <SelectContent>
@@ -159,8 +174,9 @@ export default function AddGestureDialog({ open, onOpenChange, init_script_id }:
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label>Text</Label>
+              <Label htmlFor="add-gesture-text">Text</Label>
               <Input
+                id="add-gesture-text"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onBeforeInput={(e) =>

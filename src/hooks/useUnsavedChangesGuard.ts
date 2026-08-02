@@ -40,11 +40,15 @@ export function useUnsavedChangesGuard(enabled: boolean, message: string = DEFAU
     if (!enabled) return;
 
     let sentinelPushed = false;
+    let suppressPopState = false;
+    /** History index after sentinel push; used to detect back vs forward. */
+    let sentinelHistoryLength = 0;
 
     const pushSentinel = () => {
       if (sentinelPushed) return;
       window.history.pushState(GUARD_STATE, '', window.location.href);
       sentinelPushed = true;
+      sentinelHistoryLength = window.history.length;
     };
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -53,15 +57,24 @@ export function useUnsavedChangesGuard(enabled: boolean, message: string = DEFAU
     };
 
     const handlePopState = () => {
-      // Browser already popped our sentinel (or navigated). Treat as leave attempt.
+      if (suppressPopState) return;
+
+      // Browser already moved off our sentinel (or navigated). Treat as leave attempt.
+      const wentBack = window.history.length < sentinelHistoryLength;
       sentinelPushed = false;
+
       const confirmLeave = window.confirm(messageRef.current);
       if (!confirmLeave) {
         pushSentinel();
         return;
       }
-      // Proceed with the back navigation past the real page entry.
-      window.history.back();
+
+      // Continue in the same direction the user was going.
+      if (wentBack) {
+        window.history.back();
+      } else {
+        window.history.forward();
+      }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -71,10 +84,11 @@ export function useUnsavedChangesGuard(enabled: boolean, message: string = DEFAU
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('popstate', handlePopState);
-      // Drop the duplicate same-URL sentinel without leaving the editor.
+      // Drop the sentinel without navigating away (avoids racing save/delete navigations).
       if (sentinelPushed && isGuardState(window.history.state)) {
         sentinelPushed = false;
-        window.history.back();
+        suppressPopState = true;
+        window.history.replaceState(null, '', window.location.href);
       }
     };
   }, [enabled]);

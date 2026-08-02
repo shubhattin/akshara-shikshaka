@@ -1059,41 +1059,48 @@ const CategoryChangeButton = ({
       return;
     }
 
-    const textKeyFromData = (text_data as text_data_type & { text_key?: string }).text_key;
-    const gesture_text_key =
-      textKeyFromData ?? (await transliterate(text.trim(), script, 'Normal'));
+    try {
+      const textKeyFromData = (text_data as text_data_type & { text_key?: string }).text_key;
+      const gesture_text_key =
+        textKeyFromData ?? (await transliterate(text.trim(), script, 'Normal'));
 
-    await update_category_mut.mutateAsync({
-      gesture_id: text_data.id,
-      gesture_text_key,
-      script_id: scriptID,
-      category_id: nextCategoryId,
-      prev_category_id: prevCategoryId
-    });
+      await update_category_mut.mutateAsync({
+        gesture_id: text_data.id,
+        gesture_text_key,
+        script_id: scriptID,
+        category_id: nextCategoryId,
+        prev_category_id: prevCategoryId
+      });
 
-    const nextCategory =
-      nextCategoryId === null ? null : (categories.find((c) => c.id === nextCategoryId) ?? null);
-    onCategoryChanged(nextCategory ? { id: nextCategory.id, name: nextCategory.name } : null);
+      const nextCategory =
+        nextCategoryId === null ? null : (categories.find((c) => c.id === nextCategoryId) ?? null);
+      onCategoryChanged(nextCategory ? { id: nextCategory.id, name: nextCategory.name } : null);
 
-    const prevId = prevCategoryId ?? 0;
-    const nextId = nextCategoryId ?? 0;
-    await Promise.all([
-      queryClient.invalidateQueries(
-        trpc.text_gestures.categories.get_gestures.queryFilter({
-          category_id: prevId,
-          script_id: scriptID
-        })
-      ),
-      queryClient.invalidateQueries(
-        trpc.text_gestures.categories.get_gestures.queryFilter({
-          category_id: nextId,
-          script_id: scriptID
-        })
-      )
-    ]);
+      const prevId = prevCategoryId ?? 0;
+      const nextId = nextCategoryId ?? 0;
+      await Promise.all([
+        queryClient.invalidateQueries(
+          trpc.text_gestures.categories.get_gestures.queryFilter({
+            category_id: prevId,
+            script_id: scriptID
+          })
+        ),
+        queryClient.invalidateQueries(
+          trpc.text_gestures.categories.get_gestures.queryFilter({
+            category_id: nextId,
+            script_id: scriptID
+          })
+        )
+      ]);
 
-    toast.success('Category updated');
-    setOpen(false);
+      toast.success('Category updated');
+      setOpen(false);
+    } catch {
+      // Mutation failures already toast via onError; cover transliterate / invalidate errors.
+      if (!update_category_mut.isError) {
+        toast.error('Failed to update category');
+      }
+    }
   };
 
   return (
@@ -1214,8 +1221,8 @@ const SaveEditMode = ({ text_data }: { text_data: Props['text_data'] }) => {
     );
   };
 
-  const handleDelete = async () => {
-    await delete_text_data_mut.mutateAsync({
+  const handleDelete = () => {
+    delete_text_data_mut.mutate({
       id: text_data.id,
       uuid: text_data.uuid,
       script_id: scriptID

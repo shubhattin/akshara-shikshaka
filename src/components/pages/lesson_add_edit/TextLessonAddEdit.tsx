@@ -721,35 +721,42 @@ const CategoryChangeButton = ({
       return;
     }
 
-    await update_category_mut.mutateAsync({
-      lesson_id: text_lesson_info.id,
-      category_id: nextCategoryId,
-      prev_category_id: prevCategoryId
-    });
+    try {
+      await update_category_mut.mutateAsync({
+        lesson_id: text_lesson_info.id,
+        category_id: nextCategoryId,
+        prev_category_id: prevCategoryId
+      });
 
-    const nextCategory =
-      nextCategoryId === null ? null : (categories.find((c) => c.id === nextCategoryId) ?? null);
-    onCategoryChanged(nextCategory ? { id: nextCategory.id, name: nextCategory.name } : null);
+      const nextCategory =
+        nextCategoryId === null ? null : (categories.find((c) => c.id === nextCategoryId) ?? null);
+      onCategoryChanged(nextCategory ? { id: nextCategory.id, name: nextCategory.name } : null);
 
-    const prevId = prevCategoryId ?? 0;
-    const nextId = nextCategoryId ?? 0;
-    await Promise.all([
-      queryClient.invalidateQueries(
-        trpc.text_lessons.categories.get_text_lessons.queryFilter({
-          category_id: prevId,
-          lang_id
-        })
-      ),
-      queryClient.invalidateQueries(
-        trpc.text_lessons.categories.get_text_lessons.queryFilter({
-          category_id: nextId,
-          lang_id
-        })
-      )
-    ]);
+      const prevId = prevCategoryId ?? 0;
+      const nextId = nextCategoryId ?? 0;
+      await Promise.all([
+        queryClient.invalidateQueries(
+          trpc.text_lessons.categories.get_text_lessons.queryFilter({
+            category_id: prevId,
+            lang_id
+          })
+        ),
+        queryClient.invalidateQueries(
+          trpc.text_lessons.categories.get_text_lessons.queryFilter({
+            category_id: nextId,
+            lang_id
+          })
+        )
+      ]);
 
-    toast.success('Category updated');
-    setOpen(false);
+      toast.success('Category updated');
+      setOpen(false);
+    } catch {
+      // Mutation failures already toast via onError; cover invalidate errors.
+      if (!update_category_mut.isError) {
+        toast.error('Failed to update category');
+      }
+    }
   };
 
   return (
@@ -852,6 +859,7 @@ const SaveEditMode = ({
 
   const handleSave = () => {
     beginSave();
+    const submittedWords = words;
     update_text_data_mut.mutate(
       {
         lesson_info: {
@@ -859,13 +867,13 @@ const SaveEditMode = ({
           uuid: text_lesson_info.uuid,
           audio_id: audio_id_optional ?? null
         },
-        words
+        words: submittedWords
       },
       {
         onSuccess: (data) => {
           if (!data.updated) return;
 
-          const to_be_added_word_indexes = words
+          const to_be_added_word_indexes = submittedWords
             .map((w, idx) => [w, idx] as [text_lesson_word_type, number])
             .filter(([w]) => w.id === undefined || w.id === null)
             .map(([_w, idx]) => idx);
@@ -875,19 +883,42 @@ const SaveEditMode = ({
             return;
           }
 
-          let nextWords = words;
-          if (to_be_added_word_indexes.length > 0) {
-            nextWords = words.map((w, idx) =>
-              to_be_added_word_indexes.includes(idx)
-                ? { ...w, id: data.inserted_words_ids[to_be_added_word_indexes.indexOf(idx)] }
-                : w
-            );
-            setWords(nextWords);
-            markSaved({ words: nextWords });
-          } else {
+          if (to_be_added_word_indexes.length === 0) {
             markSaved();
+            toast.success('Text Lesson Information Updated');
+            return;
           }
 
+          const insertedIdByIndex = new Map(
+            to_be_added_word_indexes.map((idx, i) => [idx, data.inserted_words_ids[i]!])
+          );
+
+          let mergedWords = submittedWords.map((w, idx) => {
+            const insertedId = insertedIdByIndex.get(idx);
+            return insertedId !== undefined ? { ...w, id: insertedId } : w;
+          });
+
+          setWords((prev) => {
+            if (prev.length === submittedWords.length) {
+              mergedWords = prev.map((w, idx) => {
+                const insertedId = insertedIdByIndex.get(idx);
+                return insertedId !== undefined ? { ...w, id: insertedId } : w;
+              });
+              return mergedWords;
+            }
+
+            const idByOrder = new Map(
+              mergedWords.filter((w) => w.id != null).map((w) => [w.order, w.id as number])
+            );
+            mergedWords = prev.map((w) => {
+              if (w.id != null) return w;
+              const insertedId = idByOrder.get(w.order);
+              return insertedId !== undefined ? { ...w, id: insertedId } : w;
+            });
+            return mergedWords;
+          });
+
+          markSaved({ words: mergedWords });
           toast.success('Text Lesson Information Updated');
         }
       }

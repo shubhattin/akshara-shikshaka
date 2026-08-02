@@ -86,14 +86,18 @@ export function EditorHistoryProvider<M extends AtomMap>({
 
   const lastCommittedRef = useRef<SnapshotOf<M> | null>(null);
   const savedBaselineRef = useRef<SnapshotOf<M> | null>(null);
+  /** Cached serialize(savedBaseline) so dirty checks only stringify current. */
+  const savedBaselineSerializedRef = useRef<string | null>(null);
   const undoStackRef = useRef<SnapshotOf<M>[]>([]);
   const redoStackRef = useRef<SnapshotOf<M>[]>([]);
   const typingDepthRef = useRef(0);
   const isRestoringRef = useRef(false);
   const savedStackDepthRef = useRef(0);
   const commitScheduledRef = useRef(false);
+  const notifyScheduledRef = useRef(false);
   const didInitRef = useRef(false);
   const pendingSaveRef = useRef<SnapshotOf<M> | null>(null);
+  const pendingSaveDepthRef = useRef<number | null>(null);
   const listenersRef = useRef(new Set<() => void>());
   // Cached state so useSyncExternalStore can bail out on referential equality.
   const stateCacheRef = useRef<HistoryState>(EMPTY_STATE);
@@ -120,22 +124,40 @@ export function EditorHistoryProvider<M extends AtomMap>({
     return serializeSnapshot(comparableFn ? comparableFn(snapshot) : snapshot);
   }, []);
 
+  const updateSavedBaseline = useCallback(
+    (next: SnapshotOf<M>) => {
+      savedBaselineRef.current = next;
+      savedBaselineSerializedRef.current = serialize(next);
+    },
+    [serialize]
+  );
+
   const computeState = useCallback((): HistoryState => {
-    const saved = savedBaselineRef.current;
-    if (!saved) return EMPTY_STATE;
+    const savedSerialized = savedBaselineSerializedRef.current;
+    if (!savedBaselineRef.current || savedSerialized === null) return EMPTY_STATE;
     const current = takeSnapshot();
     return {
       canUndo: undoStackRef.current.length > 0,
       canRedo: redoStackRef.current.length > 0,
-      isDirty: serialize(current) !== serialize(saved),
+      isDirty: serialize(current) !== savedSerialized,
       changeCount: Math.max(0, undoStackRef.current.length - savedStackDepthRef.current)
     };
   }, [serialize, takeSnapshot]);
 
-  const notify = useCallback(() => {
+  const notifyNow = useCallback(() => {
     stateCacheRef.current = computeState();
     for (const listener of listenersRef.current) listener();
   }, [computeState]);
+
+  /** Coalesce rapid atom-write notifications into one microtask flush. */
+  const notify = useCallback(() => {
+    if (notifyScheduledRef.current) return;
+    notifyScheduledRef.current = true;
+    queueMicrotask(() => {
+      notifyScheduledRef.current = false;
+      notifyNow();
+    });
+  }, [notifyNow]);
 
   const getState = useCallback(() => stateCacheRef.current, []);
   const getServerSnapshot = useCallback(() => EMPTY_STATE, []);
@@ -156,7 +178,7 @@ export function EditorHistoryProvider<M extends AtomMap>({
     if (!last) {
       lastCommittedRef.current = cloneSnapshot(current);
       if (!savedBaselineRef.current) {
-        savedBaselineRef.current = cloneSnapshot(current);
+        updateSavedBaseline(cloneSnapshot(current));
       }
       notify();
       return;
@@ -178,7 +200,7 @@ export function EditorHistoryProvider<M extends AtomMap>({
     lastCommittedRef.current = cloneSnapshot(current);
     redoStackRef.current = [];
     notify();
-  }, [notify, serialize, takeSnapshot]);
+  }, [notify, serialize, takeSnapshot, updateSavedBaseline]);
 
   const scheduleCommit = useCallback(() => {
     if (isRestoringRef.current || typingDepthRef.current > 0) return;
@@ -204,6 +226,9 @@ export function EditorHistoryProvider<M extends AtomMap>({
       const initial = takeSnapshotRef.current();
       lastCommittedRef.current = cloneSnapshot(initial);
       savedBaselineRef.current = cloneSnapshot(initial);
+      savedBaselineSerializedRef.current = serializeSnapshot(
+        comparableRef.current ? comparableRef.current(initial) : initial
+      );
       undoStackRef.current = [];
       redoStackRef.current = [];
       savedStackDepthRef.current = 0;
@@ -264,19 +289,22 @@ export function EditorHistoryProvider<M extends AtomMap>({
       },
       beginSave() {
         pendingSaveRef.current = cloneSnapshot(takeSnapshot());
+        pendingSaveDepthRef.current = undoStackRef.current.length;
       },
       markSaved(patch?: Record<string, unknown>) {
         const base = pendingSaveRef.current ?? takeSnapshot();
+        const depth = pendingSaveDepthRef.current ?? undoStackRef.current.length;
         pendingSaveRef.current = null;
+        pendingSaveDepthRef.current = null;
         const next = cloneSnapshot(base);
         if (patch) {
           for (const [key, value] of Object.entries(patch)) {
             (next as Record<string, unknown>)[key] = cloneSnapshot(value);
           }
         }
-        savedBaselineRef.current = next;
+        updateSavedBaseline(next);
         lastCommittedRef.current = cloneSnapshot(next);
-        savedStackDepthRef.current = undoStackRef.current.length;
+        savedStackDepthRef.current = depth;
         notify();
       },
       acceptKeysAsSaved(...keys: string[]) {
@@ -284,7 +312,7 @@ export function EditorHistoryProvider<M extends AtomMap>({
         const baseline = savedBaselineRef.current;
         const last = lastCommittedRef.current;
         if (!baseline) {
-          savedBaselineRef.current = cloneSnapshot(current);
+          updateSavedBaseline(cloneSnapshot(current));
           lastCommittedRef.current = cloneSnapshot(current);
           notify();
           return;
@@ -298,12 +326,12 @@ export function EditorHistoryProvider<M extends AtomMap>({
             (nextLast as Record<string, unknown>)[key] = value;
           }
         }
-        savedBaselineRef.current = nextBaseline;
+        updateSavedBaseline(nextBaseline);
         lastCommittedRef.current = nextLast;
         notify();
       }
     }),
-    [commitNow, notify, restoreSnapshot, takeSnapshot]
+    [commitNow, notify, restoreSnapshot, takeSnapshot, updateSavedBaseline]
   );
 
   const value = useMemo<HistoryContextValue>(

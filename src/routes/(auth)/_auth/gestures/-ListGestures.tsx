@@ -261,7 +261,7 @@ function ListGestures({ init_gesture_categories }: Props) {
               variant="outline"
               onClick={() => setEditOpen(true)}
               disabled={category_gestures_q.isLoading || !category_gestures_q.data}
-              className="border-green-600 text-green-700 hover:bg-green-50 hover:text-green-800 dark:border-green-500 dark:text-green-400 dark:hover:bg-green-950 dark:hover:text-green-300"
+              className="border-sky-500 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-200"
             >
               <Pencil data-icon="inline-start" />
               Edit Order

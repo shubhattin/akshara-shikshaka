@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Cookie from 'js-cookie';
@@ -112,22 +112,37 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
     })
   );
 
+  const submittingRef = useRef(false);
   const canSubmit = text.trim().length > 0 && !add_mut.isPending;
 
   async function handleConfirm() {
+    if (submittingRef.current || add_mut.isPending) return;
     const trimmed = text.trim();
     if (!trimmed) return;
-    const text_key = await transliterate(trimmed, langName, 'Normal');
-    add_mut.mutate({
-      lesson_info: {
-        lang_id: langId,
-        base_word_script_id: baseWordScriptId,
-        audio_id: null,
-        text: trimmed
-      },
-      text_key,
-      words: []
-    });
+    submittingRef.current = true;
+    try {
+      const text_key = await transliterate(trimmed, langName, 'Normal');
+      add_mut.mutate(
+        {
+          lesson_info: {
+            lang_id: langId,
+            base_word_script_id: baseWordScriptId,
+            audio_id: null,
+            text: trimmed
+          },
+          text_key,
+          words: []
+        },
+        {
+          onSettled: () => {
+            submittingRef.current = false;
+          }
+        }
+      );
+    } catch {
+      submittingRef.current = false;
+      toast.error('Failed to prepare lesson');
+    }
   }
 
   return (
@@ -144,7 +159,7 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
-              <Label>Language</Label>
+              <Label htmlFor="add-lesson-lang">Language</Label>
               <Select
                 items={[
                   { label: 'Language', value: null },
@@ -161,7 +176,7 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
                   Cookie.set(LESSON_LANG_ID_COOKIE_KEY, String(next), { expires: 30 });
                 }}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="add-lesson-lang" className="w-full">
                   <SelectValue placeholder="Language" />
                 </SelectTrigger>
                 <SelectContent>
@@ -176,7 +191,7 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
 
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-1.5">
-                <Label>Base word script</Label>
+                <Label htmlFor="add-lesson-base-script">Base word script</Label>
                 <Popover>
                   <PopoverTrigger
                     render={
@@ -214,7 +229,7 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
                   setBaseWordScriptId(Number(v));
                 }}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="add-lesson-base-script" className="w-full">
                   <SelectValue placeholder="Script" />
                 </SelectTrigger>
                 <SelectContent>
@@ -228,8 +243,9 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label>Lesson text</Label>
+              <Label htmlFor="add-lesson-text">Lesson text</Label>
               <Input
+                id="add-lesson-text"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onBeforeInput={(e) =>

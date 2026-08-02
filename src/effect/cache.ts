@@ -181,7 +181,14 @@ export const invalidateAndRefreshCache = <TData, TParams>({
     const background = yield* BackgroundWork;
     const redis = yield* RedisClient;
     const database = yield* Database;
-    yield* cache.delete(params);
+    // Best-effort invalidate: mutations should still succeed and refresh ahead.
+    yield* cache
+      .delete(params)
+      .pipe(
+        Effect.catch((error) =>
+          Effect.logWarning('cache invalidate failed', { error }).pipe(Effect.asVoid)
+        )
+      );
     yield* background.enqueue(() =>
       Effect.runPromise(
         cache

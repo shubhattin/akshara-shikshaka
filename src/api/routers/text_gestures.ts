@@ -216,13 +216,7 @@ export const deleteTextGestureData = Effect.fn('deleteTextGestureData')(function
         invalidateAndRefreshCache({
           cache: CACHE.lessons.text_lesson_info,
           params: { lesson_id: text_lesson_id }
-        }).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning('lesson cache refresh failed', { text_lesson_id, error }).pipe(
-              Effect.asVoid
-            )
-          )
-        ),
+        }),
       { concurrency: 4 }
     );
   }

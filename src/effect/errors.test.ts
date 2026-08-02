@@ -1,7 +1,7 @@
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from '@effect/vitest';
 import { z } from 'zod';
-import { DatabaseError, NotFoundError, StorageError, isKnownError } from './errors';
+import { DatabaseError, NotFoundError, RedisError, StorageError, isKnownError } from './errors';
 import { RedisClient } from './redis';
 import { BackgroundWork } from './background';
 import { Database, type DbClient, type DbTransaction } from './database';
@@ -135,6 +135,46 @@ describe('cache refresh', () => {
       expect(queuedWork).toHaveLength(1);
       yield* Effect.promise(() => queuedWork[0]!());
       expect(ops).toEqual(['del', 'set']);
+    })
+  );
+
+  it.effect('queues refresh-ahead even when delete fails', () =>
+    Effect.gen(function* () {
+      const queuedWork: Array<() => Promise<unknown>> = [];
+      const FailingRedis = Layer.succeed(RedisClient)({
+        get: () => Effect.succeed(null),
+        set: () => Effect.succeed('OK'),
+        del: () => Effect.fail(RedisError.make({ operation: 'del', cause: 'redis down' }))
+      });
+      const TestDatabase = Layer.succeed(Database)({
+        run: <A>(_operation: string, _run: (client: DbClient) => Promise<A>) =>
+          Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' })),
+        transaction: <A>(_operation: string, _run: (tx: DbTransaction) => Promise<A>) =>
+          Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' }))
+      });
+      const QueuedBackgroundWork = Layer.succeed(BackgroundWork)({
+        enqueue: (work) =>
+          Effect.sync(() => {
+            queuedWork.push(work);
+          })
+      });
+      const cache = createCache({
+        keyPrefix: 'test_list',
+        schema: z.object({ lang_id: z.number() }),
+        keyBuilder: ({ lang_id }) => `${lang_id}`,
+        fetch: () => Effect.succeed([{ id: 1, name: 'A' }])
+      });
+
+      yield* invalidateAndRefreshCache({
+        cache,
+        params: { lang_id: 1 }
+      }).pipe(
+        Effect.provide(FailingRedis),
+        Effect.provide(TestDatabase),
+        Effect.provide(QueuedBackgroundWork)
+      );
+
+      expect(queuedWork).toHaveLength(1);
     })
   );
 });

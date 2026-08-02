@@ -144,13 +144,7 @@ export const deleteAudioAsset = Effect.fn('deleteAudioAsset')(function* (input: 
         invalidateAndRefreshCache({
           cache: CACHE.lessons.text_lesson_info,
           params: { lesson_id }
-        }).pipe(
-          Effect.catch((error) =>
-            Effect.logWarning('lesson cache refresh failed', { lesson_id, error }).pipe(
-              Effect.asVoid
-            )
-          )
-        ),
+        }),
       { concurrency: 4 }
     );
   }

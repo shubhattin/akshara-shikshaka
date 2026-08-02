@@ -7,9 +7,7 @@ import { PROJECT_S3_ALIAS } from '~/constants';
 import { AiProvider, VoiceTypeEnum, type VoiceType } from '~/effect/ai';
 import { ObjectStorage } from '~/effect/storage';
 import { Database } from '~/effect/database';
-import { BackgroundWork } from '~/effect/background';
-import { CACHE } from '~/effect/cache';
-import { appRuntime } from '~/effect/runtime';
+import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
 import { DatabaseError } from '~/effect/errors';
 import { t, protectedAdminProcedure } from '../trpc_init';
 import { runTrpcEffect } from '~/effect/run';
@@ -86,7 +84,6 @@ export const uploadAudioAsset = Effect.fn('uploadAudioAsset')(function* (input: 
 export const deleteAudioAsset = Effect.fn('deleteAudioAsset')(function* (input: { id: number }) {
   const database = yield* Database;
   const storage = yield* ObjectStorage;
-  const background = yield* BackgroundWork;
 
   const result = yield* database.run('find_audio_asset', async (db) =>
     db.query.audio_assets.findFirst({
@@ -141,21 +138,21 @@ export const deleteAudioAsset = Effect.fn('deleteAudioAsset')(function* (input: 
   result.words.forEach((word) => lesson_ids.add(word.lesson.id));
 
   if (lesson_ids.size > 0) {
-    const refresh = Effect.forEach(
+    yield* Effect.forEach(
       Array.from(lesson_ids),
       (lesson_id) =>
-        CACHE.lessons.text_lesson_info
-          .refresh({ lesson_id })
-          .pipe(
-            Effect.catch((error) =>
-              Effect.logWarning('lesson cache refresh failed', { lesson_id, error }).pipe(
-                Effect.asVoid
-              )
+        invalidateAndRefreshCache({
+          cache: CACHE.lessons.text_lesson_info,
+          params: { lesson_id }
+        }).pipe(
+          Effect.catch((error) =>
+            Effect.logWarning('lesson cache refresh failed', { lesson_id, error }).pipe(
+              Effect.asVoid
             )
-          ),
+          )
+        ),
       { concurrency: 4 }
     );
-    yield* background.enqueue(() => appRuntime.runPromise(refresh));
   }
 
   return { deleted: true as const };

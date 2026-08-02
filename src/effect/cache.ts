@@ -9,6 +9,9 @@ import { Database, type DbClient } from './database';
 const CACHE_EXPIRE_S = ms('30days') / 1000;
 
 type CacheEnv = RedisClient | BackgroundWork | Database;
+export type CacheRefreshOptions = {
+  deleteFirst?: boolean;
+};
 
 export interface CacheItem<TData, TParams> {
   key: (params: TParams) => string;
@@ -17,17 +20,25 @@ export interface CacheItem<TData, TParams> {
   delete: (params: TParams) => Effect.Effect<void, CacheError, RedisClient>;
   refresh: (
     params: TParams,
-    del?: boolean
+    options?: CacheRefreshOptions
   ) => Effect.Effect<void, CacheError, RedisClient | Database>;
 }
 
-export function createCache<TSchema extends z.ZodType, TData>(
-  keyPrefix: string,
-  schema: TSchema,
-  keyBuilder: (params: z.infer<TSchema>) => string,
-  fetchFn: (params: z.infer<TSchema>) => Effect.Effect<TData, CacheError, Database>,
+export interface CreateCacheConfig<TSchema extends z.ZodType, TData> {
+  keyPrefix: string;
+  schema: TSchema;
+  keyBuilder: (params: z.infer<TSchema>) => string;
+  fetch: (params: z.infer<TSchema>) => Effect.Effect<TData, CacheError, Database>;
+  ttl?: number;
+}
+
+export function createCache<TSchema extends z.ZodType, TData>({
+  keyPrefix,
+  schema,
+  keyBuilder,
+  fetch: fetchFn,
   ttl = CACHE_EXPIRE_S
-): CacheItem<TData, z.infer<TSchema>> {
+}: CreateCacheConfig<TSchema, TData>): CacheItem<TData, z.infer<TSchema>> {
   type TParams = z.infer<TSchema>;
 
   const validate = (params: TParams): TParams => schema.parse(params);
@@ -128,7 +139,10 @@ export function createCache<TSchema extends z.ZodType, TData>(
       });
     }),
 
-    refresh: Effect.fn('cache.refresh')(function* (params: TParams, del = true) {
+    refresh: Effect.fn('cache.refresh')(function* (
+      params: TParams,
+      { deleteFirst = true }: CacheRefreshOptions = {}
+    ) {
       const parsed = validate(params);
       const key = getKey(parsed);
       const generation = bumpGeneration(key);
@@ -139,7 +153,7 @@ export function createCache<TSchema extends z.ZodType, TData>(
         try: () =>
           enqueueKeyOp(key, async () => {
             if (currentGeneration(key) !== generation) return;
-            if (del) {
+            if (deleteFirst) {
               await Effect.runPromise(redis.del(key));
             }
             await Effect.runPromise(
@@ -155,6 +169,31 @@ export function createCache<TSchema extends z.ZodType, TData>(
 
   return cache;
 }
+
+export const invalidateAndRefreshCache = <TData, TParams>({
+  cache,
+  params
+}: {
+  cache: CacheItem<TData, TParams>;
+  params: TParams;
+}) =>
+  Effect.gen(function* () {
+    const background = yield* BackgroundWork;
+    const redis = yield* RedisClient;
+    const database = yield* Database;
+    yield* cache.delete(params);
+    yield* background.enqueue(() =>
+      Effect.runPromise(
+        cache
+          .refresh(params, { deleteFirst: false })
+          .pipe(
+            Effect.provideService(RedisClient, redis),
+            Effect.provideService(Database, database)
+          )
+      )
+    );
+  });
+
 const fromDb = <A>(operation: string, run: (client: DbClient) => Promise<A>) =>
   Effect.gen(function* () {
     const database = yield* Database;
@@ -166,13 +205,13 @@ const fromDb = <A>(operation: string, run: (client: DbClient) => Promise<A>) =>
 
 export const CACHE = {
   lessons: {
-    category_list: createCache(
-      'text_lesson_category_list',
-      z.object({
+    category_list: createCache({
+      keyPrefix: 'text_lesson_category_list',
+      schema: z.object({
         lang_id: z.int().positive()
       }),
-      ({ lang_id }) => `${lang_id}`,
-      ({ lang_id }) =>
+      keyBuilder: ({ lang_id }) => `${lang_id}`,
+      fetch: ({ lang_id }) =>
         fromDb('category_list', (db) =>
           db.query.lesson_categories.findMany({
             where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
@@ -180,14 +219,14 @@ export const CACHE = {
             orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
           })
         )
-    ),
-    category_lesson_list: createCache(
-      'text_lesson_category_lessons_list',
-      z.object({
+    }),
+    category_lesson_list: createCache({
+      keyPrefix: 'text_lesson_category_lessons_list',
+      schema: z.object({
         category_id: z.int()
       }),
-      ({ category_id }) => `${category_id}`,
-      ({ category_id }) =>
+      keyBuilder: ({ category_id }) => `${category_id}`,
+      fetch: ({ category_id }) =>
         fromDb('category_lesson_list', (db) =>
           db.query.text_lessons.findMany({
             columns: {
@@ -201,14 +240,14 @@ export const CACHE = {
               and(eq(tbl.category_id, category_id), isNotNull(tbl.order))
           })
         )
-    ),
-    text_lesson_info: createCache(
-      'text_lesson_info',
-      z.object({
+    }),
+    text_lesson_info: createCache({
+      keyPrefix: 'text_lesson_info',
+      schema: z.object({
         lesson_id: z.int()
       }),
-      ({ lesson_id }) => `${lesson_id}`,
-      ({ lesson_id }) =>
+      keyBuilder: ({ lesson_id }) => `${lesson_id}`,
+      fetch: ({ lesson_id }) =>
         fromDb('text_lesson_info', (db) =>
           db.query.text_lessons.findFirst({
             where: (tbl, { eq }) => eq(tbl.id, lesson_id),
@@ -260,17 +299,17 @@ export const CACHE = {
             }
           })
         )
-    )
+    })
   },
   gestures: {
-    gesture_data: createCache(
-      'text_gesture_data',
-      z.object({
+    gesture_data: createCache({
+      keyPrefix: 'text_gesture_data',
+      schema: z.object({
         gesture_id: z.int(),
         gesture_uuid: z.uuid()
       }),
-      ({ gesture_id, gesture_uuid }) => `${gesture_id}:${gesture_uuid}`,
-      ({ gesture_id, gesture_uuid }) =>
+      keyBuilder: ({ gesture_id, gesture_uuid }) => `${gesture_id}:${gesture_uuid}`,
+      fetch: ({ gesture_id, gesture_uuid }) =>
         fromDb('gesture_data', (db) =>
           db.query.text_gestures.findFirst({
             where: (table, { eq, and }) =>
@@ -284,6 +323,6 @@ export const CACHE = {
             }
           })
         )
-    )
+    })
   }
 };

@@ -3,9 +3,7 @@ import { and, eq, max, sql } from 'drizzle-orm';
 import { Effect } from 'effect';
 import { lesson_categories, text_lessons } from '~/db/schema';
 import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
-import { CACHE } from '~/effect/cache';
-import { BackgroundWork } from '~/effect/background';
-import { appRuntime } from '~/effect/runtime';
+import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
 import { LessonCategoriesSchemaZod, TextLessonsSchemaZod } from '~/db/schema_zod';
@@ -161,7 +159,6 @@ export const updateTextLessonsOrder = Effect.fn('updateTextLessonsOrder')(functi
   lessons: Array<{ id: number; order: number | null }>;
   category_id: number;
 }) {
-  const background = yield* BackgroundWork;
   yield* dbTransaction('update_text_lessons_order', async (tx) => {
     if (input.lessons.length === 0) return;
     const value_rows = input.lessons.map(
@@ -175,11 +172,10 @@ export const updateTextLessonsOrder = Effect.fn('updateTextLessonsOrder')(functi
         AND t.category_id = ${input.category_id}
     `);
   });
-  yield* background.enqueue(() =>
-    appRuntime.runPromise(
-      CACHE.lessons.category_lesson_list.refresh({ category_id: input.category_id })
-    )
-  );
+  yield* invalidateAndRefreshCache({
+    cache: CACHE.lessons.category_lesson_list,
+    params: { category_id: input.category_id }
+  });
   return { updated: true as const };
 });
 
@@ -188,7 +184,6 @@ export const addUpdateLessonCategory = Effect.fn('addUpdateLessonCategory')(func
   prev_category_id?: number;
   lesson_id: number;
 }) {
-  const background = yield* BackgroundWork;
   yield* dbTransaction('add_update_lesson_category', async (tx) => {
     await tx
       .update(text_lessons)
@@ -200,16 +195,16 @@ export const addUpdateLessonCategory = Effect.fn('addUpdateLessonCategory')(func
   });
 
   if (input.category_id) {
-    const category_id = input.category_id;
-    yield* background.enqueue(() =>
-      appRuntime.runPromise(CACHE.lessons.category_lesson_list.refresh({ category_id }))
-    );
+    yield* invalidateAndRefreshCache({
+      cache: CACHE.lessons.category_lesson_list,
+      params: { category_id: input.category_id }
+    });
   }
   if (input.prev_category_id) {
-    const category_id = input.prev_category_id;
-    yield* background.enqueue(() =>
-      appRuntime.runPromise(CACHE.lessons.category_lesson_list.refresh({ category_id }))
-    );
+    yield* invalidateAndRefreshCache({
+      cache: CACHE.lessons.category_lesson_list,
+      params: { category_id: input.prev_category_id }
+    });
   }
   return { added: true as const };
 });

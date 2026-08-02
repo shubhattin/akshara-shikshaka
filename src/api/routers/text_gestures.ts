@@ -4,9 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { gesture_text_key_category_join, lesson_gestures, text_gestures } from '~/db/schema';
 import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
 import { NotFoundError, BadRequestError } from '~/effect/errors';
-import { CACHE } from '~/effect/cache';
-import { BackgroundWork } from '~/effect/background';
-import { appRuntime } from '~/effect/runtime';
+import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
 import { FONT_FAMILIES, type FontFamily } from '~/state/font_list';
 import { GestureSchema } from '~/tools/stroke_data/types';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
@@ -49,7 +47,6 @@ export const addTextGestureData = Effect.fn('addTextGestureData')(function* (inp
   fontSize: number;
   textCenterOffset: [number, number];
 }) {
-  const background = yield* BackgroundWork;
   const fontFamily = parseFontFamily(input.fontFamily);
   if (!fontFamily) {
     return yield* Effect.fail(
@@ -88,14 +85,13 @@ export const addTextGestureData = Effect.fn('addTextGestureData')(function* (inp
 
   if (!result.success) return result;
 
-  yield* background.enqueue(() =>
-    appRuntime.runPromise(
-      CACHE.gestures.gesture_data.refresh({
-        gesture_id: result.id,
-        gesture_uuid: result.uuid
-      })
-    )
-  );
+  yield* invalidateAndRefreshCache({
+    cache: CACHE.gestures.gesture_data,
+    params: {
+      gesture_id: result.id,
+      gesture_uuid: result.uuid
+    }
+  });
   return result;
 });
 
@@ -107,7 +103,6 @@ export const editTextGestureData = Effect.fn('editTextGestureData')(function* (i
   fontSize: number;
   textCenterOffset: [number, number];
 }) {
-  const background = yield* BackgroundWork;
   const fontFamily = parseFontFamily(input.fontFamily);
   if (!fontFamily) {
     return yield* Effect.fail(
@@ -135,14 +130,13 @@ export const editTextGestureData = Effect.fn('editTextGestureData')(function* (i
     );
   }
 
-  yield* background.enqueue(() =>
-    appRuntime.runPromise(
-      CACHE.gestures.gesture_data.refresh({
-        gesture_id: input.id,
-        gesture_uuid: input.uuid
-      })
-    )
-  );
+  yield* invalidateAndRefreshCache({
+    cache: CACHE.gestures.gesture_data,
+    params: {
+      gesture_id: input.id,
+      gesture_uuid: input.uuid
+    }
+  });
   return { updated: true as const };
 });
 
@@ -151,8 +145,6 @@ export const deleteTextGestureData = Effect.fn('deleteTextGestureData')(function
   uuid: string;
   script_id: number;
 }) {
-  const background = yield* BackgroundWork;
-
   const outcome = yield* dbTransaction('delete_text_gesture', async (tx) => {
     const [text_gesture_] = await tx
       .select({
@@ -218,21 +210,21 @@ export const deleteTextGestureData = Effect.fn('deleteTextGestureData')(function
   }
 
   if (outcome.lessons.length > 0) {
-    const refresh = Effect.forEach(
+    yield* Effect.forEach(
       outcome.lessons,
       ({ text_lesson_id }) =>
-        CACHE.lessons.text_lesson_info
-          .refresh({ lesson_id: text_lesson_id })
-          .pipe(
-            Effect.catch((error) =>
-              Effect.logWarning('lesson cache refresh failed', { text_lesson_id, error }).pipe(
-                Effect.asVoid
-              )
+        invalidateAndRefreshCache({
+          cache: CACHE.lessons.text_lesson_info,
+          params: { lesson_id: text_lesson_id }
+        }).pipe(
+          Effect.catch((error) =>
+            Effect.logWarning('lesson cache refresh failed', { text_lesson_id, error }).pipe(
+              Effect.asVoid
             )
-          ),
+          )
+        ),
       { concurrency: 4 }
     );
-    yield* background.enqueue(() => appRuntime.runPromise(refresh));
   }
 
   yield* CACHE.gestures.gesture_data.delete({

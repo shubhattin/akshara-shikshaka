@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { DatabaseError, NotFoundError, StorageError, isKnownError } from './errors';
 import { RedisClient } from './redis';
 import { BackgroundWork } from './background';
-import { Database } from './database';
-import { createCache } from './cache';
+import { Database, type DbClient, type DbTransaction } from './database';
+import { createCache, invalidateAndRefreshCache } from './cache';
 
 describe('Effect infrastructure', () => {
   it.effect('maps StorageError tags', () =>
@@ -72,20 +72,70 @@ describe('cache refresh', () => {
         transaction: () => Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' }))
       });
 
-      const cache = createCache(
-        'test_list',
-        z.object({ lang_id: z.number() }),
-        ({ lang_id }) => `${lang_id}`,
-        () => Effect.succeed([{ id: 1, name: 'A' }])
-      );
+      const cache = createCache({
+        keyPrefix: 'test_list',
+        schema: z.object({ lang_id: z.number() }),
+        keyBuilder: ({ lang_id }) => `${lang_id}`,
+        fetch: () => Effect.succeed([{ id: 1, name: 'A' }])
+      });
 
       yield* cache
-        .refresh({ lang_id: 1 }, true)
+        .refresh({ lang_id: 1 }, { deleteFirst: true })
         .pipe(Effect.provide(TrackingRedis), Effect.provide(UnusedDb));
 
       expect(ops).toEqual(['del', 'set']);
       expect(stored).toEqual([{ id: 1, name: 'A' }]);
     }).pipe(Effect.provide(BackgroundWork.Test))
+  );
+
+  it.effect('invalidates synchronously before scheduling refresh-ahead', () =>
+    Effect.gen(function* () {
+      const ops: string[] = [];
+      const queuedWork: Array<() => Promise<unknown>> = [];
+      const TrackingRedis = Layer.succeed(RedisClient)({
+        get: () => Effect.succeed(null),
+        set: () => {
+          ops.push('set');
+          return Effect.succeed('OK');
+        },
+        del: () => {
+          ops.push('del');
+          return Effect.succeed(1);
+        }
+      });
+      const TestDatabase = Layer.succeed(Database)({
+        run: <A>(_operation: string, _run: (client: DbClient) => Promise<A>) =>
+          Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' })),
+        transaction: <A>(_operation: string, _run: (tx: DbTransaction) => Promise<A>) =>
+          Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' }))
+      });
+      const QueuedBackgroundWork = Layer.succeed(BackgroundWork)({
+        enqueue: (work) =>
+          Effect.sync(() => {
+            queuedWork.push(work);
+          })
+      });
+      const cache = createCache({
+        keyPrefix: 'test_list',
+        schema: z.object({ lang_id: z.number() }),
+        keyBuilder: ({ lang_id }) => `${lang_id}`,
+        fetch: () => Effect.succeed([{ id: 1, name: 'A' }])
+      });
+
+      yield* invalidateAndRefreshCache({
+        cache,
+        params: { lang_id: 1 }
+      }).pipe(
+        Effect.provide(TrackingRedis),
+        Effect.provide(TestDatabase),
+        Effect.provide(QueuedBackgroundWork)
+      );
+
+      expect(ops).toEqual(['del']);
+      expect(queuedWork).toHaveLength(1);
+      yield* Effect.promise(() => queuedWork[0]!());
+      expect(ops).toEqual(['del', 'set']);
+    })
   );
 });
 

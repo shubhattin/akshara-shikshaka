@@ -215,7 +215,7 @@ const DescriptionEditor = () => {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Enter image description..."
-            className="min-h-[100px]"
+            className="min-h-25"
           />
           <div className="flex gap-2">
             <Button size="sm" onClick={handleSave} disabled={update_image_mut.isPending}>
@@ -232,7 +232,7 @@ const DescriptionEditor = () => {
           </div>
         </div>
       ) : (
-        <div className="min-h-[100px] rounded-md border p-3">
+        <div className="min-h-25 rounded-md border p-3">
           <p className="text-sm">{image_data?.description}</p>
         </div>
       )}

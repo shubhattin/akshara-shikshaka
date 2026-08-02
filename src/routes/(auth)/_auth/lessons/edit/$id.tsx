@@ -101,7 +101,7 @@ function LessonsEditRoute() {
   const id = text_lesson_info.id;
 
   return (
-    <div>
+    <div className="pb-28">
       <div className="my-2 mb-4 px-2">
         <Link to="/lessons" className="flex items-center gap-1 text-lg font-semibold">
           <IoMdArrowRoundBack className="inline-block text-xl" />
@@ -110,7 +110,6 @@ function LessonsEditRoute() {
       </div>
       <JotaiProvider key={`edit-lesson-${id}`}>
         <TextLessonAddEdit
-          location="edit"
           gestures_list={text_lesson_info.gestures.map((g) => g.text_gesture)}
           words={text_lesson_info.words}
           text_lesson_info={{

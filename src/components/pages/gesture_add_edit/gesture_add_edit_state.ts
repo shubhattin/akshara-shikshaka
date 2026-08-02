@@ -5,7 +5,6 @@ import { type FontFamily, DEFAULT_FONT_SIZE } from '~/state/font_list';
 
 // core text related states
 export const text_atom = atom('');
-export const text_edit_mode_atom = atom(false);
 export const script_atom = atom<script_list_type>('Devanagari');
 export const font_family_atom = atom<FontFamily>('Nirmala_UI');
 export const font_loaded_atom = atom<ReadonlyMap<FontFamily, boolean>>(

@@ -1,5 +1,5 @@
 'use client';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
@@ -25,8 +25,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '~/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '~/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import { IoMdAdd } from 'react-icons/io';
-import { FiSave } from 'react-icons/fi';
 import {
   MdDeleteOutline,
   MdPlayArrow,
@@ -34,10 +42,10 @@ import {
   MdClear,
   MdFiberManualRecord,
   MdDragHandle,
-  MdReplay
+  MdReplay,
+  MdEdit
 } from 'react-icons/md';
 import { toast } from 'sonner';
-import { custom_classes } from '~/components/custom_ui';
 import { cn } from '~/lib/utils';
 import {
   DndContext,
@@ -64,7 +72,6 @@ import { CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
 import { animateGesture } from '~/tools/stroke_data/utils';
 import {
   text_atom,
-  text_edit_mode_atom,
   font_size_atom,
   gesture_data_atom,
   selected_gesture_index_atom,
@@ -83,25 +90,24 @@ import {
   canvas_text_center_offset_atoms
 } from './gesture_add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
-import { transliterate, preloadScriptData } from 'lipilekhika';
-import {
-  createTypingContext,
-  clearTypingContextOnKeyDown,
-  handleTypingBeforeInputEvent
-} from 'lipilekhika/typing';
-import { FONT_LIST, FONT_SCRIPTS, type FontFamily } from '~/state/font_list';
-import { script_list_obj, type script_list_type } from '~/state/lang_list';
+import { transliterate } from 'lipilekhika';
+import { FONT_LIST, type FontFamily } from '~/state/font_list';
+import { script_list_obj } from '~/state/lang_list';
 import { get_script_from_id } from '~/state/lang_list';
 import { motion } from 'framer-motion';
 import type { InferSelectModel } from 'drizzle-orm';
 import type { text_gestures } from '~/db/schema';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Cookie from 'js-cookie';
-import { FONT_FAMILY_COOKIE_KEY, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
+import { FONT_FAMILY_COOKIE_KEY } from '~/state/cookie';
 import { Provider as JotaiProvider } from 'jotai';
-
-import { useMutation } from '@tanstack/react-query';
 import { buttonVariants } from '~/components/ui/button';
+import {
+  EditorHistoryProvider,
+  useEditorHistoryActions,
+  useHistoryTextField
+} from '~/hooks/useEditorHistory';
+import { EditorActionDock } from '~/components/editor/EditorActionDock';
 
 // Lazy-load the heavy Konva bundle; SSR is blocked at the render site.
 const KonvaCanvas = lazy(() => import('./AddEditGestureCanvas'));
@@ -149,25 +155,29 @@ export type text_data_type = Omit<
   } | null;
 };
 
-type Props =
-  | {
-      text_data: text_data_type;
-      location: 'add';
-    }
-  | {
-      location: 'edit';
-      text_data: text_data_type & {
-        id?: number;
-        uuid?: string;
-      };
-    };
+type Props = {
+  text_data: text_data_type & { id: number; uuid: string };
+};
+
+type CategoryInfo = {
+  id: number;
+  name: string;
+} | null;
+
+const GESTURE_HISTORY_ATOMS = {
+  text: text_atom,
+  script: script_atom,
+  font_family: font_family_atom,
+  font_size: font_size_atom,
+  text_center_offset: canvas_text_center_offset_atoms,
+  gestures: gesture_data_atom
+};
 
 const PracticeComponent = lazy(() => import('../practice/Practice'));
 
 export default function AddEditTextDataWrapper(props: Props) {
   useHydrateAtoms([
     [text_atom, props.text_data.text],
-    [text_edit_mode_atom, props.location === 'add' && true],
     [gesture_data_atom, props.text_data.gestures ?? []],
     [selected_gesture_index_atom, null],
     [is_recording_atom, false],
@@ -183,28 +193,27 @@ export default function AddEditTextDataWrapper(props: Props) {
   const stageRef = useRef<Konva.Stage | null>(null);
 
   return (
-    <>
-      <AddEditTextData {...props} stageRef={stageRef} />
+    <EditorHistoryProvider atoms={GESTURE_HISTORY_ATOMS}>
+      <AddEditTextData text_data={props.text_data} stageRef={stageRef} />
       <SaveEditMode text_data={props.text_data} />
       <PracticeSection text_data={props.text_data} />
-    </>
+    </EditorHistoryProvider>
   );
 }
 
 function AddEditTextData({
   text_data,
-  location,
   stageRef
-}: Props & {
+}: {
+  text_data: Props['text_data'];
   stageRef: React.RefObject<Konva.Stage | null>;
 }) {
-  const [textIntermediate, setIntermediateText] = useState(text_data.text);
-  const [text, setText] = useAtom(text_atom);
-  const [textEditMode, setTextEditMode] = useAtom(text_edit_mode_atom);
+  const [text] = useAtom(text_atom);
   const [fontSize, setFontSize] = useAtom(font_size_atom);
+  const fontSizeHistory = useHistoryTextField();
   const [fontLoaded, setFontLoaded] = useAtom(font_loaded_atom);
   const [mainTextPathVisible, setMainTextPathVisible] = useAtom(main_text_path_visible_atom);
-  const [isDrawing] = useAtom(is_drawing_atom);
+  const [category, setCategory] = useState<CategoryInfo>(text_data.category ?? null);
 
   // Gesture Recording State
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
@@ -359,21 +368,10 @@ function AddEditTextData({
 
   const selectedGesture = gestureData.find((g) => g.index === selectedGestureIndex);
 
-  const [script, setScript] = useAtom(script_atom);
+  const script = useAtomValue(script_atom);
   const [fontFamily, setFontFamily] = useAtom(font_family_atom);
 
   const currentScriptFontList = FONT_LIST[script]!;
-
-  const first_script_set_ref = useRef(true);
-  useEffect(() => {
-    if (location !== 'add') return;
-    preloadScriptData(script);
-    if (first_script_set_ref.current) {
-      first_script_set_ref.current = false;
-      return;
-    }
-    setFontFamily(currentScriptFontList[0].font_family);
-  }, [script]);
 
   useEffect(() => {
     if (fontLoaded.get(fontFamily)) return;
@@ -420,49 +418,12 @@ function AddEditTextData({
     );
   }, [gestureData, selectedGestureIndex]);
 
-  const ctx = useMemo(() => createTypingContext(script), [script]);
-
-  useEffect(() => {
-    void ctx.ready;
-  }, [ctx]);
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <Label className="font-bold">Script</Label>
-          {location === 'add' && (
-            <Select
-              items={[
-                { label: 'Script', value: null },
-                ...FONT_SCRIPTS.map((s) => ({ label: s, value: s }))
-              ]}
-              value={script}
-              onValueChange={(v) => {
-                if (!v) return;
-                setScript(v as script_list_type);
-                Cookie.set(
-                  SCRIPT_ID_COOKIE_KEY,
-                  script_list_obj[v as script_list_type].toString(),
-                  {
-                    expires: 30
-                  }
-                );
-              }}
-            >
-              <SelectTrigger className="w-32 text-sm">
-                <SelectValue placeholder="Script" />
-              </SelectTrigger>
-              <SelectContent>
-                {FONT_SCRIPTS.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {location !== 'add' && <span className="text-sm">{script}</span>}
+          <span className="text-sm">{script}</span>
         </div>
         <div className="flex items-center gap-2">
           <Label className="font-bold">Font Family</Label>
@@ -496,43 +457,20 @@ function AddEditTextData({
         <div className="flex items-center gap-2">
           <Label className="font-bold">Category</Label>
           <span className="text-sm font-semibold underline">
-            {text_data.category?.name ?? 'Uncategorized'}
+            {category?.name ?? 'Uncategorized'}
           </span>
+          <CategoryChangeButton
+            text_data={text_data}
+            category={category}
+            onCategoryChanged={setCategory}
+          />
         </div>
       </div>
       <div className="flex items-center gap-5">
         <Label className="font-bold">Text</Label>
-        {location === 'add' && (
-          <div className="flex items-center gap-2">
-            <Input
-              className="w-32"
-              disabled={!textEditMode}
-              value={textIntermediate}
-              onChange={(e) => setIntermediateText(e.target.value)}
-              onBeforeInput={(e) =>
-                handleTypingBeforeInputEvent(ctx, e, (newValue) => setIntermediateText(newValue))
-              }
-              onBlur={() => ctx.clearContext()}
-              onKeyDown={(e) => clearTypingContextOnKeyDown(e, ctx)}
-            />
-            {!textEditMode && <Button onClick={() => setTextEditMode(true)}>Edit</Button>}
-            {textEditMode && (
-              <Button
-                onClick={() => {
-                  setTextEditMode(false);
-                  setText(textIntermediate.trim());
-                }}
-              >
-                Save
-              </Button>
-            )}
-          </div>
-        )}
-        {location !== 'add' && (
-          <span className="text-base" style={{ fontFamily }}>
-            {text}
-          </span>
-        )}
+        <span className="text-base" style={{ fontFamily }}>
+          {text}
+        </span>
         <div className="flex items-center gap-2">
           <Label className="font-bold">Font Size</Label>
           <Input
@@ -540,6 +478,8 @@ function AddEditTextData({
             className="w-16"
             type="number"
             step={1}
+            onFocus={fontSizeHistory.onFocus}
+            onBlur={fontSizeHistory.onBlur}
             onChange={(e) => {
               const value = Number(e.target.value);
               if (value > 0) {
@@ -1075,10 +1015,147 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
   );
 }
 
-const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
+const CategoryChangeButton = ({
+  text_data,
+  category,
+  onCategoryChanged
+}: {
+  text_data: Props['text_data'];
+  category: CategoryInfo;
+  onCategoryChanged: (category: CategoryInfo) => void;
+}) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const script = useAtomValue(script_atom);
+  const text = useAtomValue(text_atom);
+  const scriptID = script_list_obj[script]!;
+  const [open, setOpen] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(category?.id ?? 0);
+
+  const categories_q = useQuery(trpc.text_gestures.categories.get_categories.queryOptions());
+  const categories = [{ id: 0, name: 'Uncategorized', order: 0 }, ...(categories_q.data ?? [])];
+
+  const update_category_mut = useMutation(
+    trpc.text_gestures.categories.add_update_gesture_category.mutationOptions({
+      onError() {
+        toast.error('Failed to update category');
+      }
+    })
+  );
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) {
+      setSelectedCategoryId(category?.id ?? 0);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (selectedCategoryId === null) return;
+    const nextCategoryId = selectedCategoryId === 0 ? null : selectedCategoryId;
+    const prevCategoryId = category?.id;
+    if (nextCategoryId === (prevCategoryId ?? null)) {
+      setOpen(false);
+      return;
+    }
+
+    const textKeyFromData = (text_data as text_data_type & { text_key?: string }).text_key;
+    const gesture_text_key =
+      textKeyFromData ?? (await transliterate(text.trim(), script, 'Normal'));
+
+    await update_category_mut.mutateAsync({
+      gesture_id: text_data.id,
+      gesture_text_key,
+      script_id: scriptID,
+      category_id: nextCategoryId,
+      prev_category_id: prevCategoryId
+    });
+
+    const nextCategory =
+      nextCategoryId === null ? null : (categories.find((c) => c.id === nextCategoryId) ?? null);
+    onCategoryChanged(nextCategory ? { id: nextCategory.id, name: nextCategory.name } : null);
+
+    const prevId = prevCategoryId ?? 0;
+    const nextId = nextCategoryId ?? 0;
+    await Promise.all([
+      queryClient.invalidateQueries(
+        trpc.text_gestures.categories.get_gestures.queryFilter({
+          category_id: prevId,
+          script_id: scriptID
+        })
+      ),
+      queryClient.invalidateQueries(
+        trpc.text_gestures.categories.get_gestures.queryFilter({
+          category_id: nextId,
+          script_id: scriptID
+        })
+      )
+    ]);
+
+    toast.success('Category updated');
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-7 gap-1 px-2 text-xs"
+        onClick={() => handleOpenChange(true)}
+      >
+        <MdEdit className="size-3.5" />
+        Change
+      </Button>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Category</DialogTitle>
+            <DialogDescription>Choose a category for this gesture.</DialogDescription>
+          </DialogHeader>
+          <RadioGroup
+            value={selectedCategoryId?.toString() ?? ''}
+            onValueChange={(v) => setSelectedCategoryId(Number(v))}
+            className="flex flex-col gap-2"
+          >
+            {categories.map((cat) => (
+              <div key={cat.id} className="flex items-center gap-2">
+                <RadioGroupItem id={`gesture-edit-cat-${cat.id}`} value={String(cat.id)} />
+                <Label
+                  htmlFor={`gesture-edit-cat-${cat.id}`}
+                  className={cn(cat.id === 0 && 'text-muted-foreground')}
+                >
+                  {cat.name}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleConfirm()}
+              disabled={
+                selectedCategoryId === null ||
+                update_category_mut.isPending ||
+                selectedCategoryId === (category?.id ?? 0)
+              }
+            >
+              {update_category_mut.isPending ? 'Updating…' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+const SaveEditMode = ({ text_data }: { text_data: Props['text_data'] }) => {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
-  const text = useAtomValue(text_atom);
+  const { beginSave, markSaved } = useEditorHistoryActions();
   const gestureData = useAtomValue(gesture_data_atom);
   const script = useAtomValue(script_atom);
   const scriptID = script_list_obj[script]!;
@@ -1087,42 +1164,11 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
   const fontSize = useAtomValue(font_size_atom);
   const textCenterOffset = useAtomValue(canvas_text_center_offset_atoms);
 
-  const is_addition = text_data.id === undefined && text_data.uuid === undefined;
-
   const navigate = useNavigate();
-  const add_text_data_mut = useMutation(
-    trpc.text_gestures.add_text_gesture_data.mutationOptions({
-      onSuccess(data) {
-        if (data.success) {
-          toast.success('Text Added');
-          navigate({ to: `/gestures/edit/${data.id}` } as never);
-          queryClient.invalidateQueries(
-            trpc.text_gestures.categories.get_gestures.queryFilter({
-              category_id: text_data.category?.id ?? 0, // 0 -> uncategorized
-              script_id: scriptID
-            })
-          );
-        } else {
-          if (data.err_code === 'text_already_exists') {
-            toast.error('Text already exists');
-          } else {
-            toast.error('Failed to add text');
-          }
-        }
-      },
-      onError(error) {
-        toast.error('Failed to add text');
-      }
-    })
-  );
 
   const update_text_data_mut = useMutation(
     trpc.text_gestures.edit_text_gesture_data.mutationOptions({
-      onSuccess(data) {
-        if (!data.updated) return;
-        toast.success('Text Updated');
-      },
-      onError(error) {
+      onError() {
         toast.error('Failed to update text');
       }
     })
@@ -1141,88 +1187,45 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
         );
         navigate({ to: '/gestures' } as never);
       },
-      onError(error) {
+      onError() {
         toast.error('Failed to delete text');
       }
     })
   );
 
-  const handle_save = async () => {
-    if (text.trim().length === 0) return;
-
-    // With Konva, we don't need to manipulate canvas objects for saving
-    // The gesture data is already stored in state and ready to save
-
-    if (is_addition) {
-      add_text_data_mut.mutate({
-        text: text.trim(),
-        textKey: await transliterate(text.trim(), script, 'Normal'),
-        scriptID,
+  const handle_save = () => {
+    beginSave();
+    update_text_data_mut.mutate(
+      {
+        id: text_data.id,
+        uuid: text_data.uuid,
         gestures: gestureData,
         fontFamily,
         fontSize,
         textCenterOffset
-      });
-    } else {
-      update_text_data_mut.mutate({
-        id: text_data.id!,
-        uuid: text_data.uuid!,
-        gestures: gestureData,
-        fontFamily,
-        fontSize,
-        textCenterOffset
-        // script and text can be only set once
-      });
-    }
+      },
+      {
+        onSuccess: (data) => {
+          if (!data.updated) return;
+          markSaved();
+          toast.success('Text Updated');
+        }
+      }
+    );
   };
 
   const handleDelete = async () => {
-    if (!is_addition) {
-      await delete_text_data_mut.mutateAsync({
-        id: text_data.id!,
-        uuid: text_data.uuid!,
-        script_id: scriptID
-      });
-    }
+    await delete_text_data_mut.mutateAsync({
+      id: text_data.id,
+      uuid: text_data.uuid,
+      script_id: scriptID
+    });
   };
 
   return (
-    <div className="mx-2 mt-2 flex items-center justify-between sm:mx-4">
-      <AlertDialog>
-        <AlertDialogTrigger
-          disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
-          className={cn(
-            buttonVariants({ variant: 'default' }),
-            custom_classes.button.blue,
-            'flex text-lg'
-          )}
-        >
-          {is_addition ? (
-            <>
-              <IoMdAdd className="text-lg" /> {!add_text_data_mut.isPending ? 'Add' : 'Adding...'}
-            </>
-          ) : (
-            <>
-              <FiSave className="text-lg" />{' '}
-              {!update_text_data_mut.isPending ? 'Save' : 'Saving...'}
-            </>
-          )}
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Sure to Save</AlertDialogTitle>
-            <AlertDialogDescription>
-              {is_addition ? 'Are you sure to Add this Text ?' : 'Are you sure to Save this Text ?'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handle_save}>Save</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {!is_addition && (
+    <>
+      <EditorActionDock onSave={handle_save} isSaving={update_text_data_mut.isPending} />
+      <div className="mx-2 mt-2 flex items-center justify-end sm:mx-4">
         <AlertDialog>
           <AlertDialogTrigger
             className={cn(
@@ -1246,8 +1249,8 @@ const SaveEditMode = ({ text_data }: { text_data: text_data_type }) => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      )}
-    </div>
+      </div>
+    </>
   );
 };
 

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTRPC } from '~/api/client';
 import { Skeleton } from '~/components/ui/skeleton';
-import { ArrowRightLeft, ChevronsUpDown, Pencil, Undo2 } from 'lucide-react';
+import { ArrowRightLeft, ChevronsUpDown, CircleHelp, Pencil, Undo2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -27,7 +27,14 @@ import {
   CommandItem,
   CommandList
 } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger
+} from '@/components/ui/popover';
 import { cn } from '~/lib/utils';
 import { TiEdit } from 'react-icons/ti';
 import {
@@ -597,7 +604,12 @@ function DisplayLessonsSection({ data }: { data: { type: string; lessons: Lesson
     <div className="flex flex-col gap-8">
       {unordered.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h3 className="text-base font-semibold text-muted-foreground">Unordered</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold text-muted-foreground">Unordered</h3>
+            <span className="rounded-md border border-yellow-600/40 bg-yellow-500/15 px-1.5 py-0.5 text-xs font-medium text-yellow-700 dark:border-yellow-500/40 dark:text-yellow-400">
+              unlisted
+            </span>
+          </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             {unordered.map((l) => (
               <Card key={l.id} className="p-0 transition-colors hover:bg-muted/60">
@@ -614,7 +626,34 @@ function DisplayLessonsSection({ data }: { data: { type: string; lessons: Lesson
         </section>
       )}
       <section className="flex flex-col gap-3">
-        <h3 className="text-base font-semibold">Ordered</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-semibold">Ordered</h3>
+          <span className="rounded-md border border-green-600/40 bg-green-500/15 px-1.5 py-0.5 text-xs font-medium text-green-700 dark:border-green-500/40 dark:text-green-400">
+            listed
+          </span>
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="About listed lessons"
+                />
+              }
+            >
+              <CircleHelp />
+            </PopoverTrigger>
+            <PopoverContent className="w-64" side="top">
+              <PopoverHeader>
+                <PopoverTitle>Listed lessons</PopoverTitle>
+                <PopoverDescription>
+                  Only listed lessons will be visible to the user.
+                </PopoverDescription>
+              </PopoverHeader>
+            </PopoverContent>
+          </Popover>
+        </div>
         {ordered.length > 0 ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {ordered.map((l) => (

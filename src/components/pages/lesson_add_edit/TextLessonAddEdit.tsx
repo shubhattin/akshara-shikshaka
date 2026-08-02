@@ -2,9 +2,8 @@
 import { useAtomValue, useAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FiSave } from 'react-icons/fi';
 import { IoMdAdd } from 'react-icons/io';
-import { MdClose, MdDeleteOutline, MdDragHandle } from 'react-icons/md';
+import { MdClose, MdDeleteOutline, MdDragHandle, MdEdit } from 'react-icons/md';
 import { RiImageAddLine } from 'react-icons/ri';
 import { toast } from 'sonner';
 import { useTRPC } from '~/api/client';
@@ -24,7 +23,6 @@ import { buttonVariants } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Skeleton } from '~/components/ui/skeleton';
-import { custom_classes } from '~/components/custom_ui';
 import { cn } from '~/lib/utils';
 import {
   DndContext,
@@ -43,17 +41,8 @@ import {
 } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { FONT_SCRIPTS } from '~/state/font_list';
-import {
-  lang_list_obj,
-  LANG_LIST,
-  type lang_list_type,
-  get_lang_from_id,
-  script_list_obj,
-  type script_list_type,
-  get_script_from_id
-} from '~/state/lang_list';
-import { transliterate, preloadScriptData } from 'lipilekhika';
+import { get_lang_from_id, get_script_from_id } from '~/state/lang_list';
+import { preloadScriptData } from 'lipilekhika';
 import {
   createTypingContext,
   clearTypingContextOnKeyDown,
@@ -75,10 +64,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
-  DialogTrigger,
-  DialogTitle
+  DialogTitle,
+  DialogTrigger
 } from '~/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import ImageSelect from './ImageSelect';
 import AudioSelect from './AudioSelect';
 import { MdPlayArrow, MdStop } from 'react-icons/md';
@@ -88,12 +80,11 @@ import { useMutation } from '@tanstack/react-query';
 import { AiOutlineAudio } from 'react-icons/ai';
 import { Link, useNavigate } from '@tanstack/react-router';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '~/components/ui/select';
+  EditorHistoryProvider,
+  useEditorHistoryActions,
+  useHistoryTextField
+} from '~/hooks/useEditorHistory';
+import { EditorActionDock } from '~/components/editor/EditorActionDock';
 
 type gestures_list_type = {
   id: number;
@@ -101,22 +92,43 @@ type gestures_list_type = {
   script_id: number;
 };
 
-type Props =
-  | {
-      location: 'add';
-      text_lesson_info: text_lesson_info_type & {
-        id?: number;
-        uuid?: string;
-      };
-      gestures_list: gestures_list_type[]; // []
-      words: text_lesson_word_type[]; // []
-    }
-  | {
-      location: 'edit';
-      text_lesson_info: text_lesson_info_type;
-      gestures_list: gestures_list_type[];
-      words: text_lesson_word_type[];
-    };
+type CategoryInfo = {
+  id: number;
+  name: string;
+} | null;
+
+type Props = {
+  text_lesson_info: text_lesson_info_type;
+  gestures_list: gestures_list_type[];
+  words: text_lesson_word_type[];
+};
+
+const LESSON_HISTORY_ATOMS = {
+  lang_id: lang_id_atom,
+  base_word_script_id: base_word_script_id_atom,
+  text: text_atom,
+  text_key: text_key_atom,
+  audio_id: audio_id_optional_atom,
+  words: words_atom
+};
+
+function lessonHistoryComparable(snapshot: {
+  lang_id: number;
+  base_word_script_id: number;
+  text: string;
+  text_key: string | null;
+  audio_id: number | null | undefined;
+  words: text_lesson_word_type[];
+}) {
+  return {
+    lang_id: snapshot.lang_id,
+    base_word_script_id: snapshot.base_word_script_id,
+    text: snapshot.text,
+    text_key: snapshot.text_key,
+    audio_id: snapshot.audio_id ?? null,
+    words: snapshot.words.map(({ id: _id, ...rest }) => rest)
+  };
+}
 
 export default function TextLessonAddEditComponent(props: Props) {
   useHydrateAtoms([
@@ -124,190 +136,111 @@ export default function TextLessonAddEditComponent(props: Props) {
     [base_word_script_id_atom, props.text_lesson_info.base_word_script_id],
     [audio_id_optional_atom, props.text_lesson_info.audio_id],
     [text_atom, props.text_lesson_info.text],
+    [text_key_atom, props.text_lesson_info.text_key],
     [words_atom, props.words]
   ]);
 
+  const [category, setCategory] = useState<CategoryInfo>(props.text_lesson_info.category ?? null);
+
   return (
-    <div className="space-y-6">
-      <LessonInfo {...props} />
-      <LessonWords {...props} />
-      <AddEditSave {...props} />
-    </div>
+    <EditorHistoryProvider atoms={LESSON_HISTORY_ATOMS} comparable={lessonHistoryComparable}>
+      <div className="space-y-6">
+        <LessonInfo
+          text_lesson_info={props.text_lesson_info}
+          gestures_list={props.gestures_list}
+          category={category}
+          onCategoryChanged={setCategory}
+        />
+        <LessonWords lesson_id={props.text_lesson_info.id} />
+        <SaveEditMode text_lesson_info={props.text_lesson_info} category={category} />
+      </div>
+    </EditorHistoryProvider>
   );
 }
 
-const LessonInfo = (props: Props) => {
-  const [lang_id, setLangId] = useAtom(lang_id_atom);
-  const [base_word_script_id, setBaseWordScriptId] = useAtom(base_word_script_id_atom);
-  const [text, setText] = useAtom(text_atom);
-
-  const [, setTextKey] = useAtom(text_key_atom);
-
-  useEffect(() => {
-    if (text.trim().length === 0) {
-      setTextKey(null);
-      return;
-    }
-    // setTextKey(await lipi_parivartak(text, base_word_script_id, lang_id));
-    transliterate(text, get_lang_from_id(lang_id), 'Normal').then((textKey) => {
-      setTextKey(textKey);
-    });
-  }, [text, lang_id]);
+const LessonInfo = ({
+  text_lesson_info,
+  gestures_list,
+  category,
+  onCategoryChanged
+}: {
+  text_lesson_info: Props['text_lesson_info'];
+  gestures_list: gestures_list_type[];
+  category: CategoryInfo;
+  onCategoryChanged: (category: CategoryInfo) => void;
+}) => {
+  const lang_id = useAtomValue(lang_id_atom);
+  const base_word_script_id = useAtomValue(base_word_script_id_atom);
+  const text = useAtomValue(text_atom);
 
   useEffect(() => {
-    // load lipi lekhika language/script data for typing tool
     preloadScriptData(get_lang_from_id(lang_id));
     preloadScriptData(get_script_from_id(base_word_script_id));
   }, [lang_id, base_word_script_id]);
-
-  const ctx = useMemo(() => createTypingContext(get_lang_from_id(lang_id)), [lang_id]);
-  useEffect(() => {
-    void ctx.ready;
-  }, [ctx]);
-
-  const langItems = [
-    { label: 'Language', value: null },
-    ...LANG_LIST.map((lang) => ({
-      label: lang,
-      value: String(lang_list_obj[lang as lang_list_type])
-    }))
-  ];
-  const scriptItems = [
-    { label: 'Base Word Script', value: null },
-    ...FONT_SCRIPTS.map((script) => ({
-      label: script,
-      value: String(script_list_obj[script as script_list_type])
-    }))
-  ];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-8">
         <Label className="flex items-center gap-2">
           <span className="font-semibold">Language</span>
-          {props.location === 'add' && (
-            <Select
-              items={langItems}
-              value={String(lang_id)}
-              onValueChange={(val) => {
-                if (!val) return;
-                setLangId(Number(val));
-              }}
-            >
-              <SelectTrigger className="w-32 text-sm">
-                <SelectValue placeholder="Language" />
-              </SelectTrigger>
-              <SelectContent>
-                {LANG_LIST.map((lang) => (
-                  <SelectItem key={lang} value={String(lang_list_obj[lang as lang_list_type])}>
-                    {lang}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {props.location === 'edit' && (
-            <span className="font-bold underline">{get_lang_from_id(lang_id)}</span>
-          )}
+          <span className="font-bold underline">{get_lang_from_id(lang_id)}</span>
         </Label>
         <Label className="flex items-center gap-2">
           <span className="font-semibold">Category</span>
-          <span className="font-bold underline">
-            {props.text_lesson_info.category?.name ?? 'Uncategorized'}
-          </span>
+          <span className="font-bold underline">{category?.name ?? 'Uncategorized'}</span>
+          <CategoryChangeButton
+            text_lesson_info={text_lesson_info}
+            category={category}
+            onCategoryChanged={onCategoryChanged}
+          />
         </Label>
         <Label className="flex items-center gap-2">
           <span className="font-semibold">Base Word Script</span>
-          {props.location === 'add' && (
-            <Select
-              items={scriptItems}
-              value={String(base_word_script_id)}
-              onValueChange={(val) => {
-                if (!val) return;
-                setBaseWordScriptId(Number(val));
-              }}
-            >
-              <SelectTrigger className="w-32 text-sm">
-                <SelectValue placeholder="Base Word Script" />
-              </SelectTrigger>
-              <SelectContent>
-                {FONT_SCRIPTS.map((script) => (
-                  <SelectItem
-                    key={script}
-                    value={String(script_list_obj[script as script_list_type])}
-                  >
-                    {script}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {props.location === 'edit' && (
-            <span className="font-bold underline">{get_script_from_id(base_word_script_id)}</span>
-          )}
+          <span className="font-bold underline">{get_script_from_id(base_word_script_id)}</span>
         </Label>
       </div>
       <div className="flex items-center gap-4">
         <Label className="flex items-center gap-2">
           <span className="text-base font-semibold">Varna</span>
-          {props.location === 'add' && (
-            <Input
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onBeforeInput={(e) =>
-                handleTypingBeforeInputEvent(ctx, e, (newValue) => setText(newValue))
-              }
-              onBlur={() => ctx.clearContext()}
-              onKeyDown={(e) => clearTypingContextOnKeyDown(e, ctx)}
-              className="w-32"
-            />
-          )}
-          {props.location === 'edit' && <span className="text-base font-bold">{text}</span>}
+          <span className="text-base font-bold">{text}</span>
         </Label>
-        {props.location === 'edit' && (
-          <OptionalAudioSection lesson_id={props.text_lesson_info.id!} text={text} />
-        )}
+        <OptionalAudioSection lesson_id={text_lesson_info.id} text={text} />
       </div>
-      {props.location === 'edit' && (
-        <div className="space-y-3 select-none">
-          <div className="grid max-h-52 grid-cols-4 gap-2 overflow-y-scroll rounded-md border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-6 lg:grid-cols-8 dark:border-gray-700 dark:bg-gray-800/50">
-            {props.gestures_list.length > 0 ? (
-              props.gestures_list.map((gesture) => (
-                <Link
-                  target="_blank"
-                  to={`/gestures/edit/${gesture.id}` as never}
-                  key={gesture.id}
-                  className={cn(
-                    'rounded-md border px-2 py-1 text-center text-base font-semibold transition-all duration-200 ease-in-out outline-none',
-                    'hover:bg-gray-100 hover:text-blue-500 dark:hover:bg-gray-700 dark:hover:text-blue-400'
-                  )}
-                >
-                  {gesture.text}
-                </Link>
-              ))
-            ) : (
-              <div className="flex items-center justify-center">
-                <p className="text-sm text-gray-500">No connected gestures found</p>
-              </div>
-            )}
-          </div>
+      <div className="space-y-3 select-none">
+        <div className="grid max-h-52 grid-cols-4 gap-2 overflow-y-scroll rounded-md border border-gray-200 bg-gray-50/50 p-3 sm:grid-cols-6 lg:grid-cols-8 dark:border-gray-700 dark:bg-gray-800/50">
+          {gestures_list.length > 0 ? (
+            gestures_list.map((gesture) => (
+              <Link
+                target="_blank"
+                to={`/gestures/edit/${gesture.id}` as never}
+                key={gesture.id}
+                className={cn(
+                  'rounded-md border px-2 py-1 text-center text-base font-semibold transition-all duration-200 ease-in-out outline-none',
+                  'hover:bg-gray-100 hover:text-blue-500 dark:hover:bg-gray-700 dark:hover:text-blue-400'
+                )}
+              >
+                {gesture.text}
+              </Link>
+            ))
+          ) : (
+            <div className="flex items-center justify-center">
+              <p className="text-sm text-gray-500">No connected gestures found</p>
+            </div>
+          )}
         </div>
-      )}
-      {props.location === 'add' && text.trim().length > 0 && (
-        <OptionalAudioSection lesson_id={null} text={text} />
-      )}
+      </div>
     </div>
   );
 };
 
 type OptionalAudioSectionProps = {
-  lesson_id: number | null;
+  lesson_id: number;
   text: string;
 };
 
 const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) => {
   const trpc = useTRPC();
-  const [_, setAudioIdOptional] = useAtom(audio_id_optional_atom);
+  const [, setAudioIdOptional] = useAtom(audio_id_optional_atom);
   const [audioDialogOpen, setAudioDialogOpen] = useState(false);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -315,14 +248,9 @@ const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) =>
   const [deleteAudioInfoStatus, setDeleteAudioInfoStatus] = useState(false);
 
   const get_text_lesson_optional_audio_data_q = useQuery(
-    trpc.text_lessons.get_text_lesson_optional_audio_data.queryOptions(
-      {
-        lesson_id: lesson_id!
-      },
-      {
-        enabled: !!lesson_id
-      }
-    )
+    trpc.text_lessons.get_text_lesson_optional_audio_data.queryOptions({
+      lesson_id
+    })
   );
 
   const audio_asset = !deleteAudioInfoStatus
@@ -362,14 +290,11 @@ const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) =>
 
   return (
     <div className="flex items-center gap-2">
-      {/* show skeleton while fetching audio data */}
-      {get_text_lesson_optional_audio_data_q.isLoading && lesson_id && (
-        <Skeleton className="h-9 w-24" />
-      )}
+      {get_text_lesson_optional_audio_data_q.isLoading && <Skeleton className="h-9 w-24" />}
 
       {!audio_asset &&
         text.trim().length > 0 &&
-        (!lesson_id || !get_text_lesson_optional_audio_data_q.isLoading) && (
+        !get_text_lesson_optional_audio_data_q.isLoading && (
           <Dialog open={audioDialogOpen} onOpenChange={setAudioDialogOpen}>
             <DialogTrigger className={cn(buttonVariants({ variant: 'outline' }), 'gap-2')}>
               <AiOutlineAudio className="size-6 text-emerald-400" />
@@ -409,7 +334,7 @@ const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) =>
   );
 };
 
-const LessonWords = (props: Props) => {
+const LessonWords = ({ lesson_id }: { lesson_id: number }) => {
   const [words, setWords] = useAtom(words_atom);
   const [isClient, setIsClient] = useState(false);
   const sensors = useSensors(
@@ -476,7 +401,7 @@ const LessonWords = (props: Props) => {
                   wordItem={w}
                   onChange={handleWordChange}
                   onDelete={handleDelete}
-                  lesson_id={props.text_lesson_info.id!}
+                  lesson_id={lesson_id}
                 />
               ))}
             </div>
@@ -492,17 +417,8 @@ const LessonWords = (props: Props) => {
               <div className="cursor-grab rounded p-1 hover:bg-muted">
                 <MdDragHandle className="h-4 w-4 text-muted-foreground" />
               </div>
-              <Input
-                value={w.word}
-                onInput={(e) => handleWordChange(w.order, e.currentTarget.value)}
-                className="w-32"
-              />
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 w-6 p-0"
-                onClick={() => handleDelete(w.order)}
-              >
+              <Input value={w.word} readOnly className="w-32" />
+              <Button size="sm" variant="ghost" className="h-6 w-6 p-0" disabled>
                 <MdDeleteOutline className="h-3 w-3" />
               </Button>
             </div>
@@ -527,6 +443,7 @@ type SortableWordItemProps = {
 function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableWordItemProps) {
   const trpc = useTRPC();
   const base_word_script_id = useAtomValue(base_word_script_id_atom);
+  const wordHistory = useHistoryTextField();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: wordItem.order.toString()
   });
@@ -590,7 +507,6 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
     setWords((prev) =>
       prev.map((w) => (w.order === wordItem.order ? { ...w, image_id: null } : w))
     );
-    // setToSaveImageInfo(null);
     setDeleteImageInfoStatus(true);
   };
 
@@ -598,7 +514,6 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
     setWords((prev) =>
       prev.map((w) => (w.order === wordItem.order ? { ...w, audio_id: null } : w))
     );
-    // setToSaveAudioInfo(null);
     setDeleteAudioInfoStatus(true);
   };
 
@@ -640,11 +555,15 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
       </div>
       <Input
         value={wordItem.word}
+        onFocus={wordHistory.onFocus}
         onChange={(e) => onChange(wordItem.order, e.target.value)}
         onBeforeInput={(e) =>
           handleTypingBeforeInputEvent(ctx, e, (newValue) => onChange(wordItem.order, newValue))
         }
-        onBlur={() => ctx.clearContext()}
+        onBlur={() => {
+          wordHistory.onBlur();
+          ctx.clearContext();
+        }}
         onKeyDown={(e) => clearTypingContextOnKeyDown(e, ctx)}
         className="w-32"
       />
@@ -657,14 +576,9 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
         <MdDeleteOutline className="h-3 w-3" />
       </Button>
       <div className="flex items-center gap-4">
-        {/* show skeleton while fetching image data */}
         {get_text_lesson_word_media_data_q.isLoading && (
           <div className="flex items-center gap-2">
             <Skeleton className="h-14 w-14 rounded" />
-            <div className="flex flex-col">
-              {/* <Skeleton className="h-4 w-24" /> */}
-              {/* <Skeleton className="mt-1 h-4 w-20" /> */}
-            </div>
           </div>
         )}
 
@@ -694,7 +608,6 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
                 title={image_asset.description}
                 className="size-14"
               />
-              {/* <span className="text-sm text-muted-foreground">{image_asset.description}</span> */}
               <button
                 onClick={onRemoveImage}
                 className="rounded-full p-1 hover:bg-gray-100 focus:ring-2 focus:ring-blue-500/50 dark:hover:bg-gray-800"
@@ -703,7 +616,6 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
               </button>
             </div>
             <Dialog open={imageViewDialogOpen} onOpenChange={setImageViewDialogOpen}>
-              {/* <DialogTrigger asChild className="cursor-pointer"></DialogTrigger> */}
               <DialogContent className="flex items-center justify-center px-8 py-6">
                 <div className="sr-only">
                   <DialogTitle>View Image</DialogTitle>
@@ -723,12 +635,6 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
             </Dialog>
           </>
         )}
-        {/* Audio selection */}
-        {/* {get_text_lesson_word_media_data_q.isLoading && (
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-6 w-24" />
-          </div>
-        )} */}
         {!audio_asset &&
           wordItem.word.trim().length > 0 &&
           !get_text_lesson_word_media_data_q.isLoading && (
@@ -771,62 +677,154 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
   );
 }
 
-const AddEditSave = (props: Props) => {
+const CategoryChangeButton = ({
+  text_lesson_info,
+  category,
+  onCategoryChanged
+}: {
+  text_lesson_info: Props['text_lesson_info'];
+  category: CategoryInfo;
+  onCategoryChanged: (category: CategoryInfo) => void;
+}) => {
   const trpc = useTRPC();
-  const navigate = useNavigate();
-  const text = useAtomValue(text_atom);
-  const lang_id = useAtomValue(lang_id_atom);
-  const base_word_script_id = useAtomValue(base_word_script_id_atom);
-  const [words, setWords] = useAtom(words_atom);
-  const textKey = useAtomValue(text_key_atom);
-  const audio_id_optional = useAtomValue(audio_id_optional_atom);
-
   const queryClient = useQueryClient();
+  const lang_id = useAtomValue(lang_id_atom);
+  const [open, setOpen] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(category?.id ?? 0);
 
-  const add_text_data_mut = useMutation(
-    trpc.text_lessons.add_text_lesson.mutationOptions({
-      onSuccess(data) {
-        toast.success('Text Lesson Added');
-        navigate({ to: `/lessons/edit/${data.id}` } as never);
-        queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_text_lessons.queryFilter({
-            category_id: props.text_lesson_info.category_id ?? 0, // 0 -> uncategorized
-            lang_id: lang_id
-          })
-        );
-      },
-      onError(error) {
-        toast.error('Failed to Add Text Lesson ' + error.message);
+  const categories_q = useQuery(
+    trpc.text_lessons.categories.get_categories.queryOptions({ lang_id })
+  );
+  const categories = [{ id: 0, name: 'Uncategorized', order: 0 }, ...(categories_q.data ?? [])];
+
+  const update_category_mut = useMutation(
+    trpc.text_lessons.categories.add_update_lesson_category.mutationOptions({
+      onError() {
+        toast.error('Failed to update category');
       }
     })
   );
 
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (next) {
+      setSelectedCategoryId(category?.id ?? 0);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (selectedCategoryId === null) return;
+    const nextCategoryId = selectedCategoryId === 0 ? null : selectedCategoryId;
+    const prevCategoryId = category?.id;
+    if (nextCategoryId === (prevCategoryId ?? null)) {
+      setOpen(false);
+      return;
+    }
+
+    await update_category_mut.mutateAsync({
+      lesson_id: text_lesson_info.id,
+      category_id: nextCategoryId,
+      prev_category_id: prevCategoryId
+    });
+
+    const nextCategory =
+      nextCategoryId === null ? null : (categories.find((c) => c.id === nextCategoryId) ?? null);
+    onCategoryChanged(nextCategory ? { id: nextCategory.id, name: nextCategory.name } : null);
+
+    const prevId = prevCategoryId ?? 0;
+    const nextId = nextCategoryId ?? 0;
+    await Promise.all([
+      queryClient.invalidateQueries(
+        trpc.text_lessons.categories.get_text_lessons.queryFilter({
+          category_id: prevId,
+          lang_id
+        })
+      ),
+      queryClient.invalidateQueries(
+        trpc.text_lessons.categories.get_text_lessons.queryFilter({
+          category_id: nextId,
+          lang_id
+        })
+      )
+    ]);
+
+    toast.success('Category updated');
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-7 gap-1 px-2 text-xs"
+        onClick={() => handleOpenChange(true)}
+      >
+        <MdEdit className="size-3.5" />
+        Change
+      </Button>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Category</DialogTitle>
+            <DialogDescription>Choose a category for this lesson.</DialogDescription>
+          </DialogHeader>
+          <RadioGroup
+            value={selectedCategoryId?.toString() ?? ''}
+            onValueChange={(v) => setSelectedCategoryId(Number(v))}
+            className="flex flex-col gap-2"
+          >
+            {categories.map((cat) => (
+              <div key={cat.id} className="flex items-center gap-2">
+                <RadioGroupItem id={`lesson-edit-cat-${cat.id}`} value={String(cat.id)} />
+                <Label
+                  htmlFor={`lesson-edit-cat-${cat.id}`}
+                  className={cn(cat.id === 0 && 'text-muted-foreground')}
+                >
+                  {cat.name}
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => void handleConfirm()}
+              disabled={
+                selectedCategoryId === null ||
+                update_category_mut.isPending ||
+                selectedCategoryId === (category?.id ?? 0)
+              }
+            >
+              {update_category_mut.isPending ? 'Updating…' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+const SaveEditMode = ({
+  text_lesson_info,
+  category
+}: {
+  text_lesson_info: Props['text_lesson_info'];
+  category: CategoryInfo;
+}) => {
+  const trpc = useTRPC();
+  const navigate = useNavigate();
+  const { beginSave, markSaved } = useEditorHistoryActions();
+  const lang_id = useAtomValue(lang_id_atom);
+  const [words, setWords] = useAtom(words_atom);
+  const audio_id_optional = useAtomValue(audio_id_optional_atom);
+  const queryClient = useQueryClient();
+
   const update_text_data_mut = useMutation(
     trpc.text_lessons.update_text_lesson.mutationOptions({
-      onSuccess(data) {
-        if (!data.updated) return;
-        // find indexes or words that were to be added, they will have no id
-        const to_be_added_word_indexes = words
-          .map((w, idx) => [w, idx] as [text_lesson_word_type, number])
-          .filter(([w]) => w.id === undefined || w.id === null)
-          .map(([_w, idx]) => idx);
-
-        if (to_be_added_word_indexes.length !== data.inserted_words_ids.length) {
-          toast.error('Failed to Add Text Lesson');
-          return;
-        }
-
-        // update the words with the added ids
-        setWords((prev) =>
-          prev.map((w, idx) =>
-            to_be_added_word_indexes.includes(idx)
-              ? { ...w, id: data.inserted_words_ids[to_be_added_word_indexes.indexOf(idx)] }
-              : w
-          )
-        );
-
-        toast.success('Text Lesson Information Updated');
-      },
       onError(error) {
         toast.error('Failed to Update Text Lesson ' + error.message);
       }
@@ -840,8 +838,8 @@ const AddEditSave = (props: Props) => {
         toast.success('Text Lesson Deleted');
         await queryClient.invalidateQueries(
           trpc.text_lessons.categories.get_text_lessons.queryFilter({
-            category_id: props.text_lesson_info.category_id ?? 0, // 0 -> uncategorized
-            lang_id: lang_id
+            category_id: category?.id ?? 0,
+            lang_id
           })
         );
         navigate({ to: '/lessons' } as never);
@@ -853,40 +851,47 @@ const AddEditSave = (props: Props) => {
   );
 
   const handleSave = () => {
-    if (text.trim().length === 0) {
-      toast.error('Text is required');
-      return;
-    }
-    if (
-      lang_id === null ||
-      lang_id === undefined ||
-      base_word_script_id === null ||
-      base_word_script_id === undefined
-    ) {
-      toast.error('Language and Base Word Script are required');
-      return;
-    }
-    if (props.location === 'add') {
-      add_text_data_mut.mutate({
+    beginSave();
+    update_text_data_mut.mutate(
+      {
         lesson_info: {
-          text: text,
-          lang_id: lang_id,
-          base_word_script_id: base_word_script_id,
-          audio_id: audio_id_optional ?? null
-        },
-        text_key: textKey!,
-        words
-      });
-    } else {
-      update_text_data_mut.mutate({
-        lesson_info: {
-          id: props.text_lesson_info.id!,
-          uuid: props.text_lesson_info.uuid!,
+          id: text_lesson_info.id,
+          uuid: text_lesson_info.uuid,
           audio_id: audio_id_optional ?? null
         },
         words
-      });
-    }
+      },
+      {
+        onSuccess: (data) => {
+          if (!data.updated) return;
+
+          const to_be_added_word_indexes = words
+            .map((w, idx) => [w, idx] as [text_lesson_word_type, number])
+            .filter(([w]) => w.id === undefined || w.id === null)
+            .map(([_w, idx]) => idx);
+
+          if (to_be_added_word_indexes.length !== data.inserted_words_ids.length) {
+            toast.error('Failed to Add Text Lesson');
+            return;
+          }
+
+          let nextWords = words;
+          if (to_be_added_word_indexes.length > 0) {
+            nextWords = words.map((w, idx) =>
+              to_be_added_word_indexes.includes(idx)
+                ? { ...w, id: data.inserted_words_ids[to_be_added_word_indexes.indexOf(idx)] }
+                : w
+            );
+            setWords(nextWords);
+            markSaved({ words: nextWords });
+          } else {
+            markSaved();
+          }
+
+          toast.success('Text Lesson Information Updated');
+        }
+      }
+    );
   };
 
   const handleDelete = () => {
@@ -894,54 +899,16 @@ const AddEditSave = (props: Props) => {
       toast.error('Please wait for the text lesson to be deleted');
       return;
     }
-    if (props.location !== 'add') {
-      delete_text_data_mut.mutate({
-        id: props.text_lesson_info.id!,
-        uuid: props.text_lesson_info.uuid!
-      });
-    }
+    delete_text_data_mut.mutate({
+      id: text_lesson_info.id,
+      uuid: text_lesson_info.uuid
+    });
   };
 
   return (
-    <div className="mt-2 flex items-center justify-between">
-      <AlertDialog>
-        <AlertDialogTrigger
-          disabled={add_text_data_mut.isPending || update_text_data_mut.isPending}
-          className={cn(
-            buttonVariants({ variant: 'default' }),
-            custom_classes.button.blue,
-            'flex text-lg'
-          )}
-        >
-          {props.location === 'add' ? (
-            <>
-              <IoMdAdd className="text-lg" />{' '}
-              {!add_text_data_mut.isPending ? 'Add Lesson Info' : 'Adding...'}
-            </>
-          ) : (
-            <>
-              <FiSave className="text-lg" />{' '}
-              {!update_text_data_mut.isPending ? 'Save Lesson Info' : 'Saving...'}
-            </>
-          )}
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Sure to Save</AlertDialogTitle>
-            <AlertDialogDescription>
-              {props.location === 'add'
-                ? 'Are you sure to Add this Text Lesson ?'
-                : 'Are you sure to Save this Text Lesson ?'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSave}>Save</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {props.location !== 'add' && (
+    <>
+      <EditorActionDock onSave={handleSave} isSaving={update_text_data_mut.isPending} />
+      <div className="mx-2 mt-2 flex items-center justify-end sm:mx-4">
         <AlertDialog>
           <AlertDialogTrigger
             className={cn(
@@ -967,7 +934,7 @@ const AddEditSave = (props: Props) => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      )}
-    </div>
+      </div>
+    </>
   );
 };

@@ -2,7 +2,6 @@
 import { useAtom, useAtomValue } from 'jotai';
 import {
   selected_language_id_atom,
-  type lesson_category_type,
   selected_category_id_atom,
   selected_lesson_id_atom,
   selected_script_id_atom,
@@ -17,7 +16,7 @@ import {
   script_list_obj,
   type script_list_type
 } from '~/state/lang_list';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '~/api/client';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
@@ -62,13 +61,13 @@ import {
 } from '~/components/ui/select';
 
 type Props = {
-  init_lesson_categories: lesson_category_type[];
   init_lang_id: number;
   init_script_id?: number | null;
-  init_lessons_list?: text_lesson_type[];
-  init_lessons_list_transliterated?: text_lesson_type[];
   saved_category_id?: number | null;
   saved_lesson_id?: number | null;
+  init_lessons_list_transliterated?: text_lesson_type[];
+  init_words_transliterated?: string[];
+  init_varna_transliterated?: string | null;
 };
 
 export default function LearnPageComponent(props: Props) {
@@ -89,14 +88,12 @@ export default function LearnPageComponent(props: Props) {
 }
 
 function LearnPage(props: Props) {
-  const { init_lesson_categories } = props;
   const trpc = useTRPC();
   const [selectedLanguageId, setSelectedLanguageId] = useAtom(selected_language_id_atom);
   const [selectedScriptId, setSelectedScriptId] = useAtom(selected_script_id_atom);
   const [selectedCategoryId, setSelectedCategoryId] = useAtom(selected_category_id_atom);
   const [open, setOpen] = useState(false);
   const [, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
-  const session = useSession();
   const scriptItems = useMemo(
     () => [
       { label: 'Script', value: null },
@@ -120,7 +117,7 @@ function LearnPage(props: Props) {
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
       { lang_id: selectedLanguageId },
-      { enabled: !!selectedLanguageId, initialData: init_lesson_categories }
+      { enabled: !!selectedLanguageId }
     )
   );
   const categories = categories_q.data ?? [];
@@ -236,8 +233,6 @@ const LessonsList = (props: Props) => {
   const selectedScriptId = useAtomValue(selected_script_id_atom);
   const selectedCategoryId = useAtomValue(selected_category_id_atom);
   const [selectedLessonId, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
-  const queryClient = useQueryClient();
-
   useEffect(() => {
     // preload lipi lekhika data for transliteration
     preloadScriptData(get_script_from_id(selectedScriptId));
@@ -247,20 +242,7 @@ const LessonsList = (props: Props) => {
     trpc.text_lessons.categories.get_category_text_lesson_list.queryOptions(
       { category_id: selectedCategoryId! },
       {
-        enabled: selectedCategoryId !== null,
-        initialData:
-          selectedCategoryId === null
-            ? undefined
-            : ((queryClient.getQueryData(
-                trpc.text_lessons.categories.get_category_text_lesson_list.queryKey({
-                  category_id: selectedCategoryId
-                })
-              ) as typeof props.init_lessons_list | undefined) ??
-              (selectedCategoryId === props.saved_category_id
-                ? props.init_lessons_list
-                : undefined))
-        // we are not keeping the previous data while new is fetching
-        // so no need for keeping previousDataRef as placeholderData
+        enabled: selectedCategoryId !== null
       }
     )
   );
@@ -373,7 +355,17 @@ const LessonsList = (props: Props) => {
         </Carousel>
       </div>
       {selectedLessonId !== null && (
-        <Lesson lesson_id={selectedLessonId} hasNext={hasNext} goToNextLesson={goToNextLesson} />
+        <Lesson
+          lesson_id={selectedLessonId}
+          hasNext={hasNext}
+          goToNextLesson={goToNextLesson}
+          init_words_transliterated={
+            selectedLessonId === props.saved_lesson_id ? props.init_words_transliterated : undefined
+          }
+          init_varna_transliterated={
+            selectedLessonId === props.saved_lesson_id ? props.init_varna_transliterated : undefined
+          }
+        />
       )}
     </div>
   );
@@ -382,12 +374,16 @@ const LessonsList = (props: Props) => {
 const Lesson = ({
   lesson_id,
   hasNext,
-  goToNextLesson
+  goToNextLesson,
+  init_words_transliterated,
+  init_varna_transliterated
 }: {
   lesson_id?: number | null;
   // taking nullable lesson_id too to be able to display loading spinner when then the user opens it for the very first time
   hasNext?: boolean;
   goToNextLesson?: () => void;
+  init_words_transliterated?: string[];
+  init_varna_transliterated?: string | null;
 }) => {
   const scriptId = useAtomValue(selected_script_id_atom);
   const selectedLanguageId = useAtomValue(selected_language_id_atom);
@@ -401,8 +397,12 @@ const Lesson = ({
     )
   );
   const lesson = lesson_info_q.data;
-  const [wordsTransliterated, setWordsTransliterated] = useState<string[]>([]);
-  const [varnaTransliterated, setVarnaTransliterated] = useState<string | null>(null);
+  const [wordsTransliterated, setWordsTransliterated] = useState<string[]>(
+    init_words_transliterated ?? []
+  );
+  const [varnaTransliterated, setVarnaTransliterated] = useState<string | null>(
+    init_varna_transliterated ?? null
+  );
   useEffect(() => {
     if (lesson?.words && scriptId) {
       transliterate(

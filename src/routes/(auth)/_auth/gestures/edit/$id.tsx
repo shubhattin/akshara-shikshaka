@@ -41,7 +41,7 @@ const getTextGestureForEdit = Effect.fn('getTextGestureForEdit')(function* (id: 
 
 const loader$ = createServerFn({ method: 'GET' })
   .middleware([adminServerFnMiddleware])
-  .inputValidator(z.object({ rawId: z.string().min(1) }))
+  .validator(z.object({ rawId: z.string().min(1) }))
   .handler(({ data }) =>
     runLoaderEffect(
       Effect.gen(function* () {

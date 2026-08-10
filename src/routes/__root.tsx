@@ -1,8 +1,8 @@
-import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router';
+import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { ReactQueryDevtoolsPanel } from '@tanstack/react-query-devtools';
 import { TanStackDevtools } from '@tanstack/react-devtools';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import { useState } from 'react';
 
@@ -21,11 +21,10 @@ import Header from '@/components/Header';
 import { Toaster } from '@/components/ui/sonner';
 import { robotoSans } from '~/components/fonts';
 import { cn } from '~/lib/utils';
-import { makeQueryClient } from '~/state/queryClient';
 import PosthogInit from '~/components/tags/PosthogInit';
 import NotFound from './-NotFound';
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   ssr: true,
   head: () => ({
     meta: [
@@ -89,7 +88,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 }
 
 function RootProviders({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => makeQueryClient());
+  const queryClient = useQueryClient();
   const [trpcClient] = useState(() =>
     createTRPCClient<AppRouter>({
       links: [
@@ -103,33 +102,31 @@ function RootProviders({ children }: { children: React.ReactNode }) {
 
   return (
     <ThemeProvider defaultTheme={DEFAULT_THEME} storageKey={THEME_STORAGE_KEY}>
-      <QueryClientProvider client={queryClient}>
-        <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
-          <div className="container mx-auto mb-12">
-            <Toaster richColors={true} />
-            <Header />
-            {children}
-          </div>
-          {import.meta.env.DEV && (
-            <TanStackDevtools
-              config={{
-                position: 'bottom-right',
-                openHotkey: undefined
-              }}
-              plugins={[
-                {
-                  name: 'Tanstack Router',
-                  render: <TanStackRouterDevtoolsPanel />
-                },
-                {
-                  name: 'Tanstack Query',
-                  render: <ReactQueryDevtoolsPanel />
-                }
-              ]}
-            />
-          )}
-        </TRPCProvider>
-      </QueryClientProvider>
+      <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+        <div className="container mx-auto mb-12">
+          <Toaster richColors={true} />
+          <Header />
+          {children}
+        </div>
+        {import.meta.env.DEV && (
+          <TanStackDevtools
+            config={{
+              position: 'bottom-right',
+              openHotkey: undefined
+            }}
+            plugins={[
+              {
+                name: 'Tanstack Router',
+                render: <TanStackRouterDevtoolsPanel />
+              },
+              {
+                name: 'Tanstack Query',
+                render: <ReactQueryDevtoolsPanel />
+              }
+            ]}
+          />
+        )}
+      </TRPCProvider>
     </ThemeProvider>
   );
 }

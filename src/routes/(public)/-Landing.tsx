@@ -37,13 +37,15 @@ const floatingChars = [
   // Mobile+: mid-field so the hero isn't empty in the center
   {
     char: 'अ',
-    className: 'top-4 left-[18%] text-3xl opacity-[0.18] sm:top-8 sm:left-[12%] sm:text-4xl sm:opacity-20',
+    className:
+      'top-4 left-[18%] text-3xl opacity-[0.18] sm:top-8 sm:left-[12%] sm:text-4xl sm:opacity-20',
     duration: 3,
     delay: 0
   },
   {
     char: 'క',
-    className: 'top-6 right-[16%] text-3xl opacity-[0.18] sm:top-10 sm:right-[12%] sm:text-4xl sm:opacity-20',
+    className:
+      'top-6 right-[16%] text-3xl opacity-[0.18] sm:top-10 sm:right-[12%] sm:text-4xl sm:opacity-20',
     duration: 3.2,
     delay: 0.6
   },
@@ -56,7 +58,8 @@ const floatingChars = [
   },
   {
     char: 'ಅ',
-    className: 'bottom-8 left-[22%] text-3xl opacity-[0.16] sm:bottom-12 sm:left-[18%] sm:text-4xl sm:opacity-20',
+    className:
+      'bottom-8 left-[22%] text-3xl opacity-[0.16] sm:bottom-12 sm:left-[18%] sm:text-4xl sm:opacity-20',
     duration: 2.9,
     delay: 0.9
   },

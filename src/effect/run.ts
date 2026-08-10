@@ -1,4 +1,4 @@
-import { Cause, Effect, Exit } from 'effect';
+import { Cause, Effect, Exit, Option } from 'effect';
 import { TRPCError } from '@trpc/server';
 import { appRuntime } from './runtime';
 import { isKnownError, type KnownError } from './errors';
@@ -45,7 +45,7 @@ export const runTrpcEffect = async <A, E, R>(effect: Effect.Effect<A, E, R>): Pr
   }
 
   const failure = Cause.findErrorOption(exit.cause);
-  if (failure._tag === 'Some' && isKnownError(failure.value)) {
+  if (Option.isSome(failure) && isKnownError(failure.value)) {
     throw toTrpcError(failure.value);
   }
 

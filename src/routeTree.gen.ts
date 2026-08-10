@@ -9,26 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as authAuthRouteImport } from './routes/(auth)/_auth'
+import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as publicLearnIndexRouteImport } from './routes/(public)/learn/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
-import { Route as authAuthLessonsIndexRouteImport } from './routes/(auth)/_auth/lessons/index'
-import { Route as authAuthImage_assetsIndexRouteImport } from './routes/(auth)/_auth/image_assets/index'
-import { Route as authAuthGesturesIndexRouteImport } from './routes/(auth)/_auth/gestures/index'
 import { Route as authAuthAudio_assetsIndexRouteImport } from './routes/(auth)/_auth/audio_assets/index'
-import { Route as authAuthLessonsEditIdRouteImport } from './routes/(auth)/_auth/lessons/edit/$id'
-import { Route as authAuthImage_assetsEditIdRouteImport } from './routes/(auth)/_auth/image_assets/edit/$id'
-import { Route as authAuthGesturesEditIdRouteImport } from './routes/(auth)/_auth/gestures/edit/$id'
+import { Route as authAuthGesturesIndexRouteImport } from './routes/(auth)/_auth/gestures/index'
+import { Route as authAuthImage_assetsIndexRouteImport } from './routes/(auth)/_auth/image_assets/index'
+import { Route as authAuthLessonsIndexRouteImport } from './routes/(auth)/_auth/lessons/index'
 import { Route as authAuthAudio_assetsEditIdRouteImport } from './routes/(auth)/_auth/audio_assets/edit/$id'
+import { Route as authAuthGesturesEditIdRouteImport } from './routes/(auth)/_auth/gestures/edit/$id'
+import { Route as authAuthImage_assetsEditIdRouteImport } from './routes/(auth)/_auth/image_assets/edit/$id'
+import { Route as authAuthLessonsEditIdRouteImport } from './routes/(auth)/_auth/lessons/edit/$id'
 
+const authAuthRoute = authAuthRouteImport.update({
+  id: '/(auth)/_auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const publicIndexRoute = publicIndexRouteImport.update({
   id: '/(public)/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const authAuthRoute = authAuthRouteImport.update({
-  id: '/(auth)/_auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const publicLearnIndexRoute = publicLearnIndexRouteImport.update({
@@ -41,9 +41,15 @@ const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
   path: '/api/trpc/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const authAuthLessonsIndexRoute = authAuthLessonsIndexRouteImport.update({
-  id: '/lessons/',
-  path: '/lessons/',
+const authAuthAudio_assetsIndexRoute =
+  authAuthAudio_assetsIndexRouteImport.update({
+    id: '/audio_assets/',
+    path: '/audio_assets/',
+    getParentRoute: () => authAuthRoute,
+  } as any)
+const authAuthGesturesIndexRoute = authAuthGesturesIndexRouteImport.update({
+  id: '/gestures/',
+  path: '/gestures/',
   getParentRoute: () => authAuthRoute,
 } as any)
 const authAuthImage_assetsIndexRoute =
@@ -52,31 +58,9 @@ const authAuthImage_assetsIndexRoute =
     path: '/image_assets/',
     getParentRoute: () => authAuthRoute,
   } as any)
-const authAuthGesturesIndexRoute = authAuthGesturesIndexRouteImport.update({
-  id: '/gestures/',
-  path: '/gestures/',
-  getParentRoute: () => authAuthRoute,
-} as any)
-const authAuthAudio_assetsIndexRoute =
-  authAuthAudio_assetsIndexRouteImport.update({
-    id: '/audio_assets/',
-    path: '/audio_assets/',
-    getParentRoute: () => authAuthRoute,
-  } as any)
-const authAuthLessonsEditIdRoute = authAuthLessonsEditIdRouteImport.update({
-  id: '/lessons/edit/$id',
-  path: '/lessons/edit/$id',
-  getParentRoute: () => authAuthRoute,
-} as any)
-const authAuthImage_assetsEditIdRoute =
-  authAuthImage_assetsEditIdRouteImport.update({
-    id: '/image_assets/edit/$id',
-    path: '/image_assets/edit/$id',
-    getParentRoute: () => authAuthRoute,
-  } as any)
-const authAuthGesturesEditIdRoute = authAuthGesturesEditIdRouteImport.update({
-  id: '/gestures/edit/$id',
-  path: '/gestures/edit/$id',
+const authAuthLessonsIndexRoute = authAuthLessonsIndexRouteImport.update({
+  id: '/lessons/',
+  path: '/lessons/',
   getParentRoute: () => authAuthRoute,
 } as any)
 const authAuthAudio_assetsEditIdRoute =
@@ -85,6 +69,22 @@ const authAuthAudio_assetsEditIdRoute =
     path: '/audio_assets/edit/$id',
     getParentRoute: () => authAuthRoute,
   } as any)
+const authAuthGesturesEditIdRoute = authAuthGesturesEditIdRouteImport.update({
+  id: '/gestures/edit/$id',
+  path: '/gestures/edit/$id',
+  getParentRoute: () => authAuthRoute,
+} as any)
+const authAuthImage_assetsEditIdRoute =
+  authAuthImage_assetsEditIdRouteImport.update({
+    id: '/image_assets/edit/$id',
+    path: '/image_assets/edit/$id',
+    getParentRoute: () => authAuthRoute,
+  } as any)
+const authAuthLessonsEditIdRoute = authAuthLessonsEditIdRouteImport.update({
+  id: '/lessons/edit/$id',
+  path: '/lessons/edit/$id',
+  getParentRoute: () => authAuthRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof publicIndexRoute
@@ -179,18 +179,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/(public)/': {
-      id: '/(public)/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof publicIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/(auth)/_auth': {
       id: '/(auth)/_auth'
       path: ''
       fullPath: ''
       preLoaderRoute: typeof authAuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/': {
+      id: '/(public)/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof publicIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(public)/learn/': {
@@ -207,18 +207,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTrpcSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/(auth)/_auth/lessons/': {
-      id: '/(auth)/_auth/lessons/'
-      path: '/lessons'
-      fullPath: '/lessons/'
-      preLoaderRoute: typeof authAuthLessonsIndexRouteImport
-      parentRoute: typeof authAuthRoute
-    }
-    '/(auth)/_auth/image_assets/': {
-      id: '/(auth)/_auth/image_assets/'
-      path: '/image_assets'
-      fullPath: '/image_assets/'
-      preLoaderRoute: typeof authAuthImage_assetsIndexRouteImport
+    '/(auth)/_auth/audio_assets/': {
+      id: '/(auth)/_auth/audio_assets/'
+      path: '/audio_assets'
+      fullPath: '/audio_assets/'
+      preLoaderRoute: typeof authAuthAudio_assetsIndexRouteImport
       parentRoute: typeof authAuthRoute
     }
     '/(auth)/_auth/gestures/': {
@@ -228,25 +221,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authAuthGesturesIndexRouteImport
       parentRoute: typeof authAuthRoute
     }
-    '/(auth)/_auth/audio_assets/': {
-      id: '/(auth)/_auth/audio_assets/'
-      path: '/audio_assets'
-      fullPath: '/audio_assets/'
-      preLoaderRoute: typeof authAuthAudio_assetsIndexRouteImport
+    '/(auth)/_auth/image_assets/': {
+      id: '/(auth)/_auth/image_assets/'
+      path: '/image_assets'
+      fullPath: '/image_assets/'
+      preLoaderRoute: typeof authAuthImage_assetsIndexRouteImport
       parentRoute: typeof authAuthRoute
     }
-    '/(auth)/_auth/lessons/edit/$id': {
-      id: '/(auth)/_auth/lessons/edit/$id'
-      path: '/lessons/edit/$id'
-      fullPath: '/lessons/edit/$id'
-      preLoaderRoute: typeof authAuthLessonsEditIdRouteImport
+    '/(auth)/_auth/lessons/': {
+      id: '/(auth)/_auth/lessons/'
+      path: '/lessons'
+      fullPath: '/lessons/'
+      preLoaderRoute: typeof authAuthLessonsIndexRouteImport
       parentRoute: typeof authAuthRoute
     }
-    '/(auth)/_auth/image_assets/edit/$id': {
-      id: '/(auth)/_auth/image_assets/edit/$id'
-      path: '/image_assets/edit/$id'
-      fullPath: '/image_assets/edit/$id'
-      preLoaderRoute: typeof authAuthImage_assetsEditIdRouteImport
+    '/(auth)/_auth/audio_assets/edit/$id': {
+      id: '/(auth)/_auth/audio_assets/edit/$id'
+      path: '/audio_assets/edit/$id'
+      fullPath: '/audio_assets/edit/$id'
+      preLoaderRoute: typeof authAuthAudio_assetsEditIdRouteImport
       parentRoute: typeof authAuthRoute
     }
     '/(auth)/_auth/gestures/edit/$id': {
@@ -256,11 +249,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authAuthGesturesEditIdRouteImport
       parentRoute: typeof authAuthRoute
     }
-    '/(auth)/_auth/audio_assets/edit/$id': {
-      id: '/(auth)/_auth/audio_assets/edit/$id'
-      path: '/audio_assets/edit/$id'
-      fullPath: '/audio_assets/edit/$id'
-      preLoaderRoute: typeof authAuthAudio_assetsEditIdRouteImport
+    '/(auth)/_auth/image_assets/edit/$id': {
+      id: '/(auth)/_auth/image_assets/edit/$id'
+      path: '/image_assets/edit/$id'
+      fullPath: '/image_assets/edit/$id'
+      preLoaderRoute: typeof authAuthImage_assetsEditIdRouteImport
+      parentRoute: typeof authAuthRoute
+    }
+    '/(auth)/_auth/lessons/edit/$id': {
+      id: '/(auth)/_auth/lessons/edit/$id'
+      path: '/lessons/edit/$id'
+      fullPath: '/lessons/edit/$id'
+      preLoaderRoute: typeof authAuthLessonsEditIdRouteImport
       parentRoute: typeof authAuthRoute
     }
   }

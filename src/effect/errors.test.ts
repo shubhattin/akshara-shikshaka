@@ -10,6 +10,7 @@ import { createCache, invalidateAndRefreshCache } from './cache';
 describe('Effect infrastructure', () => {
   it.effect('maps StorageError tags', () =>
     Effect.gen(function* () {
+      yield* Effect.void;
       const error = StorageError.make({
         operation: 'uploadAssetFile',
         key: 'x.webp',
@@ -22,6 +23,7 @@ describe('Effect infrastructure', () => {
 
   it.effect('maps NotFoundError tags', () =>
     Effect.gen(function* () {
+      yield* Effect.void;
       const error = NotFoundError.make({
         resource: 'text_lesson',
         message: 'Text lesson not found'
@@ -32,6 +34,7 @@ describe('Effect infrastructure', () => {
 
   it.effect('recognizes known errors via Schema.is', () =>
     Effect.gen(function* () {
+      yield* Effect.void;
       const found = NotFoundError.make({
         resource: 'text_lesson',
         message: 'Text lesson not found'

@@ -78,6 +78,7 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
 
   useEffect(() => {
     if (!open) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on open
     setLangId(init_lang_id || lang_list_obj['Sanskrit']);
     setBaseWordScriptId(script_list_obj['Devanagari']);
     setText('');

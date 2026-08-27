@@ -290,7 +290,7 @@ type CategoryModel = Pick<InferSelectModel<typeof gesture_categories>, 'id' | 'n
 function ManageCategoriesDialog({
   open,
   onOpenChange,
-  scriptId,
+  scriptId: _scriptId,
   categories,
   isLoading
 }: {
@@ -307,6 +307,7 @@ function ManageCategoriesDialog({
   const [categoryList, setCategoryList] = useState<CategoryModel[]>(categories);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional sync from query
     setCategoryList(categories);
   }, [categories]);
 

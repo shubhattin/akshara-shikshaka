@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { is_ios_atom, is_ios_safari_atom, pwa_state_atom } from './pwa_state';
+import { is_ios_atom, pwa_state_atom } from './pwa_state';
 import { useAtom } from 'jotai';
 import { LogIn, Share, Smartphone } from 'lucide-react';
 import {
@@ -77,21 +77,20 @@ export default function PWAInit() {
 export const PWAInstallButton = ({ setOpen }: { setOpen?: (v: boolean) => void }) => {
   const [pwa_state] = useAtom(pwa_state_atom);
   const [isIos] = useAtom(is_ios_atom);
-  const [isIosSafari] = useAtom(is_ios_safari_atom);
   const [isIosOpen, setIsIosOpen] = useState(false);
 
   const handleInstall = async () => {
     if (isIos) {
       setIsIosOpen(true);
     } else {
-      setOpen && setOpen(false);
+      setOpen?.(false);
       if (pwa_state.event_triggerer) pwa_state.event_triggerer.prompt();
     }
   };
 
   const handleIosInstall = async () => {
     setIsIosOpen(false);
-    setOpen && setOpen(false);
+    setOpen?.(false);
 
     // IMPORTANT: navigator.share() does NOT include "Add to Home Screen"
     //

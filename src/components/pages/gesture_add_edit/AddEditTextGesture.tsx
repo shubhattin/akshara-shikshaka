@@ -132,6 +132,7 @@ const ClientOnly = ({
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional mount flag to avoid hydration mismatch; runs once on client
     setHasMounted(true);
   }, []);
 
@@ -392,11 +393,12 @@ function AddEditTextData({
       .catch((err) => {
         console.error('Font loading failed:', err);
       });
-  }, [fontFamily]);
+  }, [fontFamily, script, fontLoaded, setFontLoaded]);
 
   // repaint canvas on change of notToClearGesturesIndex
   useEffect(() => {
     clearGestureVisualization();
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- clearGestureVisualization captures gestureData and is intentionally not a dep; effect should only run when notToClearGesturesIndex changes
   }, [notToClearGesturesIndex]);
 
   useEffect(() => {
@@ -416,7 +418,7 @@ function AddEditTextData({
           : g
       )
     );
-  }, [gestureData, selectedGestureIndex]);
+  }, [gestureData, selectedGestureIndex, setCanvasGesturesPath]);
 
   return (
     <div className="space-y-4">

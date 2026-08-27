@@ -30,8 +30,7 @@ import { cn } from '~/lib/utils';
 import {
   base_word_script_id_atom,
   lang_id_atom,
-  type audio_type,
-  type text_lesson_word_type
+  type audio_type
 } from './lesson_add_edit_state';
 import {
   get_lang_from_id,
@@ -58,7 +57,7 @@ export default function AudioSelect(props: Props) {
 
   useEffect(() => {
     setSelectedAudio(null);
-  }, []);
+  }, [setSelectedAudio]);
 
   const [createTab, setCreateTab] = useState<'ai' | 'record'>('record');
 
@@ -125,6 +124,7 @@ const AudioList = () => {
   }, [searchText]);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on filter change
     setPage(1);
   }, [debouncedSearch, langFilter]);
 
@@ -217,8 +217,8 @@ const AudioList = () => {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {isLoading
-          ? Array.from({ length: limit }).map((_, i) => (
-              <Card className="p-2">
+          ? Array.from({ length: limit }).map((__, i) => (
+              <Card key={i} className="p-2">
                 <CardContent className="flex items-start gap-3 p-2">
                   <Skeleton className="h-14 w-14 rounded" />
                   <div className="flex-1 space-y-2">
@@ -397,6 +397,7 @@ const AudioCreation = ({ text }: Props) => {
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     if (create_audio_mut.isPending) {
+      // oxlint-disable-next-line react/set-state-in-effect -- intentional timer reset
       setElapsedTime(0);
       intervalId = setInterval(() => setElapsedTime((prev) => prev + 100), 100);
     }
@@ -407,6 +408,7 @@ const AudioCreation = ({ text }: Props) => {
 
   useEffect(() => {
     if (create_audio_mut.isSuccess || create_audio_mut.isError || !create_audio_mut.isPending) {
+      // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on mutation status change
       setElapsedTime(0);
     }
   }, [create_audio_mut.isSuccess, create_audio_mut.isError, create_audio_mut.isPending]);
@@ -600,7 +602,7 @@ const AudioRecord = ({ text }: Props) => {
         });
         queryClient.invalidateQueries(trpc.audio_assets.list_audio_assets.pathFilter());
       },
-      onError: (error) => {
+      onError: (_error) => {
         // delete_uploaded_audio_file_mut.mutateAsync({
         //   s3_key: error.data.
         // });
@@ -619,6 +621,7 @@ const AudioRecord = ({ text }: Props) => {
   useEffect(() => {
     let timer: NodeJS.Timeout | null = null;
     if (recStatus === 'recording') {
+      // oxlint-disable-next-line react/set-state-in-effect -- intentional timer reset
       setRecordElapsedMs(0);
       timer = setInterval(() => setRecordElapsedMs((t) => t + 100), 100);
     }
@@ -634,7 +637,7 @@ const AudioRecord = ({ text }: Props) => {
     };
   }, [recordedUrl]);
 
-  const enumerateAudioDevices = async () => {
+  const enumerateAudioDevices = useCallback(async () => {
     try {
       setRecError(null);
       // Request permission so labels populate
@@ -657,15 +660,16 @@ const AudioRecord = ({ text }: Props) => {
         localStorage.setItem(SELECTED_DEVICE_ID_STORAGE_KEY, JSON.stringify(fallbackDeviceId));
       }
       tmpStream.getTracks().forEach((t) => t.stop());
-    } catch (e: any) {
+    } catch {
       setRecError('Microphone permission denied or unavailable');
     }
-  };
+  }, [setDevices, setRecError, setSelectedDeviceId]);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional mount fetch
     enumerateAudioDevices();
     // on Mount fetch the devices
-  }, []);
+  }, [enumerateAudioDevices]);
 
   const startRecording = async () => {
     if (!isBrowserSupported) return;
@@ -700,7 +704,7 @@ const AudioRecord = ({ text }: Props) => {
       };
       recorder.start();
       setRecStatus('recording');
-    } catch (e: any) {
+    } catch {
       setRecError('Failed to start recording');
     }
   };
@@ -713,7 +717,7 @@ const AudioRecord = ({ text }: Props) => {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   };
@@ -821,6 +825,7 @@ const AudioRecord = ({ text }: Props) => {
           {/* Recording Visualization */}
           {recStatus === 'recording' && (
             <div className="space-y-4">
+              {/* eslint-disable-next-line react/refs -- intentional ref access for visualization */}
               <RecordingVisualization stream={streamRef.current} isRecording={true} />
               <div className="text-center text-xs text-muted-foreground">
                 Recording... {Math.floor(recordElapsedMs / 1000)}s

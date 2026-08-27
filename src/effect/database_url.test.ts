@@ -54,6 +54,7 @@ describe('database URL selection', () => {
 
   it.effect('exposes dual-mode selection for Effect database layer', () =>
     Effect.gen(function* () {
+      yield* Effect.void;
       // Sanity: Effect tests can load alongside the dual local/neon strategy.
       // Full Neon websocket integration requires live credentials and is gated outside CI.
       expect(typeof get_db_url).toBe('function');

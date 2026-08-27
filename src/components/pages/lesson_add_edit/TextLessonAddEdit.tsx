@@ -343,6 +343,7 @@ const LessonWords = ({ lesson_id }: { lesson_id: number }) => {
   );
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional client flag for DndContext to avoid hydration mismatch
     setIsClient(true);
   }, []);
 

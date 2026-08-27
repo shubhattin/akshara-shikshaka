@@ -78,7 +78,7 @@ export default function LearnPageComponent(props: Props) {
     s.set(selected_category_id_atom, props.saved_category_id ?? null);
     s.set(selected_lesson_id_atom, props.saved_lesson_id ?? null);
     return s;
-  }, []);
+  }, []); // oxlint-disable-line react-hooks/exhaustive-deps -- store should only be created once on mount; props are initial values only
 
   return (
     <JotaiProvider store={store} key={`learn_page`}>
@@ -246,6 +246,8 @@ const LessonsList = (props: Props) => {
       }
     )
   );
+  const { data: lessonsData, isSuccess: lessonsIsSuccess, isPending: lessonsIsPending } =
+    lessons_q;
 
   const [lessonsTransliterated, setTransliteratedLessons] = useState<
     NonNullable<typeof lessons_q.data>
@@ -253,8 +255,9 @@ const LessonsList = (props: Props) => {
   const transliterationVersion = useRef(0);
 
   useEffect(() => {
-    if (!lessons_q.isSuccess) return;
-    const data = lessons_q.data;
+    if (!lessonsIsSuccess) return;
+    const data = lessonsData;
+    if (!data) return;
     transliterationVersion.current += 1;
     const currentVersion = transliterationVersion.current;
     transliterate(
@@ -268,7 +271,7 @@ const LessonsList = (props: Props) => {
         data.map((lesson, i) => ({ ...lesson, text: transliterated_texts[i] }))
       );
     });
-  }, [lessons_q.isSuccess, lessons_q.data, selectedLanguageId, selectedScriptId]);
+  }, [lessonsIsSuccess, lessonsData, selectedLanguageId, selectedScriptId]);
 
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
   const carouselScrolledToSelectedLesson = useRef(false);
@@ -276,14 +279,15 @@ const LessonsList = (props: Props) => {
     // currently this effect only runs once and not on category change
     if (
       carouselScrolledToSelectedLesson.current ||
-      lessons_q.isPending ||
-      !lessons_q.isSuccess ||
+      lessonsIsPending ||
+      !lessonsIsSuccess ||
       selectedCategoryId === null ||
       selectedCategoryId === undefined ||
       !carouselApi
     )
       return;
-    const lessons_ = lessons_q.data;
+    const lessons_ = lessonsData;
+    if (!lessons_) return;
     const idx = lessons_.findIndex((l) => l.id === selectedLessonId);
     // the not found case due to invalid lesson id is now handled on server itself
     carouselScrolledToSelectedLesson.current = true;
@@ -296,7 +300,15 @@ const LessonsList = (props: Props) => {
     if (idx >= 0) {
       carouselApi.scrollTo(idx);
     }
-  }, [carouselApi, selectedLessonId, lessons_q]);
+  }, [
+    carouselApi,
+    selectedLessonId,
+    lessonsIsPending,
+    lessonsIsSuccess,
+    lessonsData,
+    selectedCategoryId,
+    setSelectedLessonId
+  ]);
 
   // Helpers to drive carousel from child Lesson
   const currentIndex = lessonsTransliterated.findIndex((l) => l.id === selectedLessonId);
@@ -371,6 +383,25 @@ const LessonsList = (props: Props) => {
   );
 };
 
+const LessonPracticeNotFound = ({
+  varna,
+  lessonText
+}: {
+  varna: string | null;
+  lessonText?: string;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -20 }}
+    transition={{ duration: 0.3 }}
+    className="mt-16 text-center text-lg font-semibold text-muted-foreground"
+  >
+    Practice for <span className="font-bold">{varna ?? lessonText ?? ''}</span> not found. Coming
+    soon...
+  </motion.div>
+);
+
 const Lesson = ({
   lesson_id,
   hasNext,
@@ -416,14 +447,14 @@ const Lesson = ({
         get_script_from_id(scriptId)
       ).then((transliterated_varna) => setVarnaTransliterated(transliterated_varna));
     }
-  }, [lesson?.words, scriptId]);
+  }, [lesson?.words, lesson?.text, lesson?.base_word_script_id, scriptId, selectedLanguageId]);
 
   const selected_gesture = lesson?.gestures.find(
     (gesture) => gesture.text_gesture.script_id === scriptId
   )?.text_gesture;
   const text_gesture_data_q = useQuery(
     trpc.text_gestures.get_text_gesture_data.queryOptions(
-      { id: selected_gesture?.id!, uuid: selected_gesture?.uuid! },
+      { id: selected_gesture!.id, uuid: selected_gesture!.uuid },
       { enabled: !!selected_gesture }
     )
   );
@@ -480,22 +511,6 @@ const Lesson = ({
   const varnaAudioKey = lesson?.optional_audio?.s3_key;
   const carouselBasicClassName_card =
     'basis-1/3 pl-2 sm:basis-1/4 md:basis-1/5 md:pl-4 lg:basis-1/5';
-
-  const PracticeNotFound = () => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.3 }}
-      className="mt-16 text-center text-lg font-semibold text-muted-foreground"
-    >
-      Practice for <span className="font-bold">{varnaTransliterated ?? lesson?.text ?? ''}</span>{' '}
-      not found. Coming soon...
-    </motion.div>
-    //  This component has to be displayed in both cases.
-    // - If gesture record for that script does exist or data is empty
-    // - Or gesture record for that script does not exist
-  );
 
   return (
     <div className="mt-2 space-y-4">
@@ -602,7 +617,7 @@ const Lesson = ({
         {(text_gesture_data_q.isLoading || (!selected_gesture && !lesson?.gestures)) &&
           LOADING_SKELETONS.gesture_canavs()}
         {lesson?.gestures && !selected_gesture && !text_gesture_data_q.isLoading && (
-          <PracticeNotFound />
+          <LessonPracticeNotFound varna={varnaTransliterated} lessonText={lesson?.text} />
         )}
         {selected_gesture &&
           !text_gesture_data_q.isLoading &&
@@ -679,7 +694,7 @@ const Lesson = ({
                   </Practice.CanvasCenterCompleted>
                 )}
                 <Practice.NotFound>
-                  <PracticeNotFound />
+                  <LessonPracticeNotFound varna={varnaTransliterated} lessonText={lesson?.text} />
                 </Practice.NotFound>
               </Practice>
             </JotaiProvider>

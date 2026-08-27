@@ -16,6 +16,7 @@ export default function TurnstileWidget({ setToken }: Props) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional client-only mount flag to avoid SSR mismatch for Turnstile
     setMounted(true);
   }, []);
 

@@ -17,7 +17,7 @@ async function getSessionFromCookie(cookie: string) {
     const session = (await res.json()) as typeof authClient.$Infer.Session;
     // console.log('session', !!session, new Date().toISOString());
     return session;
-  } catch (e) {
+  } catch {
     return null;
   }
 }

@@ -79,10 +79,14 @@ export function EditorHistoryProvider<M extends AtomMap>({
   const store = useStore();
   // Stable list of [key, atom] for the lifetime of this atoms object.
   const atomEntriesRef = useRef(Object.entries(atoms) as [keyof M & string, M[keyof M]][]);
-  atomEntriesRef.current = Object.entries(atoms) as [keyof M & string, M[keyof M]][];
+  useEffect(() => {
+    atomEntriesRef.current = Object.entries(atoms) as [keyof M & string, M[keyof M]][];
+  }, [atoms]);
 
   const comparableRef = useRef(comparable);
-  comparableRef.current = comparable;
+  useEffect(() => {
+    comparableRef.current = comparable;
+  }, [comparable]);
 
   const lastCommittedRef = useRef<SnapshotOf<M> | null>(null);
   const savedBaselineRef = useRef<SnapshotOf<M> | null>(null);
@@ -214,11 +218,17 @@ export function EditorHistoryProvider<M extends AtomMap>({
 
   // Keep latest commit helpers in refs so the atom-subscription effect stays mounted once.
   const scheduleCommitRef = useRef(scheduleCommit);
-  scheduleCommitRef.current = scheduleCommit;
+  useEffect(() => {
+    scheduleCommitRef.current = scheduleCommit;
+  }, [scheduleCommit]);
   const notifyRef = useRef(notify);
-  notifyRef.current = notify;
+  useEffect(() => {
+    notifyRef.current = notify;
+  }, [notify]);
   const takeSnapshotRef = useRef(takeSnapshot);
-  takeSnapshotRef.current = takeSnapshot;
+  useEffect(() => {
+    takeSnapshotRef.current = takeSnapshot;
+  }, [takeSnapshot]);
 
   // Seed baselines once, then subscribe for the lifetime of this provider instance.
   useEffect(() => {

@@ -58,7 +58,7 @@ export function parseLearnPageCookie<K extends keyof typeof SAVED_COOKIES_KEY>(
     const parsedValue = cookieValue ? JSON.parse(cookieValue) : null;
     return SAVED_COOKIES_KEY[key].schema.parse(parsedValue) as any;
     // the return type takes care of this so we dont have to manually cast the type
-  } catch (error) {
+  } catch {
     return null as any;
   }
 }

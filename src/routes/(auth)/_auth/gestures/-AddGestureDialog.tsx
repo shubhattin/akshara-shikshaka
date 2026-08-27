@@ -61,6 +61,7 @@ export default function AddGestureDialog({ open, onOpenChange, init_script_id }:
 
   useEffect(() => {
     if (!open) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on open
     setScript(get_script_from_id(init_script_id));
     setText('');
     setConfirmOpen(false);

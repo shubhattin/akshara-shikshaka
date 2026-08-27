@@ -44,7 +44,7 @@ export default function ListAudio() {
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [page, setPage] = useState<number>(1);
-  const [limit, setLimit] = useState<number>(24);
+  const [limit] = useState<number>(24);
   const [langFilter, setLangFilter] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
@@ -55,6 +55,7 @@ export default function ListAudio() {
   }, [searchText]);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on filter change
     setPage(1);
   }, [debouncedSearch, langFilter]);
 

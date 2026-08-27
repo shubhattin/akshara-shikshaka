@@ -1,7 +1,7 @@
 'use client';
 
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Stage, Layer, Line, Text, Path } from 'react-konva';
+import { Stage, Layer, Text, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { CANVAS_DIMS, type GesturePoints } from '~/tools/stroke_data/types';
@@ -72,7 +72,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     if (measured.width !== textBox.width || measured.height !== textBox.height) {
       setTextBox({ width: measured.width, height: measured.height });
     }
-  }, [text, fontSize, fontFamily, currentFontLoaded, mainTextPathVisible]);
+  }, [text, fontSize, fontFamily, currentFontLoaded, mainTextPathVisible, textBox.width, textBox.height]);
 
   // Container ref used to keep the canvas within the viewport
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -142,7 +142,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     setCurrentGestureRecordingPoints((prev) => [...prev, point]);
   };
 
-  const onMouseUp = (e: KonvaMouseTouchEvent) => {
+  const onMouseUp = (_e: KonvaMouseTouchEvent) => {
     if (!isRecording || !isDrawing) return;
 
     setIsDrawing(false);

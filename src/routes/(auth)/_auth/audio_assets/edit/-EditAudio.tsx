@@ -164,6 +164,7 @@ const AudioInfo = () => {
 
   useEffect(() => {
     if (!audio_data) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional sync from atom
     setDescription(audio_data.description);
     setLangId(audio_data.lang_id == null ? 'all' : String(audio_data.lang_id));
   }, [audio_data]);

@@ -68,7 +68,7 @@ type FontEntry<F extends FontFamily> = {
 };
 type FontList = Partial<Record<script_list_type, FontEntry<FontFamily>[]>>;
 
-const get_font_entry = (font_family: FontFamily, loc: 'regular' | 'variable') => {
+const get_font_entry = (font_family: FontFamily, _loc: 'regular' | 'variable') => {
   return {
     font_family,
     url: FONT_URLS[font_family as keyof typeof FONT_URLS]

@@ -75,6 +75,7 @@ export default function ListImages() {
   }, [searchText]);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on filter change
     setPage(1);
   }, [debouncedSearch, sortBy, orderBy, limit]);
 

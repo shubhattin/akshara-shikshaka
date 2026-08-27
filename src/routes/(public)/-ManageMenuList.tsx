@@ -9,7 +9,6 @@ import {
   ContextMenuSeparator
 } from '@/components/ui/context-menu';
 import { Link } from '@tanstack/react-router';
-import { useContext } from 'react';
 import { FaRegHandPaper, FaBookOpen, FaVolumeUp, FaRegImage, FaSignInAlt } from 'react-icons/fa';
 import { signIn } from '~/lib/auth-client';
 import { useSession } from '~/lib/auth-client';

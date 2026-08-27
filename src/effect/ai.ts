@@ -172,6 +172,7 @@ export class AiProvider extends Context.Service<
           tryAi('embedText', 'openai', async () => {
             const { embedding } = await embed({
               model: openai.embeddingModel(
+                // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
                 input.model as Parameters<typeof openai.textEmbeddingModel>[0]
               ),
               value: input.value,

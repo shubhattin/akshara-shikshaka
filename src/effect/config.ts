@@ -16,7 +16,7 @@ const AppConfigSchema = Schema.Struct({
   isProd: Schema.Boolean
 });
 
-export type AppConfigShape = {
+export type AppConfigValues = {
   readonly dbUrl: Redacted.Redacted<string>;
   readonly upstashRedisUrl: string;
   readonly upstashRedisToken: Redacted.Redacted<string>;
@@ -79,9 +79,9 @@ const loadConfig = Effect.fn('loadConfig')(function* () {
       : undefined,
     isDev: data.isDev,
     isProd: data.isProd
-  } satisfies AppConfigShape;
+  } satisfies AppConfigValues;
 });
 
-export class AppConfig extends Context.Service<AppConfig, AppConfigShape>()('AppConfig') {
+export class AppConfig extends Context.Service<AppConfig, AppConfigValues>()('AppConfig') {
   static readonly Live = Layer.effect(AppConfig)(loadConfig());
 }

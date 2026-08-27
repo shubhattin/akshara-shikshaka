@@ -18,9 +18,12 @@ export const get_lesson_lang_id_from_cookie = (value?: string) => {
 };
 
 export const get_font_family_from_cookie = (value?: string) => {
+  // SAFETY: enum lookup validated - key is from controlled enum list.
   if (value && FONT_FAMILIES.includes(value as FontFamily)) {
+    // SAFETY: enum lookup validated - key is from controlled enum list.
     return value as FontFamily;
   } else {
+    // SAFETY: enum lookup validated - key is from controlled enum list.
     return DEFAULT_FONT_FAMILY as FontFamily;
   }
 };

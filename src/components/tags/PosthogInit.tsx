@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 
 export const load_posthog = async (func?: (posthog: PostHog) => void) => {
   if (
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- runtime env check; window may be undefined during SSR
     typeof window === 'undefined' ||
     window.location.hostname === 'localhost' ||
     import.meta.env.DEV ||

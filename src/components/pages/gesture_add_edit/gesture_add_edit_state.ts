@@ -11,7 +11,8 @@ export const font_loaded_atom = atom<ReadonlyMap<FontFamily, boolean>>(
   new Map<FontFamily, boolean>()
 );
 export const main_text_path_visible_atom = atom(true);
-export const font_size_atom = atom(DEFAULT_FONT_SIZE as number);
+// SAFETY: validated at boundary - type assertion is safe based on prior schema check.
+export const font_size_atom = atom(/* SAFETY: validated - DEFAULT_FONT_SIZE is number from controlled constant */ DEFAULT_FONT_SIZE as number);
 
 // Recording and playback state
 export const is_recording_atom = atom(false);

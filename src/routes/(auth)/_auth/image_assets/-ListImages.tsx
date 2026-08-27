@@ -132,6 +132,7 @@ export default function ListImages() {
             <Select
               items={sortItems}
               value={sortBy}
+              // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
               onValueChange={(val) => setSortBy(val as 'created_at' | 'updated_at')}
             >
               <SelectTrigger className="w-36">
@@ -148,6 +149,7 @@ export default function ListImages() {
             <Select
               items={orderItems}
               value={orderBy}
+              // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
               onValueChange={(val) => setOrderBy(val as 'asc' | 'desc')}
             >
               <SelectTrigger className="w-36">

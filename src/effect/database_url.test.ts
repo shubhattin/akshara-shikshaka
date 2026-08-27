@@ -57,6 +57,7 @@ describe('database URL selection', () => {
       yield* Effect.void;
       // Sanity: Effect tests can load alongside the dual local/neon strategy.
       // Full Neon websocket integration requires live credentials and is gated outside CI.
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- test assertion for function type; validates module export
       expect(typeof get_db_url).toBe('function');
     })
   );

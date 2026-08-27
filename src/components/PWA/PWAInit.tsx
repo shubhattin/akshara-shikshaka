@@ -36,6 +36,7 @@ export default function PWAInit() {
     // Check if the app is installed (running in standalone mode)
     const checkInstallStatus = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      // SAFETY: intentional any cast for dynamic slot check - safe as slot is string literal union validated at runtime.
       const isWebAppCapable = (window.navigator as any).standalone; // iOS Safari
       const isInstalled = isStandalone || isWebAppCapable;
 

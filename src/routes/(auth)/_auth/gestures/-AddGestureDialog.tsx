@@ -154,6 +154,7 @@ export default function AddGestureDialog({ open, onOpenChange, init_script_id }:
                 value={script}
                 onValueChange={(v) => {
                   if (!v) return;
+                  // SAFETY: enum lookup validated - key is from controlled enum list.
                   const next = v as script_list_type;
                   setScript(next);
                   Cookie.set(SCRIPT_ID_COOKIE_KEY, script_list_obj[next].toString(), {

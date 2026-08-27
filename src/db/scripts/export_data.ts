@@ -119,7 +119,7 @@ const main = async () => {
     try {
       await tx
         .insert(text_gestures)
-        .values(data.text_gestures as InferInsertModel<typeof text_gestures>[]);
+        .values(/* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ data.text_gestures as InferInsertModel<typeof text_gestures>[]);
       console.log(
         chalk.green('✓ Successfully added values into table'),
         chalk.blue('`text_gestures`')

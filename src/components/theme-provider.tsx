@@ -52,6 +52,7 @@ export function ThemeProvider({
   ...props
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(() =>
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- runtime env check for SSR; window may be undefined during server render
     typeof window !== 'undefined'
       ? parseStoredTheme(localStorage.getItem(storageKey), defaultTheme)
       : defaultTheme

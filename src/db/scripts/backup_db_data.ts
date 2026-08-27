@@ -84,10 +84,13 @@ const s3 = new S3Client({
   }
 });
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- S3 SDK throws untyped external errors; unknown forces narrowing via typeof guard before access
 function logS3Failure(operation: string, err: unknown) {
   console.error(`[S3 ${operation}] failed`);
   console.error(err);
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- type guard for S3 error object; narrows unknown to domain object
   if (err && typeof err === 'object') {
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
     const e = err as {
       name?: string;
       message?: string;

@@ -71,10 +71,12 @@ type FontList = Partial<Record<script_list_type, FontEntry<FontFamily>[]>>;
 const get_font_entry = (font_family: FontFamily, _loc: 'regular' | 'variable') => {
   return {
     font_family,
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
     url: FONT_URLS[font_family as keyof typeof FONT_URLS]
   } satisfies FontEntry<FontFamily>;
 };
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- Partial record must stay widened for script lookup; literal satisfies loses index signature
 export const FONT_LIST: FontList = {
   Devanagari: [
     get_font_entry('Nirmala_UI', 'regular'),

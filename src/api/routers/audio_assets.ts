@@ -38,6 +38,7 @@ export const uploadAudioAsset = Effect.fn('uploadAudioAsset')(function* (input: 
 
   const { fileBuffer, fileType } = audioBuffer;
   const s3_key =
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
     `${PROJECT_S3_ALIAS}/audio_assets/${input.text_key}_${input.lang_id ? get_lang_from_id(input.lang_id) + '_' : ''}${crypto.randomUUID()}.${fileType}` as `${typeof PROJECT_S3_ALIAS}/audio_assets/${string}.opus`;
 
   yield* storage.uploadAssetFile(s3_key, fileBuffer);

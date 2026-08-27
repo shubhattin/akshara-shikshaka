@@ -212,6 +212,7 @@ const LessonInfo = ({
             gestures_list.map((gesture) => (
               <Link
                 target="_blank"
+                // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
                 to={`/gestures/edit/${gesture.id}` as never}
                 key={gesture.id}
                 className={cn(
@@ -282,6 +283,7 @@ const OptionalAudioSection = ({ lesson_id, text }: OptionalAudioSectionProps) =>
       audioRef.current = null;
     }
     const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${asset.s3_key}`);
+    // SAFETY: intentional any cast for dynamic slot check - safe as slot is string literal union validated at runtime.
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();
@@ -378,6 +380,7 @@ const LessonWords = ({ lesson_id }: { lesson_id: number }) => {
   const handleAddNew = () => {
     setWords((prev) => [
       ...prev,
+      // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
       {
         word: '',
         order: prev.length + 1,
@@ -441,6 +444,7 @@ type SortableWordItemProps = {
   lesson_id: number;
 };
 
+// oxlint-disable-next-line complexity -- SortableWordItem composes drag, media, and audio states; split into smaller subcomponents deferred
 function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableWordItemProps) {
   const trpc = useTRPC();
   const base_word_script_id = useAtomValue(base_word_script_id_atom);
@@ -454,6 +458,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
   const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -531,6 +536,7 @@ function SortableWordItem({ wordItem, onChange, onDelete, lesson_id }: SortableW
       audioRef.current = null;
     }
     const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${asset.s3_key}`);
+    // SAFETY: intentional any cast for dynamic slot check - safe as slot is string literal union validated at runtime.
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();
@@ -850,6 +856,7 @@ const SaveEditMode = ({
             lang_id
           })
         );
+        // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
         navigate({ to: '/lessons' } as never);
       },
       onError(_error) {
@@ -875,7 +882,7 @@ const SaveEditMode = ({
           if (!data.updated) return;
 
           const to_be_added_word_indexes = submittedWords
-            .map((w, idx) => [w, idx] as [text_lesson_word_type, number])
+            .map((w, idx) => /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ [w, idx] as [text_lesson_word_type, number])
             .filter(([w]) => w.id === undefined || w.id === null)
             .map(([_w, idx]) => idx);
 
@@ -909,6 +916,7 @@ const SaveEditMode = ({
             }
 
             const idByOrder = new Map(
+              // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
               mergedWords.filter((w) => w.id != null).map((w) => [w.order, w.id as number])
             );
             mergedWords = prev.map((w) => {

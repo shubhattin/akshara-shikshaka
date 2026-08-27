@@ -29,6 +29,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 function isMacPlatform(): boolean {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- runtime env check; navigator may be undefined during SSR or test
   if (typeof navigator === 'undefined') return false;
   return /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
 }

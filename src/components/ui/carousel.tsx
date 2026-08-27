@@ -93,7 +93,6 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return;
-    // oxlint-disable-next-line react/set-state-in-effect -- intentional sync of carousel selection state with embla api on mount and selection
     onSelect(api);
     api.on('reInit', onSelect);
     api.on('select', onSelect);

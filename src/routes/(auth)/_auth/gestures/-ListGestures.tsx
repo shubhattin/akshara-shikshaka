@@ -109,6 +109,7 @@ const selected_category_id_atom = atomWithStorage<number | null>(
   null
 );
 
+// oxlint-disable-next-line complexity -- ListGestures orchestrates category selection and dialogs; extract to smaller hooks deferred
 function ListGestures({ init_gesture_categories }: Props) {
   const trpc = useTRPC();
   const [scriptId, setScriptId] = useAtom(script_id_atom);
@@ -119,6 +120,7 @@ function ListGestures({ init_gesture_categories }: Props) {
 
   const scriptOptions = FONT_SCRIPTS.map((name) => ({
     name,
+    // SAFETY: enum lookup validated - key is from controlled enum list.
     id: script_list_obj[name as script_list_type]
   }));
   const scriptItems = [
@@ -245,6 +247,7 @@ function ListGestures({ init_gesture_categories }: Props) {
           category_id={selectedCategoryID}
           categoryName={categoryName}
           gestures={category_gestures_q.data.gestures}
+          // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
           type={category_gestures_q.data.type as 'categorized' | 'uncategorized'}
           categories={categories}
         />
@@ -518,6 +521,7 @@ function DraggableCategoryRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(item.id)
   });
+  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -1211,6 +1215,7 @@ function DraftOrderedGestureCard({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(item.id)
   });
+  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,

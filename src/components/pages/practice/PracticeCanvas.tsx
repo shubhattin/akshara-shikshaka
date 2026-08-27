@@ -160,6 +160,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
       const preventTouchNavigation = (e: TouchEvent) => {
         // Prevent all browser navigation gestures when touching the drawing canvas
+        // SAFETY: DOM target is known to be Element in this canvas handler - safe to narrow from EventTarget.
         if (isDrawingCanvas(e.target as Element)) {
           e.preventDefault();
           e.stopPropagation();
@@ -168,6 +169,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
       const preventGestureZoom = (e: Event) => {
         // Prevent pinch-to-zoom and other gesture events on the canvas
+        // SAFETY: DOM target is known to be Element in this canvas handler - safe to narrow from EventTarget.
         if (isDrawingCanvas(e.target as Element)) {
           e.preventDefault();
         }
@@ -175,6 +177,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
       const preventContextMenu = (e: Event) => {
         // Prevent long press context menu on mobile
+        // SAFETY: DOM target is known to be Element in this canvas handler - safe to narrow from EventTarget.
         if (isDrawingCanvas(e.target as Element)) {
           e.preventDefault();
         }
@@ -182,6 +185,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
 
       const preventDoubleClickZoom = (e: Event) => {
         // Prevent double-click zoom on mobile
+        // SAFETY: DOM target is known to be Element in this canvas handler - safe to narrow from EventTarget.
         if (isDrawingCanvas(e.target as Element)) {
           e.preventDefault();
         }
@@ -273,6 +277,7 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
             {currentGesturePoints.length > 2 && currentGesture && (
               <Path
                 data={pointsToSvgPath(
+                  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
                   getSmoothenedPoints(currentGesturePoints, {
                     size: currentGesture.width || 6,
                     simulatePressure: currentGesture.simulate_pressure

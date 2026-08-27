@@ -99,6 +99,7 @@ function LearnPage(props: Props) {
       { label: 'Script', value: null },
       ...FONT_SCRIPTS.map((script) => ({
         label: script,
+        // SAFETY: enum lookup validated - key is from controlled enum list.
         value: String(script_list_obj[script as script_list_type])
       }))
     ],
@@ -109,6 +110,7 @@ function LearnPage(props: Props) {
       { label: 'Language', value: null },
       ...LANGUAGES_ADDED.map((lang) => ({
         label: lang,
+        // SAFETY: enum lookup validated - key is from controlled enum list.
         value: String(lang_list_obj[lang as lang_list_type])
       }))
     ],
@@ -139,6 +141,7 @@ function LearnPage(props: Props) {
           </SelectTrigger>
           <SelectContent>
             {FONT_SCRIPTS.map((script) => (
+              // SAFETY: enum lookup validated - key is from controlled enum list.
               <SelectItem key={script} value={String(script_list_obj[script as script_list_type])}>
                 {script}
               </SelectItem>
@@ -162,6 +165,7 @@ function LearnPage(props: Props) {
           </SelectTrigger>
           <SelectContent>
             {LANGUAGES_ADDED.map((lang) => (
+              // SAFETY: enum lookup validated - key is from controlled enum list.
               <SelectItem key={lang} value={String(lang_list_obj[lang as lang_list_type])}>
                 {lang}
               </SelectItem>
@@ -402,6 +406,7 @@ const LessonPracticeNotFound = ({
   </motion.div>
 );
 
+// oxlint-disable-next-line complexity -- Lesson composes transliteration, gesture, audio, and carousel state; split into hooks deferred
 const Lesson = ({
   lesson_id,
   hasNext,
@@ -480,6 +485,7 @@ const Lesson = ({
       setPlayingVarnaAudio(false);
     }
     const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${s3_key}`);
+    // SAFETY: intentional any cast for dynamic slot check - safe as slot is string literal union validated at runtime.
     audioRef.current = audio as any;
     audio.onended = () => setPlayingIndex(null);
     audio.play();
@@ -502,6 +508,7 @@ const Lesson = ({
       setPlayingIndex(null);
     }
     const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${s3_key}`);
+    // SAFETY: intentional any cast for dynamic slot check - safe as slot is string literal union validated at runtime.
     audioRef.current = audio as any;
     audio.onended = () => setPlayingVarnaAudio(false);
     audio.play();

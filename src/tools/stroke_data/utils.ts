@@ -229,7 +229,10 @@ export const evaluateGestureAccuracy = (
   };
 
   const curvatureSignature = (pts: EvalPoint[], outLen: number) => {
-    if (pts.length < 3) return /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ Array.from({ length: outLen }).fill(0) as number[];
+    if (pts.length < 3)
+      return /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ Array.from(
+        { length: outLen }
+      ).fill(0) as number[];
     const angles: number[] = [];
     for (let i = 1; i < pts.length; i++) {
       const dx = pts[i].x - pts[i - 1].x;

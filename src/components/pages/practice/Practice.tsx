@@ -91,7 +91,11 @@ function PracticeWrapper(props: Props) {
 
   return (
     <>
-      <Practice {...props}>{/* SAFETY: children prop is ReactNode union - assertion narrows for Children.toArray iteration */ props.children as React.ReactNode}</Practice>
+      <Practice {...props}>
+        {
+          /* SAFETY: children prop is ReactNode union - assertion narrows for Children.toArray iteration */ props.children as React.ReactNode
+        }
+      </Practice>
       <TurnstileWidget setToken={setTurnstileToken} />
     </>
   );
@@ -319,7 +323,8 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
   useEffect(() => {
     // on mount play the gesture
     if (play_gesture_on_mount) void playAllGestures();
-  }, [play_gesture_on_mount, playAllGestures]);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- mount-only playback; replaying on data refetch would clear user's in-progress drawing
+  }, []);
 
   const playGestureIndex = async (gestureIndex: number) => {
     // Disable drawing while playing the guided animation for the current gesture
@@ -535,7 +540,9 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
             {isCompleted && hasCanvasCenterCompleted && (
               <div className="pointer-events-none absolute inset-0 z-40 mt-4 flex justify-center">
                 <div className="pointer-events-auto">
-                  {Children.toArray(/* SAFETY: children prop is ReactNode union - assertion narrows for Children.toArray iteration */ children as React.ReactNode)
+                  {Children.toArray(
+                    /* SAFETY: children prop is ReactNode union - assertion narrows for Children.toArray iteration */ children as React.ReactNode
+                  )
                     .filter(
                       (child) =>
                         isValidElement(child) &&

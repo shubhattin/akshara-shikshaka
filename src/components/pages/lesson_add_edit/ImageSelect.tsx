@@ -44,7 +44,15 @@ export default function ImageSelect(props: Props) {
 
   return (
     <div className="space-y-4">
-      <Tabs value={tab} onValueChange={(v) => setTab(/* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ v as typeof tab)} className="w-full">
+      <Tabs
+        value={tab}
+        onValueChange={(v) =>
+          setTab(
+            /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ v as typeof tab
+          )
+        }
+        className="w-full"
+      >
         <TabsList className="flex w-full items-center justify-center">
           <TabsTrigger value="add">Select from Existing</TabsTrigger>
           <TabsTrigger value="make">Create New Image</TabsTrigger>

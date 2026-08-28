@@ -27,11 +27,7 @@ import WaveSurferPlayer from '@wavesurfer/react';
 import AudioMotionAnalyzer from 'audiomotion-analyzer';
 import ms from 'ms';
 import { cn } from '~/lib/utils';
-import {
-  base_word_script_id_atom,
-  lang_id_atom,
-  type audio_type
-} from './lesson_add_edit_state';
+import { base_word_script_id_atom, lang_id_atom, type audio_type } from './lesson_add_edit_state';
 import {
   get_lang_from_id,
   get_script_from_id,
@@ -63,7 +59,15 @@ export default function AudioSelect(props: Props) {
 
   return (
     <div className="space-y-4">
-      <Tabs value={tab} onValueChange={(v) => setTab(/* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ v as typeof tab)} className="w-full">
+      <Tabs
+        value={tab}
+        onValueChange={(v) =>
+          setTab(
+            /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ v as typeof tab
+          )
+        }
+        className="w-full"
+      >
         <TabsList className="flex w-full items-center justify-center">
           <TabsTrigger value="add">Select from Existing</TabsTrigger>
           <TabsTrigger value="make">Create New Audio</TabsTrigger>

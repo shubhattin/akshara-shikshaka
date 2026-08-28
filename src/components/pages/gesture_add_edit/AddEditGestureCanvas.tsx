@@ -72,7 +72,15 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     if (measured.width !== textBox.width || measured.height !== textBox.height) {
       setTextBox({ width: measured.width, height: measured.height });
     }
-  }, [text, fontSize, fontFamily, currentFontLoaded, mainTextPathVisible, textBox.width, textBox.height]);
+  }, [
+    text,
+    fontSize,
+    fontFamily,
+    currentFontLoaded,
+    mainTextPathVisible,
+    textBox.width,
+    textBox.height
+  ]);
 
   // Container ref used to keep the canvas within the viewport
   const containerRef = useRef<HTMLDivElement | null>(null);

@@ -729,7 +729,11 @@ const SelectedGestureControls = ({
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
                   gesture.index === selectedGestureIndex
-                    ? { ...gesture, anim_fn: /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ value as Gesture['anim_fn'] }
+                    ? {
+                        ...gesture,
+                        anim_fn:
+                          /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ value as Gesture['anim_fn']
+                      }
                     : gesture
                 )
               )

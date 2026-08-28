@@ -97,7 +97,10 @@ export function get_permutations(range: [number, number], count: number = 1): nu
  * This replaces `{key}` with the corresponding value in `options`
  */
 // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- template substitution map holds string-coercible values; narrowed via string template handling
-export function format_string_text(text: string, options: Record<string, string | number | boolean>) {
+export function format_string_text(
+  text: string,
+  options: Record<string, string | number | boolean>
+) {
   return text.replace(/{(\w+)}/g, (match, key) => String(options[key] ?? `{${key}}`));
 }
 

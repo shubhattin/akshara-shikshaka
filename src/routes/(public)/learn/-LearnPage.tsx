@@ -250,8 +250,7 @@ const LessonsList = (props: Props) => {
       }
     )
   );
-  const { data: lessonsData, isSuccess: lessonsIsSuccess, isPending: lessonsIsPending } =
-    lessons_q;
+  const { data: lessonsData, isSuccess: lessonsIsSuccess, isPending: lessonsIsPending } = lessons_q;
 
   const [lessonsTransliterated, setTransliteratedLessons] = useState<
     NonNullable<typeof lessons_q.data>
@@ -459,7 +458,9 @@ const Lesson = ({
   )?.text_gesture;
   const text_gesture_data_q = useQuery(
     trpc.text_gestures.get_text_gesture_data.queryOptions(
-      { id: selected_gesture!.id, uuid: selected_gesture!.uuid },
+      selected_gesture
+        ? { id: selected_gesture.id, uuid: selected_gesture.uuid }
+        : ({ id: 0, uuid: '' } as const),
       { enabled: !!selected_gesture }
     )
   );

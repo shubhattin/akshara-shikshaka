@@ -882,7 +882,13 @@ const SaveEditMode = ({
           if (!data.updated) return;
 
           const to_be_added_word_indexes = submittedWords
-            .map((w, idx) => /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ [w, idx] as [text_lesson_word_type, number])
+            .map(
+              (w, idx) =>
+                /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ [
+                  w,
+                  idx
+                ] as [text_lesson_word_type, number]
+            )
             .filter(([w]) => w.id === undefined || w.id === null)
             .map(([_w, idx]) => idx);
 

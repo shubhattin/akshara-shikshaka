@@ -8,6 +8,7 @@ import { waitUntil } from '@vercel/functions';
 export class BackgroundWork extends Context.Service<
   BackgroundWork,
   {
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- background work is generic promise boundary; unknown models arbitrary async result handled via catch
     readonly enqueue: (work: () => Promise<unknown>) => Effect.Effect<void>;
   }
 >()('BackgroundWork') {
@@ -37,6 +38,7 @@ export class BackgroundWork extends Context.Service<
   });
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-returns -- background work thunk is generic; unknown preserves arbitrary promise result before catch
 export const enqueueBackground = (work: () => Promise<unknown>) =>
   Effect.gen(function* () {
     const background = yield* BackgroundWork;

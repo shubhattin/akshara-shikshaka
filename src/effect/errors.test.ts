@@ -10,6 +10,7 @@ import { createCache, invalidateAndRefreshCache } from './cache';
 describe('Effect infrastructure', () => {
   it.effect('maps StorageError tags', () =>
     Effect.gen(function* () {
+      yield* Effect.void;
       const error = StorageError.make({
         operation: 'uploadAssetFile',
         key: 'x.webp',
@@ -22,6 +23,7 @@ describe('Effect infrastructure', () => {
 
   it.effect('maps NotFoundError tags', () =>
     Effect.gen(function* () {
+      yield* Effect.void;
       const error = NotFoundError.make({
         resource: 'text_lesson',
         message: 'Text lesson not found'
@@ -32,6 +34,7 @@ describe('Effect infrastructure', () => {
 
   it.effect('recognizes known errors via Schema.is', () =>
     Effect.gen(function* () {
+      yield* Effect.void;
       const found = NotFoundError.make({
         resource: 'text_lesson',
         message: 'Text lesson not found'
@@ -52,6 +55,7 @@ describe('cache refresh', () => {
   it.effect('refresh writes after optional delete via createCache', () =>
     Effect.gen(function* () {
       const ops: string[] = [];
+      // oxlint-disable-next-line anti-slop/no-known-value-widening -- test helper holds untyped redis cache slot; unknown models generic external payload
       let stored: unknown = null;
 
       const TrackingRedis = Layer.succeed(RedisClient)({
@@ -91,6 +95,7 @@ describe('cache refresh', () => {
   it.effect('invalidates synchronously before scheduling refresh-ahead', () =>
     Effect.gen(function* () {
       const ops: string[] = [];
+      // oxlint-disable-next-line anti-slop/no-unknown-returns -- test queue holds generic background work; unknown models arbitrary async result
       const queuedWork: Array<() => Promise<unknown>> = [];
       const TrackingRedis = Layer.succeed(RedisClient)({
         get: () => Effect.succeed(null),
@@ -140,6 +145,7 @@ describe('cache refresh', () => {
 
   it.effect('queues refresh-ahead even when delete fails', () =>
     Effect.gen(function* () {
+      // oxlint-disable-next-line anti-slop/no-unknown-returns -- test queue holds generic background work; unknown models arbitrary async result
       const queuedWork: Array<() => Promise<unknown>> = [];
       const FailingRedis = Layer.succeed(RedisClient)({
         get: () => Effect.succeed(null),

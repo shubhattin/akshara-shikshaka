@@ -232,7 +232,7 @@ export const gestureTextKeyCategoryJoinRelations = relations(
   })
 );
 
-export const textGesturesRelations = relations(text_gestures, ({ many, one }) => ({
+export const textGesturesRelations = relations(text_gestures, ({ many, one: _one }) => ({
   lessons: many(lesson_gestures) // via join table
 }));
 

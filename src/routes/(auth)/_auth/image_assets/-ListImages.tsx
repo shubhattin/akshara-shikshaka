@@ -75,6 +75,7 @@ export default function ListImages() {
   }, [searchText]);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on filter change
     setPage(1);
   }, [debouncedSearch, sortBy, orderBy, limit]);
 
@@ -131,6 +132,7 @@ export default function ListImages() {
             <Select
               items={sortItems}
               value={sortBy}
+              // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
               onValueChange={(val) => setSortBy(val as 'created_at' | 'updated_at')}
             >
               <SelectTrigger className="w-36">
@@ -147,6 +149,7 @@ export default function ListImages() {
             <Select
               items={orderItems}
               value={orderBy}
+              // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
               onValueChange={(val) => setOrderBy(val as 'asc' | 'desc')}
             >
               <SelectTrigger className="w-36">

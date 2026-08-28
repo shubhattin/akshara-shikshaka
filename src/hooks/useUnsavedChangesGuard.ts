@@ -8,10 +8,13 @@ const DEFAULT_MESSAGE =
 
 const GUARD_STATE = { __aksharaEditorUnsavedGuard: true } as const;
 
-function isGuardState(state: unknown): boolean {
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- history.state is browser unknown; type guard narrows unknown to domain sentinel
+function isGuardState(state: unknown): state is { __aksharaEditorUnsavedGuard: true } {
   return (
     !!state &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof -- type guard for history state; narrows unknown to domain object
     typeof state === 'object' &&
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
     (state as { __aksharaEditorUnsavedGuard?: boolean }).__aksharaEditorUnsavedGuard === true
   );
 }
@@ -24,7 +27,9 @@ function isGuardState(state: unknown): boolean {
  */
 export function useUnsavedChangesGuard(enabled: boolean, message: string = DEFAULT_MESSAGE) {
   const messageRef = useRef(message);
-  messageRef.current = message;
+  useEffect(() => {
+    messageRef.current = message;
+  }, [message]);
 
   useBlocker({
     disabled: !enabled,

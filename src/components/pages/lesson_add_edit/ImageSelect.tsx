@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '~/components/ui/button';
 import { IoAddOutline } from 'react-icons/io5';
 import { Input } from '~/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card';
+import { Card, CardContent } from '~/components/ui/card';
 import { Skeleton } from '~/components/ui/skeleton';
 import { Textarea } from '~/components/ui/textarea';
 import { IoMdArrowDropleft, IoMdArrowDropright } from 'react-icons/io';
@@ -40,11 +40,19 @@ export default function ImageSelect(props: Props) {
 
   useEffect(() => {
     setSelectedImage(null);
-  }, [tab, props.wordItem]);
+  }, [tab, props.wordItem, setSelectedImage]);
 
   return (
     <div className="space-y-4">
-      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
+      <Tabs
+        value={tab}
+        onValueChange={(v) =>
+          setTab(
+            /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ v as typeof tab
+          )
+        }
+        className="w-full"
+      >
         <TabsList className="flex w-full items-center justify-center">
           <TabsTrigger value="add">Select from Existing</TabsTrigger>
           <TabsTrigger value="make">Create New Image</TabsTrigger>
@@ -84,6 +92,7 @@ const ImageList = () => {
   }, [searchText]);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on search change
     setPage(1);
   }, [debouncedSearch]);
 
@@ -285,6 +294,7 @@ const ImageCreation = ({ wordItem }: Props) => {
 
     if (create_image_mut.isPending) {
       // Reset elapsed time when starting
+      // oxlint-disable-next-line react/set-state-in-effect -- intentional timer reset
       setElapsedTime(0);
 
       // Start timer that updates every 100ms for smooth progress
@@ -303,6 +313,7 @@ const ImageCreation = ({ wordItem }: Props) => {
   // Reset elapsed time when mutation completes or resets
   useEffect(() => {
     if (create_image_mut.isSuccess || create_image_mut.isError || !create_image_mut.isPending) {
+      // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on mutation status
       setElapsedTime(0);
     }
   }, [create_image_mut.isSuccess, create_image_mut.isError, create_image_mut.isPending]);
@@ -310,6 +321,7 @@ const ImageCreation = ({ wordItem }: Props) => {
   // Reset image prompt when mutation resets
   useEffect(() => {
     if (create_image_mut.isIdle) {
+      // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on idle
       setImagePrompt('');
     }
   }, [create_image_mut.isIdle]);

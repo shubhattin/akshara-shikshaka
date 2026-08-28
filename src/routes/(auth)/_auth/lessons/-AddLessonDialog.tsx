@@ -78,6 +78,7 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
 
   useEffect(() => {
     if (!open) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on open
     setLangId(init_lang_id || lang_list_obj['Sanskrit']);
     setBaseWordScriptId(script_list_obj['Devanagari']);
     setText('');
@@ -165,6 +166,7 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
                   { label: 'Language', value: null },
                   ...LANGUAGES_ADDED.map((name) => ({
                     label: name,
+                    // SAFETY: enum lookup validated - key is from controlled enum list.
                     value: String(lang_list_obj[name as lang_list_type])
                   }))
                 ]}
@@ -181,6 +183,7 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
                 </SelectTrigger>
                 <SelectContent>
                   {LANGUAGES_ADDED.map((name) => (
+                    // SAFETY: enum lookup validated - key is from controlled enum list.
                     <SelectItem key={name} value={String(lang_list_obj[name as lang_list_type])}>
                       {name}
                     </SelectItem>
@@ -220,6 +223,7 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
                   { label: 'Script', value: null },
                   ...FONT_SCRIPTS.map((s) => ({
                     label: s,
+                    // SAFETY: enum lookup validated - key is from controlled enum list.
                     value: String(script_list_obj[s as script_list_type])
                   }))
                 ]}
@@ -234,6 +238,7 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
                 </SelectTrigger>
                 <SelectContent>
                   {FONT_SCRIPTS.map((s) => (
+                    // SAFETY: enum lookup validated - key is from controlled enum list.
                     <SelectItem key={s} value={String(script_list_obj[s as script_list_type])}>
                       {s}
                     </SelectItem>

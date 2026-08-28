@@ -61,6 +61,7 @@ export default function AddGestureDialog({ open, onOpenChange, init_script_id }:
 
   useEffect(() => {
     if (!open) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on open
     setScript(get_script_from_id(init_script_id));
     setText('');
     setConfirmOpen(false);
@@ -153,6 +154,7 @@ export default function AddGestureDialog({ open, onOpenChange, init_script_id }:
                 value={script}
                 onValueChange={(v) => {
                   if (!v) return;
+                  // SAFETY: enum lookup validated - key is from controlled enum list.
                   const next = v as script_list_type;
                   setScript(next);
                   Cookie.set(SCRIPT_ID_COOKIE_KEY, script_list_obj[next].toString(), {

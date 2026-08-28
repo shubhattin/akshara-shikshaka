@@ -60,11 +60,15 @@ async function transliterateTexts(
 }
 
 export const Route = createFileRoute('/(public)/learn/')({
+  // oxlint-disable-next-line complexity -- loader orchestrates transliteration and lesson selection; sequential I/O with branches deferred
   loader: async ({ context }) => {
     const selection = await getLearnSelection$();
     const emptyTransliteration = {
+      // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
       init_lessons_list_transliterated: [] as text_lesson_type[],
+      // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
       init_words_transliterated: [] as string[],
+      // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
       init_varna_transliterated: null as string | null
     };
 

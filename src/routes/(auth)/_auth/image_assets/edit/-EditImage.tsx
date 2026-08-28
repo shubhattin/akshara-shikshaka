@@ -18,10 +18,8 @@ import {
 } from '~/components/ui/alert-dialog';
 import { Button } from '~/components/ui/button';
 import { Card, CardContent } from '~/components/ui/card';
-import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 import { Skeleton } from '~/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '~/components/ui/dialog';
 import { Textarea } from '~/components/ui/textarea';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { MdDeleteOutline, MdEdit } from 'react-icons/md';
@@ -176,6 +174,7 @@ const DescriptionEditor = () => {
 
   useEffect(() => {
     if (image_data) {
+      // oxlint-disable-next-line react/set-state-in-effect -- intentional sync of local description state with loaded image_data
       setDescription(image_data.description);
     }
   }, [image_data]);

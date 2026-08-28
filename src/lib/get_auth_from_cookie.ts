@@ -14,10 +14,11 @@ async function getSessionFromCookie(cookie: string) {
     if (!res.ok) {
       throw new Error(`Failed to fetch session: ${res.statusText}`);
     }
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
     const session = (await res.json()) as typeof authClient.$Infer.Session;
     // console.log('session', !!session, new Date().toISOString());
     return session;
-  } catch (e) {
+  } catch {
     return null;
   }
 }

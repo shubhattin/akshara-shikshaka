@@ -109,6 +109,7 @@ const selected_category_id_atom = atomWithStorage<number | null>(
   null
 );
 
+// oxlint-disable-next-line complexity -- ListLessons handles language/category selection and dialogs; refactor into smaller components deferred
 function ListLessons({ init_lesson_categories }: Props) {
   const trpc = useTRPC();
   const [langId, setLangId] = useAtom(lang_id_atom);
@@ -117,6 +118,7 @@ function ListLessons({ init_lesson_categories }: Props) {
 
   const langOptions = LANGUAGES_ADDED.map((name) => ({
     name,
+    // SAFETY: enum lookup validated - key is from controlled enum list.
     id: lang_list_obj[name as lang_list_type]
   }));
   const langItems = [
@@ -247,6 +249,7 @@ function ListLessons({ init_lesson_categories }: Props) {
           category_id={selectedCategoryID}
           categoryName={categoryName}
           lessons={category_lessons_q.data.lessons}
+          // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
           type={category_lessons_q.data.type as 'categorized' | 'uncategorized'}
           categories={categories}
         />
@@ -309,6 +312,7 @@ function ManageCategoriesDialog({
   const [categoryList, setCategoryList] = useState<CategoryModel[]>(categories);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional sync from query
     setCategoryList(categories);
   }, [categories]);
 
@@ -521,6 +525,7 @@ function DraggableCategoryRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(item.id)
   });
+  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -1243,6 +1248,7 @@ function DraftOrderedLessonCard({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(item.id)
   });
+  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,

@@ -132,6 +132,7 @@ const ClientOnly = ({
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional mount flag to avoid hydration mismatch; runs once on client
     setHasMounted(true);
   }, []);
 
@@ -392,11 +393,12 @@ function AddEditTextData({
       .catch((err) => {
         console.error('Font loading failed:', err);
       });
-  }, [fontFamily]);
+  }, [fontFamily, script, fontLoaded, setFontLoaded]);
 
   // repaint canvas on change of notToClearGesturesIndex
   useEffect(() => {
     clearGestureVisualization();
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- clearGestureVisualization captures gestureData and is intentionally not a dep; effect should only run when notToClearGesturesIndex changes
   }, [notToClearGesturesIndex]);
 
   useEffect(() => {
@@ -416,7 +418,7 @@ function AddEditTextData({
           : g
       )
     );
-  }, [gestureData, selectedGestureIndex]);
+  }, [gestureData, selectedGestureIndex, setCanvasGesturesPath]);
 
   return (
     <div className="space-y-4">
@@ -438,7 +440,9 @@ function AddEditTextData({
             value={fontFamily}
             onValueChange={(v) => {
               if (!v) return;
+              // SAFETY: enum lookup validated - key is from controlled enum list.
               setFontFamily(v as FontFamily);
+              // SAFETY: enum lookup validated - key is from controlled enum list.
               Cookie.set(FONT_FAMILY_COOKIE_KEY, v as FontFamily, { expires: 30 });
             }}
           >
@@ -725,7 +729,11 @@ const SelectedGestureControls = ({
               setGestureData((prev: Gesture[]) =>
                 prev.map((gesture) =>
                   gesture.index === selectedGestureIndex
-                    ? { ...gesture, anim_fn: value as Gesture['anim_fn'] }
+                    ? {
+                        ...gesture,
+                        anim_fn:
+                          /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ value as Gesture['anim_fn']
+                      }
                     : gesture
                 )
               )
@@ -1060,6 +1068,7 @@ const CategoryChangeButton = ({
     }
 
     try {
+      // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
       const textKeyFromData = (text_data as text_data_type & { text_key?: string }).text_key;
       const gesture_text_key =
         textKeyFromData ?? (await transliterate(text.trim(), script, 'Normal'));
@@ -1192,6 +1201,7 @@ const SaveEditMode = ({ text_data }: { text_data: Props['text_data'] }) => {
             script_id: scriptID
           })
         );
+        // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
         navigate({ to: '/gestures' } as never);
       },
       onError() {

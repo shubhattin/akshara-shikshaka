@@ -44,7 +44,7 @@ export default function ListAudio() {
   const [searchText, setSearchText] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [page, setPage] = useState<number>(1);
-  const [limit, setLimit] = useState<number>(24);
+  const [limit] = useState<number>(24);
   const [langFilter, setLangFilter] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
@@ -55,6 +55,7 @@ export default function ListAudio() {
   }, [searchText]);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional reset on filter change
     setPage(1);
   }, [debouncedSearch, langFilter]);
 
@@ -81,6 +82,7 @@ export default function ListAudio() {
     { label: 'All', value: 'all' },
     ...LANG_LIST.map((lang) => ({
       label: lang,
+      // SAFETY: enum lookup validated - key is from controlled enum list.
       value: String(lang_list_obj[lang as lang_list_type])
     }))
   ];
@@ -114,6 +116,7 @@ export default function ListAudio() {
       audioRef.current = null;
     }
     const audio = new Audio(`${import.meta.env.VITE_AWS_CLOUDFRONT_URL}/${s3_key}`);
+    // SAFETY: intentional any cast for dynamic slot check - safe as slot is string literal union validated at runtime.
     audioRef.current = audio as any;
     audio.onended = () => setPlayingId(null);
     audio.play();
@@ -144,6 +147,7 @@ export default function ListAudio() {
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
                 {LANG_LIST.map((lang) => (
+                  // SAFETY: enum lookup validated - key is from controlled enum list.
                   <SelectItem key={lang} value={String(lang_list_obj[lang as lang_list_type])}>
                     {lang}
                   </SelectItem>

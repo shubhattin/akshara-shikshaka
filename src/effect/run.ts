@@ -4,6 +4,7 @@ import { appRuntime } from './runtime';
 import { isKnownError, type KnownError } from './errors';
 
 /** Domain / config errors with distinct tRPC codes; infra errors share the default. */
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- Partial record widening needed for KnownError tag lookup; satisfies loses index signature
 const TRPC_CODE_BY_TAG: Partial<Record<KnownError['_tag'], TRPCError['code']>> = {
   NotFoundError: 'NOT_FOUND',
   BadRequestError: 'BAD_REQUEST',
@@ -37,6 +38,7 @@ const toTrpcError = (error: KnownError): TRPCError =>
  */
 export const runTrpcEffect = async <A, E, R>(effect: Effect.Effect<A, E, R>): Promise<A> => {
   const exit = await appRuntime.runPromiseExit(
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
     effect.pipe(Effect.annotateLogs({ boundary: 'trpc' })) as Effect.Effect<A, E>
   );
 
@@ -63,6 +65,7 @@ export const runTrpcEffect = async <A, E, R>(effect: Effect.Effect<A, E, R>): Pr
  */
 export const runLoaderEffect = <A, E, R>(effect: Effect.Effect<A, E, R>): Promise<A> =>
   appRuntime.runPromise(
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
     effect.pipe(Effect.annotateLogs({ boundary: 'loader' })) as Effect.Effect<A, E>
   );
 

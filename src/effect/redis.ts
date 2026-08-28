@@ -15,6 +15,7 @@ export class RedisClient extends Context.Service<
     readonly get: <T = unknown>(key: string) => Effect.Effect<T | null, RedisError>;
     readonly set: (
       key: string,
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- redis cache stores arbitrary serializable payloads; unknown forces schema validation at read boundary
       value: unknown,
       options?: { ex?: number }
     ) => Effect.Effect<unknown, RedisError>;
@@ -33,6 +34,7 @@ export class RedisClient extends Context.Service<
 
       return {
         get: <T = unknown>(key: string) => tryRedis('get', () => redis.get<T>(key)),
+        // oxlint-disable-next-line anti-slop/no-unknown-parameters -- redis set accepts arbitrary payload; callers validate via schema before write
         set: (key: string, value: unknown, options?: { ex?: number }) =>
           tryRedis('set', () =>
             options?.ex !== undefined

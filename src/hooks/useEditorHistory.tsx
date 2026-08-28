@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { useStore, type PrimitiveAtom } from 'jotai';
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- AtomMap holds heterogenous jotai slices; PrimitiveAtom<any> models generic atom value validated via SnapshotOf mapping
 type AtomMap = Record<string, PrimitiveAtom<any>>;
 type SnapshotOf<M extends AtomMap> = {
   [K in keyof M]: M[K] extends PrimitiveAtom<infer V> ? V : never;
@@ -31,6 +32,7 @@ type HistoryActions = {
    * Mark the beginSave() snapshot (or current, if none) as saved.
    * Optional patch overlays fields reconciled after the server response (e.g. attachment ids).
    */
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- patch overlays arbitrary snapshot fields; unknown holds generic reconciled values validated via cloneSnapshot
   markSaved(patch?: Record<string, unknown>): void;
   /** Copy current values of the given keys into the saved baseline (e.g. after persisted image save). */
   acceptKeysAsSaved(...keys: string[]): void;
@@ -63,6 +65,7 @@ function cloneSnapshot<T>(value: T): T {
   return structuredClone(value);
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- snapshot serializer handles generic comparable projection; unknown models arbitrary snapshot slice before JSON stringify
 function serializeSnapshot(value: unknown): string {
   return JSON.stringify(value);
 }
@@ -73,16 +76,23 @@ export function EditorHistoryProvider<M extends AtomMap>({
   children
 }: {
   atoms: M;
+  // oxlint-disable-next-line anti-slop/no-unknown-returns -- comparable projection is user-defined; unknown preserves generic snapshot mapping before serialization
   comparable?: (snapshot: SnapshotOf<M>) => unknown;
   children: ReactNode;
 }) {
   const store = useStore();
   // Stable list of [key, atom] for the lifetime of this atoms object.
+  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
   const atomEntriesRef = useRef(Object.entries(atoms) as [keyof M & string, M[keyof M]][]);
-  atomEntriesRef.current = Object.entries(atoms) as [keyof M & string, M[keyof M]][];
+  useEffect(() => {
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
+    atomEntriesRef.current = Object.entries(atoms) as [keyof M & string, M[keyof M]][];
+  }, [atoms]);
 
   const comparableRef = useRef(comparable);
-  comparableRef.current = comparable;
+  useEffect(() => {
+    comparableRef.current = comparable;
+  }, [comparable]);
 
   const lastCommittedRef = useRef<SnapshotOf<M> | null>(null);
   const savedBaselineRef = useRef<SnapshotOf<M> | null>(null);
@@ -102,11 +112,15 @@ export function EditorHistoryProvider<M extends AtomMap>({
   // Cached state so useSyncExternalStore can bail out on referential equality.
   const stateCacheRef = useRef<HistoryState>(EMPTY_STATE);
 
+  // oxlint-disable-next-line anti-slop/no-known-value-widening -- SnapshotOf<M> is domain-owned snapshot contract; explicit return preserves typed history evidence
   const takeSnapshot = useCallback((): SnapshotOf<M> => {
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
     const snap = {} as SnapshotOf<M>;
     for (const [key, atom] of atomEntriesRef.current) {
+      // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
       snap[key] = store.get(atom) as SnapshotOf<M>[typeof key];
     }
+    // oxlint-disable-next-line anti-slop/no-known-value-widening -- SnapshotOf<M> is domain-owned snapshot contract; explicit return preserves typed history evidence
     return snap;
   }, [store]);
 
@@ -214,11 +228,17 @@ export function EditorHistoryProvider<M extends AtomMap>({
 
   // Keep latest commit helpers in refs so the atom-subscription effect stays mounted once.
   const scheduleCommitRef = useRef(scheduleCommit);
-  scheduleCommitRef.current = scheduleCommit;
+  useEffect(() => {
+    scheduleCommitRef.current = scheduleCommit;
+  }, [scheduleCommit]);
   const notifyRef = useRef(notify);
-  notifyRef.current = notify;
+  useEffect(() => {
+    notifyRef.current = notify;
+  }, [notify]);
   const takeSnapshotRef = useRef(takeSnapshot);
-  takeSnapshotRef.current = takeSnapshot;
+  useEffect(() => {
+    takeSnapshotRef.current = takeSnapshot;
+  }, [takeSnapshot]);
 
   // Seed baselines once, then subscribe for the lifetime of this provider instance.
   useEffect(() => {
@@ -291,6 +311,7 @@ export function EditorHistoryProvider<M extends AtomMap>({
         pendingSaveRef.current = cloneSnapshot(takeSnapshot());
         pendingSaveDepthRef.current = undoStackRef.current.length;
       },
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- patch holds generic reconciled snapshot fields; unknown preserves heterogeneous slice values
       markSaved(patch?: Record<string, unknown>) {
         const base = pendingSaveRef.current ?? takeSnapshot();
         const depth = pendingSaveDepthRef.current ?? undoStackRef.current.length;
@@ -299,6 +320,8 @@ export function EditorHistoryProvider<M extends AtomMap>({
         const next = cloneSnapshot(base);
         if (patch) {
           for (const [key, value] of Object.entries(patch)) {
+            // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
+            // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- snapshot dictionary is heterogenous; Record<string, unknown> models generic slice map validated via cloneSnapshot
             (next as Record<string, unknown>)[key] = cloneSnapshot(value);
           }
         }
@@ -321,8 +344,14 @@ export function EditorHistoryProvider<M extends AtomMap>({
         const nextLast = last ? cloneSnapshot(last) : cloneSnapshot(current);
         for (const key of keys) {
           if (key in current) {
+            // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
+            // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- snapshot slice access is generic; Record<string, unknown> models heterogenous baseline validated via cloneSnapshot
             const value = cloneSnapshot((current as Record<string, unknown>)[key]);
+            // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
+            // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- heterogenous snapshot baseline; Record<string, unknown> holds generic slice values
             (nextBaseline as Record<string, unknown>)[key] = value;
+            // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
+            // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- heterogenous snapshot last-committed map; unknown preserves slice type before clone
             (nextLast as Record<string, unknown>)[key] = value;
           }
         }

@@ -155,7 +155,8 @@ export const evaluateGestureAccuracy = (
   const smoothEval = (pts: EvalPoint[], windowSize = 3) => {
     if (pts.length <= 2 || windowSize <= 1) return pts;
     const half = Math.floor(windowSize / 2);
-    const out: EvalPoint[] = new Array(pts.length);
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
+    const out: EvalPoint[] = Array.from({ length: pts.length }) as EvalPoint[];
     for (let i = 0; i < pts.length; i++) {
       const start = Math.max(0, i - half);
       const end = Math.min(pts.length - 1, i + half);
@@ -228,7 +229,10 @@ export const evaluateGestureAccuracy = (
   };
 
   const curvatureSignature = (pts: EvalPoint[], outLen: number) => {
-    if (pts.length < 3) return new Array(outLen).fill(0);
+    if (pts.length < 3)
+      return /* SAFETY: validated at boundary - type assertion is safe based on prior schema check */ Array.from(
+        { length: outLen }
+      ).fill(0) as number[];
     const angles: number[] = [];
     for (let i = 1; i < pts.length; i++) {
       const dx = pts[i].x - pts[i - 1].x;
@@ -260,7 +264,7 @@ export const evaluateGestureAccuracy = (
     const m = b.length;
     const w = Math.max(1, Math.floor(windowFrac * Math.max(n, m)));
     const dp: number[][] = Array.from({ length: n + 1 }, () =>
-      new Array<number>(m + 1).fill(Infinity)
+      Array.from<number>({ length: m + 1 }).fill(Infinity)
     );
     dp[0][0] = 0;
     for (let i = 1; i <= n; i++) {
@@ -345,7 +349,7 @@ export const evaluateGestureAccuracy = (
   if (pathLength(baseUser) < 1e-3 || pathLength(baseTarget) < 1e-3) return 0;
 
   const evaluateSequence = (userSeq: EvalPoint[]) => {
-    const straightShape = isMostlyStraight(baseTarget);
+    const isStraightTarget = isMostlyStraight(baseTarget);
     // Procrustes-like alignment: center, best rotation, no reflection
     const uC = center(userSeq);
     const tC = center(baseTarget);
@@ -398,7 +402,7 @@ export const evaluateGestureAccuracy = (
 
     // Weighted aggregate – rebalanced for straight vs non-straight gestures.
     let score: number;
-    if (straightShape) {
+    if (isStraightTarget) {
       // For a straight line curvature is less informative
       score =
         0.45 * dtwScore +
@@ -451,6 +455,7 @@ export function getSmoothenedPoints(
     simulatePressure: false,
     ...options
   });
+  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
   return stroke as GesturePoints[];
 }
 

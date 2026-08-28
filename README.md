@@ -136,5 +136,6 @@ bun run preview
 ## 🧪 Testing and Quality Control
 
 - **Static Type Checking**: `bun run check`
-- **Linting & Formatting**: `bun run format`
+- **Formatting**: `bun run format` (oxfmt)
+- **Linting**: `bun run lint` / `bun run lint:fix` (oxlint)
 - **Running Tests**: `bun run test` (via Vitest)

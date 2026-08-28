@@ -1,7 +1,7 @@
 'use client';
 
 import { forwardRef, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Stage, Layer, Line, Text, Path } from 'react-konva';
+import { Stage, Layer, Text, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { CANVAS_DIMS, type GesturePoints } from '~/tools/stroke_data/types';
@@ -72,7 +72,15 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     if (measured.width !== textBox.width || measured.height !== textBox.height) {
       setTextBox({ width: measured.width, height: measured.height });
     }
-  }, [text, fontSize, fontFamily, currentFontLoaded, mainTextPathVisible]);
+  }, [
+    text,
+    fontSize,
+    fontFamily,
+    currentFontLoaded,
+    mainTextPathVisible,
+    textBox.width,
+    textBox.height
+  ]);
 
   // Container ref used to keep the canvas within the viewport
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -142,7 +150,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     setCurrentGestureRecordingPoints((prev) => [...prev, point]);
   };
 
-  const onMouseUp = (e: KonvaMouseTouchEvent) => {
+  const onMouseUp = (_e: KonvaMouseTouchEvent) => {
     if (!isRecording || !isDrawing) return;
 
     setIsDrawing(false);
@@ -191,6 +199,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     const preventTouchNavigation = (e: TouchEvent) => {
       // Prevent all browser navigation gestures when touching the drawing canvas
+      // SAFETY: DOM target is known to be Element in this canvas handler - safe to narrow from EventTarget.
       if (isDrawingCanvas(e.target as Element)) {
         e.preventDefault();
         e.stopPropagation();
@@ -199,6 +208,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     const preventGestureZoom = (e: Event) => {
       // Prevent pinch-to-zoom and other gesture events on the canvas
+      // SAFETY: DOM target is known to be Element in this canvas handler - safe to narrow from EventTarget.
       if (isDrawingCanvas(e.target as Element)) {
         e.preventDefault();
       }
@@ -206,6 +216,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     const preventContextMenu = (e: Event) => {
       // Prevent long press context menu on mobile
+      // SAFETY: DOM target is known to be Element in this canvas handler - safe to narrow from EventTarget.
       if (isDrawingCanvas(e.target as Element)) {
         e.preventDefault();
       }
@@ -213,6 +224,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
 
     const preventDoubleClickZoom = (e: Event) => {
       // Prevent double-click zoom on mobile
+      // SAFETY: DOM target is known to be Element in this canvas handler - safe to narrow from EventTarget.
       if (isDrawingCanvas(e.target as Element)) {
         e.preventDefault();
       }

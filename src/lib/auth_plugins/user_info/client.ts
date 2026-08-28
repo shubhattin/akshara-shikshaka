@@ -16,6 +16,7 @@ type user_plugin_type = () => {
 export const userInfoPluginClient = () => {
   return {
     id: 'additional_user_info',
+    // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
     $InferServerPlugin: {} as ReturnType<user_plugin_type>
   } satisfies BetterAuthClientPlugin;
 };

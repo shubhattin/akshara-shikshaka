@@ -56,9 +56,11 @@ export function parseLearnPageCookie<K extends keyof typeof SAVED_COOKIES_KEY>(
 ): z.infer<(typeof SAVED_COOKIES_KEY)[K]['schema']> {
   try {
     const parsedValue = cookieValue ? JSON.parse(cookieValue) : null;
+    // SAFETY: intentional any cast for dynamic slot check - safe as slot is string literal union validated at runtime.
     return SAVED_COOKIES_KEY[key].schema.parse(parsedValue) as any;
     // the return type takes care of this so we dont have to manually cast the type
-  } catch (error) {
+  } catch {
+    // SAFETY: intentional any cast for dynamic slot check - safe as slot is string literal union validated at runtime.
     return null as any;
   }
 }

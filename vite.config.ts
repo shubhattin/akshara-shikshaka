@@ -17,9 +17,7 @@ const config = defineConfig({
     tanstackStart(),
     nitro(),
     viteReact({
-      babel: {
-        plugins: ['babel-plugin-react-compiler']
-      }
+      compiler: true
     })
   ]
 });

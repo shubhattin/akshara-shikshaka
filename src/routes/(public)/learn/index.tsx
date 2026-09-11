@@ -17,6 +17,7 @@ import { createServerTRPC } from '~/api/server';
 import { createIsomorphicFn } from '@tanstack/react-start';
 import js_cookie from 'js-cookie';
 import { getCookie } from '@tanstack/react-start/server';
+import { transliterate_node } from 'lipilekhika/node';
 
 function buildLearnSelection(getCookieValue: (key: string) => string | undefined) {
   return {
@@ -52,8 +53,7 @@ async function transliterateTexts(
 ) {
   if (texts.length === 0 || from === to) return texts;
   try {
-    const { transliterate_wasm } = await import('lipilekhika');
-    return await transliterate_wasm(texts, from, to);
+    return await transliterate_node(texts, from, to);
   } catch {
     return texts;
   }

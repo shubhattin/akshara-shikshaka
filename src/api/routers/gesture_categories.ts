@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Effect } from 'effect';
 import { and, asc, eq, isNull, max, ne, sql } from 'drizzle-orm';
 import { gesture_categories, gesture_text_key_category_join, text_gestures } from '~/db/schema';
-import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
+import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
 import { t, protectedAdminProcedure } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
 import { GestureCategoriesSchemaZod, TextGesturesSchemaZod } from '~/db/schema_zod';
@@ -58,7 +58,7 @@ export const reorder_text_gesture_in_category = async (
 };
 
 export const getGestureCategories = Effect.fn('getGestureCategories')(function* () {
-  return yield* dbRun('get_gesture_categories', async (db) =>
+  return yield* dbRunHttp('get_gesture_categories', async (db) =>
     db.query.gesture_categories.findMany({
       columns: { id: true, name: true, order: true },
       orderBy: (tbl, { asc }) => [asc(tbl.order)]
@@ -135,7 +135,7 @@ export const getGesturesByCategory = Effect.fn('getGesturesByCategory')(function
   category_id: number;
   script_id: number;
 }) {
-  return yield* dbRun('get_gestures_by_category', async (db) => {
+  return yield* dbRunHttp('get_gestures_by_category', async (db) => {
     if (input.category_id > 0) {
       const gestures = await db
         .select({

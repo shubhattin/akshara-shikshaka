@@ -7,11 +7,11 @@ import { eq } from 'drizzle-orm';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 import { Effect } from 'effect';
-import { dbRun } from '~/effect/database';
+import { dbRunHttp } from '~/effect/database';
 import { runLoaderEffect } from '~/effect/run';
 
 const getTextGestureForEdit = Effect.fn('getTextGestureForEdit')(function* (id: number) {
-  return yield* dbRun('get_text_gesture_for_edit', async (db) => {
+  return yield* dbRunHttp('get_text_gesture_for_edit', async (db) => {
     const [text_data_] = await db
       .select()
       .from(text_gestures)

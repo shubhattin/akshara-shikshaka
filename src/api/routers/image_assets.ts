@@ -10,7 +10,7 @@ import { PROJECT_S3_ALIAS } from '~/constants';
 import { AiProvider } from '~/effect/ai';
 import { ImageProcessor } from '~/effect/image';
 import { ObjectStorage } from '~/effect/storage';
-import { Database } from '~/effect/database';
+import { dbRunHttp } from '~/effect/database';
 import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
 import { BadRequestError, DatabaseError } from '~/effect/errors';
 
@@ -25,7 +25,6 @@ export const makeUploadImageAsset = Effect.fn('makeUploadImageAsset')(function* 
   const ai = yield* AiProvider;
   const images = yield* ImageProcessor;
   const storage = yield* ObjectStorage;
-  const database = yield* Database;
 
   const start_time = Date.now();
   const lang = get_lang_from_id(input.lang_id);
@@ -86,24 +85,22 @@ export const makeUploadImageAsset = Effect.fn('makeUploadImageAsset')(function* 
   }
   yield* Effect.logInfo('image uploaded');
 
-  const result = yield* database
-    .run('insert_image_asset', async (db) => {
-      const [row] = await db
-        .insert(image_assets)
-        .values({
-          description,
-          width: IMAGE_DIMENSIONS,
-          height: IMAGE_DIMENSIONS,
-          s3_key: s3_image_key
-        })
-        .returning();
-      return row;
-    })
-    .pipe(
-      Effect.tapError(() =>
-        storage.deleteAssetFile(s3_image_key).pipe(Effect.catch(() => Effect.void))
-      )
-    );
+  const result = yield* dbRunHttp('insert_image_asset', async (db) => {
+    const [row] = await db
+      .insert(image_assets)
+      .values({
+        description,
+        width: IMAGE_DIMENSIONS,
+        height: IMAGE_DIMENSIONS,
+        s3_key: s3_image_key
+      })
+      .returning();
+    return row;
+  }).pipe(
+    Effect.tapError(() =>
+      storage.deleteAssetFile(s3_image_key).pipe(Effect.catch(() => Effect.void))
+    )
+  );
 
   if (!result) {
     yield* storage.deleteAssetFile(s3_image_key).pipe(Effect.catch(() => Effect.void));
@@ -126,10 +123,9 @@ export const makeUploadImageAsset = Effect.fn('makeUploadImageAsset')(function* 
 });
 
 export const deleteImageAsset = Effect.fn('deleteImageAsset')(function* (input: { id: number }) {
-  const database = yield* Database;
   const storage = yield* ObjectStorage;
 
-  const result = yield* database.run('find_image_asset', async (db) =>
+  const result = yield* dbRunHttp('find_image_asset', async (db) =>
     db.query.image_assets.findFirst({
       where: eq(image_assets.id, input.id),
       columns: {
@@ -160,7 +156,7 @@ export const deleteImageAsset = Effect.fn('deleteImageAsset')(function* (input: 
     };
   }
 
-  yield* database.run('delete_image_asset', async (db) => {
+  yield* dbRunHttp('delete_image_asset', async (db) => {
     await db.delete(image_assets).where(eq(image_assets.id, input.id));
   });
 
@@ -196,19 +192,18 @@ export const listImageAssets = Effect.fn('listImageAssets')(function* (input: {
   page: number;
   limit: number;
 }) {
-  const database = yield* Database;
   const trimmed = input.search_text?.trim();
   const whereClause =
     trimmed && trimmed.length > 0 ? ilike(image_assets.description, `%${trimmed}%`) : undefined;
   const offset = (input.page - 1) * input.limit;
 
-  const countEffect = database.run('count_image_assets', async (db) =>
+  const countEffect = dbRunHttp('count_image_assets', async (db) =>
     db
       .select({ count: count() })
       .from(image_assets)
       .where(whereClause ?? undefined)
   );
-  const listEffect = database.run('list_image_assets', async (db) =>
+  const listEffect = dbRunHttp('list_image_assets', async (db) =>
     db
       .select({
         id: image_assets.id,
@@ -254,8 +249,7 @@ export const updateImageAsset = Effect.fn('updateImageAsset')(function* (input: 
   id: number;
   description: string;
 }) {
-  const database = yield* Database;
-  yield* database.run('update_image_asset', async (db) => {
+  yield* dbRunHttp('update_image_asset', async (db) => {
     await db
       .update(image_assets)
       .set({ description: input.description })

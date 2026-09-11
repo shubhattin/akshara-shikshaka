@@ -7,11 +7,11 @@ import { Provider as JotaiProvider } from 'jotai';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 import { Effect } from 'effect';
-import { dbRun } from '~/effect/database';
+import { dbRunHttp } from '~/effect/database';
 import { runLoaderEffect } from '~/effect/run';
 
 const getImageAssetForEdit = Effect.fn('getImageAssetForEdit')(function* (id: number) {
-  return yield* dbRun('get_image_asset_for_edit', async (db) =>
+  return yield* dbRunHttp('get_image_asset_for_edit', async (db) =>
     db.query.image_assets.findFirst({
       where: (table, { eq }) => eq(table.id, id),
       columns: {

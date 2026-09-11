@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Effect } from 'effect';
 import { and, eq } from 'drizzle-orm';
 import { gesture_text_key_category_join, lesson_gestures, text_gestures } from '~/db/schema';
-import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
+import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
 import { NotFoundError, BadRequestError } from '~/effect/errors';
 import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
 import { FONT_FAMILIES, type FontFamily } from '~/state/font_list';
@@ -109,7 +109,7 @@ export const editTextGestureData = Effect.fn('editTextGestureData')(function* (i
       BadRequestError.make({ message: `Invalid font family: ${input.fontFamily}` })
     );
   }
-  const updated = yield* dbRun('edit_text_gesture', async (db) => {
+  const updated = yield* dbRunHttp('edit_text_gesture', async (db) => {
     const rows = await db
       .update(text_gestures)
       .set({

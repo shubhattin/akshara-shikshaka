@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { and, eq, max, sql } from 'drizzle-orm';
 import { Effect } from 'effect';
 import { lesson_categories, text_lessons } from '~/db/schema';
-import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
+import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
 import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
@@ -136,7 +136,7 @@ export const getTextLessonsByCategory = Effect.fn('getTextLessonsByCategory')(fu
   category_id: number;
   lang_id: number;
 }) {
-  return yield* dbRun('get_text_lessons_by_category', async (db) => {
+  return yield* dbRunHttp('get_text_lessons_by_category', async (db) => {
     if (input.category_id > 0) {
       const lessons = await db.query.text_lessons.findMany({
         columns: { id: true, text: true, order: true },

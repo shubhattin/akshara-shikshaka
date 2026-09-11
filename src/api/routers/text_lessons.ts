@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { lesson_gestures, text_lesson_words, text_lessons } from '~/db/schema';
-import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
+import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
 import { BadRequestError, NotFoundError } from '~/effect/errors';
 import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
 import { reorder_text_lesson_in_category, lesson_categories_router } from './lesson_categories';
@@ -236,7 +236,7 @@ export const deleteTextLesson = Effect.fn('deleteTextLesson')(function* (input: 
 
 export const getTextLessonWordMediaData = Effect.fn('getTextLessonWordMediaData')(
   function* (input: { word_id: number; lesson_id: number }) {
-    return yield* dbRun('get_text_lesson_word_media_data', async (db) => {
+    return yield* dbRunHttp('get_text_lesson_word_media_data', async (db) => {
       const word = await db.query.text_lesson_words.findFirst({
         where: (tbl, { eq }) =>
           and(eq(tbl.id, input.word_id), eq(tbl.text_lesson_id, input.lesson_id)),
@@ -270,7 +270,7 @@ export const getTextLessonWordMediaData = Effect.fn('getTextLessonWordMediaData'
 
 export const getTextLessonOptionalAudioData = Effect.fn('getTextLessonOptionalAudioData')(
   function* (input: { lesson_id: number }) {
-    return yield* dbRun('get_text_lesson_optional_audio_data', async (db) => {
+    return yield* dbRunHttp('get_text_lesson_optional_audio_data', async (db) => {
       const lesson = await db.query.text_lessons.findFirst({
         where: (tbl, { eq }) => eq(tbl.id, input.lesson_id),
         columns: { id: true },

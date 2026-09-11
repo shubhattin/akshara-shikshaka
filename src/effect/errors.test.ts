@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { DatabaseError, NotFoundError, RedisError, StorageError, isKnownError } from './errors';
 import { RedisClient } from './redis';
 import { BackgroundWork } from './background';
-import { Database, type DbClient, type DbTransaction } from './database';
+import { DatabaseHttp, type DbHttpClient } from './database';
 import { createCache, invalidateAndRefreshCache } from './cache';
 
 describe('Effect infrastructure', () => {
@@ -71,9 +71,8 @@ describe('cache refresh', () => {
         }
       });
 
-      const UnusedDb = Layer.succeed(Database)({
-        run: () => Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' })),
-        transaction: () => Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' }))
+      const UnusedDb = Layer.succeed(DatabaseHttp)({
+        run: () => Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' }))
       });
 
       const cache = createCache({
@@ -108,10 +107,8 @@ describe('cache refresh', () => {
           return Effect.succeed(1);
         }
       });
-      const TestDatabase = Layer.succeed(Database)({
-        run: <A>(_operation: string, _run: (client: DbClient) => Promise<A>) =>
-          Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' })),
-        transaction: <A>(_operation: string, _run: (tx: DbTransaction) => Promise<A>) =>
+      const TestDatabase = Layer.succeed(DatabaseHttp)({
+        run: <A>(_operation: string, _run: (client: DbHttpClient) => A | PromiseLike<A>) =>
           Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' }))
       });
       const QueuedBackgroundWork = Layer.succeed(BackgroundWork)({
@@ -152,10 +149,8 @@ describe('cache refresh', () => {
         set: () => Effect.succeed('OK'),
         del: () => Effect.fail(RedisError.make({ operation: 'del', cause: 'redis down' }))
       });
-      const TestDatabase = Layer.succeed(Database)({
-        run: <A>(_operation: string, _run: (client: DbClient) => Promise<A>) =>
-          Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' })),
-        transaction: <A>(_operation: string, _run: (tx: DbTransaction) => Promise<A>) =>
+      const TestDatabase = Layer.succeed(DatabaseHttp)({
+        run: <A>(_operation: string, _run: (client: DbHttpClient) => A | PromiseLike<A>) =>
           Effect.fail(DatabaseError.make({ operation: 'unused', cause: 'unused' }))
       });
       const QueuedBackgroundWork = Layer.succeed(BackgroundWork)({

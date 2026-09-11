@@ -7,11 +7,11 @@ import { z } from 'zod';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 import { Effect } from 'effect';
-import { dbRun } from '~/effect/database';
+import { dbRunHttp } from '~/effect/database';
 import { runLoaderEffect } from '~/effect/run';
 
 const getTextLessonForEdit = Effect.fn('getTextLessonForEdit')(function* (id: number) {
-  return yield* dbRun('get_text_lesson_for_edit', async (db) =>
+  return yield* dbRunHttp('get_text_lesson_for_edit', async (db) =>
     db.query.text_lessons.findFirst({
       where: (tbl, { eq }) => eq(tbl.id, id),
       columns: {

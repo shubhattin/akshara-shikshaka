@@ -3,7 +3,7 @@ import { publicProcedure, t, verify_cloudflare_turnstile_token } from '../trpc_i
 import { runTrpcEffect } from '~/effect/run';
 import { user_gesture_recording_vectors, user_gesture_recordings } from '~/db/schema';
 import { Effect } from 'effect';
-import { dbTransaction } from '~/effect/database';
+import { dbRunHttp } from '~/effect/database';
 import { BadRequestError } from '~/effect/errors';
 
 const submit_user_gesture_recording_route = publicProcedure
@@ -38,8 +38,8 @@ const submit_user_gesture_recording_route = publicProcedure
           return yield* Effect.fail(BadRequestError.make({ message: 'Invalid turnstile token' }));
         }
 
-        const { id } = yield* dbTransaction('submit_user_gesture_recording', async (tx) => {
-          const [{ id }] = await tx
+        const { id } = yield* dbRunHttp('submit_user_gesture_recording', async (db) => {
+          const [{ id }] = await db
             .insert(user_gesture_recordings)
             .values({
               text: input.text,
@@ -48,7 +48,7 @@ const submit_user_gesture_recording_route = publicProcedure
             })
             .returning();
 
-          await tx.insert(user_gesture_recording_vectors).values(
+          await db.insert(user_gesture_recording_vectors).values(
             input.vectors.map((vector) => ({
               ...vector,
               user_gesture_recording_id: id

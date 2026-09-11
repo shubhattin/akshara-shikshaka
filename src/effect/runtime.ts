@@ -1,6 +1,6 @@
 import { Layer, ManagedRuntime } from 'effect';
 import { AppConfig } from './config';
-import { Database } from './database';
+import { Database, DatabaseHttp } from './database';
 import { RedisClient } from './redis';
 import { ObjectStorage } from './storage';
 import { AiProvider } from './ai';
@@ -10,7 +10,8 @@ import { BackgroundWork } from './background';
 const InfrastructureLayer = Layer.mergeAll(ImageProcessor.Live, BackgroundWork.Live);
 
 const ConfigDependentLayer = Layer.mergeAll(
-  // db pool is released on scope end of the layer
+  // db pool is released on scope end of the layer; HTTP is stateless so both clients are fine
+  DatabaseHttp.Live,
   Database.Live,
   RedisClient.Live,
   ObjectStorage.Live,

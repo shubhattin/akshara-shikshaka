@@ -7,11 +7,11 @@ import { Provider as JotaiProvider } from 'jotai';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 import { Effect } from 'effect';
-import { dbRun } from '~/effect/database';
+import { dbRunHttp } from '~/effect/database';
 import { runLoaderEffect } from '~/effect/run';
 
 const getAudioAssetForEdit = Effect.fn('getAudioAssetForEdit')(function* (id: number) {
-  return yield* dbRun('get_audio_asset_for_edit', async (db) =>
+  return yield* dbRunHttp('get_audio_asset_for_edit', async (db) =>
     db.query.audio_assets.findFirst({
       where: (table, { eq }) => eq(table.id, id),
       columns: {

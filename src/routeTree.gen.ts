@@ -13,6 +13,7 @@ import { Route as authAuthRouteImport } from './routes/(auth)/_auth'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as publicLearnIndexRouteImport } from './routes/(public)/learn/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
+import { Route as authAuthAnalyticsIndexRouteImport } from './routes/(auth)/_auth/analytics/index'
 import { Route as authAuthAudio_assetsIndexRouteImport } from './routes/(auth)/_auth/audio_assets/index'
 import { Route as authAuthGesturesIndexRouteImport } from './routes/(auth)/_auth/gestures/index'
 import { Route as authAuthImage_assetsIndexRouteImport } from './routes/(auth)/_auth/image_assets/index'
@@ -40,6 +41,11 @@ const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
   id: '/api/trpc/$',
   path: '/api/trpc/$',
   getParentRoute: () => rootRouteImport,
+} as any)
+const authAuthAnalyticsIndexRoute = authAuthAnalyticsIndexRouteImport.update({
+  id: '/analytics/',
+  path: '/analytics/',
+  getParentRoute: () => authAuthRoute,
 } as any)
 const authAuthAudio_assetsIndexRoute =
   authAuthAudio_assetsIndexRouteImport.update({
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn/': typeof publicLearnIndexRoute
+  '/analytics/': typeof authAuthAnalyticsIndexRoute
   '/audio_assets/': typeof authAuthAudio_assetsIndexRoute
   '/gestures/': typeof authAuthGesturesIndexRoute
   '/image_assets/': typeof authAuthImage_assetsIndexRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn': typeof publicLearnIndexRoute
+  '/analytics': typeof authAuthAnalyticsIndexRoute
   '/audio_assets': typeof authAuthAudio_assetsIndexRoute
   '/gestures': typeof authAuthGesturesIndexRoute
   '/image_assets': typeof authAuthImage_assetsIndexRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/(public)/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/(public)/learn/': typeof publicLearnIndexRoute
+  '/(auth)/_auth/analytics/': typeof authAuthAnalyticsIndexRoute
   '/(auth)/_auth/audio_assets/': typeof authAuthAudio_assetsIndexRoute
   '/(auth)/_auth/gestures/': typeof authAuthGesturesIndexRoute
   '/(auth)/_auth/image_assets/': typeof authAuthImage_assetsIndexRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/trpc/$'
     | '/learn/'
+    | '/analytics/'
     | '/audio_assets/'
     | '/gestures/'
     | '/image_assets/'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/trpc/$'
     | '/learn'
+    | '/analytics'
     | '/audio_assets'
     | '/gestures'
     | '/image_assets'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/(public)/'
     | '/api/trpc/$'
     | '/(public)/learn/'
+    | '/(auth)/_auth/analytics/'
     | '/(auth)/_auth/audio_assets/'
     | '/(auth)/_auth/gestures/'
     | '/(auth)/_auth/image_assets/'
@@ -206,6 +218,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/trpc/$'
       preLoaderRoute: typeof ApiTrpcSplatRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/(auth)/_auth/analytics/': {
+      id: '/(auth)/_auth/analytics/'
+      path: '/analytics'
+      fullPath: '/analytics/'
+      preLoaderRoute: typeof authAuthAnalyticsIndexRouteImport
+      parentRoute: typeof authAuthRoute
     }
     '/(auth)/_auth/audio_assets/': {
       id: '/(auth)/_auth/audio_assets/'
@@ -267,6 +286,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface authAuthRouteChildren {
+  authAuthAnalyticsIndexRoute: typeof authAuthAnalyticsIndexRoute
   authAuthAudio_assetsIndexRoute: typeof authAuthAudio_assetsIndexRoute
   authAuthGesturesIndexRoute: typeof authAuthGesturesIndexRoute
   authAuthImage_assetsIndexRoute: typeof authAuthImage_assetsIndexRoute
@@ -278,6 +298,7 @@ interface authAuthRouteChildren {
 }
 
 const authAuthRouteChildren: authAuthRouteChildren = {
+  authAuthAnalyticsIndexRoute: authAuthAnalyticsIndexRoute,
   authAuthAudio_assetsIndexRoute: authAuthAudio_assetsIndexRoute,
   authAuthGesturesIndexRoute: authAuthGesturesIndexRoute,
   authAuthImage_assetsIndexRoute: authAuthImage_assetsIndexRoute,

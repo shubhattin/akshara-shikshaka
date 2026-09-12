@@ -177,13 +177,26 @@ export const audio_assets = pgTable(
   (table) => [index('audio_assets_type_idx').on(table.type)]
 );
 
-export const user_gesture_recordings = pgTable('user_gesture_recordings', {
-  id: serial().primaryKey(),
-  text: text().notNull(),
-  script_id: smallint().notNull(),
-  completed: boolean().notNull().default(false),
-  created_at: timestamp().notNull().defaultNow()
-});
+export const user_gesture_recordings = pgTable(
+  'user_gesture_recordings',
+  {
+    id: serial().primaryKey(),
+    text: text().notNull(),
+    script_id: smallint().notNull(),
+    completed: boolean().notNull().default(false),
+    created_at: timestamp().notNull().defaultNow()
+  },
+  (table) => [
+    index('user_gesture_recordings_created_at_idx').on(table.created_at),
+    index('user_gesture_recordings_script_created_at_idx').on(table.script_id, table.created_at),
+    index('user_gesture_recordings_text_script_created_at_idx').on(
+      table.text,
+      table.script_id,
+      table.created_at
+    ),
+    index('user_gesture_recordings_completed_created_at_idx').on(table.completed, table.created_at)
+  ]
+);
 
 export const user_gesture_recording_vectors = pgTable(
   'user_gesture_recording_vectors',
@@ -201,7 +214,8 @@ export const user_gesture_recording_vectors = pgTable(
       name: 'user_gesture_recording_points_id_fk',
       columns: [table.user_gesture_recording_id],
       foreignColumns: [user_gesture_recordings.id]
-    }).onDelete('cascade')
+    }).onDelete('cascade'),
+    index('user_gesture_recording_vectors_recording_id_idx').on(table.user_gesture_recording_id)
   ]
 );
 

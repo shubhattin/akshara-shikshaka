@@ -9,7 +9,14 @@ import {
   ContextMenuSeparator
 } from '@/components/ui/context-menu';
 import { Link } from '@tanstack/react-router';
-import { FaRegHandPaper, FaBookOpen, FaVolumeUp, FaRegImage, FaSignInAlt } from 'react-icons/fa';
+import {
+  FaRegHandPaper,
+  FaBookOpen,
+  FaVolumeUp,
+  FaRegImage,
+  FaSignInAlt,
+  FaChartBar
+} from 'react-icons/fa';
 import { signIn } from '~/lib/auth-client';
 import { useSession } from '~/lib/auth-client';
 
@@ -52,6 +59,12 @@ export default function ManageMenuList({ children }: { children: React.ReactNode
               <ContextMenuItem className="w-full">
                 <FaRegHandPaper className="h-4 w-4" />
                 Gestures
+              </ContextMenuItem>
+            </Link>
+            <Link to="/analytics" className="flex items-center gap-2">
+              <ContextMenuItem className="w-full">
+                <FaChartBar className="h-4 w-4" />
+                Analytics
               </ContextMenuItem>
             </Link>
             <ContextMenuSeparator />

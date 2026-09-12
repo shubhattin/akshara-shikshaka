@@ -4,13 +4,15 @@ import { text_lessons_router } from './routers/text_lessons';
 import { image_assets_router } from './routers/image_assets';
 import { audio_assets_router } from './routers/audio_assets';
 import { user_gesture_recordings_router } from './routers/user_gesture_recordings';
+import { gesture_stats_router } from './routers/gesture_stats';
 
 export const appRouter = t.router({
   text_gestures: text_gestures_router,
   text_lessons: text_lessons_router,
   image_assets: image_assets_router,
   audio_assets: audio_assets_router,
-  user_gesture_recordings: user_gesture_recordings_router
+  user_gesture_recordings: user_gesture_recordings_router,
+  gesture_stats: gesture_stats_router
 });
 
 export type AppRouter = typeof appRouter;

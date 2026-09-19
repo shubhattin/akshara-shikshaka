@@ -1,10 +1,25 @@
 import { z } from 'zod';
 import { Effect } from 'effect';
-import { and, count, desc, eq, gte, ilike, inArray, lte, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  avg,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNotNull,
+  lte,
+  sql,
+  type SQL
+} from 'drizzle-orm';
 import { t, protectedAdminProcedure } from '../trpc_init';
 import { user_gesture_recordings, user_gesture_recording_vectors } from '~/db/schema';
 import { dbRunHttp } from '~/effect/database';
 import { runTrpcEffect } from '~/effect/run';
+import { resolveAuthUserNames } from '~/lib/auth_users.server';
+import { displayUserName } from './user/session_user';
 
 const date_range_schema = z
   .object({
@@ -282,8 +297,99 @@ const search_recorded_texts_route = protectedAdminProcedure
     )
   );
 
+const get_top_users_input_schema = date_range_schema.extend({
+  script_id: z.int().optional(),
+  limit: z.int().min(1).max(50).default(10)
+});
+
+const get_top_users_route = protectedAdminProcedure
+  .input(get_top_users_input_schema)
+  .query(({ input: { all_time, start_date, end_date, script_id, limit } }) =>
+    runTrpcEffect(
+      Effect.gen(function* () {
+        const baseConditions = [
+          isNotNull(user_gesture_recordings.user_id),
+          ...recordingDateConditions(all_time, start_date, end_date)
+        ];
+        if (script_id !== undefined) {
+          baseConditions.push(eq(user_gesture_recordings.script_id, script_id));
+        }
+
+        const topRows = yield* dbRunHttp('gesture_stats.get_top_users', (client) =>
+          client
+            .select({
+              user_id: user_gesture_recordings.user_id,
+              started: count(),
+              completed:
+                sql<number>`sum(case when ${user_gesture_recordings.completed} then 1 else 0 end)`.mapWith(
+                  Number
+                )
+            })
+            .from(user_gesture_recordings)
+            .where(and(...baseConditions))
+            .groupBy(user_gesture_recordings.user_id)
+            .orderBy(desc(count()))
+            .limit(limit)
+        );
+
+        const userIds = topRows.flatMap((row) => (row.user_id ? [row.user_id] : []));
+        if (userIds.length === 0) return { users: [] };
+
+        const namesById = yield* resolveAuthUserNames(userIds);
+
+        const accuracyConditions = [
+          inArray(user_gesture_recordings.user_id, userIds),
+          ...recordingDateConditions(all_time, start_date, end_date)
+        ];
+        if (script_id !== undefined) {
+          accuracyConditions.push(eq(user_gesture_recordings.script_id, script_id));
+        }
+
+        const accuracyRows = yield* dbRunHttp('gesture_stats.get_top_user_accuracy', (client) =>
+          client
+            .select({
+              user_id: user_gesture_recordings.user_id,
+              avg_accuracy: avg(user_gesture_recording_vectors.recorded_accuracy)
+            })
+            .from(user_gesture_recordings)
+            .innerJoin(
+              user_gesture_recording_vectors,
+              eq(
+                user_gesture_recording_vectors.user_gesture_recording_id,
+                user_gesture_recordings.id
+              )
+            )
+            .where(and(...accuracyConditions))
+            .groupBy(user_gesture_recordings.user_id)
+        );
+
+        const accuracyByUser = new Map(
+          accuracyRows.flatMap((row) =>
+            row.user_id ? [[row.user_id, Math.round(Number(row.avg_accuracy) * 100)] as const] : []
+          )
+        );
+
+        return {
+          users: topRows.flatMap((row) => {
+            if (!row.user_id) return [];
+            return [
+              {
+                user_id: row.user_id,
+                name: namesById.get(row.user_id) ?? displayUserName(row.user_id, null),
+                started: Number(row.started),
+                completed: Number(row.completed),
+                avg_accuracy: accuracyByUser.get(row.user_id) ?? 0
+              }
+            ];
+          })
+        };
+      })
+    )
+  );
+
 export const gesture_stats_router = t.router({
   get_stats_data: get_stats_data_route,
   get_top_gestures: get_top_gestures_route,
-  search_recorded_texts: search_recorded_texts_route
+  search_recorded_texts: search_recorded_texts_route,
+  get_top_users: get_top_users_route
 });

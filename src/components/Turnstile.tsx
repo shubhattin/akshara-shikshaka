@@ -1,6 +1,5 @@
-// Default export is a CJS namespace object; named export is the component.
 import { Turnstile } from 'react-turnstile';
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
 
 type Props = {
   setToken: Dispatch<SetStateAction<string | null>>;
@@ -12,13 +11,14 @@ const PROD = import.meta.env.PROD;
 export const TURNSTILE_ENABLED = SITE_KEY && PROD;
 // export const TURNSTILE_ENABLED = SITE_KEY && !PROD; // for dev mode testing
 
-export default function TurnstileWidget({ setToken }: Props) {
-  const [mounted, setMounted] = useState(false);
+const subscribe = () => () => {};
 
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- intentional client-only mount flag to avoid SSR mismatch for Turnstile
-    setMounted(true);
-  }, []);
+export default function TurnstileWidget({ setToken }: Props) {
+  const mounted = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false
+  );
 
   if (!mounted || !TURNSTILE_ENABLED) return <></>;
 
@@ -26,7 +26,6 @@ export default function TurnstileWidget({ setToken }: Props) {
     <Turnstile
       sitekey={SITE_KEY}
       onVerify={(token) => {
-        // console.log('token', token);
         setToken(token);
       }}
     />

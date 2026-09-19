@@ -8,34 +8,23 @@ import notoSansOdia from '@fontsource-variable/noto-sans-oriya/files/noto-sans-o
 import notoSerifOdia from '@fontsource-variable/noto-serif-oriya/files/noto-serif-oriya-oriya-wght-normal.woff2?url';
 import notoSansMalayalam from '@fontsource-variable/noto-sans-malayalam/files/noto-sans-malayalam-malayalam-wght-normal.woff2?url';
 import notoSerifMalayalam from '@fontsource-variable/noto-serif-malayalam/files/noto-serif-malayalam-malayalam-wght-normal.woff2?url';
-//local fonts
+// local fonts
 import NirmalaUI from '~/fonts/regular/woff2/Nirmala_UI.woff2?url';
 import AdobeDevanagari from '~/fonts/regular/woff2/Adobe_Devanagari.woff2?url';
 import AdobeTelugu from '~/fonts/regular/woff2/Adobe_Telugu.woff2?url';
 
 import { type script_list_type } from './lang_list';
+import {
+  type FontFamily,
+  DEFAULT_FONT_FAMILY,
+  DEFAULT_FONT_SIZE,
+  FONT_FAMILIES,
+  FONT_SCRIPTS,
+  LANGUAGES_ADDED
+} from './font_families';
 
-export const FONT_FAMILIES = [
-  // All
-  'Nirmala_UI',
-  // Devanagari
-  'Adobe_Devanagari',
-  'Noto_Serif_Devanagari',
-  'Noto_Sans_Devanagari',
-  // Telugu
-  'Adobe_Telugu',
-  'Noto_Serif_Telugu',
-  'Noto_Sans_Telugu',
-  // Kannada
-  'Noto_Serif_Kannada',
-  'Noto_Sans_Kannada',
-  // Odia
-  'Noto_Serif_Odia',
-  'Noto_Sans_Odia',
-  // Malayalam
-  'Noto_Serif_Malayalam',
-  'Noto_Sans_Malayalam'
-] as const;
+export type { FontFamily };
+export { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, FONT_FAMILIES, FONT_SCRIPTS, LANGUAGES_ADDED };
 
 /** Bundled woff2 URLs from @fontsource-variable packages. */
 const FONT_URLS = {
@@ -55,13 +44,6 @@ const FONT_URLS = {
   Adobe_Telugu: AdobeTelugu
 } satisfies Record<FontFamily, string>;
 
-export const LANGUAGES_ADDED = ['Sanskrit'] as const;
-export type FontFamily = (typeof FONT_FAMILIES)[number];
-
-/**
- * These are the scripts for which the fonts have been specified and setup properly
- */
-export const FONT_SCRIPTS = ['Devanagari', 'Telugu', 'Kannada', 'Odia', 'Malayalam'] as const;
 type FontEntry<F extends FontFamily> = {
   font_family: F;
   url: string;
@@ -106,6 +88,3 @@ export const FONT_LIST: FontList = {
     get_font_entry('Noto_Sans_Malayalam', 'variable')
   ]
 };
-
-export const DEFAULT_FONT_FAMILY = 'Nirmala_UI' satisfies FontFamily;
-export const DEFAULT_FONT_SIZE = 15 as const;

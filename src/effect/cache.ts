@@ -5,6 +5,7 @@ import { RedisClient } from './redis';
 import { CacheError } from './errors';
 import { BackgroundWork } from './background';
 import { DatabaseHttp, type DbHttpClient } from './database';
+import { fetchAksharaDashboardCached } from './user_cache';
 
 const CACHE_EXPIRE_S = ms('30days') / 1000;
 
@@ -330,6 +331,16 @@ export const CACHE = {
             }
           })
         )
+    })
+  },
+  user: {
+    dashboard: createCache({
+      keyPrefix: 'user',
+      schema: z.object({
+        userId: z.string().min(1)
+      }),
+      keyBuilder: ({ userId }) => `${userId}:akshara`,
+      fetch: fetchAksharaDashboardCached
     })
   }
 };

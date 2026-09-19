@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { MenuButton } from '~/components/app-bar/AppBarMenu';
 import { robotoSans } from '../fonts';
 import SupportOptions from '~/components/app-bar/SupportOptions';
+import { UserProfileChip } from '~/components/app-bar/UserProfileChip';
 
 export default function AppBar({ title }: { title: string }) {
   return (
@@ -37,6 +38,7 @@ export default function AppBar({ title }: { title: string }) {
         {/* Actions Section */}
         <div className="flex items-center gap-2">
           <SupportOptions />
+          <UserProfileChip />
           <MenuButton />
         </div>
       </div>

@@ -1,15 +1,17 @@
 import z from 'zod';
-import { publicProcedure, t, verify_cloudflare_turnstile_token } from '../trpc_init';
+import { Effect } from 'effect';
+import { publicProcedure, t } from '../trpc_init';
 import { runTrpcEffect } from '~/effect/run';
 import { user_gesture_recording_vectors, user_gesture_recordings } from '~/db/schema';
-import { Effect } from 'effect';
 import { dbRunHttp } from '~/effect/database';
-import { BadRequestError } from '~/effect/errors';
+import { optional_turnstile_token_schema, requireTurnstileIfGuest } from './turnstile_guard';
+import { sessionUserFields } from './user/session_user';
+import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
 
 const submit_user_gesture_recording_route = publicProcedure
   .input(
     z.object({
-      turnstile_token: z.string(),
+      turnstile_token: optional_turnstile_token_schema,
       text: z.string().min(1),
       script_id: z.int(),
       completed: z.boolean().optional(),
@@ -23,28 +25,20 @@ const submit_user_gesture_recording_route = publicProcedure
       )
     })
   )
-  .mutation(async ({ input }) =>
+  .mutation(async ({ input, ctx }) =>
     runTrpcEffect(
       Effect.gen(function* () {
-        const is_valid = yield* Effect.tryPromise({
-          try: () => verify_cloudflare_turnstile_token(input.turnstile_token),
-          catch: (cause) => cause
-        }).pipe(
-          Effect.map((success) => success === true),
-          Effect.catch(() => Effect.succeed(false))
-        );
+        yield* requireTurnstileIfGuest(input.turnstile_token, ctx.user);
 
-        if (!is_valid) {
-          return yield* Effect.fail(BadRequestError.make({ message: 'Invalid turnstile token' }));
-        }
-
+        const userFields = sessionUserFields(ctx.user);
         const { id } = yield* dbRunHttp('submit_user_gesture_recording', async (db) => {
           const [{ id }] = await db
             .insert(user_gesture_recordings)
             .values({
               text: input.text,
               script_id: input.script_id,
-              completed: input.completed
+              completed: input.completed,
+              user_id: userFields.user_id
             })
             .returning();
 
@@ -57,6 +51,13 @@ const submit_user_gesture_recording_route = publicProcedure
 
           return { id };
         });
+
+        if (userFields.user_id) {
+          yield* invalidateAndRefreshCache({
+            cache: CACHE.user.dashboard,
+            params: { userId: userFields.user_id }
+          });
+        }
 
         return {
           success: true as const,

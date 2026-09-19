@@ -17,7 +17,7 @@ import {
   real,
   boolean
 } from 'drizzle-orm/pg-core';
-import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_list';
+import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_families';
 import type { Gesture } from '~/tools/stroke_data/types';
 
 export const text_gestures = pgTable(
@@ -184,6 +184,7 @@ export const user_gesture_recordings = pgTable(
     text: text().notNull(),
     script_id: smallint().notNull(),
     completed: boolean().notNull().default(false),
+    user_id: text(),
     created_at: timestamp().notNull().defaultNow()
   },
   (table) => [
@@ -194,7 +195,9 @@ export const user_gesture_recordings = pgTable(
       table.script_id,
       table.created_at
     ),
-    index('user_gesture_recordings_completed_created_at_idx').on(table.completed, table.created_at)
+    index('user_gesture_recordings_completed_created_at_idx').on(table.completed, table.created_at),
+    index('user_gesture_recordings_user_id_idx').on(table.user_id),
+    index('user_gesture_recordings_user_id_created_at_idx').on(table.user_id, table.created_at)
   ]
 );
 

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as authAuthRouteImport } from './routes/(auth)/_auth'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
+import { Route as publicDashboardRouteImport } from './routes/(public)/dashboard'
 import { Route as publicLearnIndexRouteImport } from './routes/(public)/learn/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as authAuthAnalyticsIndexRouteImport } from './routes/(auth)/_auth/analytics/index'
@@ -30,6 +31,11 @@ const authAuthRoute = authAuthRouteImport.update({
 const publicIndexRoute = publicIndexRouteImport.update({
   id: '/(public)/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const publicDashboardRoute = publicDashboardRouteImport.update({
+  id: '/(public)/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const publicLearnIndexRoute = publicLearnIndexRouteImport.update({
@@ -93,6 +99,7 @@ const authAuthLessonsEditIdRoute = authAuthLessonsEditIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/dashboard': typeof publicDashboardRoute
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn/': typeof publicLearnIndexRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/lessons/edit/$id': typeof authAuthLessonsEditIdRoute
 }
 export interface FileRoutesByTo {
+  '/dashboard': typeof publicDashboardRoute
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn': typeof publicLearnIndexRoute
@@ -123,6 +131,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/(auth)/_auth': typeof authAuthRouteWithChildren
+  '/(public)/dashboard': typeof publicDashboardRoute
   '/(public)/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/(public)/learn/': typeof publicLearnIndexRoute
@@ -139,6 +148,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/dashboard'
     | '/'
     | '/api/trpc/$'
     | '/learn/'
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/lessons/edit/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/dashboard'
     | '/'
     | '/api/trpc/$'
     | '/learn'
@@ -168,6 +179,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/(auth)/_auth'
+    | '/(public)/dashboard'
     | '/(public)/'
     | '/api/trpc/$'
     | '/(public)/learn/'
@@ -184,6 +196,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   authAuthRoute: typeof authAuthRouteWithChildren
+  publicDashboardRoute: typeof publicDashboardRoute
   publicIndexRoute: typeof publicIndexRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
   publicLearnIndexRoute: typeof publicLearnIndexRoute
@@ -203,6 +216,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof publicIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/(public)/dashboard': {
+      id: '/(public)/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof publicDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(public)/learn/': {
@@ -315,6 +335,7 @@ const authAuthRouteWithChildren = authAuthRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   authAuthRoute: authAuthRouteWithChildren,
+  publicDashboardRoute: publicDashboardRoute,
   publicIndexRoute: publicIndexRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
   publicLearnIndexRoute: publicLearnIndexRoute,

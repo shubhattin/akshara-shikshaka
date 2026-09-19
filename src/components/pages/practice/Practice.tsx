@@ -47,6 +47,9 @@ import TurnstileWidget, { TURNSTILE_ENABLED } from '~/components/Turnstile';
 import { deepCopy } from '~/tools/kry';
 import { Button } from '~/components/ui/button';
 import { Skeleton } from '~/components/ui/skeleton';
+import { toast } from 'sonner';
+import { canSubmitPlayMetrics, playMetricsToken, usePlayAuth } from '~/lib/play_metrics_auth';
+import { useInvalidateUserDashboard } from '~/api/routers/user/invalidate_user_dashboard';
 
 const ACCURACY_THRESHOLD = 0.75;
 const SCALING_FACTOR_FOR_WIDTH = 0.85;
@@ -88,6 +91,8 @@ function PracticeWrapper(props: Props) {
   ]);
 
   const setTurnstileToken = useSetAtom(turnstile_token_atom);
+  const { authReady, isAuthed } = usePlayAuth();
+  const showTurnstile = TURNSTILE_ENABLED && authReady && !isAuthed;
 
   return (
     <>
@@ -96,7 +101,7 @@ function PracticeWrapper(props: Props) {
           /* SAFETY: children prop is ReactNode union - assertion narrows for Children.toArray iteration */ props.children as React.ReactNode
         }
       </Practice>
-      <TurnstileWidget setToken={setTurnstileToken} />
+      {showTurnstile ? <TurnstileWidget setToken={setTurnstileToken} /> : null}
     </>
   );
 }
@@ -122,6 +127,19 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
 
   const [turnstileToken, setTurnstileToken] = useAtom(turnstile_token_atom);
   const turnstile = useTurnstile();
+  const turnstileRef = useRef(turnstile);
+  useEffect(() => {
+    turnstileRef.current = turnstile;
+  }, [turnstile]);
+  const resetTurnstile = () => turnstileRef.current?.reset();
+  const { authReady, isAuthed } = usePlayAuth();
+  const invalidateUserDashboard = useInvalidateUserDashboard();
+  const turnstileTokenRef = useRef(turnstileToken);
+  turnstileTokenRef.current = turnstileToken;
+  const authReadyRef = useRef(authReady);
+  authReadyRef.current = authReady;
+  const isAuthedRef = useRef(isAuthed);
+  isAuthedRef.current = isAuthed;
 
   // Practice state from atoms
   const [canvasCurrentMode, setCanvasCurrentMode] = useAtom(canvas_current_mode);
@@ -181,63 +199,67 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     trpc.user_gesture_recordings.submit_user_gesture_recording.mutationOptions({
       onSuccess: () => {
         setTurnstileToken(null);
-        turnstile.reset();
-        console.log('Successfully submitted user gestures');
+        resetTurnstile();
+        invalidateUserDashboard();
+        toast.success('Practice saved');
       },
       onError: (e) => {
-        console.error('Failed to submit', e.message);
+        setTurnstileToken(null);
+        resetTurnstile();
+        toast.error(e.message || 'Failed to save practice');
       }
     })
   );
 
   const submit_user_gesture_recording_func = async (completed: boolean) => {
-    if (!TURNSTILE_ENABLED) {
-      userGestureVectorsRef.current = [];
+    const vectors = deepCopy(userGestureVectorsRef.current);
+    userGestureVectorsRef.current = [];
+
+    if (
+      vectors.length === 0 ||
+      !text_data.text ||
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- runtime type check for script_id before TRPC submission; validated via Zod schema at boundary
+      typeof text_data.script_id !== 'number'
+    ) {
       return;
     }
 
-    let retryTimeoutId: NodeJS.Timeout | null = null;
+    const MAX_RETRIES = 8;
+    const RETRY_DELAY = 400;
 
-    const MAX_RETRIES = 2;
-    const RETRY_DELAY = 700;
-    const vectors = deepCopy(userGestureVectorsRef.current);
-
-    const submit = async (retries: number = 0) => {
+    const submit = async (retries: number = 0): Promise<void> => {
       if (retries > MAX_RETRIES) {
-        console.warn('Max retries reached for gesture submission');
-        return;
-      }
-      if (!turnstileToken || turnstileToken.length === 0) {
-        retryTimeoutId = setTimeout(() => {
-          submit(retries + 1);
-        }, RETRY_DELAY);
+        toast.error('Could not save this practice attempt');
         return;
       }
 
-      // Clear any pending retry
-      if (retryTimeoutId) {
-        clearTimeout(retryTimeoutId);
-        retryTimeoutId = null;
+      const ready = authReadyRef.current;
+      const authed = isAuthedRef.current;
+      const token = turnstileTokenRef.current;
+
+      if (!ready) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        return submit(retries + 1);
       }
 
-      // Submit on completion if we have any recorded attempts
-      if (
-        vectors.length > 0 &&
-        text_data.text &&
-        // oxlint-disable-next-line anti-slop/no-runtime-typeof -- runtime type check for script_id before TRPC submission; validated via Zod schema at boundary
-        typeof text_data.script_id === 'number' &&
-        turnstileToken
-      ) {
-        await submit_user_recording_mut.mutateAsync({
-          text: text_data.text,
-          script_id: text_data.script_id,
-          vectors,
-          completed: completed,
-          turnstile_token: turnstileToken
-        });
+      if (!TURNSTILE_ENABLED && !authed) {
+        return;
       }
-      userGestureVectorsRef.current = [];
+
+      if (!canSubmitPlayMetrics(ready, authed, token)) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        return submit(retries + 1);
+      }
+
+      await submit_user_recording_mut.mutateAsync({
+        text: text_data.text,
+        script_id: text_data.script_id,
+        vectors,
+        completed,
+        turnstile_token: playMetricsToken(authed, token)
+      });
     };
+
     await submit();
   };
 

@@ -36,6 +36,11 @@ export class ImageProcessingError extends Schema.TaggedError<ImageProcessingErro
   }
 ) {}
 
+export class AuthError extends Schema.TaggedError<AuthError>()('AuthError', {
+  operation: Schema.String,
+  cause: Schema.Unknown
+}) {}
+
 export class ConfigError extends Schema.TaggedError<ConfigError>()('ConfigError', {
   message: Schema.String,
   cause: Schema.optional(Schema.Unknown)
@@ -65,6 +70,7 @@ export const KnownErrorSchema = Schema.Union([
   StorageError,
   AiProviderError,
   ImageProcessingError,
+  AuthError,
   ConfigError,
   NotFoundError,
   BadRequestError,

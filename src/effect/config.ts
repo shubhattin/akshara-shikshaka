@@ -12,6 +12,7 @@ const AppConfigSchema = Schema.Struct({
   openaiApiKey: Schema.String,
   openrouterApiKey: Schema.String,
   turnstileSecretKey: Schema.optional(Schema.String),
+  betterAuthUrl: Schema.String,
   isDev: Schema.Boolean,
   isProd: Schema.Boolean
 });
@@ -27,6 +28,7 @@ export type AppConfigValues = {
   readonly openaiApiKey: Redacted.Redacted<string>;
   readonly openrouterApiKey: Redacted.Redacted<string>;
   readonly turnstileSecretKey: Redacted.Redacted<string> | undefined;
+  readonly betterAuthUrl: string;
   readonly isDev: boolean;
   readonly isProd: boolean;
 };
@@ -50,6 +52,7 @@ const loadConfig = Effect.fn('loadConfig')(function* () {
     openaiApiKey: env.OPENAI_API_KEY,
     openrouterApiKey: env.OPENROUTER_API_KEY ?? import.meta.env?.OPENROUTER_API_KEY,
     turnstileSecretKey: env.TURNSTILE_SECRET_KEY,
+    betterAuthUrl: env.VITE_BETTER_AUTH_URL,
     isDev: import.meta.env?.DEV === true || env.NODE_ENV === 'development',
     isProd: import.meta.env?.PROD === true || env.NODE_ENV === 'production'
   });
@@ -77,6 +80,7 @@ const loadConfig = Effect.fn('loadConfig')(function* () {
     turnstileSecretKey: data.turnstileSecretKey
       ? Redacted.make(data.turnstileSecretKey)
       : undefined,
+    betterAuthUrl: data.betterAuthUrl,
     isDev: data.isDev,
     isProd: data.isProd
   } satisfies AppConfigValues;

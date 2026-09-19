@@ -402,6 +402,8 @@ type GestureStatsProps = {
 type StatsContentBodyProps = {
   topGestures: TopGestureRow[];
   topGesturesLoading: boolean;
+  topUsers: TopUserRow[];
+  topUsersLoading: boolean;
   summaryStats: ReturnType<typeof computeSummaryStats>;
   chartData: ChartDataType;
   chartType: ChartType;
@@ -411,6 +413,8 @@ type StatsContentBodyProps = {
 const StatsContentBody = ({
   topGestures,
   topGesturesLoading,
+  topUsers,
+  topUsersLoading,
   summaryStats,
   chartData,
   chartType,
@@ -420,7 +424,10 @@ const StatsContentBody = ({
 
   return (
     <>
-      <TopGesturesLeader gestures={topGestures} isLoading={topGesturesLoading} />
+      <div className="flex flex-col gap-3">
+        <TopGesturesLeader gestures={topGestures} isLoading={topGesturesLoading} />
+        <TopUsersLeader users={topUsers} isLoading={topUsersLoading} />
+      </div>
       {/* Summary Cards */}
       <SummaryCards summaryStats={summaryStats} />
 
@@ -688,6 +695,21 @@ function useGestureStatsData(params: GestureStatsQueryParams) {
     )
   );
 
+  const topUsersQuery = useQuery(
+    trpc.gesture_stats.get_top_users.queryOptions(
+      {
+        all_time: params.allTime,
+        start_date: params.from,
+        end_date: params.to,
+        script_id: params.scriptId,
+        limit: 10
+      },
+      {
+        enabled: params.enabled
+      }
+    )
+  );
+
   const vectorByRecording = useMemo(() => {
     const map = new Map<number, VectorStatPoint>();
     for (const v of statsQuery.data?.vector_stats ?? []) map.set(v.recording_id, v);
@@ -707,7 +729,7 @@ function useGestureStatsData(params: GestureStatsQueryParams) {
     [recordings, vectorByRecording]
   );
 
-  return { statsQuery, topGesturesQuery, chartData, summaryStats };
+  return { statsQuery, topGesturesQuery, topUsersQuery, chartData, summaryStats };
 }
 
 // Summary statistics
@@ -757,17 +779,18 @@ const GestureStats = ({ gestureText, gestureScriptId }: GestureStatsProps) => {
 
   const allTime = period === 'all_time';
 
-  const { statsQuery, topGesturesQuery, chartData, summaryStats } = useGestureStatsData({
-    gestureKeys: gestureKeysOrUndefined(selectedGestures),
-    scriptIds: scriptIdsOrUndefined(scriptFilter),
-    scriptId: scriptIdOrUndefined(scriptFilter),
-    completion: completionFilter,
-    allTime,
-    from: effectiveDateRange?.from,
-    to: effectiveDateRange?.to,
-    range: effectiveDateRange,
-    enabled: statsRangeEnabled(allTime, effectiveDateRange)
-  });
+  const { statsQuery, topGesturesQuery, topUsersQuery, chartData, summaryStats } =
+    useGestureStatsData({
+      gestureKeys: gestureKeysOrUndefined(selectedGestures),
+      scriptIds: scriptIdsOrUndefined(scriptFilter),
+      scriptId: scriptIdOrUndefined(scriptFilter),
+      completion: completionFilter,
+      allTime,
+      from: effectiveDateRange?.from,
+      to: effectiveDateRange?.to,
+      range: effectiveDateRange,
+      enabled: statsRangeEnabled(allTime, effectiveDateRange)
+    });
 
   return (
     <div className="space-y-3 p-4">
@@ -810,6 +833,8 @@ const GestureStats = ({ gestureText, gestureScriptId }: GestureStatsProps) => {
         <StatsContentBody
           topGestures={topGesturesQuery.data?.gestures ?? []}
           topGesturesLoading={topGesturesQuery.isLoading}
+          topUsers={topUsersQuery.data?.users ?? []}
+          topUsersLoading={topUsersQuery.isLoading}
           summaryStats={summaryStats}
           chartData={chartData}
           chartType={chartType}
@@ -832,6 +857,14 @@ type TopGestureRow = {
   completed: number;
   avg_accuracy: number;
   avg_attempts: number;
+};
+
+type TopUserRow = {
+  user_id: string;
+  name: string;
+  started: number;
+  completed: number;
+  avg_accuracy: number;
 };
 
 const TopGesturesLeader = ({
@@ -915,6 +948,108 @@ const TopGesturesLeader = ({
                         </p>
                         <p className="shrink-0 text-[0.7rem] text-muted-foreground tabular-nums">
                           {gesture.completed}/{gesture.started} · {gesture.avg_accuracy}%
+                        </p>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
+                        <div
+                          className="relative h-full overflow-hidden rounded-full transition-[width] duration-300"
+                          style={{
+                            width: `${barWidthPct}%`,
+                            backgroundColor: STARTED_BAR_COLOR
+                          }}
+                        >
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-300"
+                            style={{
+                              width: `${completedPct}%`,
+                              backgroundColor: COMPLETED_BAR_COLOR
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  );
+};
+
+const TopUsersLeader = ({ users, isLoading }: { users: TopUserRow[]; isLoading: boolean }) => {
+  const maxStarted = users.reduce((max, user) => Math.max(max, user.started), 0);
+
+  return (
+    <Accordion defaultValue={[]} className="w-full">
+      <AccordionItem
+        value="top-users"
+        className="overflow-hidden rounded-xl border border-slate-200/50 bg-linear-to-br from-indigo-50/80 via-white/80 to-sky-50/40 dark:border-slate-700/50 dark:from-indigo-950/40 dark:via-slate-900/80 dark:to-slate-800/40"
+      >
+        <AccordionTrigger className="px-4 py-3 hover:no-underline">
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10 ring-1 ring-black/5 ring-inset dark:ring-white/10">
+              <UsersIcon className="size-3.5 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div className="min-w-0 text-left">
+              <p className="text-sm font-semibold tracking-tight">Top Practitioners</p>
+              <p className="text-xs font-normal text-muted-foreground">
+                Top 10 signed-in users by recordings
+              </p>
+            </div>
+          </div>
+        </AccordionTrigger>
+        <AccordionContent className="px-4 pb-4">
+          {isLoading ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : users.length === 0 ? (
+            <p className="py-2 text-center text-sm text-muted-foreground">
+              No signed-in recordings in this period
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-[0.65rem] text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <span
+                    className="size-1.5 rounded-full"
+                    style={{ backgroundColor: STARTED_BAR_COLOR }}
+                  />
+                  Started
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span
+                    className="size-1.5 rounded-full"
+                    style={{ backgroundColor: COMPLETED_BAR_COLOR }}
+                  />
+                  Completed
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {users.map((user, index) => {
+                  const barWidthPct = maxStarted > 0 ? (user.started / maxStarted) * 100 : 0;
+                  const completedPct =
+                    user.started > 0 ? Math.min(100, (user.completed / user.started) * 100) : 0;
+
+                  return (
+                    <div
+                      key={user.user_id}
+                      className="min-w-0 space-y-1.5 rounded-lg border border-indigo-200/40 bg-white/70 px-3 py-2.5 dark:border-indigo-800/40 dark:bg-slate-950/30"
+                    >
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="min-w-0 truncate text-sm font-medium">
+                          <span className="mr-1.5 text-muted-foreground tabular-nums">
+                            #{index + 1}
+                          </span>
+                          <span>{user.name}</span>
+                        </p>
+                        <p className="shrink-0 text-[0.7rem] text-muted-foreground tabular-nums">
+                          {user.completed}/{user.started} · {user.avg_accuracy}%
                         </p>
                       </div>
                       <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">

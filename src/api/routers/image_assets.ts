@@ -11,7 +11,7 @@ import { AiProvider } from '~/effect/ai';
 import { ImageProcessor } from '~/effect/image';
 import { ObjectStorage } from '~/effect/storage';
 import { dbRunHttp } from '~/effect/database';
-import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
+import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { BadRequestError, DatabaseError } from '~/effect/errors';
 
 const IMAGE_DIMENSIONS = 256;

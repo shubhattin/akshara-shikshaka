@@ -6,7 +6,7 @@ import { user_gesture_recording_vectors, user_gesture_recordings } from '~/db/sc
 import { dbRunHttp } from '~/effect/database';
 import { optional_turnstile_token_schema, requireTurnstileIfGuest } from './turnstile_guard';
 import { sessionUserFields } from './user/session_user';
-import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
+import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 
 const submit_user_gesture_recording_route = publicProcedure
   .input(

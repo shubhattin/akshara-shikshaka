@@ -5,7 +5,6 @@ import { RedisClient } from './redis';
 import { CacheError } from './errors';
 import { BackgroundWork } from './background';
 import { DatabaseHttp, type DbHttpClient } from './database';
-import { fetchAksharaDashboardCached } from './user_cache';
 
 const CACHE_EXPIRE_S = ms('30days') / 1000;
 
@@ -202,7 +201,7 @@ export const invalidateAndRefreshCache = <TData, TParams>({
     );
   });
 
-const fromDb = <A>(operation: string, run: (client: DbHttpClient) => A | PromiseLike<A>) =>
+export const fromDb = <A>(operation: string, run: (client: DbHttpClient) => A | PromiseLike<A>) =>
   Effect.gen(function* () {
     const database = yield* DatabaseHttp;
     return yield* database.run(operation, run).pipe(
@@ -210,137 +209,3 @@ const fromDb = <A>(operation: string, run: (client: DbHttpClient) => A | Promise
       Effect.annotateLogs({ category: 'db', operation })
     );
   });
-
-export const CACHE = {
-  lessons: {
-    category_list: createCache({
-      keyPrefix: 'text_lesson_category_list',
-      schema: z.object({
-        lang_id: z.int().positive()
-      }),
-      keyBuilder: ({ lang_id }) => `${lang_id}`,
-      fetch: ({ lang_id }) =>
-        fromDb('category_list', (db) =>
-          db.query.lesson_categories.findMany({
-            where: (tbl, { eq }) => eq(tbl.lang_id, lang_id),
-            columns: { id: true, name: true, order: true },
-            orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
-          })
-        )
-    }),
-    category_lesson_list: createCache({
-      keyPrefix: 'text_lesson_category_lessons_list',
-      schema: z.object({
-        category_id: z.int()
-      }),
-      keyBuilder: ({ category_id }) => `${category_id}`,
-      fetch: ({ category_id }) =>
-        fromDb('category_lesson_list', (db) =>
-          db.query.text_lessons.findMany({
-            columns: {
-              id: true,
-              text: true,
-              order: true,
-              uuid: true
-            },
-            orderBy: (tbl, { asc }) => [asc(tbl.order)],
-            where: (tbl, { eq, isNotNull, and }) =>
-              and(eq(tbl.category_id, category_id), isNotNull(tbl.order))
-          })
-        )
-    }),
-    text_lesson_info: createCache({
-      keyPrefix: 'text_lesson_info',
-      schema: z.object({
-        lesson_id: z.int()
-      }),
-      keyBuilder: ({ lesson_id }) => `${lesson_id}`,
-      fetch: ({ lesson_id }) =>
-        fromDb('text_lesson_info', (db) =>
-          db.query.text_lessons.findFirst({
-            where: (tbl, { eq }) => eq(tbl.id, lesson_id),
-            columns: {
-              id: true,
-              base_word_script_id: true,
-              text: true
-            },
-            with: {
-              gestures: {
-                columns: {
-                  text_gesture_id: true
-                },
-                with: {
-                  text_gesture: {
-                    columns: {
-                      id: true,
-                      uuid: true,
-                      script_id: true
-                    }
-                  }
-                }
-              },
-              words: {
-                columns: {
-                  id: true,
-                  word: true,
-                  order: true
-                },
-                orderBy: (tbl, { asc }) => [asc(tbl.order)],
-                with: {
-                  image: {
-                    columns: {
-                      s3_key: true
-                    }
-                  },
-                  audio: {
-                    columns: {
-                      s3_key: true
-                    }
-                  }
-                }
-              },
-              optional_audio: {
-                columns: {
-                  s3_key: true
-                }
-              }
-            }
-          })
-        )
-    })
-  },
-  gestures: {
-    gesture_data: createCache({
-      keyPrefix: 'text_gesture_data',
-      schema: z.object({
-        gesture_id: z.int(),
-        gesture_uuid: z.uuid()
-      }),
-      keyBuilder: ({ gesture_id, gesture_uuid }) => `${gesture_id}:${gesture_uuid}`,
-      fetch: ({ gesture_id, gesture_uuid }) =>
-        fromDb('gesture_data', (db) =>
-          db.query.text_gestures.findFirst({
-            where: (table, { eq, and }) =>
-              and(eq(table.id, gesture_id), eq(table.uuid, gesture_uuid)),
-            columns: {
-              id: true,
-              uuid: true,
-              text: true,
-              gestures: true,
-              script_id: true
-            }
-          })
-        )
-    })
-  },
-  user: {
-    dashboard: createCache({
-      keyPrefix: 'user',
-      schema: z.object({
-        userId: z.string().min(1)
-      }),
-      keyBuilder: ({ userId }) => `${userId}:akshara`,
-      fetch: fetchAksharaDashboardCached
-    })
-  }
-};

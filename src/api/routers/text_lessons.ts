@@ -3,7 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { lesson_gestures, text_lesson_words, text_lessons } from '~/db/schema';
 import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
 import { BadRequestError, NotFoundError } from '~/effect/errors';
-import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
+import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { reorder_text_lesson_in_category, lesson_categories_router } from './lesson_categories';
 import { t, protectedAdminProcedure, publicProcedure } from '../trpc_init';
 import { runTrpcEffect } from '~/effect/run';

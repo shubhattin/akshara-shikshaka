@@ -3,7 +3,7 @@ import { and, eq, max, sql } from 'drizzle-orm';
 import { Effect } from 'effect';
 import { lesson_categories, text_lessons } from '~/db/schema';
 import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
-import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
+import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
 import { LessonCategoriesSchemaZod, TextLessonsSchemaZod } from '~/db/schema_zod';

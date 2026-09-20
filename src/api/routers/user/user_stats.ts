@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { protectedProcedure, t } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
-import { CACHE } from '~/effect/cache';
+import { CACHE } from '~/util/cache.server/cache_loaders';
 
 const get_dashboard_route = protectedProcedure.query(({ ctx }) =>
   runTrpcEffect(

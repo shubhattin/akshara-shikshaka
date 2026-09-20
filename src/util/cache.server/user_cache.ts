@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import { and, avg, count, desc, eq, inArray, max, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { user_gesture_recording_vectors, user_gesture_recordings } from '~/db/schema';
 import {
   emptyDashboardStats,
@@ -7,6 +8,7 @@ import {
   type DashboardGestureRow,
   type DashboardRecentRow
 } from '~/api/routers/user/user_dashboard';
+import { createCache } from '~/effect/cache';
 import { dbRunHttp } from '~/effect/database';
 import { CacheError } from '~/effect/errors';
 
@@ -185,4 +187,21 @@ export const fetchAksharaDashboardCached = (params: UserDashboardParams) => {
   return fetchAksharaDashboard(params.userId).pipe(
     Effect.mapError(toCacheError('fetchAksharaDashboard', key))
   );
+};
+
+const dashboard = createCache({
+  keyPrefix: 'user',
+  schema: z.object({
+    userId: z.string().min(1)
+  }),
+  keyBuilder: ({ userId }) => `${userId}:akshara`,
+  fetch: fetchAksharaDashboardCached
+});
+
+export type UserCacheLoaders = {
+  dashboard: typeof dashboard;
+};
+
+export const user_cache_loaders: UserCacheLoaders = {
+  dashboard
 };

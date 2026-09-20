@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { gesture_text_key_category_join, lesson_gestures, text_gestures } from '~/db/schema';
 import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
 import { NotFoundError, BadRequestError } from '~/effect/errors';
-import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
+import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { FONT_FAMILIES, type FontFamily } from '~/state/font_list';
 import { GestureSchema } from '~/tools/stroke_data/types';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';

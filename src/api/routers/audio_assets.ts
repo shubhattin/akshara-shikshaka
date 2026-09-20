@@ -7,7 +7,7 @@ import { PROJECT_S3_ALIAS } from '~/constants';
 import { AiProvider, VoiceTypeEnum, type VoiceType } from '~/effect/ai';
 import { ObjectStorage } from '~/effect/storage';
 import { dbRunHttp } from '~/effect/database';
-import { CACHE, invalidateAndRefreshCache } from '~/effect/cache';
+import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { DatabaseError } from '~/effect/errors';
 import { t, protectedAdminProcedure } from '../trpc_init';
 import { runTrpcEffect } from '~/effect/run';

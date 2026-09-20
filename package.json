@@ -101,6 +101,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "4.0.0-rc.111",
+    "@mvp-kit/vite-sitemap-plugin": "^0.1.2",
     "@oxlint/plugins": "1.80.0",
     "@tailwindcss/typography": "^0.5.20",
     "@tanstack/devtools-vite": "0.6.0",
@@ -127,7 +128,6 @@
     "sass": "^1.102.0",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
-    "vite-plugin-sitemap": "^0.8.2",
     "vitest": "^4.1.10"
   }
 }

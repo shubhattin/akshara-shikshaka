@@ -13,6 +13,7 @@ import { ObjectStorage } from '~/effect/storage';
 import { dbRunHttp } from '~/effect/database';
 import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { BadRequestError, DatabaseError } from '~/effect/errors';
+import { reportSwallowedEffect } from '~/effect/posthog_error';
 
 const IMAGE_DIMENSIONS = 256;
 
@@ -68,13 +69,17 @@ export const makeUploadImageAsset = Effect.fn('makeUploadImageAsset')(function* 
 
   const uploaded = yield* storage.uploadAssetFile(s3_image_key, resized_image_buffer).pipe(
     Effect.matchEffect({
-      onFailure: () =>
-        storage.deleteAssetFile(s3_image_key).pipe(
-          Effect.catch(() => Effect.void),
-          Effect.as({
-            success: false as const,
-            err_code: 'image_upload_failed' as const
-          })
+      onFailure: (cause) =>
+        reportSwallowedEffect(cause, 'storage.upload').pipe(
+          Effect.flatMap(() =>
+            storage.deleteAssetFile(s3_image_key).pipe(
+              Effect.catch(() => Effect.void),
+              Effect.as({
+                success: false as const,
+                err_code: 'image_upload_failed' as const
+              })
+            )
+          )
         ),
       onSuccess: () => Effect.succeed({ success: true as const })
     })
@@ -162,7 +167,11 @@ export const deleteImageAsset = Effect.fn('deleteImageAsset')(function* (input: 
 
   yield* storage.deleteAssetFile(result.s3_key).pipe(
     Effect.tapError((error) =>
-      Effect.logWarning('image S3 delete failed after DB delete', { error, key: result.s3_key })
+      reportSwallowedEffect(error, 'storage.delete').pipe(
+        Effect.flatMap(() =>
+          Effect.logWarning('image S3 delete failed after DB delete', { error, key: result.s3_key })
+        )
+      )
     ),
     Effect.catch(() => Effect.void)
   );

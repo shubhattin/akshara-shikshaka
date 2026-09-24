@@ -5,6 +5,7 @@ import { RedisClient } from './redis';
 import { CacheError } from './errors';
 import { BackgroundWork } from './background';
 import { DatabaseHttp, type DbHttpClient } from './database';
+import { reportSwallowedEffect } from './posthog_error';
 
 const CACHE_EXPIRE_S = ms('30days') / 1000;
 
@@ -102,7 +103,10 @@ export function createCache<TSchema extends z.ZodType, TData>({
         catch: (error) => error
       }).pipe(
         Effect.catch((error) =>
-          Effect.logWarning('cache set failed', { key, error }).pipe(Effect.asVoid)
+          reportSwallowedEffect(error, 'cache.set').pipe(
+            Effect.flatMap(() => Effect.logWarning('cache set failed', { key, error })),
+            Effect.asVoid
+          )
         )
       );
       yield* background.enqueue(() => Effect.runPromise(setProgram));
@@ -182,13 +186,14 @@ export const invalidateAndRefreshCache = <TData, TParams>({
     const redis = yield* RedisClient;
     const database = yield* DatabaseHttp;
     // Best-effort invalidate: mutations should still succeed and refresh ahead.
-    yield* cache
-      .delete(params)
-      .pipe(
-        Effect.catch((error) =>
-          Effect.logWarning('cache invalidate failed', { error }).pipe(Effect.asVoid)
+    yield* cache.delete(params).pipe(
+      Effect.catch((error) =>
+        reportSwallowedEffect(error, 'cache.invalidate').pipe(
+          Effect.flatMap(() => Effect.logWarning('cache invalidate failed', { error })),
+          Effect.asVoid
         )
-      );
+      )
+    );
     yield* background.enqueue(() =>
       Effect.runPromise(
         cache

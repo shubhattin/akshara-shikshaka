@@ -9,6 +9,7 @@ import { ObjectStorage } from '~/effect/storage';
 import { dbRunHttp } from '~/effect/database';
 import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { DatabaseError } from '~/effect/errors';
+import { reportSwallowedEffect } from '~/effect/posthog_error';
 import { t, protectedAdminProcedure } from '../trpc_init';
 import { runTrpcEffect } from '~/effect/run';
 import { dev_delay } from '~/tools/delay';
@@ -125,7 +126,11 @@ export const deleteAudioAsset = Effect.fn('deleteAudioAsset')(function* (input: 
 
   yield* storage.deleteAssetFile(result.s3_key).pipe(
     Effect.tapError((error) =>
-      Effect.logWarning('audio S3 delete failed after DB delete', { error, key: result.s3_key })
+      reportSwallowedEffect(error, 'storage.delete').pipe(
+        Effect.flatMap(() =>
+          Effect.logWarning('audio S3 delete failed after DB delete', { error, key: result.s3_key })
+        )
+      )
     ),
     Effect.catch(() => Effect.void)
   );

@@ -1,5 +1,6 @@
 import { Context, Effect, Layer } from 'effect';
 import { waitUntil } from '@vercel/functions';
+import { reportSwallowedFailure } from './posthog_error';
 
 /**
  * Background work that preserves Vercel `waitUntil` semantics.
@@ -18,8 +19,9 @@ export class BackgroundWork extends Context.Service<
         waitUntil(
           Promise.resolve()
             .then(work)
-            .catch((error) => {
-              console.error('[background] work failed', error);
+            .catch(async (cause: unknown) => {
+              console.error('[background] work failed', cause);
+              await reportSwallowedFailure(cause, 'background');
             })
         );
       })
@@ -31,8 +33,9 @@ export class BackgroundWork extends Context.Service<
       Effect.promise(() =>
         Promise.resolve()
           .then(work)
-          .catch((error) => {
-            console.error('[background] work failed', error);
+          .catch(async (cause: unknown) => {
+            console.error('[background] work failed', cause);
+            await reportSwallowedFailure(cause, 'background');
           })
       )
   });

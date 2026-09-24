@@ -35,6 +35,7 @@ import {
   PopoverTrigger
 } from '~/components/ui/popover';
 import { Skeleton } from '~/components/ui/skeleton';
+import { reset_posthog } from '~/components/tags/PosthogInit';
 import { GoogleIcon } from '~/components/icons';
 import Icon from '~/tools/Icon';
 import { signIn, signOut, useSession } from '~/lib/auth-client';
@@ -148,7 +149,12 @@ export function UserProfileChip() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => void signOut()}>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                void reset_posthog().then(() => signOut());
+              }}
+            >
               Log out
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -24,7 +24,10 @@ const config = defineConfig(({ mode }) => {
       devtools(),
       tailwindcss(),
       tanstackStart(),
-      nitro(),
+      nitro({
+        // Runtime picks gnu vs musl, so the whole package (including .node files) is traced.
+        traceDeps: ['lipilekhika*']
+      }),
       viteReact({
         compiler: true
       }),

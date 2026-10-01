@@ -65,7 +65,7 @@
     "cn": "0.2.4",
     "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.8.3",
-    "effect": "4.0.0-rc.111",
+    "effect": "4.0.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.43.0",
     "jotai": "^2.20.2",
@@ -101,7 +101,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.0-rc.111",
+    "@effect/vitest": "4.0.0",
     "@mvp-kit/vite-sitemap-plugin": "^0.1.2",
     "@oxlint/plugins": "1.80.0",
     "@tailwindcss/typography": "^0.5.20",

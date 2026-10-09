@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as authAuthRouteImport } from './routes/(auth)/_auth'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as publicDashboardRouteImport } from './routes/(public)/dashboard'
@@ -24,6 +25,11 @@ import { Route as authAuthGesturesEditIdRouteImport } from './routes/(auth)/_aut
 import { Route as authAuthImage_assetsEditIdRouteImport } from './routes/(auth)/_auth/image_assets/edit/$id'
 import { Route as authAuthLessonsEditIdRouteImport } from './routes/(auth)/_auth/lessons/edit/$id'
 
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const authAuthRoute = authAuthRouteImport.update({
   id: '/(auth)/_auth',
   getParentRoute: () => rootRouteImport,
@@ -99,6 +105,7 @@ const authAuthLessonsEditIdRoute = authAuthLessonsEditIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/admin': typeof AdminRoute
   '/dashboard': typeof publicDashboardRoute
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/lessons/edit/$id': typeof authAuthLessonsEditIdRoute
 }
 export interface FileRoutesByTo {
+  '/admin': typeof AdminRoute
   '/dashboard': typeof publicDashboardRoute
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
@@ -130,6 +138,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/admin': typeof AdminRoute
   '/(auth)/_auth': typeof authAuthRouteWithChildren
   '/(public)/dashboard': typeof publicDashboardRoute
   '/(public)/': typeof publicIndexRoute
@@ -148,6 +157,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/admin'
     | '/dashboard'
     | '/'
     | '/api/trpc/$'
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
     | '/lessons/edit/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/admin'
     | '/dashboard'
     | '/'
     | '/api/trpc/$'
@@ -178,6 +189,7 @@ export interface FileRouteTypes {
     | '/lessons/edit/$id'
   id:
     | '__root__'
+    | '/admin'
     | '/(auth)/_auth'
     | '/(public)/dashboard'
     | '/(public)/'
@@ -195,6 +207,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  AdminRoute: typeof AdminRoute
   authAuthRoute: typeof authAuthRouteWithChildren
   publicDashboardRoute: typeof publicDashboardRoute
   publicIndexRoute: typeof publicIndexRoute
@@ -204,6 +217,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/(auth)/_auth': {
       id: '/(auth)/_auth'
       path: ''
@@ -334,6 +354,7 @@ const authAuthRouteWithChildren = authAuthRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  AdminRoute: AdminRoute,
   authAuthRoute: authAuthRouteWithChildren,
   publicDashboardRoute: publicDashboardRoute,
   publicIndexRoute: publicIndexRoute,

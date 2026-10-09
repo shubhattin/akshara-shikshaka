@@ -43,6 +43,7 @@ const config = defineConfig(({ mode }) => {
             'Allow: /',
             'Allow: /learn',
             'Disallow: /dashboard',
+            'Disallow: /admin',
             'Disallow: /analytics',
             'Disallow: /audio_assets',
             'Disallow: /gestures',

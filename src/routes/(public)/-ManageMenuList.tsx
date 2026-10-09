@@ -15,7 +15,8 @@ import {
   FaVolumeUp,
   FaRegImage,
   FaSignInAlt,
-  FaChartBar
+  FaChartBar,
+  FaShieldAlt
 } from 'react-icons/fa';
 import { signIn } from '~/lib/auth-client';
 import { useSession } from '~/lib/auth-client';
@@ -48,9 +49,15 @@ export default function ManageMenuList({ children }: { children: React.ReactNode
         )}
         {session.data?.user?.role === 'admin' && (
           <>
-            {/* <ContextMenuLabel>Manage</ContextMenuLabel> */}
-            <Link to="/lessons" className="flex items-center gap-2">
+            <Link to="/admin" className="flex items-center gap-2">
               <ContextMenuItem className="w-full font-bold">
+                <FaShieldAlt className="h-4 w-4" />
+                Admin
+              </ContextMenuItem>
+            </Link>
+            <ContextMenuSeparator />
+            <Link to="/lessons" className="flex items-center gap-2">
+              <ContextMenuItem className="w-full">
                 <FaBookOpen className="h-4 w-4" />
                 Lessons
               </ContextMenuItem>

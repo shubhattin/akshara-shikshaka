@@ -2,8 +2,7 @@ import {
   get_lang_from_id,
   get_script_from_id,
   lang_list_obj,
-  script_list_obj,
-  type script_and_lang_list_type
+  script_list_obj
 } from '@/state/lang_list';
 import { createFileRoute } from '@tanstack/react-router';
 import {
@@ -17,7 +16,6 @@ import { createServerTRPC } from '~/api/server';
 import { createIsomorphicFn } from '@tanstack/react-start';
 import js_cookie from 'js-cookie';
 import { getCookie } from '@tanstack/react-start/server';
-import { transliterate_node } from 'lipilekhika/node';
 
 function buildLearnSelection(getCookieValue: (key: string) => string | undefined) {
   return {
@@ -46,19 +44,6 @@ export const getLearnSelection$ = createIsomorphicFn()
     return buildLearnSelection((key) => getCookie(key));
   });
 
-async function transliterateTexts(
-  texts: string[],
-  from: script_and_lang_list_type,
-  to: script_and_lang_list_type
-) {
-  if (texts.length === 0 || from === to) return texts;
-  try {
-    return await transliterate_node(texts, from, to);
-  } catch {
-    return texts;
-  }
-}
-
 export const Route = createFileRoute('/(public)/learn/')({
   // oxlint-disable-next-line complexity -- loader orchestrates transliteration and lesson selection; sequential I/O with branches deferred
   loader: async ({ context }) => {
@@ -76,6 +61,7 @@ export const Route = createFileRoute('/(public)/learn/')({
       return { ...selection, ...emptyTransliteration };
     }
 
+    const { transliterateTexts } = await import('~/lib/transliterateTexts.server');
     const trpc = await createServerTRPC(context.queryClient);
     const lessonCategories = await context.queryClient.ensureQueryData(
       trpc.text_lessons.categories.get_categories.queryOptions({

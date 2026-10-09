@@ -25,6 +25,10 @@ const config = defineConfig(({ mode }) => {
       tailwindcss(),
       tanstackStart(),
       nitro({
+        // Vite 8.2 + Nitro splits the SSR service into a chunk that re-exports
+        // an undeclared `ssr_exports`, which 500s every request.
+        // https://github.com/TanStack/router/issues/8031
+        inlineDynamicImports: true,
         // Runtime picks gnu vs musl, so the whole package (including .node files) is traced.
         traceDeps: ['lipilekhika*']
       }),

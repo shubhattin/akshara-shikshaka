@@ -58,7 +58,7 @@
     "@wavesurfer/react": "^1.0.12",
     "ai": "^6.0.246",
     "audiomotion-analyzer": "^4.5.4",
-    "better-auth": "^1.6.26",
+    "better-auth": "^1.7.10",
     "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",

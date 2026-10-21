@@ -18,7 +18,7 @@ import {
   FaChartBar,
   FaShieldAlt
 } from 'react-icons/fa';
-import { signIn } from '~/lib/auth-client';
+import { startGoogleSignIn } from '~/lib/popup_sign_in';
 import { useSession } from '~/lib/auth-client';
 
 export default function ManageMenuList({ children }: { children: React.ReactNode }) {
@@ -31,12 +31,7 @@ export default function ManageMenuList({ children }: { children: React.ReactNode
         {!session.data?.user && (
           <ContextMenuItem
             className="flex items-center gap-2 p-2"
-            onClick={() =>
-              signIn.social({
-                provider: 'google',
-                callbackURL: `${window.location.origin}`
-              })
-            }
+            onClick={() => void startGoogleSignIn()}
           >
             <FaSignInAlt className="h-4 w-4" />
             Login

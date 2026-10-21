@@ -38,7 +38,8 @@ import { Skeleton } from '~/components/ui/skeleton';
 import { reset_posthog } from '~/components/tags/PosthogInit';
 import { GoogleIcon } from '~/components/icons';
 import Icon from '~/tools/Icon';
-import { signIn, signOut, useSession } from '~/lib/auth-client';
+import { signOut, useSession } from '~/lib/auth-client';
+import { startGoogleSignIn } from '~/lib/popup_sign_in';
 import { cn } from '~/lib/utils';
 
 const chipButtonClass =
@@ -180,12 +181,7 @@ function GuestCard() {
         variant="outline"
         size="lg"
         className="w-full"
-        onClick={async () => {
-          await signIn.social({
-            provider: 'google',
-            callbackURL: window.location.href
-          });
-        }}
+        onClick={() => void startGoogleSignIn()}
       >
         <span data-icon="inline-start">
           <Icon src={GoogleIcon} />

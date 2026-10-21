@@ -13,6 +13,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as authAuthRouteImport } from './routes/(auth)/_auth'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as publicDashboardRouteImport } from './routes/(public)/dashboard'
+import { Route as AuthPopupDoneRouteImport } from './routes/auth/popup-done'
 import { Route as publicLearnIndexRouteImport } from './routes/(public)/learn/index'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as authAuthAnalyticsIndexRouteImport } from './routes/(auth)/_auth/analytics/index'
@@ -42,6 +43,11 @@ const publicIndexRoute = publicIndexRouteImport.update({
 const publicDashboardRoute = publicDashboardRouteImport.update({
   id: '/(public)/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthPopupDoneRoute = AuthPopupDoneRouteImport.update({
+  id: '/auth/popup-done',
+  path: '/auth/popup-done',
   getParentRoute: () => rootRouteImport,
 } as any)
 const publicLearnIndexRoute = publicLearnIndexRouteImport.update({
@@ -107,6 +113,7 @@ const authAuthLessonsEditIdRoute = authAuthLessonsEditIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/dashboard': typeof publicDashboardRoute
+  '/auth/popup-done': typeof AuthPopupDoneRoute
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn/': typeof publicLearnIndexRoute
@@ -123,6 +130,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/dashboard': typeof publicDashboardRoute
+  '/auth/popup-done': typeof AuthPopupDoneRoute
   '/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn': typeof publicLearnIndexRoute
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/(auth)/_auth': typeof authAuthRouteWithChildren
   '/(public)/dashboard': typeof publicDashboardRoute
+  '/auth/popup-done': typeof AuthPopupDoneRoute
   '/(public)/': typeof publicIndexRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/(public)/learn/': typeof publicLearnIndexRoute
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/admin'
     | '/dashboard'
+    | '/auth/popup-done'
     | '/'
     | '/api/trpc/$'
     | '/learn/'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
   to:
     | '/admin'
     | '/dashboard'
+    | '/auth/popup-done'
     | '/'
     | '/api/trpc/$'
     | '/learn'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/(auth)/_auth'
     | '/(public)/dashboard'
+    | '/auth/popup-done'
     | '/(public)/'
     | '/api/trpc/$'
     | '/(public)/learn/'
@@ -210,6 +222,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   authAuthRoute: typeof authAuthRouteWithChildren
   publicDashboardRoute: typeof publicDashboardRoute
+  AuthPopupDoneRoute: typeof AuthPopupDoneRoute
   publicIndexRoute: typeof publicIndexRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
   publicLearnIndexRoute: typeof publicLearnIndexRoute
@@ -243,6 +256,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof publicDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/popup-done': {
+      id: '/auth/popup-done'
+      path: '/auth/popup-done'
+      fullPath: '/auth/popup-done'
+      preLoaderRoute: typeof AuthPopupDoneRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(public)/learn/': {
@@ -357,6 +377,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   authAuthRoute: authAuthRouteWithChildren,
   publicDashboardRoute: publicDashboardRoute,
+  AuthPopupDoneRoute: AuthPopupDoneRoute,
   publicIndexRoute: publicIndexRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
   publicLearnIndexRoute: publicLearnIndexRoute,

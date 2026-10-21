@@ -12,3 +12,8 @@ export const authClient = createAuthClient({
 });
 
 export const { useSession, signIn, signOut, signUp } = authClient;
+
+/** Re-read the session after a sign-in that did not reload the page. */
+export function refreshAuthSession() {
+  authClient.$store.notify('$sessionSignal');
+}

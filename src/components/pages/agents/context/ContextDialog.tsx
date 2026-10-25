@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 
 const approxTokens = (text: string) => Math.round(text.length / 3.5);
 
-/** Everything the agent reads before the conversation: system prompt and database schema. */
+/** Everything the agent reads before the conversation, one tab per section. */
 export function ContextDialog({
   open,
   onOpenChange

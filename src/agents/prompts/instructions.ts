@@ -1,9 +1,10 @@
 import type { SystemModelMessage } from 'ai';
 import { describeDatabaseSchema } from '~/agents/db_schema/describe_schema';
 import { GENERAL_SYSTEM_PROMPT } from './general';
+import { buildLanguagesContext } from './languages';
 
 export type InstructionSection = {
-  id: 'system_prompt' | 'database_schema';
+  id: 'system_prompt' | 'database_schema' | 'languages';
   title: string;
   content: string;
 };
@@ -19,6 +20,11 @@ export function agentInstructionSections(): InstructionSection[] {
       id: 'database_schema',
       title: 'Database schema',
       content: `<database_schema>\n${describeDatabaseSchema()}\n</database_schema>`
+    },
+    {
+      id: 'languages',
+      title: 'Languages & scripts',
+      content: `<languages>\n${buildLanguagesContext()}\n</languages>`
     }
   ];
 }

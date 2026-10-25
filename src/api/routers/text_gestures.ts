@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Effect } from 'effect';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { gesture_text_key_category_join, lesson_gestures, text_gestures } from '~/db/schema';
 import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
 import { NotFoundError, BadRequestError } from '~/effect/errors';
@@ -283,6 +283,32 @@ const delete_text_gesture_data_route = protectedAdminProcedure
   .input(z.object({ id: z.number(), uuid: z.uuid(), script_id: z.int() }))
   .mutation(async ({ input }) => runTrpcEffect(deleteTextGestureData(input)));
 
+/**
+ * Strokes + glyph settings for gesture previews (`GesturePreview`), by id. Used wherever a
+ * gesture is shown by reference, e.g. previews embedded in admin agent replies.
+ */
+export const getGesturePreviews = Effect.fn('getGesturePreviews')(function* (ids: number[]) {
+  if (ids.length === 0) return [];
+  return yield* dbRunHttp('text_gestures.previews', (client) =>
+    client
+      .select({
+        id: text_gestures.id,
+        text: text_gestures.text,
+        script_id: text_gestures.script_id,
+        gestures: text_gestures.gestures,
+        font_family: text_gestures.font_family,
+        font_size: text_gestures.font_size,
+        text_center_offset: text_gestures.text_center_offset
+      })
+      .from(text_gestures)
+      .where(inArray(text_gestures.id, ids))
+  );
+});
+
+const get_gesture_previews_route = protectedAdminProcedure
+  .input(z.object({ ids: z.array(z.int().positive()).max(50) }))
+  .query(async ({ input }) => runTrpcEffect(getGesturePreviews(input.ids)));
+
 const get_text_gesture_data_route = publicProcedure
   .input(z.object({ id: z.int(), uuid: z.uuid() }))
   .query(async ({ input }) => runTrpcEffect(getTextGestureData(input)));
@@ -292,5 +318,6 @@ export const text_gestures_router = t.router({
   edit_text_gesture_data: edit_text_gesture_data_route,
   delete_text_gesture_data: delete_text_gesture_data_route,
   categories: gesture_categories_router,
-  get_text_gesture_data: get_text_gesture_data_route
+  get_text_gesture_data: get_text_gesture_data_route,
+  get_gesture_previews: get_gesture_previews_route
 });

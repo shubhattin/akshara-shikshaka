@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Redacted } from 'effect';
 import OpenAI from 'openai';
 import { createOpenAI, type OpenAIImageModelGenerationOptions } from '@ai-sdk/openai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { embed, generateImage, generateText, Output } from 'ai';
+import { embed, generateImage, generateText, Output, type LanguageModel } from 'ai';
 import { z } from 'zod';
 import { AppConfig } from './config';
 import { AiProviderError } from './errors';
@@ -77,6 +77,9 @@ const tryAi = <A>(operation: string, provider: string, run: () => Promise<A>) =>
 export class AiProvider extends Context.Service<
   AiProvider,
   {
+    /** Direct OpenAI (Responses API) model — used by the admin agent for GPT models. */
+    readonly openaiModel: (modelId: string) => LanguageModel;
+    readonly openrouterModel: (modelId: string) => LanguageModel;
     readonly generateSpeech: (input: {
       text: string;
       instructions: string;
@@ -108,6 +111,8 @@ export class AiProvider extends Context.Service<
       const openrouter = createOpenRouter({ apiKey: openrouterKey });
 
       return {
+        openaiModel: (modelId) => openai(modelId),
+        openrouterModel: (modelId) => openrouter(modelId),
         generateSpeech: (input) =>
           tryAi('generateSpeech', 'openai', async () => {
             const audio = await openaiSdk.audio.speech.create({

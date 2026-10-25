@@ -9,12 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as authAuthRouteImport } from './routes/(auth)/_auth'
 import { Route as publicIndexRouteImport } from './routes/(public)/index'
 import { Route as publicDashboardRouteImport } from './routes/(public)/dashboard'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminAgentsRouteRouteImport } from './routes/admin/agents/route'
 import { Route as AuthPopupDoneRouteImport } from './routes/auth/popup-done'
 import { Route as publicLearnIndexRouteImport } from './routes/(public)/learn/index'
+import { Route as AdminAgentsIndexRouteImport } from './routes/admin/agents/index'
+import { Route as AdminAgentsChatIdRouteImport } from './routes/admin/agents/$chatId'
+import { Route as ApiAgentsChatRouteImport } from './routes/api.agents.chat'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as authAuthAnalyticsIndexRouteImport } from './routes/(auth)/_auth/analytics/index'
 import { Route as authAuthAudio_assetsIndexRouteImport } from './routes/(auth)/_auth/audio_assets/index'
@@ -26,7 +31,7 @@ import { Route as authAuthGesturesEditIdRouteImport } from './routes/(auth)/_aut
 import { Route as authAuthImage_assetsEditIdRouteImport } from './routes/(auth)/_auth/image_assets/edit/$id'
 import { Route as authAuthLessonsEditIdRouteImport } from './routes/(auth)/_auth/lessons/edit/$id'
 
-const AdminRoute = AdminRouteImport.update({
+const AdminRouteRoute = AdminRouteRouteImport.update({
   id: '/admin',
   path: '/admin',
   getParentRoute: () => rootRouteImport,
@@ -45,6 +50,16 @@ const publicDashboardRoute = publicDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminAgentsRouteRoute = AdminAgentsRouteRouteImport.update({
+  id: '/agents',
+  path: '/agents',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AuthPopupDoneRoute = AuthPopupDoneRouteImport.update({
   id: '/auth/popup-done',
   path: '/auth/popup-done',
@@ -53,6 +68,21 @@ const AuthPopupDoneRoute = AuthPopupDoneRouteImport.update({
 const publicLearnIndexRoute = publicLearnIndexRouteImport.update({
   id: '/(public)/learn/',
   path: '/learn/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminAgentsIndexRoute = AdminAgentsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminAgentsRouteRoute,
+} as any)
+const AdminAgentsChatIdRoute = AdminAgentsChatIdRouteImport.update({
+  id: '/$chatId',
+  path: '/$chatId',
+  getParentRoute: () => AdminAgentsRouteRoute,
+} as any)
+const ApiAgentsChatRoute = ApiAgentsChatRouteImport.update({
+  id: '/api/agents/chat',
+  path: '/api/agents/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
@@ -111,12 +141,17 @@ const authAuthLessonsEditIdRoute = authAuthLessonsEditIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteRouteWithChildren
+  '/admin/agents': typeof AdminAgentsRouteRouteWithChildren
   '/dashboard': typeof publicDashboardRoute
   '/auth/popup-done': typeof AuthPopupDoneRoute
   '/': typeof publicIndexRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/agents/$chatId': typeof AdminAgentsChatIdRoute
+  '/api/agents/chat': typeof ApiAgentsChatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn/': typeof publicLearnIndexRoute
+  '/admin/agents/': typeof AdminAgentsIndexRoute
   '/analytics/': typeof authAuthAnalyticsIndexRoute
   '/audio_assets/': typeof authAuthAudio_assetsIndexRoute
   '/gestures/': typeof authAuthGesturesIndexRoute
@@ -128,12 +163,15 @@ export interface FileRoutesByFullPath {
   '/lessons/edit/$id': typeof authAuthLessonsEditIdRoute
 }
 export interface FileRoutesByTo {
-  '/admin': typeof AdminRoute
   '/dashboard': typeof publicDashboardRoute
   '/auth/popup-done': typeof AuthPopupDoneRoute
   '/': typeof publicIndexRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/agents/$chatId': typeof AdminAgentsChatIdRoute
+  '/api/agents/chat': typeof ApiAgentsChatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn': typeof publicLearnIndexRoute
+  '/admin/agents': typeof AdminAgentsIndexRoute
   '/analytics': typeof authAuthAnalyticsIndexRoute
   '/audio_assets': typeof authAuthAudio_assetsIndexRoute
   '/gestures': typeof authAuthGesturesIndexRoute
@@ -146,13 +184,18 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteRouteWithChildren
+  '/admin/agents': typeof AdminAgentsRouteRouteWithChildren
   '/(auth)/_auth': typeof authAuthRouteWithChildren
   '/(public)/dashboard': typeof publicDashboardRoute
   '/auth/popup-done': typeof AuthPopupDoneRoute
   '/(public)/': typeof publicIndexRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/agents/$chatId': typeof AdminAgentsChatIdRoute
+  '/api/agents/chat': typeof ApiAgentsChatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/(public)/learn/': typeof publicLearnIndexRoute
+  '/admin/agents/': typeof AdminAgentsIndexRoute
   '/(auth)/_auth/analytics/': typeof authAuthAnalyticsIndexRoute
   '/(auth)/_auth/audio_assets/': typeof authAuthAudio_assetsIndexRoute
   '/(auth)/_auth/gestures/': typeof authAuthGesturesIndexRoute
@@ -167,11 +210,16 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/admin'
+    | '/admin/agents'
     | '/dashboard'
     | '/auth/popup-done'
     | '/'
+    | '/admin/'
+    | '/admin/agents/$chatId'
+    | '/api/agents/chat'
     | '/api/trpc/$'
     | '/learn/'
+    | '/admin/agents/'
     | '/analytics/'
     | '/audio_assets/'
     | '/gestures/'
@@ -183,12 +231,15 @@ export interface FileRouteTypes {
     | '/lessons/edit/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/admin'
     | '/dashboard'
     | '/auth/popup-done'
     | '/'
+    | '/admin'
+    | '/admin/agents/$chatId'
+    | '/api/agents/chat'
     | '/api/trpc/$'
     | '/learn'
+    | '/admin/agents'
     | '/analytics'
     | '/audio_assets'
     | '/gestures'
@@ -201,12 +252,17 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/admin'
+    | '/admin/agents'
     | '/(auth)/_auth'
     | '/(public)/dashboard'
     | '/auth/popup-done'
     | '/(public)/'
+    | '/admin/'
+    | '/admin/agents/$chatId'
+    | '/api/agents/chat'
     | '/api/trpc/$'
     | '/(public)/learn/'
+    | '/admin/agents/'
     | '/(auth)/_auth/analytics/'
     | '/(auth)/_auth/audio_assets/'
     | '/(auth)/_auth/gestures/'
@@ -219,11 +275,12 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AdminRoute: typeof AdminRoute
+  AdminRouteRoute: typeof AdminRouteRouteWithChildren
   authAuthRoute: typeof authAuthRouteWithChildren
   publicDashboardRoute: typeof publicDashboardRoute
   AuthPopupDoneRoute: typeof AuthPopupDoneRoute
   publicIndexRoute: typeof publicIndexRoute
+  ApiAgentsChatRoute: typeof ApiAgentsChatRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
   publicLearnIndexRoute: typeof publicLearnIndexRoute
 }
@@ -234,7 +291,7 @@ declare module '@tanstack/react-router' {
       id: '/admin'
       path: '/admin'
       fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
+      preLoaderRoute: typeof AdminRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/(auth)/_auth': {
@@ -258,6 +315,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof publicDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/agents': {
+      id: '/admin/agents'
+      path: '/agents'
+      fullPath: '/admin/agents'
+      preLoaderRoute: typeof AdminAgentsRouteRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/auth/popup-done': {
       id: '/auth/popup-done'
       path: '/auth/popup-done'
@@ -270,6 +341,27 @@ declare module '@tanstack/react-router' {
       path: '/learn'
       fullPath: '/learn/'
       preLoaderRoute: typeof publicLearnIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/agents/': {
+      id: '/admin/agents/'
+      path: '/'
+      fullPath: '/admin/agents/'
+      preLoaderRoute: typeof AdminAgentsIndexRouteImport
+      parentRoute: typeof AdminAgentsRouteRoute
+    }
+    '/admin/agents/$chatId': {
+      id: '/admin/agents/$chatId'
+      path: '/$chatId'
+      fullPath: '/admin/agents/$chatId'
+      preLoaderRoute: typeof AdminAgentsChatIdRouteImport
+      parentRoute: typeof AdminAgentsRouteRoute
+    }
+    '/api/agents/chat': {
+      id: '/api/agents/chat'
+      path: '/api/agents/chat'
+      fullPath: '/api/agents/chat'
+      preLoaderRoute: typeof ApiAgentsChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/trpc/$': {
@@ -345,6 +437,33 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminAgentsRouteRouteChildren {
+  AdminAgentsChatIdRoute: typeof AdminAgentsChatIdRoute
+  AdminAgentsIndexRoute: typeof AdminAgentsIndexRoute
+}
+
+const AdminAgentsRouteRouteChildren: AdminAgentsRouteRouteChildren = {
+  AdminAgentsChatIdRoute: AdminAgentsChatIdRoute,
+  AdminAgentsIndexRoute: AdminAgentsIndexRoute,
+}
+
+const AdminAgentsRouteRouteWithChildren =
+  AdminAgentsRouteRoute._addFileChildren(AdminAgentsRouteRouteChildren)
+
+interface AdminRouteRouteChildren {
+  AdminAgentsRouteRoute: typeof AdminAgentsRouteRouteWithChildren
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminAgentsRouteRoute: AdminAgentsRouteRouteWithChildren,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
+  AdminRouteRouteChildren,
+)
+
 interface authAuthRouteChildren {
   authAuthAnalyticsIndexRoute: typeof authAuthAnalyticsIndexRoute
   authAuthAudio_assetsIndexRoute: typeof authAuthAudio_assetsIndexRoute
@@ -374,11 +493,12 @@ const authAuthRouteWithChildren = authAuthRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
-  AdminRoute: AdminRoute,
+  AdminRouteRoute: AdminRouteRouteWithChildren,
   authAuthRoute: authAuthRouteWithChildren,
   publicDashboardRoute: publicDashboardRoute,
   AuthPopupDoneRoute: AuthPopupDoneRoute,
   publicIndexRoute: publicIndexRoute,
+  ApiAgentsChatRoute: ApiAgentsChatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
   publicLearnIndexRoute: publicLearnIndexRoute,
 }

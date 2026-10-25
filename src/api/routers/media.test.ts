@@ -10,6 +10,12 @@ import { makeUploadImageAsset } from './image_assets';
 import { uploadAudioAsset } from './audio_assets';
 
 const AiTest = Layer.succeed(AiProvider)({
+  openaiModel: () => {
+    throw new Error('not used in this test');
+  },
+  openrouterModel: () => {
+    throw new Error('not used in this test');
+  },
   generateSpeech: () =>
     Effect.succeed({
       fileBuffer: Buffer.from('audio'),
@@ -111,6 +117,12 @@ describe('audio upload workflow', () => {
   it.effect('fails when AI speech generation fails', () =>
     Effect.gen(function* () {
       const AiFail = Layer.succeed(AiProvider)({
+        openaiModel: () => {
+          throw new Error('not used in this test');
+        },
+        openrouterModel: () => {
+          throw new Error('not used in this test');
+        },
         generateSpeech: () =>
           Effect.fail(
             AiProviderError.make({

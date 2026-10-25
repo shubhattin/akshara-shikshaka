@@ -19,6 +19,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_families';
 import type { Gesture } from '~/tools/stroke_data/types';
+import type { AgentModelId } from '~/agents/models';
+import type { AgentMessageMetadata, AgentUIMessage } from '~/agents/ui_message';
 
 export const text_gestures = pgTable(
   'text_gestures',
@@ -222,6 +224,48 @@ export const user_gesture_recording_vectors = pgTable(
   ]
 );
 
+/** One admin agent conversation (`/admin/agents/$chatId`). */
+export const agent_chats = pgTable(
+  'agent_chats',
+  {
+    /** Same id `useChat` uses on the client. */
+    id: text().primaryKey(),
+    /** Model of the latest turn; can change mid-chat. */
+    model: text().notNull().$type<AgentModelId>(),
+    title: text().notNull().default(''),
+    /** Better Auth user id of the admin who started the chat. */
+    user_id: text().notNull(),
+    /** True while a reply is streaming for this chat (possibly in the background). */
+    streaming: boolean().notNull().default(false),
+    created_at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** Bumped on every turn; sorts the sidebar. */
+    updated_at: timestamp({ withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [index('agent_chats_updated_at_idx').on(table.updated_at)]
+);
+
+/**
+ * Full UI messages: text, reasoning, and every tool call with its input and output. Gesture
+ * previews are stored as ids only (see `~/agents/gesture_embed`).
+ */
+export const agent_messages = pgTable(
+  'agent_messages',
+  {
+    id: text().primaryKey(),
+    chat_id: text()
+      .notNull()
+      .references(() => agent_chats.id, { onDelete: 'cascade' }),
+    role: text().notNull().$type<AgentUIMessage['role']>(),
+    /** `UIMessage.parts`, stored as-is (validated against the tools before every turn). */
+    parts: jsonb().notNull().$type<AgentUIMessage['parts']>(),
+    metadata: jsonb().$type<AgentMessageMetadata>(),
+    /** Order within the chat. */
+    position: integer().notNull(),
+    created_at: timestamp({ withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [index('agent_messages_chat_id_position_idx').on(table.chat_id, table.position)]
+);
+
 // relations
 
 export const lesssonGesturesRelations = relations(lesson_gestures, ({ one }) => ({
@@ -307,3 +351,14 @@ export const userGestureRecordingVectorsRelations = relations(
     })
   })
 );
+
+export const agentChatsRelations = relations(agent_chats, ({ many }) => ({
+  messages: many(agent_messages)
+}));
+
+export const agentMessagesRelations = relations(agent_messages, ({ one }) => ({
+  chat: one(agent_chats, {
+    fields: [agent_messages.chat_id],
+    references: [agent_chats.id]
+  })
+}));

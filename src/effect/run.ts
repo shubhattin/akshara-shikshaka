@@ -33,6 +33,19 @@ const toTrpcError = (error: KnownError, cause: Error): TRPCError =>
     cause
   });
 
+const httpStatusForError = (error: KnownError): number => {
+  switch (error._tag) {
+    case 'NotFoundError':
+      return 404;
+    case 'BadRequestError':
+      return 400;
+    case 'UnauthorizedError':
+      return 401;
+    default:
+      return 500;
+  }
+};
+
 const reportBoundaryFailure = async (
   cause: Cause.Cause<unknown>,
   source: string
@@ -93,3 +106,36 @@ export const runLoaderEffect = async <A, E, R>(effect: Effect.Effect<A, E, R>): 
  * (e.g. discriminated unions). Unexpected infrastructure errors still map to TRPCError.
  */
 export const runTrpcEffectResult = runTrpcEffect;
+
+/**
+ * Run an Effect at a server-route boundary and map known errors to a JSON Response.
+ */
+export const runRouteEffect = async <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  options?: {
+    onSuccess?: (value: A) => Response;
+  }
+): Promise<Response> => {
+  const exit = await appRuntime.runPromiseExit(
+    // SAFETY: boundary effects reach here with R = never; annotateLogs adds no requirements
+    effect.pipe(Effect.annotateLogs({ boundary: 'route' })) as Effect.Effect<A, E>
+  );
+
+  if (Exit.isSuccess(exit)) {
+    return options?.onSuccess?.(exit.value) ?? Response.json(exit.value);
+  }
+
+  const failure = Cause.findErrorOption(exit.cause);
+  if (Option.isSome(failure) && isKnownError(failure.value)) {
+    const status = httpStatusForError(failure.value);
+    if (status >= 500) await reportBoundaryFailure(exit.cause, 'route');
+    return Response.json(
+      { error: toTrpcMessage(failure.value), tag: failure.value._tag },
+      { status }
+    );
+  }
+
+  console.error('[route] unexpected effect defect', Cause.pretty(exit.cause));
+  await reportBoundaryFailure(exit.cause, 'route');
+  return Response.json({ error: 'Unexpected server error' }, { status: 500 });
+};

@@ -1,11 +1,18 @@
 import type { IconType } from 'react-icons';
 import { Link } from '@tanstack/react-router';
-import { FaBookOpen, FaChartBar, FaRegHandPaper, FaRegImage, FaVolumeUp } from 'react-icons/fa';
+import {
+  FaBookOpen,
+  FaChartBar,
+  FaRegHandPaper,
+  FaRegImage,
+  FaRobot,
+  FaVolumeUp
+} from 'react-icons/fa';
 import { IoMdArrowRoundBack } from 'react-icons/io';
 import { cn } from '~/lib/utils';
 
 type AdminDestination = {
-  to: '/lessons' | '/gestures' | '/analytics' | '/image_assets' | '/audio_assets';
+  to: '/lessons' | '/gestures' | '/analytics' | '/image_assets' | '/audio_assets' | '/admin/agents';
   label: string;
   description: string;
   icon: IconType;
@@ -53,6 +60,14 @@ const destinations: AdminDestination[] = [
     icon: FaVolumeUp,
     iconClass: 'from-cyan-400 to-blue-500',
     hoverClass: 'hover:border-cyan-400'
+  },
+  {
+    to: '/admin/agents',
+    label: 'Agent',
+    description: 'Ask about gestures, lessons and practice data; previews gestures inline.',
+    icon: FaRobot,
+    iconClass: 'from-rose-400 to-pink-500',
+    hoverClass: 'hover:border-rose-400'
   }
 ];
 

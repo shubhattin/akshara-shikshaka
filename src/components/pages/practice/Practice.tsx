@@ -201,7 +201,6 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
         setTurnstileToken(null);
         resetTurnstile();
         invalidateUserDashboard();
-        toast.success('Practice saved');
       },
       onError: (e) => {
         setTurnstileToken(null);

@@ -6,7 +6,8 @@ import type Konva from 'konva';
 import { useAtom, useAtomValue } from 'jotai';
 import type { GesturePoints, Gesture } from '~/tools/stroke_data/types';
 import { CANVAS_DIMS } from '~/tools/stroke_data/types';
-import { getSmoothenedPoints, pointsToSvgPath } from '~/tools/stroke_data/utils';
+import { getLiveStrokePath } from '~/tools/stroke_data/stroke_render';
+import { KonvaGestureStroke } from '~/components/gesture/KonvaGestureStroke';
 import {
   scaling_factor_atom,
   animated_gesture_lines_atom,
@@ -258,32 +259,22 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
           <Layer>
             {/* Animated Gesture Paths (guidance and completed strokes) */}
             {animatedGestureLines.map((line, index) => (
-              <Path
+              <KonvaGestureStroke
                 key={`gesture-path-${line.index}-${index}`}
-                data={pointsToSvgPath(
-                  line.isAnimatedPath
-                    ? line.points
-                    : getSmoothenedPoints(line.points, {
-                        size: line.width,
-                        simulatePressure: line.simulate_pressure
-                      })
-                )}
-                fill={line.color}
-                strokeEnabled={false}
-                listening={false}
+                stroke={line}
+                color={line.color}
+                reveal={line.reveal}
               />
             ))}
 
             {/* Current Drawing Stroke (while user is drawing) */}
             {currentGesturePoints.length > 2 && currentGesture && (
               <Path
-                data={pointsToSvgPath(
-                  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
-                  getSmoothenedPoints(currentGesturePoints, {
-                    size: currentGesture.width || 6,
-                    simulatePressure: currentGesture.simulate_pressure
-                  }) as GesturePoints[]
-                )}
+                data={getLiveStrokePath({
+                  points: currentGesturePoints,
+                  width: currentGesture.width || 6,
+                  simulate_pressure: currentGesture.simulate_pressure
+                })}
                 fill={USER_GESTURE_COLOR}
                 strokeEnabled={false}
                 listening={false}

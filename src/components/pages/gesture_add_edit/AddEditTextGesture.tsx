@@ -69,7 +69,13 @@ import { useHydrateAtoms } from 'jotai/utils';
 import { Switch } from '@/components/ui/switch';
 import type { Gesture } from '~/tools/stroke_data/types';
 import { CANVAS_DIMS, GESTURE_GAP_DURATION } from '~/tools/stroke_data/types';
-import { animateGesture } from '~/tools/stroke_data/utils';
+import { EMPTY_RECORDING, recordingToGesture } from '~/tools/stroke_data/recording';
+import {
+  animateGesture,
+  getGestureDuration,
+  sleep,
+  STROKE_REFERENCE_LENGTH
+} from '~/tools/stroke_data/animation';
 import {
   text_atom,
   font_size_atom,
@@ -81,7 +87,7 @@ import {
   canvas_gestures_path_atom,
   DEFAULTS,
   is_drawing_atom,
-  current_gesture_recording_points_atom,
+  current_gesture_recording_atom,
   not_to_clear_gestures_index_atom,
   font_family_atom,
   script_atom,
@@ -184,7 +190,7 @@ export default function AddEditTextDataWrapper(props: Props) {
     [is_recording_atom, false],
     [is_playing_atom, false],
     [is_drawing_atom, false],
-    [current_gesture_recording_points_atom, []],
+    [current_gesture_recording_atom, EMPTY_RECORDING],
     [font_family_atom, props.text_data.font_family],
     [font_loaded_atom, new Map<FontFamily, boolean>()],
     [font_size_atom, props.text_data.font_size],
@@ -326,21 +332,34 @@ function AddEditTextData({
     );
   };
 
+  // One playback at a time, cancelled when the editor unmounts
+  const playbackRef = useRef<AbortController | null>(null);
+  useEffect(() => () => playbackRef.current?.abort(), []);
+  const beginPlayback = () => {
+    playbackRef.current?.abort();
+    playbackRef.current = new AbortController();
+    return playbackRef.current.signal;
+  };
+
   const playAllGestures = async () => {
+    const signal = beginPlayback();
     setIsPlaying(true);
     clearGestureVisualization(true);
 
     for (const gesture of gestureData) {
       if (gesture.points.length === 0) continue;
-      await playGestureWithKonva(gesture);
-      await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION)); // Small delay between gestures
+      if (!(await playGestureWithKonva(gesture, signal))) return;
+      if (!(await sleep(GESTURE_GAP_DURATION, signal))) return; // Small delay between gestures
     }
 
     setIsPlaying(false);
   };
 
-  // Konva-based gesture animation using framework-agnostic helper
-  const playGestureWithKonva = async (gesture: Gesture): Promise<void> => {
+  /** Resolves `false` if the playback was cancelled before the stroke finished */
+  const playGestureWithKonva = async (
+    gesture: Gesture,
+    signal = beginPlayback()
+  ): Promise<boolean> => {
     const gesturePathId = gesture.index;
 
     // Initialize the gesture path in state
@@ -348,23 +367,27 @@ function AddEditTextData({
       ...prev.filter((path) => path.index !== gesturePathId),
       {
         index: gesturePathId,
-        points: [],
+        points: gesture.points,
         color: gesture.color,
         width: gesture.width,
-        simulate_pressure: gesture.simulate_pressure
+        simulate_pressure: gesture.simulate_pressure,
+        reveal: 0
       }
     ]);
 
-    // Use the framework-agnostic animation helper
-    await animateGesture(gesture, (frame) => {
-      setCanvasGesturesPath((prev) =>
-        prev.map((path) =>
-          path.index === gesturePathId
-            ? { ...path, points: frame.partialPoints, isAnimatedPath: true }
-            : path
-        )
-      );
-    });
+    return animateGesture(
+      gesture,
+      (frame) => {
+        setCanvasGesturesPath((prev) =>
+          prev.map((path) =>
+            path.index === gesturePathId
+              ? { ...path, reveal: frame.isComplete ? undefined : frame.reveal }
+              : path
+          )
+        );
+      },
+      { signal }
+    );
   };
 
   const selectedGesture = gestureData.find((g) => g.index === selectedGestureIndex);
@@ -601,7 +624,7 @@ const SelectedGestureControls = ({
   clearGestureVisualization
 }: {
   selectedGesture: Gesture;
-  playGestureWithKonva: (gesture: Gesture) => Promise<void>;
+  playGestureWithKonva: (gesture: Gesture) => Promise<boolean>;
   clearGestureVisualization: () => void;
 }) => {
   const [isRecording, setIsRecording] = useAtom(is_recording_atom);
@@ -609,9 +632,7 @@ const SelectedGestureControls = ({
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
   const selectedGestureIndex = useAtomValue(selected_gesture_index_atom);
   const setNotToClearGesturesIndex = useSetAtom(not_to_clear_gestures_index_atom);
-  const [currentGestureRecordingPoints, setCurrentGestureRecordingPoints] = useAtom(
-    current_gesture_recording_points_atom
-  );
+  const [currentRecording, setCurrentRecording] = useAtom(current_gesture_recording_atom);
 
   // Path handling is now done directly via mouse events in the parent component
   const startRecording = () => {
@@ -622,26 +643,27 @@ const SelectedGestureControls = ({
 
   const stopRecording = () => {
     setIsRecording(false);
-    setCurrentGestureRecordingPoints([]);
+    setCurrentRecording(EMPTY_RECORDING);
     clearGestureVisualization(); // Clear all drawn paths
   };
 
   const saveRecording = () => {
-    if (selectedGestureIndex === null || currentGestureRecordingPoints.length === 0) return;
+    if (selectedGestureIndex === null || currentRecording.points.length === 0) return;
 
-    // Save CENTERLINE points; rendering/animation derive polygons from these
-    const centerlinePoints = currentGestureRecordingPoints;
-    const pointCount = centerlinePoints.length;
+    // Save raw CENTERLINE points (plus their timings/pressure); rendering/animation derive
+    // outlines from these
+    const recorded = recordingToGesture(currentRecording);
+    const pointCount = recorded.points.length;
 
-    // Set the points for the selected gesture (overwrite previous points)
+    // Overwrite the selected gesture's previous recording
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
-        gesture.index === selectedGestureIndex ? { ...gesture, points: centerlinePoints } : gesture
+        gesture.index === selectedGestureIndex ? { ...gesture, ...recorded } : gesture
       )
     );
 
     // Clear temporary points
-    setCurrentGestureRecordingPoints([]);
+    setCurrentRecording(EMPTY_RECORDING);
 
     // Stop recording but keep the visualization
     setIsRecording(false);
@@ -666,7 +688,9 @@ const SelectedGestureControls = ({
     if (selectedGestureIndex === null) return;
     setGestureData((prev: Gesture[]) =>
       prev.map((gesture) =>
-        gesture.index === selectedGestureIndex ? { ...gesture, points: [] } : gesture
+        gesture.index === selectedGestureIndex
+          ? { ...gesture, points: [], timings: undefined, pressures: undefined }
+          : gesture
       )
     );
     setNotToClearGesturesIndex((prev) => {
@@ -777,7 +801,14 @@ const SelectedGestureControls = ({
 
         {/* Animation Duration */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium">Animation: {selectedGesture.duration}ms</Label>
+          <Label className="text-sm font-medium">
+            Pace: {selectedGesture.duration}ms per {STROKE_REFERENCE_LENGTH}px
+            {selectedGesture.points.length > 0 ? (
+              <span className="font-normal text-muted-foreground">
+                · this stroke {Math.round(getGestureDuration(selectedGesture))}ms
+              </span>
+            ) : null}
+          </Label>
           <Slider
             value={[selectedGesture.duration]}
             onValueChange={(value) =>
@@ -843,10 +874,10 @@ const SelectedGestureControls = ({
               variant="outline"
               onClick={() => {
                 // Clear previous temp points to start fresh
-                setCurrentGestureRecordingPoints([]);
+                setCurrentRecording(EMPTY_RECORDING);
                 clearGestureVisualization(); // Clear canvas for fresh start
               }}
-              disabled={currentGestureRecordingPoints.length === 0}
+              disabled={currentRecording.points.length === 0}
             >
               <MdReplay className="mr-1" />
               Record Again
@@ -859,7 +890,7 @@ const SelectedGestureControls = ({
               size="sm"
               variant="default"
               onClick={saveRecording}
-              disabled={currentGestureRecordingPoints.length === 0}
+              disabled={currentRecording.points.length === 0}
             >
               Done
             </Button>

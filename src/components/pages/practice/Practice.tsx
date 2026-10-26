@@ -77,6 +77,8 @@ type text_data_type = {
 type Props = {
   text_data: text_data_type;
   play_gesture_on_mount?: boolean;
+  /** Practise without saving attempts (e.g. trying unsaved strokes before applying them) */
+  sandbox?: boolean;
   // rendered on complete - can be ReactNode or a function that receives restartPractice callback
   children?: React.ReactNode | ((restartPractice: () => Promise<void>) => React.ReactNode);
 };
@@ -98,7 +100,7 @@ function PracticeWrapper(props: Props) {
 
   const setTurnstileToken = useSetAtom(turnstile_token_atom);
   const { authReady, isAuthed } = usePlayAuth();
-  const showTurnstile = TURNSTILE_ENABLED && authReady && !isAuthed;
+  const showTurnstile = TURNSTILE_ENABLED && authReady && !isAuthed && !props.sandbox;
 
   return (
     <>
@@ -127,7 +129,7 @@ function usePracticeContext(): PracticeContextValue {
 }
 
 // oxlint-disable-next-line complexity -- Practice orchestrates canvas, gesture, and submission state; extracted helpers cover sub-concerns; refactor to smaller hooks deferred
-function Practice({ text_data, play_gesture_on_mount, children }: Props) {
+function Practice({ text_data, play_gesture_on_mount, sandbox, children }: Props) {
   const stageRef = useRef<Konva.Stage | null>(null);
   const trpc = useTRPC();
 
@@ -219,6 +221,7 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
   const submit_user_gesture_recording_func = async (completed: boolean) => {
     const vectors = deepCopy(userGestureVectorsRef.current);
     userGestureVectorsRef.current = [];
+    if (sandbox) return;
 
     if (
       vectors.length === 0 ||

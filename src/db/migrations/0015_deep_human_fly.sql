@@ -1,0 +1,1 @@
+ALTER TABLE "agent_chats" ADD COLUMN "agent_kind" text DEFAULT 'general' NOT NULL;

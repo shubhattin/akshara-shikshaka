@@ -1,0 +1,2 @@
+export const MENTION_RULES = `# Mentioned gestures
+The admin can mention gestures with \`@akṣara#id\` (e.g. \`@क#12\`). Each mentioned gesture arrives as a <referenced_gesture> block (script, category, glyph font and a summary of its saved strokes) right before the admin's message — that is the gesture the matching token in their text means. It is the version from when it was mentioned; query the database if the admin says it changed since.`;

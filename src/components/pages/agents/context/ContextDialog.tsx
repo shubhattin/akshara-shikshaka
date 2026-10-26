@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '~/api/client';
+import type { AgentKind } from '~/agents/agent_kinds';
 import {
   CodeBlock,
   CodeBlockActions,
@@ -24,13 +25,17 @@ const approxTokens = (text: string) => Math.round(text.length / 3.5);
 /** Everything the agent reads before the conversation, one tab per section. */
 export function ContextDialog({
   open,
-  onOpenChange
+  onOpenChange,
+  agentKind
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  agentKind: AgentKind;
 }) {
   const trpc = useTRPC();
-  const context_q = useQuery(trpc.agents.get_context.queryOptions(undefined, { enabled: open }));
+  const context_q = useQuery(
+    trpc.agents.get_context.queryOptions({ agent_kind: agentKind }, { enabled: open })
+  );
   const sections = context_q.data ?? [];
   const [tab, setTab] = useState<string | null>(null);
   const activeTab = tab ?? sections[0]?.id ?? 'system_prompt';

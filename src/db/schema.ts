@@ -20,6 +20,7 @@ import {
 import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_families';
 import type { Gesture } from '~/tools/stroke_data/types';
 import type { AgentModelId } from '~/agents/models';
+import type { AgentKind } from '~/agents/agent_kinds';
 import type { AgentMessageMetadata, AgentUIMessage } from '~/agents/ui_message';
 
 export const text_gestures = pgTable(
@@ -232,6 +233,8 @@ export const agent_chats = pgTable(
     id: text().primaryKey(),
     /** Model of the latest turn; can change mid-chat. */
     model: text().notNull().$type<AgentModelId>(),
+    /** Which agent the chat talks to; fixed when the chat is created. */
+    agent_kind: text().notNull().default('general').$type<AgentKind>(),
     title: text().notNull().default(''),
     /** Better Auth user id of the admin who started the chat. */
     user_id: text().notNull(),

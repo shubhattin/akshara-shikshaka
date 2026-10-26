@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { agent_chats, agent_messages } from '~/db/schema';
 import { dbRunHttp, dbTransaction } from '~/effect/database';
 import { NotFoundError } from '~/effect/errors';
+import type { AgentKind } from '~/agents/agent_kinds';
 import type { AgentModelId } from '~/agents/models';
 import type { AgentUIMessage } from '~/agents/ui_message';
 
@@ -13,6 +14,7 @@ const ownedChat = (id: string, user_id: string) =>
 export const createAgentChat = Effect.fn('agents.create_chat')(function* (input: {
   id: string;
   model: AgentModelId;
+  agent_kind: AgentKind;
   user_id: string;
 }) {
   const [chat] = yield* dbRunHttp('agents.insert_chat', (client) =>
@@ -27,6 +29,7 @@ export const listAgentChats = Effect.fn('agents.list_chats')(function* (user_id:
       .select({
         id: agent_chats.id,
         title: agent_chats.title,
+        agent_kind: agent_chats.agent_kind,
         updated_at: agent_chats.updated_at,
         streaming: agent_chats.streaming
       })

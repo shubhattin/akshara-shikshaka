@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { AGENT_KIND_META, type AgentKind } from '~/agents/agent_kinds';
-import { AGENT_ICONS } from '../agent_meta';
+import { AgentKindIcon } from '../AgentKindIcon';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import {
@@ -114,7 +113,7 @@ function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
                             : 'text-foreground/80 hover:bg-muted/60 hover:text-foreground'
                         )}
                       >
-                        <ChatIcon kind={chat.agent_kind} />
+                        <AgentKindIcon kind={chat.agent_kind} />
                         <span className="min-w-0 flex-1 truncate">{chat.title || 'New chat'}</span>
                         {chat.streaming ? (
                           <span
@@ -190,9 +189,4 @@ export function MobileHistoryButton() {
       </DrawerContent>
     </Drawer>
   );
-}
-
-function ChatIcon({ kind }: { kind: AgentKind }) {
-  const Icon = AGENT_ICONS[kind];
-  return <Icon className="size-4 shrink-0 text-muted-foreground" aria-label={AGENT_KIND_META[kind].label} />;
 }

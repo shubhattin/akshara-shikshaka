@@ -8,7 +8,8 @@ import { AGENT_KIND_META, AGENT_KINDS, type AgentKind } from '~/agents/agent_kin
 import type { AgentModelId } from '~/agents/models';
 import { Button } from '~/components/ui/button';
 import { cn } from '~/lib/utils';
-import { AGENT_ICONS, AGENT_SUGGESTIONS } from './agent_meta';
+import { AGENT_SUGGESTIONS } from './agent_meta';
+import { AgentKindIcon } from './AgentKindIcon';
 import { ChatComposer, type ComposerMessage } from './chat/ChatComposer';
 import { ModelPicker } from './chat/ModelPicker';
 import { setPendingMessage } from './pending_message';
@@ -59,7 +60,6 @@ export function NewChatPanel() {
 
           <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Agent">
             {AGENT_KINDS.map((kind) => {
-              const Icon = AGENT_ICONS[kind];
               const selected = agentKind === kind;
               return (
                 <button
@@ -78,8 +78,8 @@ export function NewChatPanel() {
                       : 'border-border bg-card hover:border-foreground/20 hover:bg-muted/40'
                   )}
                 >
-                  <span className="flex items-center gap-2 font-semibold">
-                    <Icon className={cn('size-4', selected ? 'text-primary' : 'text-muted-foreground')} />
+                  <span className="flex items-center gap-2.5 font-semibold">
+                    <AgentKindIcon kind={kind} size="lg" />
                     {AGENT_KIND_META[kind].label}
                   </span>
                   <span className="text-xs text-muted-foreground">{AGENT_KIND_META[kind].description}</span>

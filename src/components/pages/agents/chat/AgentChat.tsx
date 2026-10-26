@@ -37,7 +37,8 @@ import {
   MessageScrollerViewport
 } from '~/components/ui/message-scroller';
 import { Spinner } from '~/components/ui/spinner';
-import { AGENT_ICONS, AGENT_SUGGESTIONS } from '../agent_meta';
+import { AGENT_SUGGESTIONS } from '../agent_meta';
+import { AgentKindIcon } from '../AgentKindIcon';
 import { ContextDialog } from '../context/ContextDialog';
 import { hasPendingMessage, takePendingMessage } from '../pending_message';
 import { MobileHistoryButton } from '../sidebar/AgentsSidebar';
@@ -238,14 +239,13 @@ export function AgentChat({ data }: { data: AgentChatData }) {
   });
 
   const lastMessage = messages.at(-1);
-  const KindIcon = AGENT_ICONS[chat.agent_kind];
 
   return (
     <AgentChatProvider value={{ chatId: chat.id, agentKind: chat.agent_kind, runActive, harness }}>
       <div className="flex h-full min-h-0 flex-col">
         <header className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
           <MobileHistoryButton />
-          <KindIcon className="size-4 shrink-0 text-primary" />
+          <AgentKindIcon kind={chat.agent_kind} size="md" />
           <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
             {chat.title || 'New chat'}
             <span className="ml-2 text-xs font-normal text-muted-foreground">

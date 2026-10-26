@@ -21,10 +21,7 @@ export const resolveAgentModel = Effect.fn('agents.resolve_model')(function* (
   modelId: AgentModelId
 ) {
   const ai = yield* AiProvider;
-  const meta = AGENT_MODELS[modelId];
-  return meta.provider === 'openai'
-    ? ai.openaiModel(meta.providerModelId)
-    : ai.openrouterModel(meta.providerModelId);
+  return ai.openrouterModel(AGENT_MODELS[modelId].providerModelId);
 });
 
 export const createAgent = Effect.fn('agents.create_agent')(function* (
@@ -45,10 +42,7 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
     instructions: toSystemMessages(agentInstructionSections(kind)),
     tools,
     stopWhen: stepCountIs(MAX_STEPS),
-    providerOptions: {
-      openai: { reasoningEffort: effort, reasoningSummary: 'auto' },
-      openrouter: { reasoning: { effort } }
-    }
+    providerOptions: { openrouter: { reasoning: { effort } } }
   });
   return { agent, tools };
 });

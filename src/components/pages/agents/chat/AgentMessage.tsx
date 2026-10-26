@@ -13,6 +13,7 @@ import { ReasoningStep } from '../tools/ReasoningStep';
 import { SqlQueryStep } from '../tools/SqlQueryStep';
 import { WebSearchStep } from '../tools/WebSearchStep';
 import { AgentMarkdown } from './AgentMarkdown';
+import { ReplyCost } from './ChatCost';
 import { groupParts, messageText, type StepPart } from './message_parts';
 
 function StepRow({ part, streaming }: { part: StepPart; streaming: boolean }) {
@@ -116,6 +117,7 @@ export function AssistantMessage({
           }
         })}
         {waiting ? <ThinkingLine /> : null}
+        {!streaming ? <ReplyCost metadata={message.metadata} /> : null}
       </MessageContent>
     </Message>
   );

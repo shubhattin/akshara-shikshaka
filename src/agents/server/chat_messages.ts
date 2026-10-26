@@ -1,4 +1,4 @@
-import { getToolName, isToolUIPart } from 'ai';
+import { getToolName, isToolUIPart, type ModelMessage } from 'ai';
 import { isGestureCreatorToolName } from '~/agents/gesture_creator/schemas';
 import { MAX_GESTURE_REFS, messageGestureRefs } from '~/agents/gesture_refs';
 import type { AgentUIMessage, GestureRefData } from '~/agents/ui_message';
@@ -119,3 +119,22 @@ export const withResolvedRefs = (message: AgentUIMessage, resolved: GestureRefDa
     ...message.parts.filter((part) => part.type !== 'data-gesture_ref')
   ]
 });
+
+/**
+ * Mark the end of the conversation as a cache breakpoint (the system prompt has the other one).
+ * The next request — the next turn, or the continuation after a browser tool — then reads the
+ * whole history from cache instead of paying for it again. Ignored by models that cache
+ * automatically.
+ */
+export function withHistoryCacheBreakpoint(messages: ModelMessage[]): ModelMessage[] {
+  const last = messages.at(-1);
+  if (!last) return messages;
+  const marked: ModelMessage = {
+    ...last,
+    providerOptions: {
+      ...last.providerOptions,
+      openrouter: { ...last.providerOptions?.openrouter, cacheControl: { type: 'ephemeral' } }
+    }
+  };
+  return [...messages.slice(0, -1), marked];
+}

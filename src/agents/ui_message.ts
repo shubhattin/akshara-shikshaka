@@ -37,6 +37,8 @@ export type WebSearchInput = { query: string };
 export type WebSearchOutput = {
   summary: string;
   sources: { url: string; title?: string }[];
+  /** USD charged for the search call (counted in the reply's cost) */
+  cost?: number;
 };
 
 export type AgentUITools = {
@@ -50,6 +52,11 @@ export type AgentUITools = {
 
 export type AgentMessageMetadata = {
   model?: AgentModelId;
+  /**
+   * USD actually charged for this reply (every model step plus web searches), as reported by
+   * OpenRouter. Summed across the requests of a reply that waited on browser tools.
+   */
+  cost?: number;
   usage?: {
     inputTokens?: number;
     outputTokens?: number;

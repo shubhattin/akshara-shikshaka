@@ -16,11 +16,13 @@ import {
   mergeClientToolOutputs,
   newMessageRefs,
   pruneHarnessImages,
+  withHistoryCacheBreakpoint,
   withResolvedRefs
 } from '~/agents/server/chat_messages';
 import { resolveGestureRefs } from '~/agents/server/gesture_refs';
 import { generateChatTitle } from '~/agents/server/chat_title';
-import type { AgentMessageMetadata, AgentUIMessage } from '~/agents/ui_message';
+import { createReplyMeter } from '~/agents/server/cost';
+import type { AgentUIMessage } from '~/agents/ui_message';
 import { enqueueBackground } from '~/effect/background';
 import { BadRequestError } from '~/effect/errors';
 import { runRouteEffect } from '~/effect/run';
@@ -124,13 +126,17 @@ async function handleChat(request: Request): Promise<Response> {
           ? appRuntime.runPromise(generateChatTitle(firstText(messages[0]!)))
           : null;
 
+      const meter = createReplyMeter(model, isToolResult ? messages.at(-1)?.metadata : undefined);
+
       yield* setChatStreaming(id, true);
       const result = yield* Effect.promise(async () =>
         agent.stream({
-          prompt: await convertToModelMessages<AgentUIMessage>(pruneHarnessImages(messages), {
-            tools,
-            convertDataPart: gestureRefToModelText
-          }),
+          prompt: withHistoryCacheBreakpoint(
+            await convertToModelMessages<AgentUIMessage>(pruneHarnessImages(messages), {
+              tools,
+              convertDataPart: gestureRefToModelText
+            })
+          ),
           // The Gesture Creator needs the open page to run its tools: stop when the page goes.
           abortSignal: chat.agent_kind === 'gesture_creator' ? request.signal : undefined
         })
@@ -142,21 +148,8 @@ async function handleChat(request: Request): Promise<Response> {
         // Keep generating (and saving) even if the admin closes the tab mid-reply.
         consumeSseStream: ({ stream }) =>
           appRuntime.runSync(enqueueBackground(() => consumeStream({ stream }))),
-        messageMetadata: ({ part }): AgentMessageMetadata | undefined => {
-          if (part.type === 'start') return { model };
-          if (part.type === 'finish') {
-            return {
-              model,
-              usage: {
-                inputTokens: part.totalUsage.inputTokens,
-                outputTokens: part.totalUsage.outputTokens,
-                cachedInputTokens: part.totalUsage.inputTokenDetails?.cacheReadTokens,
-                reasoningTokens: part.totalUsage.outputTokenDetails?.reasoningTokens
-              }
-            };
-          }
-          return undefined;
-        },
+        // Actual cost and tokens, continuing from the stored message when resuming after tools.
+        messageMetadata: ({ part }) => meter(part),
         onFinish: async ({ messages: finished }) => {
           try {
             const title = titlePromise ? await titlePromise : undefined;

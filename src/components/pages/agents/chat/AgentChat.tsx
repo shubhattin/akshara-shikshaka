@@ -44,6 +44,7 @@ import { MobileHistoryButton } from '../sidebar/AgentsSidebar';
 import { AgentChatProvider } from './agent_chat_context';
 import { AssistantMessage, ThinkingLine, UserMessage } from './AgentMessage';
 import { ChatComposer, type ComposerMessage } from './ChatComposer';
+import { ChatCost } from './ChatCost';
 import { ModelPicker } from './ModelPicker';
 
 export type AgentChatData = inferRouterOutputs<AppRouter>['agents']['get_chat'];
@@ -251,6 +252,7 @@ export function AgentChat({ data }: { data: AgentChatData }) {
               {AGENT_KIND_META[chat.agent_kind].label}
             </span>
           </h1>
+          <ChatCost messages={messages} />
           <Button variant="outline" size="sm" onClick={() => setContextOpen(true)}>
             <LibraryBigIcon />
             Context

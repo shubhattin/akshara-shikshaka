@@ -16,7 +16,7 @@ export const AGENT_KIND_META = {
     label: 'Gesture Creator',
     description:
       'Traces the strokes of an @-mentioned gesture over its glyph, checks its own work, and proposes it for you to apply.',
-    defaultModel: 'claude-opus-5.5'
+    defaultModel: 'gpt-6-luna'
   }
 } as const satisfies Record<
   AgentKind,

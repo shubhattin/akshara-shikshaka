@@ -1,4 +1,5 @@
 import { atom } from 'jotai';
+import type { GestureScore } from '~/tools/stroke_data/gesture_scoring';
 import type { AnimationGesture, GesturePoints } from '~/tools/stroke_data/types';
 
 // Practice workflow state
@@ -7,7 +8,8 @@ export const is_drawing_atom = atom(false);
 export const completed_gestures_count_atom = atom(0);
 
 export const show_try_again_atom = atom(false);
-export const last_accuracy_atom = atom(0);
+/** Result of the last failed attempt, shown in the try-again prompt */
+export const last_gesture_score_atom = atom<GestureScore | null>(null);
 
 export const current_gesture_index_atom = atom(0);
 export const is_animating_current_gesture_atom = atom(false);

@@ -16,7 +16,12 @@ import {
 import type Konva from 'konva';
 import { cn } from '~/lib/utils';
 import { MdPlayArrow, MdArrowForward, MdRefresh, MdClose, MdReplay } from 'react-icons/md';
-import { evaluateGestureAccuracy, animateGesture } from '~/tools/stroke_data/utils';
+import { animateGesture } from '~/tools/stroke_data/utils';
+import {
+  scoreGlyphStroke,
+  type GestureIssue,
+  type GestureScore
+} from '~/tools/stroke_data/gesture_scoring';
 import {
   CANVAS_DIMS,
   GESTURE_GAP_DURATION,
@@ -34,7 +39,7 @@ import {
   completed_gestures_count_atom,
   is_animating_current_gesture_atom,
   show_try_again_atom,
-  last_accuracy_atom,
+  last_gesture_score_atom,
   scaling_factor_atom,
   animated_gesture_lines_atom,
   current_gesture_points_atom,
@@ -51,7 +56,8 @@ import { toast } from 'sonner';
 import { canSubmitPlayMetrics, playMetricsToken, usePlayAuth } from '~/lib/play_metrics_auth';
 import { useInvalidateUserDashboard } from '~/api/routers/user/invalidate_user_dashboard';
 
-const ACCURACY_THRESHOLD = 0.75;
+/** Minimum positional slack for a drawn stroke, in on-screen pixels */
+const MIN_TOLERANCE_CSS_PX = 10;
 const SCALING_FACTOR_FOR_WIDTH = 0.85;
 
 const PracticeKonvaCanvas = lazy(() => import('./PracticeCanvas'));
@@ -86,7 +92,7 @@ function PracticeWrapper(props: Props) {
     [completed_gestures_count_atom, 0],
     [is_animating_current_gesture_atom, false],
     [show_try_again_atom, false],
-    [last_accuracy_atom, 0],
+    [last_gesture_score_atom, null],
     [animated_gesture_lines_atom, []]
   ]);
 
@@ -152,7 +158,7 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     is_animating_current_gesture_atom
   );
   const [showTryAgain, setShowTryAgain] = useAtom(show_try_again_atom);
-  const [lastAccuracy, setLastAccuracy] = useAtom(last_accuracy_atom);
+  const [lastGestureScore, setLastGestureScore] = useAtom(last_gesture_score_atom);
   const [scalingFactor, setScalingFactor] = useAtom(scaling_factor_atom);
   const setAnimatedGestureLines = useSetAtom(animated_gesture_lines_atom);
   const setCurrentGesturePoints = useSetAtom(current_gesture_points_atom);
@@ -362,28 +368,39 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     if (!currentGesture) return;
 
     // Evaluate gesture accuracy with error handling
-    let accuracy = 0;
+    let result: GestureScore = { score: 0, passed: false, issue: 'mismatch', checks: {} };
     try {
-      accuracy = evaluateGestureAccuracy(userPoints, currentGesture.points);
+      result = scoreGlyphStroke(
+        userPoints,
+        gestureData.map((gesture) => gesture.points),
+        currentGestureIndex,
+        // Tolerance is in logical canvas units, so a smaller on-screen canvas gets more slack
+        { minTolerance: MIN_TOLERANCE_CSS_PX / (scalingFactor ?? 1) }
+      );
     } catch (error) {
       console.error('Error evaluating stroke accuracy:', error);
       // Treat evaluation errors as failed attempts
-      accuracy = 0;
+    }
+
+    // A tap only counts for dot strokes (bindu, nukta); anywhere else it's an accidental touch
+    if (userPoints.length < 2 && !result.passed) {
+      setCurrentGesturePoints([]);
+      return;
     }
 
     // Store/override latest attempt for this gesture
     try {
-      upsertUserVector(currentGesture.index, currentGesture.points, userPoints, accuracy);
+      upsertUserVector(currentGesture.index, currentGesture.points, userPoints, result.score);
     } catch (e) {
       console.error('Error saving user stroke vectors:', e);
     }
 
-    if (accuracy > ACCURACY_THRESHOLD) {
+    if (result.passed) {
       // completeCurrentGesture
       setShowTryAgain(false);
       playNextGesture();
     } else {
-      setLastAccuracy(accuracy);
+      setLastGestureScore(result);
       setShowTryAgain(true);
 
       if (tryAgainTimeoutRef.current) {
@@ -553,7 +570,11 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
           <div className="relative">
             <AnimatePresence>
               {showTryAgain && canvasCurrentMode === 'practicing' && (
-                <TryAgainSection accuracy={lastAccuracy} onSkipGesture={skipCurrentGesture} />
+                <TryAgainSection
+                  result={lastGestureScore}
+                  currentStrokeIndex={currentGestureIndex}
+                  onSkipGesture={skipCurrentGesture}
+                />
               )}
             </AnimatePresence>
 
@@ -693,17 +714,34 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
   );
 }
 
+const ISSUE_HINTS = {
+  backwards: 'Drawn in the wrong direction',
+  misplaced: 'Draw it over the guide',
+  too_small: 'Too small, trace the whole guide',
+  too_large: 'Too big, stay on the guide',
+  incomplete: 'Draw the whole stroke in one go',
+  mismatch: "Doesn't match the guide",
+  wrong_stroke: 'That is a different stroke'
+} satisfies Record<GestureIssue, string>;
+
+const tryAgainHint = (result: GestureScore | null, currentStrokeIndex: number) => {
+  if (!result?.issue) return 'Try Again';
+  if (result.issue === 'wrong_stroke' && result.matchedStrokeIndex !== undefined) {
+    return `That's stroke ${result.matchedStrokeIndex + 1}, draw stroke ${currentStrokeIndex + 1} first`;
+  }
+  return ISSUE_HINTS[result.issue];
+};
+
 // Try Again Section Component
 const TryAgainSection = ({
-  accuracy,
+  result,
+  currentStrokeIndex,
   onSkipGesture
 }: {
-  accuracy: number;
+  result: GestureScore | null;
+  currentStrokeIndex: number;
   onSkipGesture: () => void;
 }) => {
-  const accuracyPercent = Math.round(accuracy * 100);
-  const _isBelowThreshold = accuracyPercent < 70;
-
   const setCurrentGesturePoints = useSetAtom(current_gesture_points_atom);
   const setShowTryAgain = useSetAtom(show_try_again_atom);
 
@@ -750,8 +788,8 @@ const TryAgainSection = ({
           >
             {accuracyPercent}%
           </div> */}
-          <span className="text-center text-sm font-medium text-gray-600 dark:text-gray-400">
-            Try Again
+          <span className="max-w-56 text-center text-sm font-medium text-gray-600 dark:text-gray-400">
+            {tryAgainHint(result, currentStrokeIndex)}
           </span>
         </div>
 

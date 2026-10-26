@@ -88,7 +88,8 @@ const PracticeKonvaCanvas = forwardRef<Konva.Stage, PracticeKonvaCanvasProps>(
       let finalGesturePoints: GesturePoints[] = currentGesturePoints;
       // compare the original points recorded for accuarcy and not the smoothened points
 
-      if (finalGesturePoints.length > 1) {
+      // Single-point taps are passed on too: they are how a dot (bindu, nukta) is drawn
+      if (finalGesturePoints.length > 0) {
         onUserStroke(finalGesturePoints);
       }
     };

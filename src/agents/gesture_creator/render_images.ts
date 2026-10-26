@@ -192,8 +192,17 @@ export function renderSkeletonImage(mask: GlyphMask, graph: SkeletonGraph): stri
 
 export type DrawnStroke = { points: Pt[]; width: number };
 
-function paintStroke(ctx: CanvasRenderingContext2D, stroke: DrawnStroke, color: string, alpha: number) {
-  const render = getStrokeRender({ points: stroke.points, width: stroke.width, simulate_pressure: false });
+function paintStroke(
+  ctx: CanvasRenderingContext2D,
+  stroke: DrawnStroke,
+  color: string,
+  alpha: number
+) {
+  const render = getStrokeRender({
+    points: stroke.points,
+    width: stroke.width,
+    simulate_pressure: false
+  });
   ctx.save();
   ctx.scale(SCALE, SCALE);
   ctx.globalAlpha = alpha;

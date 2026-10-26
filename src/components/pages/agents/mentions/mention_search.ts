@@ -15,6 +15,11 @@ export type MentionScriptFilter = number | 'all';
 /** `all`, `none` (uncategorised), or one category id. */
 export type MentionCategoryFilter = number | 'all' | 'none';
 
+/** Narrows a category filter to a concrete id by excluding the domain sentinels. */
+export function isCategoryId(filter: MentionCategoryFilter): filter is number {
+  return filter !== 'all' && filter !== 'none';
+}
+
 type IndexEntry = { gesture: MentionableGesture; roman: string; category: string };
 
 export type MentionIndex = IndexEntry[];
@@ -71,7 +76,7 @@ export function searchMentions(
     const { gesture } = entry;
     if (options.script !== 'all' && gesture.script_id !== options.script) return;
     if (options.category === 'none' && gesture.category_id !== null) return;
-    if (typeof options.category === 'number' && gesture.category_id !== options.category) return;
+    if (isCategoryId(options.category) && gesture.category_id !== options.category) return;
     if (options.exclude.has(gesture.id)) return;
     const score = query ? rank(entry, query) : 1;
     if (score > 0) matches.push({ gesture, score, order });

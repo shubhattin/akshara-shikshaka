@@ -1,5 +1,5 @@
 import type { StrokeSpec } from './schemas';
-import type { SkeletonGraph } from './skeleton';
+import type { SkeletonEdge, SkeletonGraph } from './skeleton';
 
 /**
  * Stroke plans → stroke points. A plan walks the skeleton graph (or gives freehand waypoints,
@@ -56,10 +56,14 @@ export function smooth(pts: readonly Pt[], sigma: number): Pt[] {
   const s = sigma / DENSE_STEP;
   if (dense.length < 3 || s < 0.5) return dense;
   const radius = Math.ceil(3 * s);
-  const kernel = Array.from({ length: 2 * radius + 1 }, (_, k) => Math.exp(-((k - radius) ** 2) / (2 * s * s)));
+  const kernel = Array.from({ length: 2 * radius + 1 }, (_, k) =>
+    Math.exp(-((k - radius) ** 2) / (2 * s * s))
+  );
   const n = dense.length;
   return dense.map((_, i) => {
-    let sx = 0, sy = 0, sw = 0;
+    let sx = 0,
+      sy = 0,
+      sw = 0;
     for (let k = -radius; k <= radius; k++) {
       const p = dense[Math.min(n - 1, Math.max(0, i + k))]!;
       const wk = kernel[k + radius]!;
@@ -77,7 +81,10 @@ export function catmullRom(points: readonly Pt[], samplesPerSegment = 24): Pt[] 
   const pts = [points[0]!, ...points, points.at(-1)!];
   const out: Pt[] = [];
   for (let i = 1; i < pts.length - 2; i++) {
-    const p0 = pts[i - 1]!, p1 = pts[i]!, p2 = pts[i + 1]!, p3 = pts[i + 2]!;
+    const p0 = pts[i - 1]!,
+      p1 = pts[i]!,
+      p2 = pts[i + 1]!,
+      p3 = pts[i + 2]!;
     const t0 = 0;
     const t1 = t0 + Math.sqrt(Math.max(dist(p0, p1), 1e-6));
     const t2 = t1 + Math.sqrt(Math.max(dist(p1, p2), 1e-6));
@@ -88,8 +95,11 @@ export function catmullRom(points: readonly Pt[], samplesPerSegment = 24): Pt[] 
         const u = (t - ta) / (tb - ta);
         return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
       };
-      const a1 = lerp(p0, p1, t0, t1), a2 = lerp(p1, p2, t1, t2), a3 = lerp(p2, p3, t2, t3);
-      const b1 = lerp(a1, a2, t0, t2), b2 = lerp(a2, a3, t1, t3);
+      const a1 = lerp(p0, p1, t0, t1),
+        a2 = lerp(p1, p2, t1, t2),
+        a3 = lerp(p2, p3, t2, t3);
+      const b1 = lerp(a1, a2, t0, t2),
+        b2 = lerp(a2, a3, t1, t3);
       out.push(lerp(b1, b2, t1, t2));
     }
   }
@@ -100,13 +110,15 @@ export function catmullRom(points: readonly Pt[], samplesPerSegment = 24): Pt[] 
 /** Shoelace area; on screen (y down) a visually counter-clockwise loop is negative. */
 const signedArea = (pts: readonly Pt[]) => {
   let a = 0;
-  for (let i = 1; i < pts.length; i++) a += pts[i - 1]![0] * pts[i]![1] - pts[i]![0] * pts[i - 1]![1];
+  for (let i = 1; i < pts.length; i++)
+    a += pts[i - 1]![0] * pts[i]![1] - pts[i]![0] * pts[i - 1]![1];
   return a;
 };
 
 const parseCut = (cut: string) => {
   const match = /^(to|from)=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(cut.replace(/\s+/g, ''));
   if (!match) return null;
+  // SAFETY: regex alternation guarantees match[1] is 'to'|'from' and groups 2-3 are numeric strings, so Number() yields the cut coordinates.
   return { kind: match[1] as 'to' | 'from', at: [Number(match[2]), Number(match[3])] as Pt };
 };
 
@@ -129,7 +141,8 @@ const nearestIndex = (pts: readonly Pt[], at: Pt) => {
  */
 function completeCutEnds(graph: SkeletonGraph, steps: readonly string[]): string[] {
   const out = [...steps];
-  const edgeOf = (token: string) => graph.edges.find((e) => e.id === token.split('|')[0]!.split(':')[0]!.trim());
+  const edgeOf = (token: string) =>
+    graph.edges.find((e) => e.id === token.split('|')[0]!.split(':')[0]!.trim());
   if (out.length >= 2 && out[0]!.includes('|from=')) {
     const edge = edgeOf(out[0]!);
     if (edge && !edge.closed) out.unshift(out[1] === edge.to ? edge.from : edge.to);
@@ -141,15 +154,97 @@ function completeCutEnds(graph: SkeletonGraph, steps: readonly string[]): string
   return out;
 }
 
+/** Centreline of one graph walk plus the nodes it starts/ends on (undefined when cut short). */
+export type WalkPathResult = { pts: Pt[]; startNode?: string; endNode?: string };
+
+/** One cut edge of a walk: the trimmed points, or the end of the walk for a `to=` cut. */
+type CutOutcome = { pts: Pt[]; startNode: string | undefined; done: boolean };
+
+/** Closed-loop edge: both ends must name the loop anchor plus an explicit cw/ccw direction. */
+function resolveClosedSegment(
+  edge: SkeletonEdge,
+  from: string,
+  to: string,
+  orient: string | undefined
+): Pt[] {
+  if (from !== edge.from || to !== edge.from) {
+    throw new StrokePlanError(
+      `${edge.id} is a closed loop at ${edge.from}: write ${edge.from}, ${edge.id}:cw|ccw, ${edge.from}`
+    );
+  }
+  if (orient !== 'cw' && orient !== 'ccw') {
+    throw new StrokePlanError(
+      `${edge.id} is a closed loop: give its direction as "${edge.id}:cw" or "${edge.id}:ccw"`
+    );
+  }
+  const ccw = signedArea(edge.points) < 0;
+  return (orient === 'ccw') === ccw ? edge.points : [...edge.points].reverse();
+}
+
+/** Open edge: pick the point order matching the walk direction. */
+function resolveOpenSegment(edge: SkeletonEdge, from: string, to: string): Pt[] {
+  const forward = edge.from === from && edge.to === to;
+  const backward = edge.to === from && edge.from === to;
+  if (!forward && !backward) {
+    throw new StrokePlanError(`${edge.id} connects ${edge.from}–${edge.to}, not ${from}–${to}`);
+  }
+  return forward ? edge.points : [...edge.points].reverse();
+}
+
+/** One walk edge, oriented along the travel direction. */
+function resolveSegment(
+  edge: SkeletonEdge,
+  from: string,
+  to: string,
+  orient: string | undefined
+): Pt[] {
+  return edge.closed
+    ? resolveClosedSegment(edge, from, to, orient)
+    : resolveOpenSegment(edge, from, to);
+}
+
+/**
+ * Trim the edge centreline at a `to=`/`from=` cut point. `isFirst`/`isLast` say whether this
+ * edge opens/closes the stroke; a `to=` cut ends the walk (`done`).
+ */
+function applyCut(
+  seg: Pt[],
+  cutText: string,
+  edge: SkeletonEdge,
+  token: string,
+  isFirst: boolean,
+  isLast: boolean,
+  pts: Pt[],
+  startNode: string | undefined
+): CutOutcome {
+  const cut = parseCut(cutText);
+  if (!cut) throw new StrokePlanError(`Bad cut "${cutText}": use to=x,y or from=x,y`);
+  const { index, distance } = nearestIndex(seg, cut.at);
+  if (distance > Math.max(12, edge.width)) {
+    throw new StrokePlanError(
+      `Cut point ${cut.at.join(',')} is ${Math.round(distance)} px from ${edge.id}; pick a point on that edge (it runs from ${seg[0]!.join(',')} to ${seg.at(-1)!.join(',')})`
+    );
+  }
+  if (cut.kind === 'to') {
+    if (!isLast) throw new StrokePlanError(`"to=" cuts end the stroke: put ${token} last`);
+    return { pts: [...pts, ...seg.slice(0, index + 1)], startNode, done: true };
+  }
+  if (!isFirst) throw new StrokePlanError(`"from=" cuts start the stroke: put ${token} first`);
+  return { pts: seg.slice(index), startNode: undefined, done: false };
+}
+
 /** The centreline of a graph walk: ["N1","E2","N3", …]. */
-export function walkPath(graph: SkeletonGraph, rawSteps: readonly string[]): { pts: Pt[]; startNode?: string; endNode?: string } {
+export function walkPath(graph: SkeletonGraph, rawSteps: readonly string[]): WalkPathResult {
   const steps = completeCutEnds(graph, rawSteps);
   const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
   const edges = new Map(graph.edges.map((e) => [e.id, e]));
   const nodeIds = () => graph.nodes.map((n) => n.id).join(', ');
-  if (steps.length === 1) throw new StrokePlanError(`A path needs at least one edge: got only ${steps[0]}`);
+  if (steps.length === 1)
+    throw new StrokePlanError(`A path needs at least one edge: got only ${steps[0]}`);
   if (steps.length % 2 === 0) {
-    throw new StrokePlanError(`A path alternates node, edge, node… and ends on a node: [${steps.join(', ')}]`);
+    throw new StrokePlanError(
+      `A path alternates node, edge, node… and ends on a node: [${steps.join(', ')}]`
+    );
   }
   const first = nodes.get(steps[0]!);
   if (!first) throw new StrokePlanError(`Unknown node ${steps[0]} (nodes: ${nodeIds()})`);
@@ -157,49 +252,36 @@ export function walkPath(graph: SkeletonGraph, rawSteps: readonly string[]): { p
   let startNode: string | undefined = first.id;
   let endNode: string | undefined;
   for (let i = 1; i < steps.length; i += 2) {
+    // SAFETY: walk steps alternate node, edge, node, so steps[i] is always an edge token "id[:orient][|cut]"; split yields the edge id plus optional cut/orient parts.
     const [token, cutText] = steps[i]!.split('|') as [string, string | undefined];
+    // SAFETY: edge token holds "edgeId[:orient]" with at most one ':'; split yields the id plus an optional orientation suffix.
     const [edgeId, orient] = token.split(':') as [string, string | undefined];
     const edge = edges.get(edgeId.trim());
     const from = steps[i - 1]!;
     const to = steps[i + 1]!;
-    if (!edge) throw new StrokePlanError(`Unknown edge ${edgeId} (edges: ${graph.edges.map((e) => e.id).join(', ')})`);
+    if (!edge)
+      throw new StrokePlanError(
+        `Unknown edge ${edgeId} (edges: ${graph.edges.map((e) => e.id).join(', ')})`
+      );
     if (!nodes.has(to)) throw new StrokePlanError(`Unknown node ${to} after ${edgeId}`);
-    let seg: Pt[];
-    if (edge.closed) {
-      if (from !== edge.from || to !== edge.from) {
-        throw new StrokePlanError(`${edge.id} is a closed loop at ${edge.from}: write ${edge.from}, ${edge.id}:cw|ccw, ${edge.from}`);
-      }
-      if (orient !== 'cw' && orient !== 'ccw') {
-        throw new StrokePlanError(`${edge.id} is a closed loop: give its direction as "${edge.id}:cw" or "${edge.id}:ccw"`);
-      }
-      const ccw = signedArea(edge.points) < 0;
-      seg = (orient === 'ccw') === ccw ? edge.points : [...edge.points].reverse();
-    } else {
-      const forward = edge.from === from && edge.to === to;
-      const backward = edge.to === from && edge.from === to;
-      if (!forward && !backward) {
-        throw new StrokePlanError(`${edge.id} connects ${edge.from}–${edge.to}, not ${from}–${to}`);
-      }
-      seg = forward ? edge.points : [...edge.points].reverse();
-    }
+    const seg = resolveSegment(edge, from, to, orient);
     if (cutText) {
-      const cut = parseCut(cutText);
-      if (!cut) throw new StrokePlanError(`Bad cut "${cutText}": use to=x,y or from=x,y`);
-      const { index, distance } = nearestIndex(seg, cut.at);
-      if (distance > Math.max(12, edge.width)) {
-        throw new StrokePlanError(
-          `Cut point ${cut.at.join(',')} is ${Math.round(distance)} px from ${edge.id}; pick a point on that edge (it runs from ${seg[0]!.join(',')} to ${seg.at(-1)!.join(',')})`
-        );
-      }
-      if (cut.kind === 'to') {
-        if (i !== steps.length - 2) throw new StrokePlanError(`"to=" cuts end the stroke: put ${steps[i]} last`);
-        pts = [...pts, ...seg.slice(0, index + 1)];
+      const cut = applyCut(
+        seg,
+        cutText,
+        edge,
+        token,
+        i === 1,
+        i === steps.length - 2,
+        pts,
+        startNode
+      );
+      pts = cut.pts;
+      startNode = cut.startNode;
+      if (cut.done) {
         endNode = undefined;
         return { pts, startNode, endNode };
       }
-      if (i !== 1) throw new StrokePlanError(`"from=" cuts start the stroke: put ${steps[i]} first`);
-      pts = seg.slice(index);
-      startNode = undefined;
     } else {
       pts.push(...seg);
     }
@@ -243,13 +325,18 @@ export function buildStroke(
   graph: SkeletonGraph,
   onInk: (p: Pt) => boolean
 ): BuiltStroke {
-  const finish = (pts: Pt[]) => resample(pts, SPACING).map(([x, y]) => [round1(x), round1(y)] as Pt);
+  const finish = (pts: Pt[]) =>
+    resample(pts, SPACING).map(([x, y]) => {
+      // SAFETY: round1 returns finite numbers, so the pair is a valid 2-tuple canvas point.
+      return [round1(x), round1(y)] as Pt;
+    });
   if ('dot' in spec) {
     const [x, y] = spec.dot;
     // a tiny circle, like a pen tap that wobbles a little
     return {
       points: Array.from({ length: 6 }, (_, k) => {
         const a = (k / 6) * Math.PI * 2;
+        // SAFETY: cos/sin offsets of the dot centre stay finite numbers, so the pair is a valid 2-tuple canvas point.
         return [round1(x + Math.cos(a) * 1.5), round1(y + Math.sin(a) * 1.5)] as Pt;
       })
     };
@@ -261,7 +348,9 @@ export function buildStroke(
   let pts = smooth(walk.pts, PATH_SIGMA);
   const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
   const reach = graph.strokeWidth * 0.45;
-  if (walk.startNode && nodes.get(walk.startNode)?.kind === 'end') pts = extendEnd(pts, true, reach, onInk);
-  if (walk.endNode && nodes.get(walk.endNode)?.kind === 'end') pts = extendEnd(pts, false, reach, onInk);
+  if (walk.startNode && nodes.get(walk.startNode)?.kind === 'end')
+    pts = extendEnd(pts, true, reach, onInk);
+  if (walk.endNode && nodes.get(walk.endNode)?.kind === 'end')
+    pts = extendEnd(pts, false, reach, onInk);
   return { points: finish(pts), startNode: walk.startNode, endNode: walk.endNode };
 }

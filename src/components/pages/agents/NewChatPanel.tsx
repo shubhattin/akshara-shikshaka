@@ -55,7 +55,9 @@ export function NewChatPanel() {
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-8 md:py-14">
           <div className="flex flex-col gap-1 text-center">
             <h1 className="text-2xl font-black tracking-tight">Agents</h1>
-            <p className="text-sm text-muted-foreground">Internal AI helpers for Akshara Shikshaka.</p>
+            <p className="text-sm text-muted-foreground">
+              Internal AI helpers for Akshara Shikshaka.
+            </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Agent">
@@ -82,7 +84,9 @@ export function NewChatPanel() {
                     <AgentKindIcon kind={kind} size="lg" />
                     {AGENT_KIND_META[kind].label}
                   </span>
-                  <span className="text-xs text-muted-foreground">{AGENT_KIND_META[kind].description}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {AGENT_KIND_META[kind].description}
+                  </span>
                 </button>
               );
             })}
@@ -90,8 +94,8 @@ export function NewChatPanel() {
 
           {agentKind === 'gesture_creator' ? (
             <p className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              The Gesture Creator draws in this browser tab: keep the chat open while it works. You can cancel
-              an attempt at any time; nothing is saved until you apply a proposal.
+              The Gesture Creator draws in this browser tab: keep the chat open while it works. You
+              can cancel an attempt at any time; nothing is saved until you apply a proposal.
             </p>
           ) : null}
 

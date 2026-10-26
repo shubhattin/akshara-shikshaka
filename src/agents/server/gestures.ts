@@ -26,12 +26,22 @@ export const listMentionableGestures = Effect.fn('agents.list_mentionable_gestur
         gesture_text_key_category_join,
         eq(gesture_text_key_category_join.gesture_text_key, text_gestures.text_key)
       )
-      .leftJoin(gesture_categories, eq(gesture_categories.id, gesture_text_key_category_join.category_id))
-      .orderBy(asc(text_gestures.script_id), asc(gesture_categories.order), asc(text_gestures.order), asc(text_gestures.id))
+      .leftJoin(
+        gesture_categories,
+        eq(gesture_categories.id, gesture_text_key_category_join.category_id)
+      )
+      .orderBy(
+        asc(text_gestures.script_id),
+        asc(gesture_categories.order),
+        asc(text_gestures.order),
+        asc(text_gestures.id)
+      )
   );
   // Romanize per script in one batch each, so "ka" finds क, క and ಕ.
   const byScript = new Map<number, number[]>();
-  rows.forEach((row, index) => byScript.set(row.script_id, [...(byScript.get(row.script_id) ?? []), index]));
+  rows.forEach((row, index) =>
+    byScript.set(row.script_id, [...(byScript.get(row.script_id) ?? []), index])
+  );
   const roman = Array.from({ length: rows.length }, () => '');
   yield* Effect.forEach(
     [...byScript],
@@ -71,12 +81,17 @@ export const getGestureForAgent = Effect.fn('agents.get_gesture')(function* (id:
         gesture_text_key_category_join,
         eq(gesture_text_key_category_join.gesture_text_key, text_gestures.text_key)
       )
-      .leftJoin(gesture_categories, eq(gesture_categories.id, gesture_text_key_category_join.category_id))
+      .leftJoin(
+        gesture_categories,
+        eq(gesture_categories.id, gesture_text_key_category_join.category_id)
+      )
       .where(eq(text_gestures.id, id))
       .limit(1)
   );
   if (!row) {
-    return yield* Effect.fail(NotFoundError.make({ resource: 'text_gesture', message: 'Gesture not found' }));
+    return yield* Effect.fail(
+      NotFoundError.make({ resource: 'text_gesture', message: 'Gesture not found' })
+    );
   }
   return row;
 });
@@ -93,14 +108,23 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
 }) {
   const chat = yield* findAgentChat(input.chatId, input.userId);
   if (chat.agent_kind !== 'gesture_creator') {
-    return yield* Effect.fail(BadRequestError.make({ message: 'This chat does not create gestures' }));
+    return yield* Effect.fail(
+      BadRequestError.make({ message: 'This chat does not create gestures' })
+    );
   }
   const messages = yield* loadAgentMessages(input.chatId);
   const part = messages
     .flatMap((message) => message.parts)
     .find((p) => p.type === 'tool-propose_gesture' && p.toolCallId === input.toolCallId);
-  if (!part || part.type !== 'tool-propose_gesture' || part.state !== 'output-available' || !part.output.ok) {
-    return yield* Effect.fail(BadRequestError.make({ message: 'That proposal is not in this chat' }));
+  if (
+    !part ||
+    part.type !== 'tool-propose_gesture' ||
+    part.state !== 'output-available' ||
+    !part.output.ok
+  ) {
+    return yield* Effect.fail(
+      BadRequestError.make({ message: 'That proposal is not in this chat' })
+    );
   }
   const parsed = proposed_gesture_schema.safeParse(part.output.proposal);
   if (!parsed.success) {
@@ -109,7 +133,9 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
   const proposal = parsed.data;
   const current = yield* getGestureForAgent(proposal.gesture_id);
   if (current.uuid !== proposal.uuid) {
-    return yield* Effect.fail(BadRequestError.make({ message: 'The gesture was replaced since the proposal' }));
+    return yield* Effect.fail(
+      BadRequestError.make({ message: 'The gesture was replaced since the proposal' })
+    );
   }
   const sameGlyph =
     current.font_family === proposal.font_family &&
@@ -119,7 +145,8 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
   if (!sameGlyph) {
     return yield* Effect.fail(
       BadRequestError.make({
-        message: 'The glyph font, size or position changed since this was drawn. Ask the agent to retrace it.'
+        message:
+          'The glyph font, size or position changed since this was drawn. Ask the agent to retrace it.'
       })
     );
   }

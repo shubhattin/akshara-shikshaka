@@ -34,12 +34,15 @@ export const AGENT_MODELS = {
     hint: 'Best quality — heavier analysis',
     providerModelId: 'anthropic/claude-opus-5.5'
   }
-} as const satisfies Record<
-  AgentModelId,
-  { label: string; hint: string; providerModelId: string }
->;
+} as const satisfies Record<AgentModelId, { label: string; hint: string; providerModelId: string }>;
 
 export const agent_model_id_schema = z.enum(AGENT_MODEL_IDS);
+
+/** Stored chats can name a model that no longer exists: fall back to the default instead of crashing. */
+export function coerceAgentModelId(id: string): AgentModelId {
+  const parsed = agent_model_id_schema.safeParse(id);
+  return parsed.success ? parsed.data : AGENT_DEFAULT_MODEL;
+}
 
 /** Model a new chat starts with. */
 export const AGENT_DEFAULT_MODEL = 'gpt-6-luna' satisfies AgentModelId;

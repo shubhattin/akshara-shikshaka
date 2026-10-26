@@ -65,7 +65,10 @@ function morph(src: Uint8Array, w: number, h: number, dilate: boolean): Uint8Arr
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const c = src[y * w + x]!;
-      const l = at(x - 1, y), r = at(x + 1, y), u = at(x, y - 1), d = at(x, y + 1);
+      const l = at(x - 1, y),
+        r = at(x + 1, y),
+        u = at(x, y - 1),
+        d = at(x, y + 1);
       out[y * w + x] = dilate ? c | l | r | u | d : c & l & r & u & d;
     }
   }
@@ -91,53 +94,71 @@ export function distanceTransform(mask: Uint8Array, w: number, h: number): Float
     for (let x = 0; x < w; x++) {
       const i = y * w + x;
       if (!mask[i]) continue;
-      d[i] = Math.min(d[i]!, at(x - 1, y) + 1, at(x, y - 1) + 1, at(x - 1, y - 1) + D, at(x + 1, y - 1) + D);
+      d[i] = Math.min(
+        d[i]!,
+        at(x - 1, y) + 1,
+        at(x, y - 1) + 1,
+        at(x - 1, y - 1) + D,
+        at(x + 1, y - 1) + D
+      );
     }
   }
   for (let y = h - 1; y >= 0; y--) {
     for (let x = w - 1; x >= 0; x--) {
       const i = y * w + x;
       if (!mask[i]) continue;
-      d[i] = Math.min(d[i]!, at(x + 1, y) + 1, at(x, y + 1) + 1, at(x + 1, y + 1) + D, at(x - 1, y + 1) + D);
+      d[i] = Math.min(
+        d[i]!,
+        at(x + 1, y) + 1,
+        at(x, y + 1) + 1,
+        at(x + 1, y + 1) + D,
+        at(x - 1, y + 1) + D
+      );
     }
   }
   return d;
 }
 
-/** Zhang–Suen thinning, then one pass removing staircase corners so lines are one pixel wide. */
-export function thin(mask: Uint8Array, w: number, h: number): Uint8Array {
-  const img = mask.slice();
-  // keep a blank border so neighbour reads never wrap
-  for (let x = 0; x < w; x++) img[x] = img[(h - 1) * w + x] = 0;
-  for (let y = 0; y < h; y++) img[y * w] = img[y * w + w - 1] = 0;
+/** Zhang–Suen removal test for one foreground pixel; `nb` holds p2..p9 clockwise from north. */
+function zhangSuenRemovable(nb: readonly number[], step: number): boolean {
+  const b = nb[0]! + nb[1]! + nb[2]! + nb[3]! + nb[4]! + nb[5]! + nb[6]! + nb[7]!;
+  if (b < 2 || b > 6) return false;
+  let a = 0;
+  for (let k = 0; k < 8; k++) {
+    if (nb[k] === 0 && nb[(k + 1) % 8] === 1) a++;
+  }
+  if (a !== 1) return false;
+  return step === 0
+    ? nb[0]! * nb[2]! * nb[4]! === 0 && nb[2]! * nb[4]! * nb[6]! === 0
+    : nb[0]! * nb[2]! * nb[6]! === 0 && nb[0]! * nb[4]! * nb[6]! === 0;
+}
+
+/** One Zhang–Suen sub-iteration: collect removals over a full scan, then apply them. */
+function zhangSuenPass(img: Uint8Array, w: number, h: number, step: number): number {
   const remove: number[] = [];
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (let step = 0; step < 2; step++) {
-      remove.length = 0;
-      for (let y = 1; y < h - 1; y++) {
-        for (let x = 1; x < w - 1; x++) {
-          const i = y * w + x;
-          if (!img[i]) continue;
-          const p2 = img[i - w]!, p3 = img[i - w + 1]!, p4 = img[i + 1]!, p5 = img[i + w + 1]!;
-          const p6 = img[i + w]!, p7 = img[i + w - 1]!, p8 = img[i - 1]!, p9 = img[i - w - 1]!;
-          const b = p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
-          if (b < 2 || b > 6) continue;
-          const seq = [p2, p3, p4, p5, p6, p7, p8, p9, p2];
-          let a = 0;
-          for (let k = 0; k < 8; k++) if (seq[k] === 0 && seq[k + 1] === 1) a++;
-          if (a !== 1) continue;
-          if (step === 0 ? p2 * p4 * p6 === 0 && p4 * p6 * p8 === 0 : p2 * p4 * p8 === 0 && p2 * p6 * p8 === 0) {
-            remove.push(i);
-          }
-        }
-      }
-      for (const i of remove) img[i] = 0;
-      if (remove.length > 0) changed = true;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (!img[i]) continue;
+      const nb = [
+        img[i - w]!,
+        img[i - w + 1]!,
+        img[i + 1]!,
+        img[i + w + 1]!,
+        img[i + w]!,
+        img[i + w - 1]!,
+        img[i - 1]!,
+        img[i - w - 1]!
+      ];
+      if (zhangSuenRemovable(nb, step)) remove.push(i);
     }
   }
-  // Staircase clean-up: drop a pixel whose 2–3 neighbours are already connected to each other.
+  for (const i of remove) img[i] = 0;
+  return remove.length;
+}
+
+/** Staircase clean-up: drop a pixel whose 2–3 neighbours are already connected to each other. */
+function removeStaircasePixels(img: Uint8Array, w: number, h: number): void {
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = y * w + x;
@@ -147,6 +168,22 @@ export function thin(mask: Uint8Array, w: number, h: number): Uint8Array {
       if (neighbourComponents(set) === 1) img[i] = 0;
     }
   }
+}
+
+/** Zhang–Suen thinning, then one pass removing staircase corners so lines are one pixel wide. */
+export function thin(mask: Uint8Array, w: number, h: number): Uint8Array {
+  const img = mask.slice();
+  // keep a blank border so neighbour reads never wrap
+  for (let x = 0; x < w; x++) img[x] = img[(h - 1) * w + x] = 0;
+  for (let y = 0; y < h; y++) img[y * w] = img[y * w + w - 1] = 0;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let step = 0; step < 2; step++) {
+      if (zhangSuenPass(img, w, h, step) > 0) changed = true;
+    }
+  }
+  removeStaircasePixels(img, w, h);
   return img;
 }
 
@@ -205,6 +242,125 @@ export function labelComponents(mask: Uint8Array, w: number, h: number) {
 }
 
 type RawEdge = { a: number; b: number; path: number[] };
+
+type WorkEdge = { a: number; b: number; pts: [number, number][]; widths: number[] };
+
+/** Ink bounding box plus the small-blob dots, with the component ids to erase from the skeleton. */
+type InkLayout = {
+  box: [number, number, number, number];
+  dots: SkeletonDot[];
+  dotComponents: Set<number>;
+};
+
+/** Bounding box of the ink plus dot blobs (components within ~2.6 stroke widths). */
+function computeInkLayout(
+  components: number[][],
+  w: number,
+  h: number,
+  scale: number,
+  strokeWidthPx: number
+): InkLayout {
+  let x0 = w,
+    y0 = h,
+    x1 = 0,
+    y1 = 0;
+  const dots: SkeletonDot[] = [];
+  const dotComponents = new Set<number>();
+  components.forEach((pixels, index) => {
+    let bx0 = w,
+      by0 = h,
+      bx1 = 0,
+      by1 = 0;
+    for (const i of pixels) {
+      const x = i % w;
+      const y = (i - x) / w;
+      bx0 = Math.min(bx0, x);
+      by0 = Math.min(by0, y);
+      bx1 = Math.max(bx1, x);
+      by1 = Math.max(by1, y);
+    }
+    x0 = Math.min(x0, bx0);
+    y0 = Math.min(y0, by0);
+    x1 = Math.max(x1, bx1);
+    y1 = Math.max(y1, by1);
+    if (Math.max(bx1 - bx0, by1 - by0) <= 2.6 * strokeWidthPx) {
+      dotComponents.add(index + 1);
+      dots.push({
+        id: '',
+        x: round1((bx0 + bx1) / 2 / scale),
+        y: round1((by0 + by1) / 2 / scale),
+        r: round1(Math.max(bx1 - bx0, by1 - by0) / 2 / scale)
+      });
+    }
+  });
+  return {
+    box:
+      x1 >= x0
+        ? [round1(x0 / scale), round1(y0 / scale), round1(x1 / scale), round1(y1 / scale)]
+        : [0, 0, 0, 0],
+    dots,
+    dotComponents
+  };
+}
+
+/** Iteratively drop thinning-artefact spurs (re-thinning after each round). */
+function pruneSpurs(sk: Uint8Array, w: number, h: number, spurPx: number) {
+  let current = sk;
+  let traced = trace(current, w, h);
+  for (let round = 0; round < 4; round++) {
+    const degree = new Map<number, number>();
+    for (const e of traced.edges) {
+      degree.set(e.a, (degree.get(e.a) ?? 0) + 1);
+      degree.set(e.b, (degree.get(e.b) ?? 0) + 1);
+    }
+    let changed = false;
+    for (const e of traced.edges) {
+      const da = degree.get(e.a) ?? 0;
+      const db = degree.get(e.b) ?? 0;
+      if (e.a === e.b || (da === 1) === (db === 1) || e.path.length >= spurPx) continue;
+      // keep the junction pixel, drop the rest of the spur (including the end node cluster)
+      const spur = da === 1 ? e.path.slice(0, -1) : e.path.slice(1);
+      for (const px of spur) current[px] = 0;
+      for (const px of traced.clusters[(da === 1 ? e.a : e.b) - 1] ?? []) current[px] = 0;
+      changed = true;
+    }
+    if (!changed) break;
+    current = thin(current, w, h);
+    traced = trace(current, w, h);
+  }
+  return { sk: current, traced };
+}
+
+/** Merge pass-through nodes (degree 2, not a loop anchor) so an edge runs end to end. */
+function mergePassThroughNodes(work: WorkEdge[]): WorkEdge[] {
+  let current = work;
+  for (;;) {
+    const incident = new Map<number, number[]>();
+    current.forEach((e, k) => {
+      incident.set(e.a, [...(incident.get(e.a) ?? []), k]);
+      incident.set(e.b, [...(incident.get(e.b) ?? []), k]);
+    });
+    const node = [...incident].find(([, ks]) => ks.length === 2 && ks[0] !== ks[1]);
+    if (!node) break;
+    // SAFETY: find predicate guarantees ks holds exactly two distinct edge indices, so the entry destructures to a node id plus a 2-tuple of edge keys.
+    const [n, [k1, k2]] = node as [number, [number, number]];
+    const e1 = current[k1]!;
+    const e2 = current[k2]!;
+    const p1 = e1.b === n ? e1.pts : [...e1.pts].reverse();
+    const w1 = e1.b === n ? e1.widths : [...e1.widths].reverse();
+    const p2 = e2.a === n ? e2.pts : [...e2.pts].reverse();
+    const w2 = e2.a === n ? e2.widths : [...e2.widths].reverse();
+    const merged: WorkEdge = {
+      a: e1.b === n ? e1.a : e1.b,
+      b: e2.a === n ? e2.b : e2.a,
+      pts: [...p1, ...p2.slice(1)],
+      widths: [...w1, ...w2]
+    };
+    current = current.filter((_, k) => k !== k1 && k !== k2);
+    current.push(merged);
+  }
+  return current.filter((e) => e.pts.length >= 2 && (e.a !== e.b || pathLength(e.pts) > 4));
+}
 
 /** Trace a one-pixel skeleton into nodes (clusters of non-degree-2 pixels) and edges. */
 function trace(sk: Uint8Array, w: number, h: number) {
@@ -313,57 +469,19 @@ export function buildSkeletonGraph(input: GlyphMask): SkeletonGraph {
   const strokeWidthPx = Math.max(2, median(skWidths));
 
   // Box + dots from ink components
-  let x0 = w, y0 = h, x1 = 0, y1 = 0;
   const { labels: inkLabel, components } = labelComponents(ink, w, h);
-  const dotComponents = new Set<number>();
-  const dots: SkeletonDot[] = [];
-  components.forEach((pixels, index) => {
-    let bx0 = w, by0 = h, bx1 = 0, by1 = 0;
-    for (const i of pixels) {
-      const x = i % w;
-      const y = (i - x) / w;
-      bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x); by1 = Math.max(by1, y);
-    }
-    x0 = Math.min(x0, bx0); y0 = Math.min(y0, by0); x1 = Math.max(x1, bx1); y1 = Math.max(y1, by1);
-    if (Math.max(bx1 - bx0, by1 - by0) <= 2.6 * strokeWidthPx) {
-      dotComponents.add(index + 1);
-      dots.push({
-        id: '',
-        x: round1((bx0 + bx1) / 2 / scale),
-        y: round1((by0 + by1) / 2 / scale),
-        r: round1(Math.max(bx1 - bx0, by1 - by0) / 2 / scale)
-      });
-    }
-  });
+  const { box, dots, dotComponents } = computeInkLayout(components, w, h, scale, strokeWidthPx);
   for (let i = 0; i < sk.length; i++) if (sk[i] && dotComponents.has(inkLabel[i]!)) sk[i] = 0;
 
   // Iterative spur pruning
   const spurPx = Math.max(6 * scale, 0.75 * strokeWidthPx);
-  let traced = trace(sk, w, h);
-  for (let round = 0; round < 4; round++) {
-    const degree = new Map<number, number>();
-    for (const e of traced.edges) {
-      degree.set(e.a, (degree.get(e.a) ?? 0) + 1);
-      degree.set(e.b, (degree.get(e.b) ?? 0) + 1);
-    }
-    let changed = false;
-    for (const e of traced.edges) {
-      const da = degree.get(e.a) ?? 0;
-      const db = degree.get(e.b) ?? 0;
-      if (e.a === e.b || (da === 1) === (db === 1) || e.path.length >= spurPx) continue;
-      // keep the junction pixel, drop the rest of the spur (including the end node cluster)
-      const spur = da === 1 ? e.path.slice(0, -1) : e.path.slice(1);
-      for (const px of spur) sk[px] = 0;
-      for (const px of traced.clusters[(da === 1 ? e.a : e.b) - 1] ?? []) sk[px] = 0;
-      changed = true;
-    }
-    if (!changed) break;
-    sk = thin(sk, w, h);
-    traced = trace(sk, w, h);
-  }
+  const pruned = pruneSpurs(sk, w, h, spurPx);
+  sk = pruned.sk;
+  const traced = pruned.traced;
 
   const centre = (cluster: number[]): [number, number] => {
-    let sx = 0, sy = 0;
+    let sx = 0,
+      sy = 0;
     for (const i of cluster) {
       const x = i % w;
       sx += x;
@@ -376,7 +494,6 @@ export function buildSkeletonGraph(input: GlyphMask): SkeletonGraph {
     return [x / scale, (i - x) / w / scale];
   };
 
-  type WorkEdge = { a: number; b: number; pts: [number, number][]; widths: number[] };
   let work: WorkEdge[] = traced.edges.map((e) => ({
     a: e.a,
     b: e.b,
@@ -391,31 +508,7 @@ export function buildSkeletonGraph(input: GlyphMask): SkeletonGraph {
   }
 
   // Merge pass-through nodes (degree 2, not a loop anchor) so an edge runs end to end.
-  for (;;) {
-    const incident = new Map<number, number[]>();
-    work.forEach((e, k) => {
-      incident.set(e.a, [...(incident.get(e.a) ?? []), k]);
-      incident.set(e.b, [...(incident.get(e.b) ?? []), k]);
-    });
-    const node = [...incident].find(([, ks]) => ks.length === 2 && ks[0] !== ks[1]);
-    if (!node) break;
-    const [n, [k1, k2]] = node as [number, [number, number]];
-    const e1 = work[k1]!;
-    const e2 = work[k2]!;
-    const p1 = e1.b === n ? e1.pts : [...e1.pts].reverse();
-    const w1 = e1.b === n ? e1.widths : [...e1.widths].reverse();
-    const p2 = e2.a === n ? e2.pts : [...e2.pts].reverse();
-    const w2 = e2.a === n ? e2.widths : [...e2.widths].reverse();
-    const merged: WorkEdge = {
-      a: e1.b === n ? e1.a : e1.b,
-      b: e2.a === n ? e2.b : e2.a,
-      pts: [...p1, ...p2.slice(1)],
-      widths: [...w1, ...w2]
-    };
-    work = work.filter((_, k) => k !== k1 && k !== k2);
-    work.push(merged);
-  }
-  work = work.filter((e) => e.pts.length >= 2 && (e.a !== e.b || pathLength(e.pts) > 4));
+  work = mergePassThroughNodes(work);
 
   // Stable, readable ids: nodes top-to-bottom then left-to-right, edges by their first node
   const used = [...new Set(work.flatMap((e) => [e.a, e.b]))];
@@ -447,7 +540,10 @@ export function buildSkeletonGraph(input: GlyphMask): SkeletonGraph {
   const edges: SkeletonEdge[] = work.map((e, k) => {
     // orient each edge from its lower-numbered node
     const flip = e.a !== e.b && used.indexOf(e.a) > used.indexOf(e.b);
-    const pts = (flip ? [...e.pts].reverse() : e.pts).map(([x, y]) => [round1(x), round1(y)] as [number, number]);
+    const pts = (flip ? [...e.pts].reverse() : e.pts).map(([x, y]) => {
+      // SAFETY: round1 returns numbers, so each rounded pair remains a valid 2-tuple canvas point.
+      return [round1(x), round1(y)] as [number, number];
+    });
     return {
       id: `E${k + 1}`,
       from: nodeId.get(flip ? e.b : e.a)!,
@@ -466,6 +562,6 @@ export function buildSkeletonGraph(input: GlyphMask): SkeletonGraph {
     edges,
     dots,
     strokeWidth: round1(strokeWidthPx / scale),
-    box: x1 >= x0 ? [round1(x0 / scale), round1(y0 / scale), round1(x1 / scale), round1(y1 / scale)] : [0, 0, 0, 0]
+    box
   };
 }

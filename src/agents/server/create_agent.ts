@@ -32,9 +32,11 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
   const searchModel = yield* resolveAgentModel(AGENT_UTILITY_MODEL);
   const tools: AgentTools = {
     sql_query: sqlQueryTool,
-    web_search: createWebSearchTool(searchModel),
-    ...(kind === 'gesture_creator' ? gestureCreatorTools : {})
+    web_search: createWebSearchTool(searchModel)
   };
+  if (kind === 'gesture_creator') {
+    Object.assign(tools, gestureCreatorTools);
+  }
   // Tracing is spatial work: give the creator more room to think.
   const effort = kind === 'gesture_creator' ? 'high' : 'medium';
   const agent = new ToolLoopAgent({

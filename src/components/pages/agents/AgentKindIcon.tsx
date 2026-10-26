@@ -30,7 +30,12 @@ export function AgentKindIcon({
     <span
       role="img"
       aria-label={AGENT_KIND_META[kind].label}
-      className={cn('inline-flex shrink-0 items-center justify-center', TILE[size], KIND_STYLE[kind], className)}
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center',
+        TILE[size],
+        KIND_STYLE[kind],
+        className
+      )}
     >
       <Icon aria-hidden />
     </span>

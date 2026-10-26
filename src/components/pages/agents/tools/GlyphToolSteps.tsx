@@ -13,7 +13,17 @@ import { HarnessImages } from './HarnessImages';
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-function Pending({ icon, running, label, stopped }: { icon: React.ReactNode; running: boolean; label: string; stopped: string }) {
+function Pending({
+  icon,
+  running,
+  label,
+  stopped
+}: {
+  icon: React.ReactNode;
+  running: boolean;
+  label: string;
+  stopped: string;
+}) {
   return (
     <TraceLine status={running ? 'running' : 'error'}>
       <TraceIcon>{icon}</TraceIcon>
@@ -23,7 +33,13 @@ function Pending({ icon, running, label, stopped }: { icon: React.ReactNode; run
 }
 
 /** inspect_glyph: the rendered glyph, its skeleton graph and the saved strokes. */
-export function InspectGlyphStep({ part, streaming }: { part: AgentToolPart<'inspect_glyph'>; streaming: boolean }) {
+export function InspectGlyphStep({
+  part,
+  streaming
+}: {
+  part: AgentToolPart<'inspect_glyph'>;
+  streaming: boolean;
+}) {
   const icon = <ScanSearchIcon />;
   if (part.state === 'output-error') {
     return (
@@ -41,7 +57,14 @@ export function InspectGlyphStep({ part, streaming }: { part: AgentToolPart<'ins
     );
   }
   if (part.state !== 'output-available') {
-    return <Pending icon={icon} running={streaming} label="Rendering the glyph…" stopped="Inspection interrupted" />;
+    return (
+      <Pending
+        icon={icon}
+        running={streaming}
+        label="Rendering the glyph…"
+        stopped="Inspection interrupted"
+      />
+    );
   }
   const out = part.output;
   return (
@@ -54,14 +77,15 @@ export function InspectGlyphStep({ part, streaming }: { part: AgentToolPart<'ins
           </TraceTitle>
           <TraceDescription>
             {out.nodes.length} nodes · {out.edges.length} edges
-            {out.dots.length ? ` · ${out.dots.length} dots` : ''} · {out.existing_strokes} saved strokes
+            {out.dots.length ? ` · ${out.dots.length} dots` : ''} · {out.existing_strokes} saved
+            strokes
           </TraceDescription>
         </TraceLine>
       </TraceCollapsibleTrigger>
       <TraceCollapsibleContent className="flex flex-col gap-2">
         <p className="text-xs text-muted-foreground">
-          {out.script} · {out.font_family.replaceAll('_', ' ')} · size {out.font_size} · stroke width ≈{' '}
-          {out.stroke_width}px
+          {out.script} · {out.font_family.replaceAll('_', ' ')} · size {out.font_size} · stroke
+          width ≈ {out.stroke_width}px
         </p>
         <HarnessImages images={out.images} />
       </TraceCollapsibleContent>
@@ -70,7 +94,13 @@ export function InspectGlyphStep({ part, streaming }: { part: AgentToolPart<'ins
 }
 
 /** trace_strokes: the draft, its writing order and the self-checks. */
-export function TraceStrokesStep({ part, streaming }: { part: AgentToolPart<'trace_strokes'>; streaming: boolean }) {
+export function TraceStrokesStep({
+  part,
+  streaming
+}: {
+  part: AgentToolPart<'trace_strokes'>;
+  streaming: boolean;
+}) {
   const icon = <PenLineIcon />;
   const strokeCount = part.input?.strokes?.length ?? 0;
   if (part.state === 'output-error') {
@@ -118,7 +148,9 @@ export function TraceStrokesStep({ part, streaming }: { part: AgentToolPart<'tra
         </TraceLine>
       </TraceCollapsibleTrigger>
       <TraceCollapsibleContent className="flex flex-col gap-2">
-        {part.input?.note ? <p className="text-xs text-muted-foreground">{part.input.note}</p> : null}
+        {part.input?.note ? (
+          <p className="text-xs text-muted-foreground">{part.input.note}</p>
+        ) : null}
         <HarnessImages images={out.images} />
         {out.issues.length > 0 ? (
           <ul className="flex list-disc flex-col gap-0.5 pl-4 text-xs text-muted-foreground">

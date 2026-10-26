@@ -16,7 +16,8 @@ export type InstructionSection = {
  * goes after the last section, so every turn of a chat reuses the whole prefix.
  */
 export function agentInstructionSections(kind: AgentKind = 'general'): InstructionSection[] {
-  const systemPrompt = kind === 'gesture_creator' ? GESTURE_CREATOR_SYSTEM_PROMPT : GENERAL_SYSTEM_PROMPT;
+  const systemPrompt =
+    kind === 'gesture_creator' ? GESTURE_CREATOR_SYSTEM_PROMPT : GENERAL_SYSTEM_PROMPT;
   return [
     { id: 'system_prompt', title: 'System prompt', content: systemPrompt },
     {

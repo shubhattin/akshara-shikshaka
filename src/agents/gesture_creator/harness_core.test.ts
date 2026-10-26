@@ -6,7 +6,10 @@ import { buildStroke, StrokePlanError } from './strokes';
 type Pt = [number, number];
 
 /** A raster (scale 2) with thick strokes painted as discs along line segments, canvas units. */
-function paint(segments: [Pt, Pt][], extras: { dot?: Pt; ring?: { c: Pt; r: number } } = {}): GlyphMask {
+function paint(
+  segments: [Pt, Pt][],
+  extras: { dot?: Pt; ring?: { c: Pt; r: number } } = {}
+): GlyphMask {
   const scale = 2;
   const size = 800;
   const data = new Uint8Array(size * size);
@@ -27,20 +30,32 @@ function paint(segments: [Pt, Pt][], extras: { dot?: Pt; ring?: { c: Pt; r: numb
   if (extras.ring) {
     for (let k = 0; k < 720; k++) {
       const t = (k / 720) * Math.PI * 2;
-      disc(extras.ring.c[0] + Math.cos(t) * extras.ring.r, extras.ring.c[1] + Math.sin(t) * extras.ring.r, 6);
+      disc(
+        extras.ring.c[0] + Math.cos(t) * extras.ring.r,
+        extras.ring.c[1] + Math.sin(t) * extras.ring.r,
+        6
+      );
     }
   }
   return { data, width: size, height: size, scale };
 }
 
-const onInkOf = (mask: GlyphMask) => ([x, y]: Pt) =>
-  mask.data[Math.round(y * mask.scale) * mask.width + Math.round(x * mask.scale)] === 1;
+const onInkOf =
+  (mask: GlyphMask) =>
+  ([x, y]: Pt) =>
+    mask.data[Math.round(y * mask.scale) * mask.width + Math.round(x * mask.scale)] === 1;
 
 describe('buildSkeletonGraph', () => {
   // A "T": headline 100→300 at y=120, stem from (200,120) down to y=300
   const mask = paint([
-    [[100, 120], [300, 120]],
-    [[200, 120], [200, 300]]
+    [
+      [100, 120],
+      [300, 120]
+    ],
+    [
+      [200, 120],
+      [200, 300]
+    ]
   ]);
   const graph = buildSkeletonGraph(mask);
 
@@ -61,7 +76,15 @@ describe('buildSkeletonGraph', () => {
 
   it('reports separate small blobs as dots and closed rings as loop edges', () => {
     const withExtras = buildSkeletonGraph(
-      paint([[[100, 300], [300, 300]]], { dot: [200, 80], ring: { c: [200, 190], r: 50 } })
+      paint(
+        [
+          [
+            [100, 300],
+            [300, 300]
+          ]
+        ],
+        { dot: [200, 80], ring: { c: [200, 190], r: 50 } }
+      )
     );
     expect(withExtras.dots).toHaveLength(1);
     expect(withExtras.dots[0]!.x).toBeCloseTo(200, 0);
@@ -71,8 +94,14 @@ describe('buildSkeletonGraph', () => {
 
 describe('buildStroke', () => {
   const mask = paint([
-    [[100, 120], [300, 120]],
-    [[200, 120], [200, 300]]
+    [
+      [100, 120],
+      [300, 120]
+    ],
+    [
+      [200, 120],
+      [200, 300]
+    ]
   ]);
   const graph = buildSkeletonGraph(mask);
   const onInk = onInkOf(mask);
@@ -86,7 +115,15 @@ describe('buildStroke', () => {
 
   it('walks the graph in the given direction and reaches the glyph ends', () => {
     const { points } = buildStroke(
-      { path: [left.id, edgeBetween(left.id, junction.id), junction.id, edgeBetween(junction.id, right.id), right.id] },
+      {
+        path: [
+          left.id,
+          edgeBetween(left.id, junction.id),
+          junction.id,
+          edgeBetween(junction.id, right.id),
+          right.id
+        ]
+      },
       graph,
       onInk
     );
@@ -97,33 +134,58 @@ describe('buildStroke', () => {
 
   it('stops at a pen-lift cut', () => {
     const stem = edgeBetween(junction.id, bottom.id);
-    const { points } = buildStroke({ path: [junction.id, `${stem}|to=200,210`, bottom.id] }, graph, onInk);
+    const { points } = buildStroke(
+      { path: [junction.id, `${stem}|to=200,210`, bottom.id] },
+      graph,
+      onInk
+    );
     expect(points.at(-1)![1]).toBeCloseTo(210, -1);
   });
 
   it('explains plans that do not fit the graph', () => {
-    expect(() => buildStroke({ path: [left.id, edgeBetween(junction.id, bottom.id), right.id] }, graph, onInk)).toThrow(
-      StrokePlanError
+    expect(() =>
+      buildStroke({ path: [left.id, edgeBetween(junction.id, bottom.id), right.id] }, graph, onInk)
+    ).toThrow(StrokePlanError);
+    expect(() => buildStroke({ path: ['N99', 'E1', 'N1'] }, graph, onInk)).toThrow(
+      /Unknown node N99/
     );
-    expect(() => buildStroke({ path: ['N99', 'E1', 'N1'] }, graph, onInk)).toThrow(/Unknown node N99/);
   });
 
   it('makes a small dot and a smooth waypoint curve', () => {
     expect(buildStroke({ dot: [50, 50] }, graph, onInk).points).toHaveLength(6);
-    const curve = buildStroke({ waypoints: [[100, 200], [150, 160], [200, 200]] }, graph, onInk).points;
+    const curve = buildStroke(
+      {
+        waypoints: [
+          [100, 200],
+          [150, 160],
+          [200, 200]
+        ]
+      },
+      graph,
+      onInk
+    ).points;
     expect(curve.length).toBeGreaterThan(30);
   });
 });
 
 describe('evaluateDraft', () => {
   const mask = paint([
-    [[100, 120], [300, 120]],
-    [[200, 120], [200, 300]]
+    [
+      [100, 120],
+      [300, 120]
+    ],
+    [
+      [200, 120],
+      [200, 300]
+    ]
   ]);
   const graph = buildSkeletonGraph(mask);
   const onInk = onInkOf(mask);
   const line = (a: Pt, b: Pt): Pt[] =>
-    Array.from({ length: 51 }, (_, i) => [a[0] + ((b[0] - a[0]) * i) / 50, a[1] + ((b[1] - a[1]) * i) / 50]);
+    Array.from({ length: 51 }, (_, i) => [
+      a[0] + ((b[0] - a[0]) * i) / 50,
+      a[1] + ((b[1] - a[1]) * i) / 50
+    ]);
 
   it('passes a full, on-ink draft', () => {
     const result = evaluateDraft({
@@ -137,7 +199,12 @@ describe('evaluateDraft', () => {
   });
 
   it('flags a missing stroke and a stroke off the glyph', () => {
-    const result = evaluateDraft({ graph, strokes: [line([100, 120], [300, 120]), line([50, 350], [350, 350])], onInk, saved: [] });
+    const result = evaluateDraft({
+      graph,
+      strokes: [line([100, 120], [300, 120]), line([50, 350], [350, 350])],
+      onInk,
+      saved: []
+    });
     expect(result.ok).toBe(false);
     expect(result.issues.join(' ')).toMatch(/covered/);
     expect(result.issues.join(' ')).toMatch(/Stroke 2 leaves the glyph/);
@@ -158,8 +225,14 @@ describe('evaluateDraft', () => {
 
 describe('pen-lift cuts at the ends of a path', () => {
   const mask = paint([
-    [[100, 120], [300, 120]],
-    [[200, 120], [200, 300]]
+    [
+      [100, 120],
+      [300, 120]
+    ],
+    [
+      [200, 120],
+      [200, 300]
+    ]
   ]);
   const graph = buildSkeletonGraph(mask);
   const onInk = onInkOf(mask);

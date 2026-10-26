@@ -1,10 +1,11 @@
+import type { LucideIcon } from 'lucide-react';
 import { MessageSquareTextIcon, PenToolIcon } from 'lucide-react';
 import type { AgentKind } from '~/agents/agent_kinds';
 
 export const AGENT_ICONS = {
   general: MessageSquareTextIcon,
   gesture_creator: PenToolIcon
-} as const satisfies Record<AgentKind, unknown>;
+} as const satisfies Record<AgentKind, LucideIcon>;
 
 /** Starter prompts on an empty chat. */
 export const AGENT_SUGGESTIONS = {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2Icon, PenToolIcon, TriangleAlertIcon } from 'lucide-react';
+import { CheckCircle2Icon, ExternalLinkIcon, PenToolIcon, TriangleAlertIcon } from 'lucide-react';
 import { useTRPC } from '~/api/client';
 import type { ProposedGesture } from '~/agents/gesture_creator/schemas';
 import { GesturePreview } from '~/components/gesture/GesturePreview';
@@ -70,15 +70,26 @@ function ProposalBody({ proposal, toolCallId }: { proposal: ProposedGesture; too
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-card p-3 sm:flex-row">
-      <GesturePreview gestures={proposal.gestures} backgroundSrc={background} className="w-full shrink-0 sm:w-44" />
+      <GesturePreview
+        gestures={proposal.gestures}
+        backgroundSrc={background}
+        className="w-full shrink-0 sm:w-44"
+      />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex items-center gap-2">
           <PenToolIcon className="size-4 text-primary" />
           <p className="min-w-0 flex-1 truncate text-sm font-semibold">
-            Proposed gesture for <span className="text-base">{proposal.text}</span>
-            <span className="ml-1 font-normal text-muted-foreground">
+            Proposed gesture for <span className="text-base">{proposal.text}</span>{' '}
+            <a
+              href={`/gestures/edit/${proposal.gesture_id}`}
+              target="_blank"
+              rel="noreferrer"
+              title="Open this gesture in the editor"
+              className="ml-1 font-normal text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-primary"
+            >
               {get_script_from_id(proposal.script_id)} #{proposal.gesture_id}
-            </span>
+              <ExternalLinkIcon className="mb-0.5 ml-0.5 inline size-3" />
+            </a>
           </p>
           {applied ? (
             <span className="flex items-center gap-1 rounded-md border border-emerald-500/40 px-1.5 py-px text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
@@ -90,14 +101,18 @@ function ProposalBody({ proposal, toolCallId }: { proposal: ProposedGesture; too
         <p className="text-sm text-foreground/90">{proposal.summary}</p>
         <p className="text-xs text-muted-foreground">
           {proposal.gestures.length} strokes
-          {first ? ` · pace ${first.duration} ms per 200 px · ${first.anim_fn} · width ${first.width}` : ''}
+          {first
+            ? ` · pace ${first.duration} ms per 200 px · ${first.anim_fn} · width ${first.width}`
+            : ''}
         </p>
         <div className="mt-auto flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => setOpen(true)} disabled={runActive}>
             {applied ? 'Review / apply again' : 'Apply gesture'}
           </Button>
           {runActive ? (
-            <span className="text-xs text-muted-foreground">Available when the agent finishes.</span>
+            <span className="text-xs text-muted-foreground">
+              Available when the agent finishes.
+            </span>
           ) : null}
         </div>
       </div>

@@ -26,11 +26,14 @@ const strokeLength = (points: Gesture['points']) => {
   return Math.round(total);
 };
 
-const pointText = (p: Gesture['points'][number] | undefined) => (p ? `${Math.round(p[0])},${Math.round(p[1])}` : '—');
+const pointText = (p: Gesture['points'][number] | undefined) =>
+  p ? `${Math.round(p[0])},${Math.round(p[1])}` : '—';
 
 /** One mentioned gesture for the model: metadata and a stroke summary, never raw points. */
 export function renderReferencedGesture(row: RefGestureRow): string {
-  const strokes = [...row.gestures].sort((a, b) => a.index - b.index).filter((g) => g.points.length > 0);
+  const strokes = [...row.gestures]
+    .sort((a, b) => a.index - b.index)
+    .filter((g) => g.points.length > 0);
   const lines = [
     `<referenced_gesture id="${row.id}" mention="${mentionToken(row)}">`,
     `text: ${row.text}`,
@@ -68,7 +71,10 @@ const loadRefGestures = Effect.fn('agents.load_ref_gestures')(function* (ids: nu
         gesture_text_key_category_join,
         eq(gesture_text_key_category_join.gesture_text_key, text_gestures.text_key)
       )
-      .leftJoin(gesture_categories, eq(gesture_categories.id, gesture_text_key_category_join.category_id))
+      .leftJoin(
+        gesture_categories,
+        eq(gesture_categories.id, gesture_text_key_category_join.category_id)
+      )
       .where(inArray(text_gestures.id, ids))
   );
   return rows;

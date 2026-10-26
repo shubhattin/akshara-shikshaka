@@ -40,6 +40,103 @@ function menuKeyAction(event: KeyboardEvent, navigable: boolean, loading: boolea
   return null;
 }
 
+type MentionTrigger = { start: number; query: string };
+
+/** The `@query` at the caret, if the caret sits in a trigger position. */
+function triggerAtCaret(caret: number | null, text: string): MentionTrigger | null {
+  return caret === null ? null : findMentionTrigger(text, caret);
+}
+
+/** A fully typed mention keeps the menu shut until the token is edited again. */
+function isCompletedTrigger(trigger: MentionTrigger | null, refs: GestureRefData[]): boolean {
+  return trigger !== null && refs.some((ref) => mentionToken(ref) === `@${trigger.query}`);
+}
+
+/** The trigger the menu answers to: positioned, not dismissed, not already complete. */
+function resolveActiveTrigger(
+  trigger: MentionTrigger | null,
+  dismissedStart: number | null,
+  completed: boolean
+): MentionTrigger | null {
+  return trigger && trigger.start !== dismissedStart && !completed ? trigger : null;
+}
+
+/** `@` position the menu stays shut for; a caret move elsewhere re-arms it. */
+function useDismissedStart(trigger: MentionTrigger | null) {
+  const [dismissedStart, setDismissedStart] = useState<number | null>(null);
+  if (dismissedStart !== null && trigger?.start !== dismissedStart) setDismissedStart(null);
+  return [dismissedStart, setDismissedStart] as const;
+}
+
+/** The mention list loads once, the first time a trigger appears. */
+function useMentionListEnabled(active: MentionTrigger | null) {
+  const [used, setUsed] = useState(false);
+  if (active && !used) setUsed(true);
+  return used;
+}
+
+/** Search index of the mentionable gestures, if loaded. */
+function useMentionIndex(gestures: MentionableGesture[] | undefined) {
+  return useMemo(() => (gestures ? buildMentionIndex(gestures) : null), [gestures]);
+}
+
+/** Gestures matching the active trigger within the script/category filters. */
+function searchMenuResults(
+  active: MentionTrigger | null,
+  index: ReturnType<typeof buildMentionIndex> | null,
+  script: MentionScriptFilter,
+  category: MentionCategoryFilter,
+  refs: GestureRefData[]
+) {
+  return active && index
+    ? searchMentions(index, {
+        query: active.query,
+        script,
+        category,
+        exclude: new Set(refs.map((ref) => ref.id)),
+        limit: RESULT_LIMIT
+      })
+    : { results: [], total: 0 };
+}
+
+function isMenuLoading(used: boolean, isPending: boolean) {
+  return used && isPending;
+}
+
+function isMenuNavigable(open: boolean, loading: boolean, resultCount: number) {
+  return open && !loading && resultCount > 0;
+}
+
+function menuResultKey(
+  active: MentionTrigger | null,
+  script: MentionScriptFilter,
+  category: MentionCategoryFilter
+) {
+  return `${active?.query ?? ''}|${script}|${category}`;
+}
+
+function resolveActiveIndex(highlight: { key: string; index: number }, resultKey: string) {
+  return highlight.key === resultKey ? highlight.index : 0;
+}
+
+function menuQueryOf(active: MentionTrigger | null) {
+  return active?.query ?? '';
+}
+
+function listOrEmpty(gestures: MentionableGesture[] | undefined) {
+  return gestures ?? [];
+}
+
+function buildTextareaAria(open: boolean, listId: string, navigable: boolean, activeIndex: number) {
+  return {
+    role: 'combobox',
+    'aria-autocomplete': 'list',
+    'aria-expanded': open,
+    'aria-controls': open ? listId : undefined,
+    'aria-activedescendant': navigable ? mentionOptionId(listId, activeIndex) : undefined
+  } as const;
+}
+
 /**
  * `@` mentions of gestures for a textarea. The text is the source of truth: a picked gesture
  * stays referenced while its `@akṣara#id` is in the text, so deleting the word drops the mention
@@ -61,41 +158,31 @@ export function useGestureMentions({
   const [script, setScript] = useState<MentionScriptFilter>('all');
   const [category, setCategory] = useState<MentionCategoryFilter>('all');
   const [highlight, setHighlight] = useState({ key: '', index: 0 });
-  /** `@` position the menu was closed for (Esc or an outside click). */
-  const [dismissedStart, setDismissedStart] = useState<number | null>(null);
-  const [used, setUsed] = useState(false);
 
   const refs = picked.filter((ref) => tokenPattern(mentionToken(ref)).test(text));
-  const trigger = caret === null ? null : findMentionTrigger(text, caret);
-  if (dismissedStart !== null && trigger?.start !== dismissedStart) setDismissedStart(null);
-  // Right after a complete mention the menu stays shut; editing the token reopens it.
-  const completed = trigger !== null && refs.some((ref) => mentionToken(ref) === `@${trigger.query}`);
-  const active = trigger && trigger.start !== dismissedStart && !completed ? trigger : null;
+  const trigger = triggerAtCaret(caret, text);
+  const [dismissedStart, setDismissedStart] = useDismissedStart(trigger);
+  const completed = isCompletedTrigger(trigger, refs);
+  const active = resolveActiveTrigger(trigger, dismissedStart, completed);
 
   // Load the list the first time an `@` is typed.
-  if (active && !used) setUsed(true);
+  const used = useMentionListEnabled(active);
   const list_q = useQuery(
-    trpc.agents.list_mentionable_gestures.queryOptions(undefined, { enabled: used, staleTime: 5 * 60_000 })
+    trpc.agents.list_mentionable_gestures.queryOptions(undefined, {
+      enabled: used,
+      staleTime: 5 * 60_000
+    })
   );
   const gestures: MentionableGesture[] | undefined = list_q.data;
-  const index = useMemo(() => (gestures ? buildMentionIndex(gestures) : null), [gestures]);
-  const loading = used && list_q.isPending;
+  const index = useMentionIndex(gestures);
+  const loading = isMenuLoading(used, list_q.isPending);
 
-  const search =
-    active && index
-      ? searchMentions(index, {
-          query: active.query,
-          script,
-          category,
-          exclude: new Set(refs.map((ref) => ref.id)),
-          limit: RESULT_LIMIT
-        })
-      : { results: [], total: 0 };
+  const search = searchMenuResults(active, index, script, category, refs);
   const open = active !== null;
-  const navigable = open && !loading && search.results.length > 0;
+  const navigable = isMenuNavigable(open, loading, search.results.length);
 
-  const resultKey = `${active?.query ?? ''}|${script}|${category}`;
-  const activeIndex = highlight.key === resultKey ? highlight.index : 0;
+  const resultKey = menuResultKey(active, script, category);
+  const activeIndex = resolveActiveIndex(highlight, resultKey);
   const setActiveIndex = (next: number) => setHighlight({ key: resultKey, index: next });
   const atLimit = refs.length >= MAX_GESTURE_REFS;
 
@@ -111,7 +198,11 @@ export function useGestureMentions({
 
   const pick = (gesture: MentionableGesture) => {
     if (!active || caret === null || atLimit) return;
-    const ref: GestureRefData = { id: gesture.id, text: gesture.text, script_id: gesture.script_id };
+    const ref: GestureRefData = {
+      id: gesture.id,
+      text: gesture.text,
+      script_id: gesture.script_id
+    };
     const next = insertMention(text, active.start, caret, mentionToken(ref));
     setText(next.text);
     setPicked((prev) => [...prev.filter((entry) => entry.id !== ref.id), ref]);
@@ -173,21 +264,15 @@ export function useGestureMentions({
     startMention,
     handleKeyDown,
     syncCaret,
-    textareaAria: {
-      role: 'combobox',
-      'aria-autocomplete': 'list',
-      'aria-expanded': open,
-      'aria-controls': open ? listId : undefined,
-      'aria-activedescendant': navigable ? mentionOptionId(listId, activeIndex) : undefined
-    } as const,
+    textareaAria: buildTextareaAria(open, listId, navigable, activeIndex),
     menu: {
       open,
       onDismiss: () => {
         if (active) setDismissedStart(active.start);
       },
       listId,
-      query: active?.query ?? '',
-      gestures: gestures ?? [],
+      query: menuQueryOf(active),
+      gestures: listOrEmpty(gestures),
       script,
       onScriptChange: (next: MentionScriptFilter) => {
         setScript(next);

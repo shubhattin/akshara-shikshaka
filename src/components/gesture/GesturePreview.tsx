@@ -70,7 +70,13 @@ export function GesturePreview({
         aria-label={`Gesture with ${ordered.length} stroke${ordered.length === 1 ? '' : 's'}`}
       >
         {backgroundSrc ? (
-          <image href={backgroundSrc} x={0} y={0} width={CANVAS_DIMS.width} height={CANVAS_DIMS.height} />
+          <image
+            href={backgroundSrc}
+            x={0}
+            y={0}
+            width={CANVAS_DIMS.width}
+            height={CANVAS_DIMS.height}
+          />
         ) : null}
         {visible.map((gesture) => (
           <path key={gesture.index} d={getStrokeRender(gesture).path} fill={gesture.color} />

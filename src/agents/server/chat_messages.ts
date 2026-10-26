@@ -14,10 +14,14 @@ type Part = AgentUIMessage['parts'][number];
  * The browser ran the Gesture Creator tools of the stored assistant message and sent the message
  * back. Take only those results — everything else comes from the stored copy.
  */
-export function mergeClientToolOutputs(stored: AgentUIMessage, incoming: AgentUIMessage): AgentUIMessage {
+export function mergeClientToolOutputs(
+  stored: AgentUIMessage,
+  incoming: AgentUIMessage
+): AgentUIMessage {
   const results = new Map<string, Part>();
   for (const part of incoming.parts) {
-    if (isToolUIPart(part) && isGestureCreatorToolName(getToolName(part))) results.set(part.toolCallId, part);
+    if (isToolUIPart(part) && isGestureCreatorToolName(getToolName(part)))
+      results.set(part.toolCallId, part);
   }
   return {
     ...stored,
@@ -112,7 +116,10 @@ export function pruneHarnessImages(messages: AgentUIMessage[]): AgentUIMessage[]
 export const newMessageRefs = (message: AgentUIMessage): GestureRefData[] =>
   messageGestureRefs(message).slice(0, MAX_GESTURE_REFS);
 
-export const withResolvedRefs = (message: AgentUIMessage, resolved: GestureRefData[]): AgentUIMessage => ({
+export const withResolvedRefs = (
+  message: AgentUIMessage,
+  resolved: GestureRefData[]
+): AgentUIMessage => ({
   ...message,
   parts: [
     ...resolved.map((data) => ({ type: 'data-gesture_ref' as const, data })),

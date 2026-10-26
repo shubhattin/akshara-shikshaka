@@ -7,10 +7,16 @@ import { AnimationsFunctionsEnumSchema, GestureSchema } from '~/tools/stroke_dat
  * and sends the output back. Shared by both sides, so this file stays free of browser code.
  */
 
-export const GESTURE_CREATOR_TOOL_NAMES = ['inspect_glyph', 'trace_strokes', 'propose_gesture'] as const;
+export const GESTURE_CREATOR_TOOL_NAMES = [
+  'inspect_glyph',
+  'trace_strokes',
+  'propose_gesture'
+] as const;
 export type GestureCreatorToolName = (typeof GESTURE_CREATOR_TOOL_NAMES)[number];
 
 export const isGestureCreatorToolName = (name: string): name is GestureCreatorToolName =>
+  // SAFETY: GESTURE_CREATOR_TOOL_NAMES is the const tuple of valid tool names, so a successful
+  // includes check narrows the string to a member of that tuple.
   (GESTURE_CREATOR_TOOL_NAMES as readonly string[]).includes(name);
 
 const point_schema = z.tuple([z.number(), z.number()]);
@@ -156,12 +162,16 @@ export const propose_gesture_input_schema = z.object({
   trace_id: z
     .string()
     .min(1)
-    .describe('toolCallId of the trace_strokes call whose strokes to propose (usually the last one)'),
+    .describe(
+      'toolCallId of the trace_strokes call whose strokes to propose (usually the last one)'
+    ),
   pace_ms: z
     .int()
     .min(GESTURE_PACE_RANGE.min)
     .max(GESTURE_PACE_RANGE.max)
-    .describe('Animation pace: ms to draw a 200 px stroke (longer strokes take longer). Default 600.'),
+    .describe(
+      'Animation pace: ms to draw a 200 px stroke (longer strokes take longer). Default 600.'
+    ),
   anim_fn: AnimationsFunctionsEnumSchema.describe('Easing of each stroke. Default "linear".'),
   width: z
     .int()
@@ -186,4 +196,6 @@ export const proposed_gesture_schema = z.object({
 });
 export type ProposedGesture = z.infer<typeof proposed_gesture_schema>;
 
-export type ProposeGestureOutput = { ok: true; proposal: ProposedGesture } | { ok: false; error: string };
+export type ProposeGestureOutput =
+  | { ok: true; proposal: ProposedGesture }
+  | { ok: false; error: string };

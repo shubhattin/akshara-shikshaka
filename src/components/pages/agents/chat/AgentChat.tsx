@@ -12,10 +12,16 @@ import {
 import { AlertCircleIcon, LibraryBigIcon, RotateCcwIcon, XIcon } from 'lucide-react';
 import { useTRPC } from '~/api/client';
 import type { AppRouter } from '~/api/trpc_router';
-import { AGENT_KIND_META } from '~/agents/agent_kinds';
+import { AGENT_KIND_META, type AgentKind } from '~/agents/agent_kinds';
 import { createGestureHarness, HarnessCancelledError } from '~/agents/gesture_creator/harness';
-import { isGestureCreatorToolName, type GestureCreatorToolName } from '~/agents/gesture_creator/schemas';
-import type { AgentModelId } from '~/agents/models';
+import {
+  isGestureCreatorToolName,
+  type GestureCreatorToolName,
+  type InspectGlyphOutput,
+  type ProposeGestureOutput,
+  type TraceStrokesOutput
+} from '~/agents/gesture_creator/schemas';
+import { coerceAgentModelId, type AgentModelId } from '~/agents/models';
 import type { AgentUIMessage } from '~/agents/ui_message';
 import {
   AlertDialog,
@@ -69,12 +75,319 @@ const pendingHarnessCalls = (message: AgentUIMessage | undefined) =>
 
 const CANCELLED = 'Cancelled by the admin.';
 
+type GestureToolSuccessSubmit = {
+  tool: GestureCreatorToolName;
+  toolCallId: string;
+  output: InspectGlyphOutput | TraceStrokesOutput | ProposeGestureOutput;
+};
+
+type GestureToolErrorSubmit = {
+  tool: GestureCreatorToolName;
+  toolCallId: string;
+  state: 'output-error';
+  errorText: string;
+};
+
+type GestureToolSubmit = GestureToolSuccessSubmit | GestureToolErrorSubmit;
+
+/** Whether the assistant reply may be sent back automatically (browser tools pending). */
+function shouldAutoSend(
+  isCreator: boolean,
+  cancelled: boolean,
+  messages: AgentUIMessage[]
+): boolean {
+  return (
+    isCreator && !cancelled && lastAssistantMessageIsCompleteWithToolCalls({ messages: messages })
+  );
+}
+
+/** A failed request ends the attempt (Retry starts a new one). */
+function computeRunActive(
+  isCreator: boolean,
+  liveRun: boolean,
+  status: string,
+  busy: boolean,
+  runningTools: number
+): boolean {
+  return isCreator && ((liveRun && status !== 'error') || busy || runningTools > 0);
+}
+
+/** The turn ended when the reply carries no pending browser tools (or errored). */
+function didTurnEnd(message: AgentUIMessage, isError: boolean): boolean {
+  return isError || pendingHarnessCalls(message).length === 0;
+}
+
+/** Cancel payloads for browser tools still waiting on the last message. */
+function pendingCancelPayloads(lastMessage: AgentUIMessage | undefined): GestureToolSubmit[] {
+  const payloads: GestureToolSubmit[] = [];
+  for (const part of pendingHarnessCalls(lastMessage)) {
+    if (!isToolUIPart(part)) continue;
+    const name = getToolName(part);
+    if (!isGestureCreatorToolName(name)) continue;
+    payloads.push({
+      tool: name,
+      toolCallId: part.toolCallId,
+      state: 'output-error',
+      errorText: CANCELLED
+    });
+  }
+  return payloads;
+}
+
+/** Whether a background reply finished elsewhere and should be adopted. */
+function shouldAdoptRemoteMessages(args: {
+  busy: boolean;
+  runActive: boolean;
+  sentLocally: boolean;
+  streaming: boolean | undefined;
+  previousCount: number;
+  nextCount: number;
+}): boolean {
+  return (
+    !args.busy &&
+    !args.runActive &&
+    !args.sentLocally &&
+    !args.streaming &&
+    args.nextCount > args.previousCount
+  );
+}
+
+function BackgroundReplyNotice({
+  busy,
+  runActive,
+  streaming
+}: {
+  busy: boolean;
+  runActive: boolean;
+  streaming: boolean | undefined;
+}) {
+  return (
+    <>
+      {!busy && !runActive && streaming ? (
+        <p
+          role="status"
+          className="flex items-center justify-center gap-2 border-b border-border/70 px-3 py-1.5 text-xs text-muted-foreground"
+        >
+          <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+          Replying in the background — it will appear here when it lands.
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+function EmptyChatPrompt({
+  agentKind,
+  onSend
+}: {
+  agentKind: AgentKind;
+  onSend: (message: ComposerMessage) => void;
+}) {
+  return (
+    <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center gap-5 px-4 text-center">
+      <div className="flex flex-col gap-1">
+        <p className="text-lg font-semibold">{AGENT_KIND_META[agentKind].label}</p>
+        <p className="text-sm text-muted-foreground">{AGENT_KIND_META[agentKind].description}</p>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        {AGENT_SUGGESTIONS[agentKind].map((suggestion) => (
+          <Button
+            key={suggestion}
+            variant="outline"
+            size="sm"
+            className="h-auto rounded-full py-1.5 whitespace-normal"
+            onClick={() => onSend({ text: suggestion, refs: [] })}
+          >
+            {suggestion}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ChatTimeline({
+  messages,
+  busy,
+  runActive,
+  status,
+  error,
+  onRetry
+}: {
+  messages: AgentUIMessage[];
+  busy: boolean;
+  runActive: boolean;
+  status: string;
+  error: Error | undefined;
+  onRetry: () => void;
+}) {
+  const lastMessage = messages.at(-1);
+  return (
+    <MessageScrollerProvider autoScroll>
+      <MessageScroller>
+        <MessageScrollerViewport>
+          <MessageScrollerContent
+            aria-busy={busy}
+            className="mx-auto w-full max-w-3xl gap-6 px-4 py-6"
+          >
+            {messages.map((message) => (
+              <MessageScrollerItem
+                key={message.id}
+                messageId={message.id}
+                scrollAnchor={message.role === 'user'}
+              >
+                {message.role === 'user' ? (
+                  <UserMessage message={message} />
+                ) : (
+                  <AssistantMessage
+                    message={message}
+                    streaming={(busy || runActive) && message === lastMessage}
+                  />
+                )}
+              </MessageScrollerItem>
+            ))}
+            {status === 'submitted' && lastMessage?.role === 'user' ? (
+              <MessageScrollerItem messageId="pending">
+                <ThinkingLine />
+              </MessageScrollerItem>
+            ) : null}
+            {error && !busy ? (
+              <MessageScrollerItem messageId="error">
+                <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                  <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <p className="break-words">{error.message || 'The agent failed to reply.'}</p>
+                    <Button size="xs" variant="outline" className="self-start" onClick={onRetry}>
+                      <RotateCcwIcon />
+                      Retry
+                    </Button>
+                  </div>
+                </div>
+              </MessageScrollerItem>
+            ) : null}
+          </MessageScrollerContent>
+        </MessageScrollerViewport>
+        <MessageScrollerButton />
+      </MessageScroller>
+    </MessageScrollerProvider>
+  );
+}
+
+function TimelineSwitch({
+  empty,
+  messages,
+  busy,
+  runActive,
+  status,
+  error,
+  agentKind,
+  onSend,
+  onRetry
+}: {
+  empty: boolean;
+  messages: AgentUIMessage[];
+  busy: boolean;
+  runActive: boolean;
+  status: string;
+  error: Error | undefined;
+  agentKind: AgentKind;
+  onSend: (message: ComposerMessage) => void;
+  onRetry: () => void;
+}) {
+  return (
+    <>
+      {empty ? (
+        <EmptyChatPrompt agentKind={agentKind} onSend={onSend} />
+      ) : (
+        <ChatTimeline
+          messages={messages}
+          busy={busy}
+          runActive={runActive}
+          status={status}
+          error={error}
+          onRetry={onRetry}
+        />
+      )}
+    </>
+  );
+}
+
+function RunBanner({
+  runActive,
+  runningTools,
+  onCancel
+}: {
+  runActive: boolean;
+  runningTools: number;
+  onCancel: () => void;
+}) {
+  return (
+    <>
+      {runActive ? (
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs"
+        >
+          <Spinner className="size-3.5 text-primary" />
+          <span className="min-w-0 flex-1 text-foreground">
+            {runningTools > 0 ? 'Drawing in this tab…' : 'Gesture Creator is working…'}
+            <span className="ml-1 text-muted-foreground">
+              Keep this chat open until it finishes.
+            </span>
+          </span>
+          <Button size="xs" variant="outline" onClick={onCancel}>
+            <XIcon />
+            Cancel attempt
+          </Button>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function ComposerBar({
+  busy,
+  runActive,
+  isCreator,
+  model,
+  onSend,
+  onCancelRun,
+  onStop,
+  onModelChange
+}: {
+  busy: boolean;
+  runActive: boolean;
+  isCreator: boolean;
+  model: AgentModelId;
+  onSend: (message: ComposerMessage) => void;
+  onCancelRun: () => void;
+  onStop: () => void;
+  onModelChange: (model: AgentModelId) => void;
+}) {
+  const composerBusy = busy || runActive;
+  return (
+    <ChatComposer
+      busy={composerBusy}
+      onStop={() => void (isCreator ? onCancelRun() : onStop())}
+      stopLabel={isCreator ? 'Cancel attempt' : 'Stop'}
+      onSend={onSend}
+      placeholder={
+        isCreator
+          ? 'Mention a gesture with @, or tell the agent how to draw…'
+          : 'Ask about gestures, lessons, practice…'
+      }
+      toolbar={<ModelPicker value={model} onChange={onModelChange} disabled={composerBusy} />}
+      autoFocus
+    />
+  );
+}
+
 export function AgentChat({ data }: { data: AgentChatData }) {
   const { chat } = data;
   const isCreator = chat.agent_kind === 'gesture_creator';
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [model, setModel] = useState<AgentModelId>(chat.model);
+  const [model, setModel] = useState<AgentModelId>(() => coerceAgentModelId(chat.model));
   const [contextOpen, setContextOpen] = useState(false);
 
   const transport = useMemo(
@@ -120,7 +433,7 @@ export function AgentChat({ data }: { data: AgentChatData }) {
       transport,
       // Browser tool results go straight back to the agent, unless the admin cancelled.
       sendAutomaticallyWhen: ({ messages: current }) =>
-        isCreator && !cancelledRef.current && lastAssistantMessageIsCompleteWithToolCalls({ messages: current }),
+        shouldAutoSend(isCreator, cancelledRef.current, current),
       onToolCall: async ({ toolCall }) => {
         if (!harness || toolCall.dynamic || !isGestureCreatorToolName(toolCall.toolName)) return;
         if (cancelledRef.current) return;
@@ -129,9 +442,12 @@ export function AgentChat({ data }: { data: AgentChatData }) {
         const { signal } = toolAbortRef.current;
         setRunningTools((n) => n + 1);
         // SAFETY: addToolOutput is typed per tool name; `tool` and the harness output match.
-        const submit = addToolOutput as (args: Record<string, unknown>) => Promise<void>;
+        const submit = addToolOutput as (args: GestureToolSubmit) => Promise<void>;
         try {
-          const output = await harness.run(tool, toolCall.input, { messages: messagesRef.current, signal });
+          const output = await harness.run(tool, toolCall.input, {
+            messages: messagesRef.current,
+            signal
+          });
           if (cancelledRef.current) return;
           // not awaited: awaiting inside onToolCall can deadlock the chat's job queue
           void submit({ tool, toolCallId: toolCall.toolCallId, output });
@@ -144,7 +460,7 @@ export function AgentChat({ data }: { data: AgentChatData }) {
         }
       },
       onFinish: ({ message, isError }) => {
-        if (isError || pendingHarnessCalls(message).length === 0) setLiveRun(false);
+        if (didTurnEnd(message, isError)) setLiveRun(false);
         refreshSidebar();
         // Title + streaming flag land with the save; pick up the fresh chat state.
         void queryClient.invalidateQueries({
@@ -159,8 +475,7 @@ export function AgentChat({ data }: { data: AgentChatData }) {
   }, [messages]);
 
   const busy = status === 'submitted' || status === 'streaming';
-  // A failed request ends the attempt (Retry starts a new one).
-  const runActive = isCreator && ((liveRun && status !== 'error') || busy || runningTools > 0);
+  const runActive = computeRunActive(isCreator, liveRun, status, busy, runningTools);
 
   // Set once this view sends: from then on the local conversation wins over refetches.
   const sentLocally = useRef(false);
@@ -181,9 +496,9 @@ export function AgentChat({ data }: { data: AgentChatData }) {
     const pending = takePendingMessage(chat.id);
     if (pending) {
       resetTurnRefs();
-      void sendMessage({ parts: toUserParts(pending) }, { body: { model: chat.model } });
+      void sendMessage({ parts: toUserParts(pending) }, { body: { model } });
     }
-  }, [chat.id, chat.model, sendMessage, resetTurnRefs]);
+  }, [chat.id, model, sendMessage, resetTurnRefs]);
 
   const send = (message: ComposerMessage) => {
     beginTurn();
@@ -197,10 +512,9 @@ export function AgentChat({ data }: { data: AgentChatData }) {
     toolAbortRef.current = null;
     await stop();
     // SAFETY: as in onToolCall — the tool names come from the parts themselves.
-    const submit = addToolOutput as (args: Record<string, unknown>) => Promise<void>;
-    for (const part of pendingHarnessCalls(messagesRef.current.at(-1))) {
-      if (!isToolUIPart(part)) continue;
-      void submit({ tool: getToolName(part), toolCallId: part.toolCallId, state: 'output-error', errorText: CANCELLED });
+    const submit = addToolOutput as (args: GestureToolSubmit) => Promise<void>;
+    for (const payload of pendingCancelPayloads(messagesRef.current.at(-1))) {
+      void submit(payload);
     }
     setLiveRun(false);
   }, [stop, addToolOutput]);
@@ -209,11 +523,14 @@ export function AgentChat({ data }: { data: AgentChatData }) {
   // view is idle: adopt it so refresh / back-navigation shows the finished turn.
   useEffect(() => {
     if (
-      !busy &&
-      !runActive &&
-      !sentLocally.current &&
-      !data.chat.streaming &&
-      data.messages.length > messages.length
+      shouldAdoptRemoteMessages({
+        busy,
+        runActive,
+        sentLocally: sentLocally.current,
+        streaming: data.chat.streaming,
+        previousCount: messages.length,
+        nextCount: data.messages.length
+      })
     ) {
       setMessages(data.messages);
     }
@@ -238,7 +555,7 @@ export function AgentChat({ data }: { data: AgentChatData }) {
     withResolver: true
   });
 
-  const lastMessage = messages.at(-1);
+  const empty = messages.length === 0 && !busy;
 
   return (
     <AgentChatProvider value={{ chatId: chat.id, agentKind: chat.agent_kind, runActive, harness }}>
@@ -258,127 +575,40 @@ export function AgentChat({ data }: { data: AgentChatData }) {
             Context
           </Button>
         </header>
-        {!busy && !runActive && chat.streaming ? (
-          <p
-            role="status"
-            className="flex items-center justify-center gap-2 border-b border-border/70 px-3 py-1.5 text-xs text-muted-foreground"
-          >
-            <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-            Replying in the background — it will appear here when it lands.
-          </p>
-        ) : null}
+        <BackgroundReplyNotice busy={busy} runActive={runActive} streaming={data.chat.streaming} />
 
         <div className="relative min-h-0 flex-1">
-          {messages.length === 0 && !busy ? (
-            <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center gap-5 px-4 text-center">
-              <div className="flex flex-col gap-1">
-                <p className="text-lg font-semibold">{AGENT_KIND_META[chat.agent_kind].label}</p>
-                <p className="text-sm text-muted-foreground">{AGENT_KIND_META[chat.agent_kind].description}</p>
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {AGENT_SUGGESTIONS[chat.agent_kind].map((suggestion) => (
-                  <Button
-                    key={suggestion}
-                    variant="outline"
-                    size="sm"
-                    className="h-auto rounded-full py-1.5 whitespace-normal"
-                    onClick={() => send({ text: suggestion, refs: [] })}
-                  >
-                    {suggestion}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <MessageScrollerProvider autoScroll>
-              <MessageScroller>
-                <MessageScrollerViewport>
-                  <MessageScrollerContent
-                    aria-busy={busy}
-                    className="mx-auto w-full max-w-3xl gap-6 px-4 py-6"
-                  >
-                    {messages.map((message) => (
-                      <MessageScrollerItem
-                        key={message.id}
-                        messageId={message.id}
-                        scrollAnchor={message.role === 'user'}
-                      >
-                        {message.role === 'user' ? (
-                          <UserMessage message={message} />
-                        ) : (
-                          <AssistantMessage
-                            message={message}
-                            streaming={(busy || runActive) && message === lastMessage}
-                          />
-                        )}
-                      </MessageScrollerItem>
-                    ))}
-                    {status === 'submitted' && lastMessage?.role === 'user' ? (
-                      <MessageScrollerItem messageId="pending">
-                        <ThinkingLine />
-                      </MessageScrollerItem>
-                    ) : null}
-                    {error && !busy ? (
-                      <MessageScrollerItem messageId="error">
-                        <div className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                          <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
-                          <div className="flex min-w-0 flex-1 flex-col gap-2">
-                            <p className="break-words">
-                              {error.message || 'The agent failed to reply.'}
-                            </p>
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              className="self-start"
-                              onClick={() => {
-                                beginTurn();
-                                void regenerate({ body: { model } });
-                              }}
-                            >
-                              <RotateCcwIcon />
-                              Retry
-                            </Button>
-                          </div>
-                        </div>
-                      </MessageScrollerItem>
-                    ) : null}
-                  </MessageScrollerContent>
-                </MessageScrollerViewport>
-                <MessageScrollerButton />
-              </MessageScroller>
-            </MessageScrollerProvider>
-          )}
+          <TimelineSwitch
+            empty={empty}
+            messages={messages}
+            busy={busy}
+            runActive={runActive}
+            status={status}
+            error={error}
+            agentKind={chat.agent_kind}
+            onSend={send}
+            onRetry={() => {
+              beginTurn();
+              void regenerate({ body: { model } });
+            }}
+          />
         </div>
 
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-4 pb-4">
-          {runActive ? (
-            <div
-              role="status"
-              className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs"
-            >
-              <Spinner className="size-3.5 text-primary" />
-              <span className="min-w-0 flex-1 text-foreground">
-                {runningTools > 0 ? 'Drawing in this tab…' : 'Gesture Creator is working…'}
-                <span className="ml-1 text-muted-foreground">Keep this chat open until it finishes.</span>
-              </span>
-              <Button size="xs" variant="outline" onClick={() => void cancelRun()}>
-                <XIcon />
-                Cancel attempt
-              </Button>
-            </div>
-          ) : null}
-          <ChatComposer
-            busy={busy || runActive}
-            onStop={() => void (isCreator ? cancelRun() : stop())}
-            stopLabel={isCreator ? 'Cancel attempt' : 'Stop'}
+          <RunBanner
+            runActive={runActive}
+            runningTools={runningTools}
+            onCancel={() => void cancelRun()}
+          />
+          <ComposerBar
+            busy={busy}
+            runActive={runActive}
+            isCreator={isCreator}
+            model={model}
             onSend={send}
-            placeholder={
-              isCreator
-                ? 'Mention a gesture with @, or tell the agent how to draw…'
-                : 'Ask about gestures, lessons, practice…'
-            }
-            toolbar={<ModelPicker value={model} onChange={setModel} disabled={busy || runActive} />}
-            autoFocus
+            onCancelRun={() => void cancelRun()}
+            onStop={() => void stop()}
+            onModelChange={setModel}
           />
         </div>
       </div>
@@ -390,8 +620,8 @@ export function AgentChat({ data }: { data: AgentChatData }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Gesture creation in progress</AlertDialogTitle>
             <AlertDialogDescription>
-              The Gesture Creator draws in this page. Leaving now cancels the current attempt; the chat so far is
-              kept and you can continue it later.
+              The Gesture Creator draws in this page. Leaving now cancels the current attempt; the
+              chat so far is kept and you can continue it later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

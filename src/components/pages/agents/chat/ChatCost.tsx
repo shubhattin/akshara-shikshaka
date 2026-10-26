@@ -12,7 +12,11 @@ export function formatCost(usd: number): string {
 }
 
 const compact = (n: number) =>
-  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
+  n >= 1_000_000
+    ? `${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000
+      ? `${(n / 1_000).toFixed(1)}k`
+      : String(n);
 
 function usageLine(usage: AgentMessageMetadata['usage']): string | null {
   if (!usage) return null;
@@ -41,7 +45,9 @@ export function ReplyCost({ metadata }: { metadata: AgentMessageMetadata | undef
           {metadata.model ? ` · ${AGENT_MODELS[metadata.model]?.label ?? metadata.model}` : null}
         </span>
         {tokens ? <span className="text-muted-foreground tabular-nums">{tokens}</span> : null}
-        <span className="text-muted-foreground/70">As charged by OpenRouter, cache discounts included.</span>
+        <span className="text-muted-foreground/70">
+          As charged by OpenRouter, cache discounts included.
+        </span>
       </PopoverContent>
     </Popover>
   );
@@ -84,7 +90,9 @@ export function ChatCost({ messages }: { messages: AgentUIMessage[] }) {
             {untracked} older {untracked === 1 ? 'reply has' : 'replies have'} no cost recorded.
           </span>
         ) : null}
-        <span className="text-muted-foreground/70">As charged by OpenRouter, cache discounts included; chat titles not counted.</span>
+        <span className="text-muted-foreground/70">
+          As charged by OpenRouter, cache discounts included; chat titles not counted.
+        </span>
       </PopoverContent>
     </Popover>
   );

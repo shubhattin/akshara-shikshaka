@@ -26,8 +26,14 @@ const index = buildMentionIndex([
 ]);
 
 const search = (query: string, extra: Partial<Parameters<typeof searchMentions>[1]> = {}) =>
-  searchMentions(index, { query, script: 'all', category: 'all', exclude: new Set(), limit: 10, ...extra })
-    .results.map((g) => g.id);
+  searchMentions(index, {
+    query,
+    script: 'all',
+    category: 'all',
+    exclude: new Set(),
+    limit: 10,
+    ...extra
+  }).results.map((g) => g.id);
 
 describe('searchMentions', () => {
   it('finds by akṣara, romanization and id', () => {

@@ -36,9 +36,7 @@ const body_schema = z.object({
    * The new user message (history is loaded from the database), or — in a Gesture Creator chat —
    * the last assistant message carrying the results of tools the browser ran.
    */
-  message: z
-    .object({ id: z.string().min(1), role: z.enum(['user', 'assistant']) })
-    .passthrough(),
+  message: z.object({ id: z.string().min(1), role: z.enum(['user', 'assistant']) }).passthrough(),
   model: agent_model_id_schema
 });
 
@@ -60,7 +58,9 @@ const waitForSavedTurn = Effect.fn('agents.wait_for_saved_turn')(function* (
     if (!chat.streaming) return chat;
     yield* Effect.sleep('250 millis');
   }
-  return yield* Effect.fail(BadRequestError.make({ message: 'The previous step is still being saved' }));
+  return yield* Effect.fail(
+    BadRequestError.make({ message: 'The previous step is still being saved' })
+  );
 });
 
 async function handleChat(request: Request): Promise<Response> {
@@ -74,33 +74,65 @@ async function handleChat(request: Request): Promise<Response> {
   const parsed = body_schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: 'Invalid request' }, { status: 400 });
   const { id, model } = parsed.data;
-  // SAFETY: shape checked by validateUIMessages below before anything uses it.
-  const incoming = parsed.data.message as unknown as AgentUIMessage;
+  // Validated below with validateUIMessages before anything uses it beyond id/role.
+  const incomingRaw = parsed.data.message;
 
   return runRouteEffect(
     Effect.gen(function* () {
-      const isToolResult = incoming.role === 'assistant';
-      const chat = isToolResult ? yield* waitForSavedTurn(id, user.id) : yield* findAgentChat(id, user.id);
+      const isToolResult = incomingRaw.role === 'assistant';
+      const chat = isToolResult
+        ? yield* waitForSavedTurn(id, user.id)
+        : yield* findAgentChat(id, user.id);
       if (isToolResult && chat.agent_kind !== 'gesture_creator') {
-        return yield* Effect.fail(BadRequestError.make({ message: 'This chat has no browser tools' }));
+        return yield* Effect.fail(
+          BadRequestError.make({ message: 'This chat has no browser tools' })
+        );
       }
       const previous = yield* loadAgentMessages(id);
       const { agent, tools } = yield* createAgent(model, chat.agent_kind);
 
+      // The stored id check runs on the boundary-typed fields; the full shape is
+      // decoded next so only validated messages enter the conversation.
+      const incomingId = incomingRaw.id;
+      if (isToolResult) {
+        const stored = previous.at(-1);
+        if (stored?.id !== incomingId || stored.role !== 'assistant') {
+          return yield* Effect.fail(
+            BadRequestError.make({
+              message: 'Those tool results belong to an older step of this chat'
+            })
+          );
+        }
+      }
+      const validatedIncoming = yield* Effect.tryPromise({
+        try: () =>
+          validateUIMessages<AgentUIMessage>({
+            messages: [incomingRaw],
+            tools,
+            dataSchemas: AGENT_DATA_SCHEMAS
+          }).then((messages) => messages[0]!),
+        catch: () => BadRequestError.make({ message: 'Invalid message' })
+      });
+
       let conversation: AgentUIMessage[];
       if (isToolResult) {
         const stored = previous.at(-1);
-        if (stored?.id !== incoming.id || stored.role !== 'assistant') {
+        if (stored?.id !== validatedIncoming.id || stored.role !== 'assistant') {
           return yield* Effect.fail(
-            BadRequestError.make({ message: 'Those tool results belong to an older step of this chat' })
+            BadRequestError.make({
+              message: 'Those tool results belong to an older step of this chat'
+            })
           );
         }
-        conversation = [...previous.slice(0, -1), mergeClientToolOutputs(stored, incoming)];
+        conversation = [
+          ...previous.slice(0, -1),
+          mergeClientToolOutputs(stored, validatedIncoming)
+        ];
       } else {
         // A retry resends a message that may already be stored: replay history up to it.
-        const resent = previous.findIndex((message) => message.id === incoming.id);
+        const resent = previous.findIndex((message) => message.id === validatedIncoming.id);
         const history = resent === -1 ? previous : previous.slice(0, resent);
-        conversation = [...history, incoming];
+        conversation = [...history, validatedIncoming];
       }
 
       const validated = yield* Effect.tryPromise({
@@ -117,7 +149,10 @@ async function handleChat(request: Request): Promise<Response> {
         ? validated
         : [
             ...validated.slice(0, -1),
-            withResolvedRefs(validated.at(-1)!, yield* resolveGestureRefs(newMessageRefs(validated.at(-1)!)))
+            withResolvedRefs(
+              validated.at(-1)!,
+              yield* resolveGestureRefs(newMessageRefs(validated.at(-1)!))
+            )
           ];
 
       // Title the chat in parallel with the first reply.

@@ -29,7 +29,9 @@ function samples(pts: readonly Pt[], step: number): Pt[] {
     const seg = dist(a, b);
     let t = carry;
     while (t <= seg) {
-      out.push(seg === 0 ? a : [a[0] + ((b[0] - a[0]) * t) / seg, a[1] + ((b[1] - a[1]) * t) / seg]);
+      out.push(
+        seg === 0 ? a : [a[0] + ((b[0] - a[0]) * t) / seg, a[1] + ((b[1] - a[1]) * t) / seg]
+      );
       t += step;
     }
     carry = t - seg;
@@ -46,14 +48,22 @@ const nearestDistance = (p: Pt, pts: readonly Pt[]) => {
   return Math.sqrt(best);
 };
 
-const toReference = (score: ReturnType<typeof scoreGlyphStroke>) => ({
-  passed: score.passed,
-  score: Math.round(score.score * 100) / 100,
-  issue: score.issue,
-  ...(score.matchedStrokeIndex !== undefined ? { matched_stroke: score.matchedStrokeIndex + 1 } : {})
-});
+const toReference = (score: ReturnType<typeof scoreGlyphStroke>) => {
+  const reference: ReferenceCheck['against_saved'] = {
+    passed: score.passed,
+    score: Math.round(score.score * 100) / 100,
+    issue: score.issue
+  };
+  if (score.matchedStrokeIndex !== undefined) {
+    reference.matched_stroke = score.matchedStrokeIndex + 1;
+  }
+  return reference;
+};
 
-export type DraftEvaluation = Omit<TraceStrokesOutput, 'gesture_id' | 'glyph' | 'images' | 'strokes'> & {
+export type DraftEvaluation = Omit<
+  TraceStrokesOutput,
+  'gesture_id' | 'glyph' | 'images' | 'strokes'
+> & {
   perStroke: { off_ink: number; reference?: ReferenceCheck }[];
   /** Uncovered skeleton runs with their points, for drawing */
   gaps: { from: Pt; to: Pt; points: Pt[] }[];
@@ -104,7 +114,9 @@ export function evaluateDraft(input: {
     }
     flush();
     if (pts.length > 0 && edgeMissed / pts.length >= 0.1) {
-      const missedPts = pts.filter((p) => !strokes.some((stroke) => nearestDistance(p, stroke) <= tol));
+      const missedPts = pts.filter(
+        (p) => !strokes.some((stroke) => nearestDistance(p, stroke) <= tol)
+      );
       uncovered.push({
         edge: edge.id,
         fraction: round3(edgeMissed / pts.length),
@@ -117,7 +129,9 @@ export function evaluateDraft(input: {
   const retraceShare = retraceBase > 0 ? retraced / retraceBase : 0;
 
   const missedDots = graph.dots
-    .filter((dot) => !strokes.some((stroke) => nearestDistance([dot.x, dot.y], stroke) <= dot.r + 5))
+    .filter(
+      (dot) => !strokes.some((stroke) => nearestDistance([dot.x, dot.y], stroke) <= dot.r + 5)
+    )
     .map((dot) => dot.id);
 
   const saved = input.saved.filter((s) => s.length > 0);
@@ -137,17 +151,28 @@ export function evaluateDraft(input: {
   if (coverage < COVERAGE_OK) {
     issues.push(
       `Only ${pct(coverage)} of the glyph is covered. Missing: ${uncovered
-        .map((u) => `${u.edge} (${pct(u.fraction)} of it, ${u.from.map(Math.round).join(',')} → ${u.to.map(Math.round).join(',')})`)
+        .map(
+          (u) =>
+            `${u.edge} (${pct(u.fraction)} of it, ${u.from.map(Math.round).join(',')} → ${u.to.map(Math.round).join(',')})`
+        )
         .join('; ')}`
     );
   }
   perStroke.forEach((s, index) => {
-    if (s.off_ink > OFF_INK_OK) issues.push(`Stroke ${index + 1} leaves the glyph: ${pct(s.off_ink)} of its points are off the ink`);
+    if (s.off_ink > OFF_INK_OK)
+      issues.push(
+        `Stroke ${index + 1} leaves the glyph: ${pct(s.off_ink)} of its points are off the ink`
+      );
   });
-  if (retraceShare > RETRACE_OK) issues.push(`${pct(retraceShare)} of the glyph is drawn by two strokes; check for overlapping strokes`);
+  if (retraceShare > RETRACE_OK)
+    issues.push(
+      `${pct(retraceShare)} of the glyph is drawn by two strokes; check for overlapping strokes`
+    );
   if (missedDots.length > 0) issues.push(`Dots not drawn: ${missedDots.join(', ')}`);
   if (saved.length > 0 && saved.length !== strokes.length) {
-    issues.push(`Note: the saved gesture has ${saved.length} strokes, this draft ${strokes.length}`);
+    issues.push(
+      `Note: the saved gesture has ${saved.length} strokes, this draft ${strokes.length}`
+    );
   }
   perStroke.forEach((s, index) => {
     const ref = s.reference?.against_saved;

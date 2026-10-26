@@ -14,7 +14,13 @@ export type AgentChatContextValue = {
 
 const AgentChatContext = createContext<AgentChatContextValue | null>(null);
 
-export function AgentChatProvider({ value, children }: { value: AgentChatContextValue; children: ReactNode }) {
+export function AgentChatProvider({
+  value,
+  children
+}: {
+  value: AgentChatContextValue;
+  children: ReactNode;
+}) {
   return <AgentChatContext.Provider value={value}>{children}</AgentChatContext.Provider>;
 }
 

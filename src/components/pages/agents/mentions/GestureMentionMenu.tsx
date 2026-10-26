@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover';
 import { AtSignIcon } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '~/components/ui/select';
 import { Spinner } from '~/components/ui/spinner';
 import { cn } from '~/lib/utils';
 import { get_script_from_id } from '~/state/lang_list';
@@ -10,6 +16,7 @@ import type {
   MentionCategoryFilter,
   MentionScriptFilter
 } from './mention_search';
+import { isCategoryId } from './mention_search';
 import { mentionOptionId } from './use_gesture_mentions';
 
 const scriptName = (id: number) => get_script_from_id(id) ?? `Script ${id}`;
@@ -78,7 +85,8 @@ export function GestureMentionMenu({
   );
   const categoryItems = useMemo(() => {
     const seen = new Map<number, string>();
-    for (const g of gestures) if (g.category_id !== null && g.category) seen.set(g.category_id, g.category);
+    for (const g of gestures)
+      if (g.category_id !== null && g.category) seen.set(g.category_id, g.category);
     return [
       { value: 'all', label: 'All categories' },
       ...[...seen].map(([id, name]) => ({ value: String(id), label: name })),
@@ -98,7 +106,13 @@ export function GestureMentionMenu({
       }}
     >
       <PopoverPrimitive.Portal>
-        <PopoverPrimitive.Positioner anchor={anchor} side="top" align="start" sideOffset={8} className="isolate z-50">
+        <PopoverPrimitive.Positioner
+          anchor={anchor}
+          side="top"
+          align="start"
+          sideOffset={8}
+          className="isolate z-50"
+        >
           <PopoverPrimitive.Popup
             initialFocus={false}
             finalFocus={false}
@@ -139,7 +153,7 @@ export function GestureMentionMenu({
               </Select>
               <Select
                 items={categoryItems}
-                value={typeof category === 'number' ? String(category) : category}
+                value={isCategoryId(category) ? String(category) : category}
                 onValueChange={(value) => {
                   if (!value) return;
                   onCategoryChange(value === 'all' || value === 'none' ? value : Number(value));
@@ -209,11 +223,14 @@ export function GestureMentionMenu({
                       <span className="block truncate text-sm font-medium">
                         {gesture.text}
                         {gesture.roman && gesture.roman !== gesture.text ? (
-                          <span className="ml-1.5 text-xs font-normal text-muted-foreground">{gesture.roman}</span>
+                          <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                            {gesture.roman}
+                          </span>
                         ) : null}
                       </span>
                       <span className="block truncate text-[11px] text-muted-foreground">
-                        {scriptName(gesture.script_id)} · {gesture.category ?? 'Uncategorised'} · #{gesture.id}
+                        {scriptName(gesture.script_id)} · {gesture.category ?? 'Uncategorised'} · #
+                        {gesture.id}
                       </span>
                     </span>
                     <span

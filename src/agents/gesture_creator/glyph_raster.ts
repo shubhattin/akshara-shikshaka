@@ -40,7 +40,11 @@ export async function rasterizeGlyph(source: GlyphSource): Promise<GlyphMask> {
   await ensureGlyphFont(source.font_family);
   const { default: Konva } = await import('konva');
   const container = document.createElement('div');
-  const stage = new Konva.Stage({ container, width: CANVAS_DIMS.width, height: CANVAS_DIMS.height });
+  const stage = new Konva.Stage({
+    container,
+    width: CANVAS_DIMS.width,
+    height: CANVAS_DIMS.height
+  });
   try {
     const layer = new Konva.Layer();
     stage.add(layer);

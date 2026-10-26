@@ -33,7 +33,7 @@ export function ModelPicker({
         }
       >
         <CpuIcon />
-        {AGENT_MODELS[value].label}
+        {AGENT_MODELS[value]?.label ?? value}
         <ChevronDownIcon className="opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64">

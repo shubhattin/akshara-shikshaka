@@ -23,17 +23,32 @@ type ContentPart =
   | { type: 'text'; text: string }
   | { type: 'image-data'; data: string; mediaType: string };
 
-const IMAGE_CAPTIONS: Record<string, string> = {
+const IMAGE_CAPTIONS = {
   glyph: 'The glyph on the 400×400 canvas with a coordinate grid (labels every 50).',
   skeleton:
     'Skeleton graph over the faint glyph: coloured, labelled edges (E…), black nodes (N…), dots ringed (D…).',
-  saved: 'Strokes currently saved for this gesture: numbered at their start, arrows show direction.',
+  saved:
+    'Strokes currently saved for this gesture: numbered at their start, arrows show direction.',
   strokes:
     'Your draft over the faint glyph: numbered at each start dot, arrows show direction; red dashes = glyph parts no stroke covers.',
   order: 'Writing order: one panel per stroke, earlier strokes grey, the current one coloured.'
-};
+} as const satisfies Record<string, string>;
 
-function imageParts(images: HarnessImages | undefined, omitted: boolean | undefined): ContentPart[] {
+type HarnessImageCaptionName = keyof typeof IMAGE_CAPTIONS;
+
+function isCaptionName(name: string): name is HarnessImageCaptionName {
+  return name in IMAGE_CAPTIONS;
+}
+
+/** Human label for a harness image, falling back to the raw name. */
+function captionForImage(name: string): string {
+  return isCaptionName(name) ? IMAGE_CAPTIONS[name] : name;
+}
+
+function imageParts(
+  images: HarnessImages | undefined,
+  omitted: boolean | undefined
+): ContentPart[] {
   if (omitted || !images) {
     return [{ type: 'text', text: '(Images of this older call are omitted to save context.)' }];
   }
@@ -41,7 +56,7 @@ function imageParts(images: HarnessImages | undefined, omitted: boolean | undefi
     const match = /^data:(image\/[a-z]+);base64,(.+)$/.exec(url);
     if (!match) return [];
     return [
-      { type: 'text', text: IMAGE_CAPTIONS[name] ?? name },
+      { type: 'text', text: captionForImage(name) },
       { type: 'image-data', mediaType: match[1]!, data: match[2]! }
     ];
   });
@@ -49,7 +64,7 @@ function imageParts(images: HarnessImages | undefined, omitted: boolean | undefi
 
 export const inspectGlyphTool = tool<InspectGlyphInput, InspectGlyphOutput>({
   description:
-    'Render a gesture\'s glyph exactly as learners see it and return its skeleton graph: nodes (pen ends, junctions), edges (centreline runs with ids), dots, plus images of the glyph on a grid, the labelled skeleton and the saved strokes. Call this first for a mentioned gesture.',
+    "Render a gesture's glyph exactly as learners see it and return its skeleton graph: nodes (pen ends, junctions), edges (centreline runs with ids), dots, plus images of the glyph on a grid, the labelled skeleton and the saved strokes. Call this first for a mentioned gesture.",
   inputSchema: inspect_glyph_input_schema,
   // produced by our own browser code; stored as-is
   outputSchema: z.custom<InspectGlyphOutput>(),
@@ -76,7 +91,10 @@ export const traceStrokesTool = tool<TraceStrokesInput, TraceStrokesOutput>({
     };
     return {
       type: 'content',
-      value: [{ type: 'text', text: JSON.stringify(summary) }, ...imageParts(images, images_omitted)]
+      value: [
+        { type: 'text', text: JSON.stringify(summary) },
+        ...imageParts(images, images_omitted)
+      ]
     };
   }
 });

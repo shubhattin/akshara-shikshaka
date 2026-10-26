@@ -113,7 +113,9 @@ export function AssistantMessage({
                 </AgentMarkdown>
               );
             case 'proposal':
-              return <GestureProposalCard key={group.key} part={group.part} streaming={streaming} />;
+              return (
+                <GestureProposalCard key={group.key} part={group.part} streaming={streaming} />
+              );
           }
         })}
         {waiting ? <ThinkingLine /> : null}

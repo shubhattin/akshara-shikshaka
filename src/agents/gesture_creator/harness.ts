@@ -1,5 +1,6 @@
 import { get_script_from_id } from '~/state/lang_list';
 import type { Gesture } from '~/tools/stroke_data/types';
+import type { AgentUITools } from '~/agents/ui_message';
 import { DEFAULTS } from '~/components/pages/gesture_add_edit/gesture_add_edit_state';
 import { evaluateDraft } from './evaluate';
 import { inkLookup, rasterizeGlyph } from './glyph_raster';
@@ -14,10 +15,15 @@ import {
   propose_gesture_input_schema,
   trace_strokes_input_schema,
   type GestureCreatorToolName,
+  type HarnessImages,
+  type InspectGlyphInput,
   type InspectGlyphOutput,
+  type ProposeGestureInput,
   type ProposeGestureOutput,
+  type TraceStrokesInput,
   type TraceStrokesOutput,
-  type TracedGlyph
+  type TracedGlyph,
+  type TracedStroke
 } from './schemas';
 import { buildSkeletonGraph, type GlyphMask, type SkeletonGraph } from './skeleton';
 import { buildStroke, pathLength } from './strokes';
@@ -57,7 +63,8 @@ export class HarnessCancelledError extends Error {
   }
 }
 
-const glyphKey = (g: TracedGlyph) => `${g.font_family}|${g.font_size}|${g.text_center_offset.join(',')}`;
+const glyphKey = (g: TracedGlyph) =>
+  `${g.font_family}|${g.font_size}|${g.text_center_offset.join(',')}`;
 
 const glyphOf = (gesture: HarnessGesture): TracedGlyph => ({
   font_family: gesture.font_family,
@@ -65,7 +72,9 @@ const glyphOf = (gesture: HarnessGesture): TracedGlyph => ({
   text_center_offset: [...gesture.text_center_offset]
 });
 
-export function createGestureHarness(deps: { loadGesture: (id: number) => Promise<HarnessGesture> }) {
+export function createGestureHarness(deps: {
+  loadGesture: (id: number) => Promise<HarnessGesture>;
+}) {
   /** Rendered glyph + skeleton per gesture and glyph settings (stable node/edge ids across calls). */
   const sessions = new Map<string, Promise<Session>>();
 
@@ -88,19 +97,24 @@ export function createGestureHarness(deps: { loadGesture: (id: number) => Promis
   const savedStrokes = (gesture: HarnessGesture) =>
     [...gesture.gestures].sort((a, b) => a.index - b.index).map((g) => g.points);
 
-  async function inspect(raw: unknown, signal: AbortSignal): Promise<InspectGlyphOutput> {
-    const input = inspect_glyph_input_schema.parse(raw);
+  async function inspect(
+    input: InspectGlyphInput,
+    signal: AbortSignal
+  ): Promise<InspectGlyphOutput> {
     const { gesture, mask, graph } = await openSession(input.gesture_id);
     if (signal.aborted) throw new HarnessCancelledError();
     const saved = savedStrokes(gesture).filter((s) => s.length > 0);
-    const images: Record<string, string> = {
+    const images: HarnessImages = {
       glyph: renderGlyphImage(mask),
       skeleton: renderSkeletonImage(mask, graph)
     };
     if (input.show_existing !== false && saved.length > 0) {
       images.saved = renderStrokesImage(
         mask,
-        saved.map((points, index) => ({ points, width: gesture.gestures[index]?.width ?? DEFAULTS.GESTURE_BRUSH_WIDTH }))
+        saved.map((points, index) => ({
+          points,
+          width: gesture.gestures[index]?.width ?? DEFAULTS.GESTURE_BRUSH_WIDTH
+        }))
       );
     }
     return {
@@ -128,8 +142,7 @@ export function createGestureHarness(deps: { loadGesture: (id: number) => Promis
     };
   }
 
-  async function trace(raw: unknown, signal: AbortSignal): Promise<TraceStrokesOutput> {
-    const input = trace_strokes_input_schema.parse(raw);
+  async function trace(input: TraceStrokesInput, signal: AbortSignal): Promise<TraceStrokesOutput> {
     const { gesture, mask, graph, onInk } = await openSession(input.gesture_id);
     if (signal.aborted) throw new HarnessCancelledError();
     const onStrictInk = inkLookup(mask, 0.5);
@@ -149,15 +162,21 @@ export function createGestureHarness(deps: { loadGesture: (id: number) => Promis
       gesture_id: gesture.id,
       glyph: glyphOf(gesture),
       ok: evaluation.ok,
-      strokes: strokes.map((points, index) => ({
-        index,
-        points,
-        length: Math.round(pathLength(points)),
-        start: points[0]!,
-        end: points.at(-1)!,
-        off_ink: evaluation.perStroke[index]!.off_ink,
-        ...(evaluation.perStroke[index]!.reference ? { reference: evaluation.perStroke[index]!.reference } : {})
-      })),
+      strokes: strokes.map((points, index): TracedStroke => {
+        const stroke: TracedStroke = {
+          index,
+          points,
+          length: Math.round(pathLength(points)),
+          start: points[0]!,
+          end: points.at(-1)!,
+          off_ink: evaluation.perStroke[index]!.off_ink
+        };
+        const reference = evaluation.perStroke[index]!.reference;
+        if (reference) {
+          stroke.reference = reference;
+        }
+        return stroke;
+      }),
       coverage: evaluation.coverage,
       uncovered: evaluation.uncovered,
       retraced: evaluation.retraced,
@@ -171,10 +190,9 @@ export function createGestureHarness(deps: { loadGesture: (id: number) => Promis
   }
 
   async function propose(
-    raw: unknown,
+    input: ProposeGestureInput,
     messages: readonly MessageLike[]
   ): Promise<ProposeGestureOutput> {
-    const input = propose_gesture_input_schema.parse(raw);
     let traced: TraceStrokesOutput | undefined;
     for (const message of messages) {
       for (const part of message.parts) {
@@ -189,13 +207,17 @@ export function createGestureHarness(deps: { loadGesture: (id: number) => Promis
       }
     }
     if (!traced) {
-      return { ok: false, error: `No finished trace_strokes call with id ${input.trace_id} in this chat` };
+      return {
+        ok: false,
+        error: `No finished trace_strokes call with id ${input.trace_id} in this chat`
+      };
     }
     const gesture = await deps.loadGesture(traced.gesture_id);
     if (glyphKey(glyphOf(gesture)) !== glyphKey(traced.glyph)) {
       return {
         ok: false,
-        error: 'The glyph font, size or position changed since that trace. Inspect the glyph again and retrace.'
+        error:
+          'The glyph font, size or position changed since that trace. Inspect the glyph again and retrace.'
       };
     }
     const width = input.width ?? DEFAULTS.GESTURE_BRUSH_WIDTH;
@@ -225,17 +247,17 @@ export function createGestureHarness(deps: { loadGesture: (id: number) => Promis
   return {
     async run(
       tool: GestureCreatorToolName,
-      input: unknown,
+      input: AgentUITools[keyof AgentUITools]['input'],
       ctx: { messages: readonly MessageLike[]; signal: AbortSignal }
-    ): Promise<unknown> {
+    ): Promise<InspectGlyphOutput | TraceStrokesOutput | ProposeGestureOutput> {
       if (ctx.signal.aborted) throw new HarnessCancelledError();
       switch (tool) {
         case 'inspect_glyph':
-          return inspect(input, ctx.signal);
+          return inspect(inspect_glyph_input_schema.parse(input), ctx.signal);
         case 'trace_strokes':
-          return trace(input, ctx.signal);
+          return trace(trace_strokes_input_schema.parse(input), ctx.signal);
         case 'propose_gesture':
-          return propose(input, ctx.messages);
+          return propose(propose_gesture_input_schema.parse(input), ctx.messages);
       }
     },
     /** Glyph render for previews (the apply dialog draws strokes over it). */

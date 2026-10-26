@@ -5,7 +5,9 @@ import { Stage, Layer, Text, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { CANVAS_DIMS, type GesturePoints } from '~/tools/stroke_data/types';
-import { getSmoothenedPoints, pointsToSvgPath } from '~/tools/stroke_data/utils';
+import { getLiveStrokePath } from '~/tools/stroke_data/stroke_render';
+import { appendSample, EMPTY_RECORDING } from '~/tools/stroke_data/recording';
+import { KonvaGestureStroke } from '~/components/gesture/KonvaGestureStroke';
 import {
   main_text_path_visible_atom,
   font_size_atom,
@@ -14,7 +16,7 @@ import {
   gesture_data_atom,
   is_recording_atom,
   is_drawing_atom,
-  current_gesture_recording_points_atom,
+  current_gesture_recording_atom,
   not_to_clear_gestures_index_atom,
   text_atom,
   font_family_atom,
@@ -33,9 +35,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
   const gestureData = useAtomValue(gesture_data_atom);
   const isRecording = useAtomValue(is_recording_atom);
   const [isDrawing, setIsDrawing] = useAtom(is_drawing_atom);
-  const [currentGestureRecordingPoints, setCurrentGestureRecordingPoints] = useAtom(
-    current_gesture_recording_points_atom
-  );
+  const [currentRecording, setCurrentRecording] = useAtom(current_gesture_recording_atom);
   const setNotToClearGesturesIndex = useSetAtom(not_to_clear_gestures_index_atom);
 
   // Get selected gesture for drawing style
@@ -137,7 +137,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     const pos = e.currentTarget.getStage()?.getPointerPosition();
     if (!pos) return;
     const point: GesturePoints = [pos.x, pos.y];
-    setCurrentGestureRecordingPoints([point]);
+    setCurrentRecording(appendSample(EMPTY_RECORDING, point, e.evt));
   };
 
   const onMouseMove = (e: KonvaMouseTouchEvent) => {
@@ -147,7 +147,8 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     if (!pos) return;
 
     const point: GesturePoints = [pos.x, pos.y];
-    setCurrentGestureRecordingPoints((prev) => [...prev, point]);
+    const evt = e.evt;
+    setCurrentRecording((prev) => appendSample(prev, point, evt));
   };
 
   const onMouseUp = (_e: KonvaMouseTouchEvent) => {
@@ -315,33 +316,22 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
             .filter((g) => !(isRecording && g.index === selectedGestureIndex))
             // ^ not displaying the current gesture even if marked while recording
             .map((gesture) => (
-              <Path
+              <KonvaGestureStroke
                 key={`animated-${gesture.index}`}
-                // points={flattenPoints(gesture.points)}
-                data={pointsToSvgPath(
-                  gesture.isAnimatedPath
-                    ? gesture.points
-                    : getSmoothenedPoints(gesture.points, {
-                        size: gesture.width,
-                        simulatePressure: gesture.simulate_pressure
-                      })
-                  // to prevent smoothening multiple times which distorts the path
-                )}
-                fill={gesture.color}
-                strokeEnabled={false}
-                listening={false}
+                stroke={gesture}
+                color={gesture.color}
+                reveal={gesture.reveal}
               />
             ))}
 
           {/* Current Drawing Path (during recording) */}
-          {currentGestureRecordingPoints.length > 2 && selectedGesture && (
+          {currentRecording.points.length > 2 && selectedGesture && (
             <Path
-              data={pointsToSvgPath(
-                getSmoothenedPoints(currentGestureRecordingPoints, {
-                  size: selectedGesture.width,
-                  simulatePressure: selectedGesture.simulate_pressure
-                })
-              )}
+              data={getLiveStrokePath({
+                points: currentRecording.points,
+                width: selectedGesture.width,
+                simulate_pressure: selectedGesture.simulate_pressure
+              })}
               fill={selectedGesture.color}
               strokeEnabled={false}
               listening={false}

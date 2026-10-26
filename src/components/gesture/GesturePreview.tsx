@@ -1,25 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { PlayIcon, SquareIcon } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { cn } from '~/lib/utils';
-import {
-  CANVAS_DIMS,
-  GESTURE_GAP_DURATION,
-  type Gesture,
-  type GesturePoints
-} from '~/tools/stroke_data/types';
-import { animateGesture, getSmoothenedPoints, pointsToSvgPath } from '~/tools/stroke_data/utils';
+import { CANVAS_DIMS, GESTURE_GAP_DURATION, type Gesture } from '~/tools/stroke_data/types';
+import { animateGesture, sleep } from '~/tools/stroke_data/animation';
+import { getRevealClipPath, getStrokeRender } from '~/tools/stroke_data/stroke_render';
 
-const strokePath = (gesture: Gesture) =>
-  pointsToSvgPath(
-    getSmoothenedPoints(gesture.points, {
-      size: gesture.width,
-      simulatePressure: gesture.simulate_pressure
-    })
-  );
-
-/** While replaying: strokes fully drawn so far, and the outline of the one being drawn. */
-type Playback = { done: number; partial: GesturePoints[] | null };
+/** While replaying: strokes fully drawn so far, and how much of the next one is revealed. */
+type Playback = { done: number; reveal: number | null };
 
 /**
  * A gesture's strokes on the 400×400 gesture canvas, scaled to fit. Static by default (every
@@ -37,34 +25,38 @@ export function GesturePreview({
 }) {
   const ordered = [...gestures].sort((a, b) => a.index - b.index);
   const [playback, setPlayback] = useState<Playback | null>(null);
-  const run = useRef(0);
+  const controller = useRef<AbortController | null>(null);
+  const clipId = useId();
 
-  useEffect(
-    () => () => {
-      run.current += 1;
-    },
-    []
-  );
+  useEffect(() => () => controller.current?.abort(), []);
 
   const play = async () => {
-    const id = ++run.current;
+    controller.current?.abort();
+    const { signal } = (controller.current = new AbortController());
     for (let index = 0; index < ordered.length; index++) {
-      if (run.current !== id) return;
-      setPlayback({ done: index, partial: null });
-      await animateGesture(ordered[index]!, (frame) => {
-        if (run.current === id) setPlayback({ done: index, partial: frame.partialPoints });
-      });
-      await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION));
+      setPlayback({ done: index, reveal: 0 });
+      const finished = await animateGesture(
+        ordered[index]!,
+        (frame) => setPlayback({ done: index, reveal: frame.reveal }),
+        { signal }
+      );
+      if (!finished || !(await sleep(GESTURE_GAP_DURATION, signal))) return;
     }
-    if (run.current === id) setPlayback(null);
+    setPlayback(null);
   };
 
   const stop = () => {
-    run.current += 1;
+    controller.current?.abort();
     setPlayback(null);
   };
 
   const visible = playback ? ordered.slice(0, playback.done) : ordered;
+  const animating = playback ? ordered[playback.done] : undefined;
+  const animatingRender = animating ? getStrokeRender(animating) : null;
+  const animatingClip =
+    animatingRender && playback?.reveal != null
+      ? getRevealClipPath(animatingRender, playback.reveal)
+      : null;
 
   return (
     <div className={cn('group/gesture relative', className)}>
@@ -75,13 +67,21 @@ export function GesturePreview({
         aria-label={`Gesture with ${ordered.length} stroke${ordered.length === 1 ? '' : 's'}`}
       >
         {visible.map((gesture) => (
-          <path key={gesture.index} d={strokePath(gesture)} fill={gesture.color} />
+          <path key={gesture.index} d={getStrokeRender(gesture).path} fill={gesture.color} />
         ))}
-        {playback?.partial ? (
-          <path
-            d={pointsToSvgPath(playback.partial)}
-            fill={ordered[playback.done]?.color ?? 'black'}
-          />
+        {animating && animatingRender ? (
+          <>
+            {animatingClip !== null ? (
+              <clipPath id={clipId}>
+                <path d={animatingClip} />
+              </clipPath>
+            ) : null}
+            <path
+              d={animatingRender.path}
+              fill={animating.color}
+              clipPath={animatingClip !== null ? `url(#${clipId})` : undefined}
+            />
+          </>
         ) : null}
         {showStrokeOrder && !playback
           ? ordered.map((gesture, order) => {

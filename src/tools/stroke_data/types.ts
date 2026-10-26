@@ -30,7 +30,14 @@ export const GestureSchema = z.object({
   duration: z.number(),
   anim_fn: AnimationsFunctionsEnumSchema,
   simulate_pressure: z.boolean(),
-  points: z.array(StrokePathSchema)
+  points: z.array(StrokePathSchema),
+  /**
+   * Capture metadata parallel to `points` (same length), recorded since these fields were added:
+   * ms since the stroke's first point, and pen/stylus pressure 0..1 (absent for mouse and touch).
+   * Not used for rendering yet; kept so timing-faithful replay or real pressure can be built later.
+   */
+  timings: z.array(z.number()).optional(),
+  pressures: z.array(z.number()).optional()
 });
 export const AnimationGestureSchema = GestureSchema.pick({
   index: true,
@@ -39,7 +46,8 @@ export const AnimationGestureSchema = GestureSchema.pick({
   points: true,
   simulate_pressure: true
 }).extend({
-  isAnimatedPath: z.boolean().optional()
+  /** Canvas units of the stroke revealed while it animates; absent once fully drawn */
+  reveal: z.number().optional()
 });
 
 export type GesturePoints = z.infer<typeof StrokePathSchema>;

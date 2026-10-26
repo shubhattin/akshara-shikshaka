@@ -16,7 +16,7 @@ import {
 import type Konva from 'konva';
 import { cn } from '~/lib/utils';
 import { MdPlayArrow, MdArrowForward, MdRefresh, MdClose, MdReplay } from 'react-icons/md';
-import { animateGesture } from '~/tools/stroke_data/utils';
+import { animateGesture, sleep } from '~/tools/stroke_data/animation';
 import {
   scoreGlyphStroke,
   type GestureIssue,
@@ -293,53 +293,65 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
 
   const totalGestures = gestureData.length;
 
-  // Konva initialization is handled by the Stage component automatically
+  // One playback at a time: starting another (play all, guidance, restart) cancels the last
+  const playbackRef = useRef<AbortController | null>(null);
+  const beginPlayback = useCallback(() => {
+    playbackRef.current?.abort();
+    playbackRef.current = new AbortController();
+    return playbackRef.current.signal;
+  }, []);
+  useEffect(() => () => playbackRef.current?.abort(), []);
 
-  // Konva-based gesture animation
+  /** Resolves `false` if the playback was cancelled before the stroke finished */
   const playGestureWithKonva = useCallback(
-    async (gesture: Gesture): Promise<void> => {
+    async (gesture: Gesture, signal: AbortSignal): Promise<boolean> => {
       const gestureLineId = gesture.index;
 
-      // Initialize the gesture path in state
       setAnimatedGestureLines((prev) => [
         ...prev.filter((line) => line.index !== gestureLineId),
         {
           index: gestureLineId,
-          points: [],
+          points: gesture.points,
           color: gesture.color,
           width: gesture.width,
           gesture_type: 'current_animated_gesture',
-          simulate_pressure: gesture.simulate_pressure
+          simulate_pressure: gesture.simulate_pressure,
+          reveal: 0
         }
       ]);
 
-      // Use the centerline->polygon animation helper
-      await animateGesture(gesture, (frame) => {
-        setAnimatedGestureLines((prev) =>
-          prev.map((line) =>
-            line.index === gestureLineId
-              ? { ...line, points: frame.partialPoints, isAnimatedPath: true }
-              : line
-          )
-        );
-      });
+      return animateGesture(
+        gesture,
+        (frame) => {
+          setAnimatedGestureLines((prev) =>
+            prev.map((line) =>
+              line.index === gestureLineId
+                ? { ...line, reveal: frame.isComplete ? undefined : frame.reveal }
+                : line
+            )
+          );
+        },
+        { signal }
+      );
     },
     [setAnimatedGestureLines]
   );
 
   const playAllGestures = useCallback(async () => {
+    const signal = beginPlayback();
     setCanvasCurrentMode('playing');
     // clear user drawn gestures
     setCurrentGesturePoints([]);
     setAnimatedGestureLines([]);
 
     for (const gesture of gestureData) {
-      await playGestureWithKonva(gesture); // Not a guidance gesture
-      await new Promise((resolve) => setTimeout(resolve, GESTURE_GAP_DURATION));
+      if (!(await playGestureWithKonva(gesture, signal))) return; // Not a guidance gesture
+      if (!(await sleep(GESTURE_GAP_DURATION, signal))) return;
     }
 
     setCanvasCurrentMode('none');
   }, [
+    beginPlayback,
     gestureData,
     setCanvasCurrentMode,
     setCurrentGesturePoints,
@@ -353,11 +365,12 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- mount-only playback; replaying on data refetch would clear user's in-progress drawing
   }, []);
 
-  const playGestureIndex = async (gestureIndex: number) => {
+  const playGestureIndex = async (gestureIndex: number, signal = beginPlayback()) => {
     // Disable drawing while playing the guided animation for the current gesture
     setIsDrawing(false);
     setIsAnimatingCurrentGesture(true);
-    await playGestureWithKonva(gestureData[gestureIndex]); // This is a guidance gesture
+    // This is a guidance gesture; if cancelled, whatever cancelled it owns the state now
+    if (!(await playGestureWithKonva(gestureData[gestureIndex], signal))) return;
     setIsAnimatingCurrentGesture(false);
     setIsDrawing(true);
   };
@@ -424,9 +437,10 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
       prev.map((line, i) => (i === prev.length - 1 ? { ...line, gesture_type: null } : line))
     );
     if (currentGestureIndex < totalGestures - 1) {
-      setTimeout(() => {
-        playGestureIndex(currentGestureIndex + 1);
-      }, 300);
+      const signal = beginPlayback();
+      void (async () => {
+        if (await sleep(300, signal)) await playGestureIndex(currentGestureIndex + 1, signal);
+      })();
     } else {
       setCanvasCurrentMode('none');
       submit_user_gesture_recording_func(true);
@@ -456,6 +470,8 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
   };
 
   const resetPractice = useCallback(async () => {
+    playbackRef.current?.abort();
+    setIsAnimatingCurrentGesture(false);
     setCanvasCurrentMode('none');
     setCurrentGestureIndex(0);
     setCompletedGesturesCount(0);
@@ -469,7 +485,8 @@ function Practice({ text_data, play_gesture_on_mount, children }: Props) {
     setCompletedGesturesCount,
     setShowTryAgain,
     setIsDrawing,
-    setAnimatedGestureLines
+    setAnimatedGestureLines,
+    setIsAnimatingCurrentGesture
   ]);
 
   const restartPractice = async () => {

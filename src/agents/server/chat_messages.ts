@@ -1,52 +1,18 @@
-import { getToolName, isToolUIPart, type ModelMessage } from 'ai';
-import { isGestureCreatorToolName } from '~/agents/gesture_creator/schemas';
+import { isToolUIPart, type ModelMessage } from 'ai';
 import { MAX_GESTURE_REFS, messageGestureRefs } from '~/agents/gesture_refs';
 import type { AgentUIMessage, GestureRefData } from '~/agents/ui_message';
 
 /**
- * Message plumbing for the chat route: merging tool results run in the browser, closing tool
- * calls that never ran, and keeping old harness images out of the model's context.
+ * Message plumbing for the chat route: closing tool calls that never ran, and keeping old harness
+ * images out of the model's context.
  */
 
 type Part = AgentUIMessage['parts'][number];
 
-/**
- * The browser ran the Gesture Creator tools of the stored assistant message and sent the message
- * back. Take only those results — everything else comes from the stored copy.
- */
-export function mergeClientToolOutputs(
-  stored: AgentUIMessage,
-  incoming: AgentUIMessage
-): AgentUIMessage {
-  const results = new Map<string, Part>();
-  for (const part of incoming.parts) {
-    if (isToolUIPart(part) && isGestureCreatorToolName(getToolName(part)))
-      results.set(part.toolCallId, part);
-  }
-  return {
-    ...stored,
-    parts: stored.parts.map((part): Part => {
-      if (!isToolUIPart(part) || part.state !== 'input-available') return part;
-      if (!isGestureCreatorToolName(getToolName(part))) return part;
-      const found = results.get(part.toolCallId);
-      const result = found && isToolUIPart(found) ? found : undefined;
-      if (result?.state === 'output-available') {
-        // SAFETY: same tool call id and tool name as the stored part; only its result is taken.
-        return { ...part, state: 'output-available', output: result.output } as Part;
-      }
-      if (result?.state === 'output-error') {
-        // SAFETY: as above; the error text replaces the missing result.
-        return { ...part, state: 'output-error', errorText: result.errorText } as Part;
-      }
-      return part;
-    })
-  };
-}
-
-const NOT_RUN = 'Not run: the admin cancelled it or left the chat before it ran.';
+const NOT_RUN = 'Not run: the reply was stopped before this tool finished.';
 
 /**
- * A stopped or cancelled turn can leave tool calls without a result (or no content at all),
+ * A stopped turn can leave tool calls without a result (or no content at all),
  * which the model API rejects. Mark them as failed, drop half-streamed calls and empty replies
  * before replaying history.
  */
@@ -129,9 +95,8 @@ export const withResolvedRefs = (
 
 /**
  * Mark the end of the conversation as a cache breakpoint (the system prompt has the other one).
- * The next request — the next turn, or the continuation after a browser tool — then reads the
- * whole history from cache instead of paying for it again. Ignored by models that cache
- * automatically.
+ * The reply's later steps (after each tool call) and the next turn then read the whole history
+ * from cache instead of paying for it again. Ignored by models that cache automatically.
  */
 export function withHistoryCacheBreakpoint(messages: ModelMessage[]): ModelMessage[] {
   const last = messages.at(-1);

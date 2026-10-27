@@ -6,8 +6,8 @@ import { AGENT_MODELS, AGENT_UTILITY_MODEL, type AgentModelId } from '~/agents/m
 import { agentInstructionSections, toSystemMessages } from '~/agents/prompts/instructions';
 import { sqlQueryTool } from '~/agents/tools/sql_query';
 import { createWebSearchTool } from '~/agents/tools/web_search';
-import { gestureCreatorTools } from '~/agents/tools/gesture_creator_tools';
-import type { AgentUITools } from '~/agents/ui_message';
+import { createGestureCreatorTools } from '~/agents/tools/gesture_creator_tools';
+import type { AgentUIMessage, AgentUITools } from '~/agents/ui_message';
 
 /** The tools as the UI message type knows them; the Gesture Creator's only in its chats. */
 export type AgentTools = {
@@ -26,7 +26,9 @@ export const resolveAgentModel = Effect.fn('agents.resolve_model')(function* (
 
 export const createAgent = Effect.fn('agents.create_agent')(function* (
   modelId: AgentModelId,
-  kind: AgentKind
+  kind: AgentKind,
+  /** The stored conversation (the Gesture Creator's proposals refer back to its traces). */
+  history: readonly AgentUIMessage[] = []
 ) {
   const model = yield* resolveAgentModel(modelId);
   const searchModel = yield* resolveAgentModel(AGENT_UTILITY_MODEL);
@@ -35,7 +37,7 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
     web_search: createWebSearchTool(searchModel)
   };
   if (kind === 'gesture_creator') {
-    Object.assign(tools, gestureCreatorTools);
+    Object.assign(tools, createGestureCreatorTools(history));
   }
   // Tracing is spatial work: give the creator more room to think.
   const effort = kind === 'gesture_creator' ? 'high' : 'medium';

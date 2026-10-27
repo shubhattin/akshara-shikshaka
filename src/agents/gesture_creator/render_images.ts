@@ -1,5 +1,6 @@
 import { getStrokeRender } from '~/tools/stroke_data/stroke_render';
 import { CANVAS_DIMS } from '~/tools/stroke_data/types';
+import { context2d, type CanvasEnv } from './canvas_env';
 import type { GlyphMask, SkeletonGraph } from './skeleton';
 
 /**
@@ -29,12 +30,9 @@ export const STROKE_COLORS = [
 ];
 const strokeColor = (index: number) => STROKE_COLORS[index % STROKE_COLORS.length]!;
 
-function canvas(width = SIZE, height = SIZE) {
-  const el = document.createElement('canvas');
-  el.width = width;
-  el.height = height;
-  const ctx = el.getContext('2d');
-  if (!ctx) throw new Error('Canvas 2D is not available');
+function canvas(env: CanvasEnv, width = SIZE, height = SIZE) {
+  const el = env.createCanvas(width, height);
+  const ctx = context2d(el);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
   return { el, ctx };
@@ -43,7 +41,7 @@ function canvas(width = SIZE, height = SIZE) {
 const glyphLayers = new WeakMap<GlyphMask, Map<string, HTMLCanvasElement>>();
 
 /** The glyph ink in one colour, as a canvas to draw (cached per mask and colour). */
-function glyphLayer(mask: GlyphMask, rgba: [number, number, number, number]) {
+function glyphLayer(env: CanvasEnv, mask: GlyphMask, rgba: [number, number, number, number]) {
   const key = rgba.join(',');
   let byColour = glyphLayers.get(mask);
   if (!byColour) {
@@ -52,10 +50,8 @@ function glyphLayer(mask: GlyphMask, rgba: [number, number, number, number]) {
   }
   const cached = byColour.get(key);
   if (cached) return cached;
-  const el = document.createElement('canvas');
-  el.width = mask.width;
-  el.height = mask.height;
-  const ctx = el.getContext('2d')!;
+  const el = env.createCanvas(mask.width, mask.height);
+  const ctx = context2d(el);
   const img = ctx.createImageData(mask.width, mask.height);
   for (let i = 0; i < mask.data.length; i++) {
     if (!mask.data[i]) continue;
@@ -66,7 +62,7 @@ function glyphLayer(mask: GlyphMask, rgba: [number, number, number, number]) {
   return el;
 }
 
-function paintGrid(ctx: CanvasRenderingContext2D, strong: boolean) {
+function paintGrid(env: CanvasEnv, ctx: CanvasRenderingContext2D, strong: boolean) {
   ctx.save();
   for (let v = 0; v <= CANVAS_DIMS.width; v += 25) {
     const major = v % 50 === 0;
@@ -80,7 +76,7 @@ function paintGrid(ctx: CanvasRenderingContext2D, strong: boolean) {
     ctx.stroke();
   }
   ctx.fillStyle = '#c2410c';
-  ctx.font = '600 14px ui-sans-serif, system-ui, sans-serif';
+  ctx.font = `600 14px ${env.labelFamily}`;
   ctx.textBaseline = 'top';
   for (let v = 50; v < CANVAS_DIMS.width; v += 50) {
     ctx.fillText(String(v), v * SCALE + 3, 3);
@@ -89,9 +85,16 @@ function paintGrid(ctx: CanvasRenderingContext2D, strong: boolean) {
   ctx.restore();
 }
 
-function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string) {
+function label(
+  env: CanvasEnv,
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  color: string
+) {
   ctx.save();
-  ctx.font = '700 16px ui-sans-serif, system-ui, sans-serif';
+  ctx.font = `700 16px ${env.labelFamily}`;
   const w = ctx.measureText(text).width + 8;
   ctx.fillStyle = 'rgba(255,255,255,0.92)';
   ctx.strokeStyle = color;
@@ -139,18 +142,18 @@ function arrowsAlong(ctx: CanvasRenderingContext2D, pts: Pt[], color: string, ev
 const toRaster = (pts: readonly Pt[]): Pt[] => pts.map(([x, y]) => [x * SCALE, y * SCALE]);
 
 /** The glyph in dark ink on the coordinate grid. */
-export function renderGlyphImage(mask: GlyphMask): string {
-  const { el, ctx } = canvas();
-  ctx.drawImage(glyphLayer(mask, [38, 38, 38, 255]), 0, 0, SIZE, SIZE);
-  paintGrid(ctx, true);
+export function renderGlyphImage(env: CanvasEnv, mask: GlyphMask): string {
+  const { el, ctx } = canvas(env);
+  ctx.drawImage(glyphLayer(env, mask, [38, 38, 38, 255]), 0, 0, SIZE, SIZE);
+  paintGrid(env, ctx, true);
   return el.toDataURL('image/png');
 }
 
 /** The skeleton graph over the faint glyph: coloured, labelled edges and black nodes. */
-export function renderSkeletonImage(mask: GlyphMask, graph: SkeletonGraph): string {
-  const { el, ctx } = canvas();
-  ctx.drawImage(glyphLayer(mask, [212, 212, 212, 255]), 0, 0, SIZE, SIZE);
-  paintGrid(ctx, false);
+export function renderSkeletonImage(env: CanvasEnv, mask: GlyphMask, graph: SkeletonGraph): string {
+  const { el, ctx } = canvas(env);
+  ctx.drawImage(glyphLayer(env, mask, [212, 212, 212, 255]), 0, 0, SIZE, SIZE);
+  paintGrid(env, ctx, false);
   graph.edges.forEach((edge, index) => {
     const color = strokeColor(index);
     const pts = toRaster(edge.points);
@@ -163,7 +166,7 @@ export function renderSkeletonImage(mask: GlyphMask, graph: SkeletonGraph): stri
     ctx.stroke();
     ctx.restore();
     const mid = pts[Math.floor(pts.length / 2)]!;
-    label(ctx, edge.closed ? `${edge.id} ⟲` : edge.id, mid[0], mid[1], color);
+    label(env, ctx, edge.closed ? `${edge.id} loop` : edge.id, mid[0], mid[1], color);
   });
   for (const node of graph.nodes) {
     const x = node.x * SCALE;
@@ -172,7 +175,7 @@ export function renderSkeletonImage(mask: GlyphMask, graph: SkeletonGraph): stri
     ctx.beginPath();
     ctx.arc(x, y, 7, 0, Math.PI * 2);
     ctx.fill();
-    ctx.font = '700 16px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = `700 16px ${env.labelFamily}`;
     ctx.fillStyle = '#000000';
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 4;
@@ -185,7 +188,7 @@ export function renderSkeletonImage(mask: GlyphMask, graph: SkeletonGraph): stri
     ctx.beginPath();
     ctx.arc(dot.x * SCALE, dot.y * SCALE, dot.r * SCALE + 6, 0, Math.PI * 2);
     ctx.stroke();
-    label(ctx, dot.id, dot.x * SCALE, (dot.y - dot.r) * SCALE - 18, '#7c3aed');
+    label(env, ctx, dot.id, dot.x * SCALE, (dot.y - dot.r) * SCALE - 18, '#7c3aed');
   }
   return el.toDataURL('image/png');
 }
@@ -193,6 +196,7 @@ export function renderSkeletonImage(mask: GlyphMask, graph: SkeletonGraph): stri
 export type DrawnStroke = { points: Pt[]; width: number };
 
 function paintStroke(
+  env: CanvasEnv,
   ctx: CanvasRenderingContext2D,
   stroke: DrawnStroke,
   color: string,
@@ -207,20 +211,21 @@ function paintStroke(
   ctx.scale(SCALE, SCALE);
   ctx.globalAlpha = alpha;
   ctx.fillStyle = color;
-  if (render.path) ctx.fill(new Path2D(render.path));
+  if (render.path) ctx.fill(env.createPath(render.path));
   ctx.restore();
 }
 
 /** Drafted (or saved) strokes over the faint glyph: fills, centrelines, start dots, numbers and arrows. */
 export function renderStrokesImage(
+  env: CanvasEnv,
   mask: GlyphMask,
   strokes: DrawnStroke[],
   options: { uncovered?: { from: Pt; to: Pt; points: Pt[] }[] } = {}
 ): string {
-  const { el, ctx } = canvas();
-  ctx.drawImage(glyphLayer(mask, [200, 200, 200, 255]), 0, 0, SIZE, SIZE);
-  paintGrid(ctx, false);
-  strokes.forEach((stroke, index) => paintStroke(ctx, stroke, strokeColor(index), 0.35));
+  const { el, ctx } = canvas(env);
+  ctx.drawImage(glyphLayer(env, mask, [200, 200, 200, 255]), 0, 0, SIZE, SIZE);
+  paintGrid(env, ctx, false);
+  strokes.forEach((stroke, index) => paintStroke(env, ctx, stroke, strokeColor(index), 0.35));
   for (const gap of options.uncovered ?? []) {
     const pts = toRaster(gap.points);
     ctx.save();
@@ -255,7 +260,7 @@ export function renderStrokesImage(
     ctx.arc(sx, sy, 8, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    label(ctx, String(index + 1), sx + 18, sy - 18, color);
+    label(env, ctx, String(index + 1), sx + 18, sy - 18, color);
   });
   return el.toDataURL('image/png');
 }
@@ -265,6 +270,7 @@ export function renderStrokesImage(
  * colour with its arrow — the writing order at a glance.
  */
 export function renderOrderStrip(
+  env: CanvasEnv,
   mask: GlyphMask,
   strokes: DrawnStroke[],
   box: [number, number, number, number]
@@ -277,7 +283,7 @@ export function renderOrderStrip(
   const panel = 300;
   const perRow = Math.min(4, Math.max(1, strokes.length));
   const rows = Math.ceil(strokes.length / perRow);
-  const { el, ctx } = canvas(panel * perRow, panel * rows);
+  const { el, ctx } = canvas(env, panel * perRow, panel * rows);
   const k = panel / (side * SCALE);
   strokes.forEach((_, index) => {
     const ox = (index % perRow) * panel;
@@ -289,10 +295,10 @@ export function renderOrderStrip(
     ctx.translate(ox, oy);
     ctx.scale(k, k);
     ctx.translate(-(cx - side / 2) * SCALE, -(cy - side / 2) * SCALE);
-    ctx.drawImage(glyphLayer(mask, [226, 226, 226, 255]), 0, 0, SIZE, SIZE);
-    strokes.slice(0, index).forEach((stroke) => paintStroke(ctx, stroke, '#737373', 0.55));
+    ctx.drawImage(glyphLayer(env, mask, [226, 226, 226, 255]), 0, 0, SIZE, SIZE);
+    strokes.slice(0, index).forEach((stroke) => paintStroke(env, ctx, stroke, '#737373', 0.55));
     const color = strokeColor(index);
-    paintStroke(ctx, strokes[index]!, color, 0.85);
+    paintStroke(env, ctx, strokes[index]!, color, 0.85);
     const pts = toRaster(strokes[index]!.points);
     arrowsAlong(ctx, pts, '#111111', 90);
     const [sx, sy] = pts[0]!;
@@ -303,16 +309,14 @@ export function renderOrderStrip(
     ctx.restore();
     ctx.strokeStyle = '#e5e5e5';
     ctx.strokeRect(ox + 0.5, oy + 0.5, panel - 1, panel - 1);
-    label(ctx, `Stroke ${index + 1}`, ox + 46, oy + 18, color);
+    label(env, ctx, `Stroke ${index + 1}`, ox + 46, oy + 18, color);
   });
   return el.toDataURL('image/png');
 }
 
 /** The glyph alone in light grey on a transparent canvas, to sit under stroke previews. */
-export function renderGlyphBackground(mask: GlyphMask): string {
-  const el = document.createElement('canvas');
-  el.width = SIZE;
-  el.height = SIZE;
-  el.getContext('2d')!.drawImage(glyphLayer(mask, [215, 215, 215, 255]), 0, 0, SIZE, SIZE);
+export function renderGlyphBackground(env: CanvasEnv, mask: GlyphMask): string {
+  const el = env.createCanvas(SIZE, SIZE);
+  context2d(el).drawImage(glyphLayer(env, mask, [215, 215, 215, 255]), 0, 0, SIZE, SIZE);
   return el.toDataURL('image/png');
 }

@@ -44,7 +44,7 @@ export type WebSearchOutput = {
 export type AgentUITools = {
   sql_query: { input: SqlQueryInput; output: SqlQueryOutput };
   web_search: { input: WebSearchInput; output: WebSearchOutput };
-  // Gesture Creator, executed in the browser
+  // Gesture Creator, run on the server against the rendered glyph
   inspect_glyph: { input: InspectGlyphInput; output: InspectGlyphOutput };
   trace_strokes: { input: TraceStrokesInput; output: TraceStrokesOutput };
   propose_gesture: { input: ProposeGestureInput; output: ProposeGestureOutput };
@@ -54,7 +54,7 @@ export type AgentMessageMetadata = {
   model?: AgentModelId;
   /**
    * USD actually charged for this reply (every model step plus web searches), as reported by
-   * OpenRouter. Summed across the requests of a reply that waited on browser tools.
+   * OpenRouter.
    */
   cost?: number;
   usage?: {

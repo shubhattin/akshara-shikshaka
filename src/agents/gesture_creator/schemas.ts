@@ -2,9 +2,8 @@ import { z } from 'zod';
 import { AnimationsFunctionsEnumSchema, GestureSchema } from '~/tools/stroke_data/types';
 
 /**
- * Tool contracts of the Gesture Creator. The tools run in the admin's browser (they need the
- * glyph rendered on a canvas): the server only declares them, the chat page executes each call
- * and sends the output back. Shared by both sides, so this file stays free of browser code.
+ * Tool contracts of the Gesture Creator. The tools run on the server; the chat UI renders their
+ * outputs, so this file stays free of runtime code from either side.
  */
 
 export const GESTURE_CREATOR_TOOL_NAMES = [

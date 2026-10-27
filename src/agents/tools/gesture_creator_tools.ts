@@ -1,5 +1,10 @@
 import { tool } from 'ai';
 import { z } from 'zod';
+import { createGestureHarness, findTraceInMessages } from '~/agents/gesture_creator/harness';
+import { serverCanvasEnv } from '~/agents/gesture_creator/server_canvas.server';
+import { getGestureForAgent } from '~/agents/server/gestures';
+import type { AgentUIMessage } from '~/agents/ui_message';
+import { appRuntime } from '~/effect/runtime';
 import {
   inspect_glyph_input_schema,
   propose_gesture_input_schema,
@@ -14,9 +19,8 @@ import {
 } from '~/agents/gesture_creator/schemas';
 
 /**
- * The Gesture Creator tools as the server declares them. None has `execute`: the agent's turn
- * ends at the call, the admin's browser runs it against the rendered glyph and sends the result
- * back. `toModelOutput` turns the stored images into image parts and drops stroke points.
+ * The Gesture Creator tools, run on the server against the glyph rendered like the editor.
+ * `toModelOutput` turns the stored images into image parts and drops stroke points.
  */
 
 type ContentPart =
@@ -62,11 +66,11 @@ function imageParts(
   });
 }
 
-export const inspectGlyphTool = tool<InspectGlyphInput, InspectGlyphOutput>({
+const inspectGlyphTool = tool<InspectGlyphInput, InspectGlyphOutput>({
   description:
     "Render a gesture's glyph exactly as learners see it and return its skeleton graph: nodes (pen ends, junctions), edges (centreline runs with ids), dots, plus images of the glyph on a grid, the labelled skeleton and the saved strokes. Call this first for a mentioned gesture.",
   inputSchema: inspect_glyph_input_schema,
-  // produced by our own browser code; stored as-is
+  // produced by our own harness; stored as-is
   outputSchema: z.custom<InspectGlyphOutput>(),
   toModelOutput: ({ output }) => {
     const { images, images_omitted, ...data } = output;
@@ -77,7 +81,7 @@ export const inspectGlyphTool = tool<InspectGlyphInput, InspectGlyphOutput>({
   }
 });
 
-export const traceStrokesTool = tool<TraceStrokesInput, TraceStrokesOutput>({
+const traceStrokesTool = tool<TraceStrokesInput, TraceStrokesOutput>({
   description:
     'Draw a draft of the gesture: strokes in writing order, each a walk over the skeleton graph (path), freehand waypoints, or a dot. Returns self-checks (coverage of the glyph, ink, retracing, dots, and scores against the saved strokes if any) and images of the draft and its order. Look at the images, fix and call again until it is right.',
   inputSchema: trace_strokes_input_schema,
@@ -99,7 +103,7 @@ export const traceStrokesTool = tool<TraceStrokesInput, TraceStrokesOutput>({
   }
 });
 
-export const proposeGestureTool = tool<ProposeGestureInput, ProposeGestureOutput>({
+const proposeGestureTool = tool<ProposeGestureInput, ProposeGestureOutput>({
   description:
     'Propose a finished trace to the admin with its animation pace and easing. It appears as a card with an Apply button (preview, practice, replace confirmation); nothing is saved until the admin applies it.',
   inputSchema: propose_gesture_input_schema,
@@ -112,8 +116,34 @@ export const proposeGestureTool = tool<ProposeGestureInput, ProposeGestureOutput
   })
 });
 
-export const gestureCreatorTools = {
-  inspect_glyph: inspectGlyphTool,
-  trace_strokes: traceStrokesTool,
-  propose_gesture: proposeGestureTool
-};
+/**
+ * The tools for one request. `history` is the stored conversation: a proposal refers to its trace
+ * by call id, which may come from this request or an earlier one.
+ */
+export function createGestureCreatorTools(history: readonly AgentUIMessage[]) {
+  const traces = new Map<string, TraceStrokesOutput>();
+  const harness = createGestureHarness({
+    env: serverCanvasEnv,
+    loadGesture: (id) => appRuntime.runPromise(getGestureForAgent(id)),
+    findTrace: (traceId) => traces.get(traceId) ?? findTraceInMessages(history, traceId)
+  });
+  const signalOf = (signal: AbortSignal | undefined) => signal ?? new AbortController().signal;
+  return {
+    inspect_glyph: tool<InspectGlyphInput, InspectGlyphOutput>({
+      ...inspectGlyphTool,
+      execute: (input, { abortSignal }) => harness.inspect(input, signalOf(abortSignal))
+    }),
+    trace_strokes: tool<TraceStrokesInput, TraceStrokesOutput>({
+      ...traceStrokesTool,
+      execute: async (input, { toolCallId, abortSignal }) => {
+        const output = await harness.trace(input, signalOf(abortSignal));
+        traces.set(toolCallId, output);
+        return output;
+      }
+    }),
+    propose_gesture: tool<ProposeGestureInput, ProposeGestureOutput>({
+      ...proposeGestureTool,
+      execute: (input, { abortSignal }) => harness.propose(input, signalOf(abortSignal))
+    })
+  };
+}

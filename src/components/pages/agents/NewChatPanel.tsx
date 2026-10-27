@@ -94,8 +94,9 @@ export function NewChatPanel() {
 
           {agentKind === 'gesture_creator' ? (
             <p className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              The Gesture Creator draws in this browser tab: keep the chat open while it works. You
-              can cancel an attempt at any time; nothing is saved until you apply a proposal.
+              The Gesture Creator works on the server: you can leave or reload the page and come
+              back to it. Cancel an attempt at any time; nothing is saved until you apply a
+              proposal.
             </p>
           ) : null}
 

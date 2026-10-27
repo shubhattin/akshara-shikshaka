@@ -30,7 +30,7 @@ const config = defineConfig(({ mode }) => {
         // https://github.com/TanStack/router/issues/8031
         inlineDynamicImports: true,
         // Runtime picks gnu vs musl, so the whole package (including .node files) is traced.
-        traceDeps: ['lipilekhika*']
+        traceDeps: ['lipilekhika*', '@napi-rs/canvas*']
       }),
       viteReact({
         compiler: true

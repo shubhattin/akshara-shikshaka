@@ -2,7 +2,8 @@ import {
   get_lang_from_id,
   get_script_from_id,
   lang_list_obj,
-  script_list_obj
+  script_list_obj,
+  type script_and_lang_list_type
 } from '@/state/lang_list';
 import { createFileRoute } from '@tanstack/react-router';
 import {
@@ -13,7 +14,7 @@ import {
 import LearnPage from './-LearnPage';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { createServerTRPC } from '~/api/server';
-import { createIsomorphicFn } from '@tanstack/react-start';
+import { createIsomorphicFn, createServerOnlyFn } from '@tanstack/react-start';
 import js_cookie from 'js-cookie';
 import { getCookie } from '@tanstack/react-start/server';
 
@@ -44,6 +45,14 @@ export const getLearnSelection$ = createIsomorphicFn()
     return buildLearnSelection((key) => getCookie(key));
   });
 
+/** Server-only so the compiler drops the native-binding import from the client bundle. */
+const transliterateTexts = createServerOnlyFn(
+  async (texts: string[], from: script_and_lang_list_type, to: script_and_lang_list_type) => {
+    const server = await import('~/lib/transliterateTexts.server');
+    return server.transliterateTexts(texts, from, to);
+  }
+);
+
 export const Route = createFileRoute('/(public)/learn/')({
   // oxlint-disable-next-line complexity -- loader orchestrates transliteration and lesson selection; sequential I/O with branches deferred
   loader: async ({ context }) => {
@@ -61,7 +70,6 @@ export const Route = createFileRoute('/(public)/learn/')({
       return { ...selection, ...emptyTransliteration };
     }
 
-    const { transliterateTexts } = await import('~/lib/transliterateTexts.server');
     const trpc = await createServerTRPC(context.queryClient);
     const lessonCategories = await context.queryClient.ensureQueryData(
       trpc.text_lessons.categories.get_categories.queryOptions({

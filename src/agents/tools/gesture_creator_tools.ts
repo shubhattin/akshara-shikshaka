@@ -91,7 +91,12 @@ const traceStrokesTool = tool<TraceStrokesInput, TraceStrokesOutput>({
     const summary = {
       trace_id: toolCallId,
       ...data,
-      strokes: strokes.map(({ points, ...stroke }) => ({ ...stroke, points: points.length }))
+      // numbered from 1, as in the images and the admin's draft editor
+      strokes: strokes.map(({ points, index, ...stroke }) => ({
+        stroke: index + 1,
+        ...stroke,
+        points: points.length
+      }))
     };
     return {
       type: 'content',
@@ -116,17 +121,26 @@ const proposeGestureTool = tool<ProposeGestureInput, ProposeGestureOutput>({
   })
 });
 
-/**
- * The tools for one request. `history` is the stored conversation: a proposal refers to its trace
- * by call id, which may come from this request or an earlier one.
- */
-export function createGestureCreatorTools(history: readonly AgentUIMessage[]) {
-  const traces = new Map<string, TraceStrokesOutput>();
-  const harness = createGestureHarness({
+/** The harness on the server, reading gestures from the database. */
+export const createServerGestureHarness = (
+  findTrace: (traceId: string) => TraceStrokesOutput | undefined
+) =>
+  createGestureHarness({
     env: serverCanvasEnv,
     loadGesture: (id) => appRuntime.runPromise(getGestureForAgent(id)),
-    findTrace: (traceId) => traces.get(traceId) ?? findTraceInMessages(history, traceId)
+    findTrace
   });
+
+/**
+ * The tools for one request. `history` returns the conversation so far: a proposal refers to its
+ * trace by id, which may come from this request, an earlier one, or an admin's draft edit in the
+ * new message.
+ */
+export function createGestureCreatorTools(history: () => readonly AgentUIMessage[]) {
+  const traces = new Map<string, TraceStrokesOutput>();
+  const harness = createServerGestureHarness(
+    (traceId) => traces.get(traceId) ?? findTraceInMessages(history(), traceId)
+  );
   const signalOf = (signal: AbortSignal | undefined) => signal ?? new AbortController().signal;
   return {
     inspect_glyph: tool<InspectGlyphInput, InspectGlyphOutput>({

@@ -1,6 +1,8 @@
 import { getStrokeRender } from '~/tools/stroke_data/stroke_render';
 import { CANVAS_DIMS } from '~/tools/stroke_data/types';
 import { context2d, type CanvasEnv } from './canvas_env';
+import { strokeColor } from './draft_plan';
+import type { DraftMark } from './schemas';
 import type { GlyphMask, SkeletonGraph } from './skeleton';
 
 /**
@@ -13,22 +15,6 @@ type Pt = [number, number];
 
 const SCALE = 2;
 const SIZE = CANVAS_DIMS.width * SCALE;
-
-export const STROKE_COLORS = [
-  '#e5484d',
-  '#0161fd',
-  '#30a46c',
-  '#f76b15',
-  '#8e4ec6',
-  '#12a594',
-  '#d6409f',
-  '#ad7f58',
-  '#3e63dd',
-  '#978365',
-  '#e54666',
-  '#46a758'
-];
-const strokeColor = (index: number) => STROKE_COLORS[index % STROKE_COLORS.length]!;
 
 function canvas(env: CanvasEnv, width = SIZE, height = SIZE) {
   const el = env.createCanvas(width, height);
@@ -220,7 +206,7 @@ export function renderStrokesImage(
   env: CanvasEnv,
   mask: GlyphMask,
   strokes: DrawnStroke[],
-  options: { uncovered?: { from: Pt; to: Pt; points: Pt[] }[] } = {}
+  options: { uncovered?: { from: Pt; to: Pt; points: Pt[] }[]; marks?: DraftMark[] } = {}
 ): string {
   const { el, ctx } = canvas(env);
   ctx.drawImage(glyphLayer(env, mask, [200, 200, 200, 255]), 0, 0, SIZE, SIZE);
@@ -262,7 +248,26 @@ export function renderStrokesImage(
     ctx.stroke();
     label(env, ctx, String(index + 1), sx + 18, sy - 18, color);
   });
+  for (const mark of options.marks ?? []) paintMark(env, ctx, mark);
   return el.toDataURL('image/png');
+}
+
+/** An area the admin marked: a dashed red ring with its letter. */
+function paintMark(env: CanvasEnv, ctx: CanvasRenderingContext2D, mark: DraftMark) {
+  const x = mark.x * SCALE;
+  const y = mark.y * SCALE;
+  const r = mark.r * SCALE;
+  ctx.save();
+  ctx.fillStyle = 'rgba(220,38,38,0.08)';
+  ctx.strokeStyle = '#dc2626';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([12, 8]);
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+  label(env, ctx, mark.id, x + r * 0.72 + 12, y - r * 0.72 - 12, '#dc2626');
 }
 
 /**

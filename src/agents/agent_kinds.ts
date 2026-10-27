@@ -10,13 +10,13 @@ export const AGENT_KIND_META = {
     label: 'General',
     description:
       'Ask about gestures, lessons and practice. Reads the database and the web; never changes anything.',
-    defaultModel: 'gemini-3.7-flash'
+    defaultModel: 'gpt-6-luna'
   },
   gesture_creator: {
     label: 'Gesture Creator',
     description:
       'Traces the strokes of an @-mentioned gesture over its glyph, checks its own work, and proposes it for you to apply.',
-    defaultModel: 'gemini-3.7-flash'
+    defaultModel: 'gpt-6-luna'
   }
 } as const satisfies Record<
   AgentKind,

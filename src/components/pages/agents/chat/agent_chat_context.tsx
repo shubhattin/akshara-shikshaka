@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import type { AgentKind } from '~/agents/agent_kinds';
+import type { DraftEditData } from '~/agents/gesture_creator/schemas';
 
 /** What message parts need to know about the chat they sit in (proposal cards, harness steps). */
 export type AgentChatContextValue = {
@@ -7,6 +8,10 @@ export type AgentChatContextValue = {
   agentKind: AgentKind;
   /** The agent is still replying (streaming here or running on the server). */
   replying: boolean;
+  /** The chat's newest draft (trace call id or edit id): the one the draft editor opens. */
+  latestDraftId: string | null;
+  /** Send the admin's draft edit, with an optional note, as a new message. */
+  sendDraftEdit: (edit: DraftEditData, note: string) => void;
 };
 
 const AgentChatContext = createContext<AgentChatContextValue | null>(null);

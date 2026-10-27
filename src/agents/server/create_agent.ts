@@ -8,6 +8,7 @@ import { sqlQueryTool } from '~/agents/tools/sql_query';
 import { createWebSearchTool } from '~/agents/tools/web_search';
 import { createGestureCreatorTools } from '~/agents/tools/gesture_creator_tools';
 import type { AgentUIMessage, AgentUITools } from '~/agents/ui_message';
+import { withHistoryCacheBreakpoint } from './chat_messages';
 
 /** The tools as the UI message type knows them; the Gesture Creator's only in its chats. */
 export type AgentTools = {
@@ -27,8 +28,8 @@ export const resolveAgentModel = Effect.fn('agents.resolve_model')(function* (
 export const createAgent = Effect.fn('agents.create_agent')(function* (
   modelId: AgentModelId,
   kind: AgentKind,
-  /** The stored conversation (the Gesture Creator's proposals refer back to its traces). */
-  history: readonly AgentUIMessage[] = []
+  /** The conversation so far (the Gesture Creator's proposals refer back to its traces). */
+  history: () => readonly AgentUIMessage[] = () => []
 ) {
   const model = yield* resolveAgentModel(modelId);
   const searchModel = yield* resolveAgentModel(AGENT_UTILITY_MODEL);
@@ -46,6 +47,9 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
     instructions: toSystemMessages(agentInstructionSections(kind)),
     tools,
     stopWhen: stepCountIs(MAX_STEPS),
+    // Move the cache breakpoint onto each step's newest message (the route marks the first step).
+    prepareStep: ({ stepNumber, messages }) =>
+      stepNumber === 0 ? {} : { messages: withHistoryCacheBreakpoint(messages) },
     providerOptions: { openrouter: { reasoning: { effort } } }
   });
   return { agent, tools };

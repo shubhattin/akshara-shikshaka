@@ -39,6 +39,8 @@ export function GestureMentionMenu({
   onCategoryChange,
   results,
   total,
+  hasMore,
+  onLoadMore,
   loading,
   error,
   atLimit,
@@ -59,6 +61,9 @@ export function GestureMentionMenu({
   onCategoryChange: (category: MentionCategoryFilter) => void;
   results: MentionableGesture[];
   total: number;
+  /** More matches than shown; `onLoadMore` adds the next page */
+  hasMore: boolean;
+  onLoadMore: () => void;
   loading: boolean;
   error: boolean;
   atLimit: boolean;
@@ -182,6 +187,11 @@ export function GestureMentionMenu({
               role="listbox"
               aria-label="Gestures"
               className="max-h-72 overflow-y-auto overscroll-contain p-1"
+              onScroll={(event) => {
+                const el = event.currentTarget;
+                // near the bottom: the next page, before the admin reaches the end
+                if (hasMore && el.scrollTop + el.clientHeight >= el.scrollHeight - 64) onLoadMore();
+              }}
             >
               {loading ? (
                 <p className="flex items-center gap-2 px-2.5 py-3 text-sm text-muted-foreground">
@@ -246,6 +256,17 @@ export function GestureMentionMenu({
                   </div>
                 ))
               )}
+              {!loading && !error && hasMore ? (
+                <button
+                  type="button"
+                  // Keep focus (and the caret) in the textarea.
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={onLoadMore}
+                  className="w-full rounded-lg px-2 py-1.5 text-center text-xs text-muted-foreground hover:bg-muted"
+                >
+                  Show more ({total - results.length} left)
+                </button>
+              ) : null}
             </div>
 
             <div className="flex items-center gap-3 border-t border-border/70 bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
@@ -265,9 +286,9 @@ export function GestureMentionMenu({
                   </span>
                 </span>
               )}
-              {!loading && total > results.length ? (
+              {!loading && total > 0 ? (
                 <span className="ml-auto tabular-nums">
-                  {results.length} of {total} — type to narrow
+                  {hasMore ? `${results.length} of ${total} — scroll for more` : `${total} found`}
                 </span>
               ) : null}
             </div>

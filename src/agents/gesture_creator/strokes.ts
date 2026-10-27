@@ -292,6 +292,107 @@ export function walkPath(graph: SkeletonGraph, rawSteps: readonly string[]): Wal
   return { pts, startNode, endNode };
 }
 
+/**
+ * A straight stroke whose glyph end is cut at an angle (serif fonts) gets a centreline that
+ * bends towards the cut's sharp corner over its last stroke-width: a headline comes out tilted
+ * up at one end and down at the other. When the stroke runs straight for two to three
+ * stroke-widths before its end and the end bends off that line by a little, a kink sharper than
+ * the run could make, continue the line instead. Curved strokes are left alone: over that length
+ * a curve is not straight. With `clearance` (distance to the ink's edge), a stroke that really
+ * turns at its end (a small hook) is kept too: the straight line would run off towards the
+ * ink's edge there, while at an angled cut it stays about as central as the bent one.
+ *
+ * `pts` runs towards the free end (its last point). Null when there is nothing to straighten.
+ */
+export function straightenStrokeEnd(
+  pts: readonly Pt[],
+  width: number,
+  clearance?: (p: Pt) => number
+): Pt[] | null {
+  const hook = 0.9 * width;
+  const fromEnd = Array.from({ length: pts.length }, () => 0);
+  for (let i = pts.length - 2; i >= 0; i--) {
+    fromEnd[i] = fromEnd[i + 1]! + dist(pts[i]!, pts[i + 1]!);
+  }
+  // the run stops short of the other end, which may bend the same way
+  const span = Math.min(3 * width, fromEnd[0]! - 2 * hook - 2);
+  if (span < 2 * width) return null;
+  const run = pts.filter((_, i) => fromEnd[i]! >= hook && fromEnd[i]! <= hook + span);
+  const firstEnd = fromEnd.findIndex((d) => d < hook);
+  const endPart = pts.slice(firstEnd);
+  if (run.length < 8 || firstEnd < 1 || endPart.length < 2) return null;
+  // best-fit line through the run (principal axis), pointing towards the end
+  const cx = run.reduce((a, p) => a + p[0], 0) / run.length;
+  const cy = run.reduce((a, p) => a + p[1], 0) / run.length;
+  let sxx = 0,
+    sxy = 0,
+    syy = 0;
+  for (const [x, y] of run) {
+    sxx += (x - cx) ** 2;
+    sxy += (x - cx) * (y - cy);
+    syy += (y - cy) ** 2;
+  }
+  const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  let u: Pt = [Math.cos(angle), Math.sin(angle)];
+  const toward: Pt = [pts.at(-1)![0] - run[0]![0], pts.at(-1)![1] - run[0]![1]];
+  if (u[0] * toward[0] + u[1] * toward[1] < 0) u = [-u[0], -u[1]];
+  const off = (p: Pt) => Math.abs((p[0] - cx) * u[1] - (p[1] - cy) * u[0]);
+  const runOff = Math.max(...run.map(off));
+  if (runOff > Math.max(0.75, 0.05 * width)) return null;
+  const endOff = Math.max(...endPart.map(off));
+  // a small kink, much sharper than any curvature of the run; a bigger turn is a real feature
+  if (endOff <= 1 || endOff > 0.6 * width || endOff < 4 * Math.max(runOff, 0.25)) return null;
+  const project = (p: Pt): number => (p[0] - cx) * u[0] + (p[1] - cy) * u[1];
+  const onLine = (t: number): Pt => [cx + u[0] * t, cy + u[1] * t];
+  const from = project(pts[firstEnd - 1]!);
+  const to = project(pts.at(-1)!);
+  const line: Pt[] = [];
+  for (let t = from + DENSE_STEP; t < to; t += DENSE_STEP) line.push(onLine(t));
+  line.push(onLine(Math.max(to, from)));
+  const straight = [...pts.slice(0, firstEnd), ...line];
+  if (clearance && keepsLessInk(pts, straight, width, clearance)) return null;
+  return straight;
+}
+
+/** Points from `skip` to `upto` units back from the end of a polyline. */
+function nearEnd(pts: readonly Pt[], upto: number, skip: number): Pt[] {
+  const out: Pt[] = [];
+  let d = 0;
+  for (let i = pts.length - 1; i > 0 && d <= upto; i--) {
+    if (d >= skip) out.push(pts[i]!);
+    d += dist(pts[i]!, pts[i - 1]!);
+  }
+  return out;
+}
+
+/**
+ * Does the straightened end run much closer to the ink's edge than the original one? Measured
+ * over the end part, leaving out its last stretch (every end gets thin there). Checked on all
+ * 167 gestures: angled cuts keep ≥ 0.83 of the clearance, real hooks (ए, ऐ) about 0.73.
+ */
+function keepsLessInk(
+  original: readonly Pt[],
+  straight: readonly Pt[],
+  width: number,
+  clearance: (p: Pt) => number
+) {
+  const least = (p: readonly Pt[]) =>
+    Math.min(...nearEnd(p, 0.9 * width, 0.3 * width).map(clearance));
+  return least(straight) < 0.8 * least(original);
+}
+
+const straightenAt = (
+  pts: Pt[],
+  atStart: boolean,
+  width: number,
+  clearance?: (p: Pt) => number
+): Pt[] => {
+  const towardEnd = atStart ? [...pts].reverse() : pts;
+  const fixed = straightenStrokeEnd(towardEnd, width, clearance);
+  if (!fixed) return pts;
+  return atStart ? fixed.reverse() : fixed;
+};
+
 /** Push a free end outward along its tangent while it stays on ink (thinning shortens ends). */
 function extendEnd(pts: Pt[], atStart: boolean, reach: number, onInk: (p: Pt) => boolean): Pt[] {
   if (pts.length < 2 || reach <= 0) return pts;
@@ -323,7 +424,9 @@ export type BuiltStroke = { points: Pt[]; startNode?: string; endNode?: string }
 export function buildStroke(
   spec: StrokeSpec,
   graph: SkeletonGraph,
-  onInk: (p: Pt) => boolean
+  onInk: (p: Pt) => boolean,
+  /** Distance to the ink's edge, canvas units: lets straight ends tell an angled cut from a hook */
+  clearance?: (p: Pt) => number
 ): BuiltStroke {
   const finish = (pts: Pt[]) =>
     resample(pts, SPACING).map(([x, y]) => {
@@ -348,9 +451,12 @@ export function buildStroke(
   let pts = smooth(walk.pts, PATH_SIGMA);
   const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
   const reach = graph.strokeWidth * 0.45;
-  if (walk.startNode && nodes.get(walk.startNode)?.kind === 'end')
-    pts = extendEnd(pts, true, reach, onInk);
-  if (walk.endNode && nodes.get(walk.endNode)?.kind === 'end')
-    pts = extendEnd(pts, false, reach, onInk);
+  const freeStart = !!walk.startNode && nodes.get(walk.startNode)?.kind === 'end';
+  const freeEnd = !!walk.endNode && nodes.get(walk.endNode)?.kind === 'end';
+  // straight strokes end straight even where the glyph's end is cut at an angle
+  if (freeStart) pts = straightenAt(pts, true, graph.strokeWidth, clearance);
+  if (freeEnd) pts = straightenAt(pts, false, graph.strokeWidth, clearance);
+  if (freeStart) pts = extendEnd(pts, true, reach, onInk);
+  if (freeEnd) pts = extendEnd(pts, false, reach, onInk);
   return { points: finish(pts), startNode: walk.startNode, endNode: walk.endNode };
 }

@@ -1,9 +1,10 @@
+import type { AgentUIMessage } from '~/agents/ui_message';
 import { get_script_from_id } from '~/state/lang_list';
 import type { Gesture } from '~/tools/stroke_data/types';
 import { DEFAULTS } from '~/components/pages/gesture_add_edit/gesture_add_edit_state';
 import { evaluateDraft } from './evaluate';
 import type { CanvasEnv } from './canvas_env';
-import { inkLookup, rasterizeGlyph } from './glyph_raster';
+import { inkClearance, inkLookup, rasterizeGlyph } from './glyph_raster';
 import {
   renderGlyphImage,
   renderOrderStrip,
@@ -11,11 +12,14 @@ import {
   renderStrokesImage
 } from './render_images';
 import {
+  type DraftMark,
+  type DraftMarkInfo,
   type HarnessImages,
   type InspectGlyphInput,
   type InspectGlyphOutput,
   type ProposeGestureInput,
   type ProposeGestureOutput,
+  type StrokeSpec,
   type TraceStrokesInput,
   type TraceStrokesOutput,
   type TracedGlyph,
@@ -48,6 +52,7 @@ type Session = {
   mask: GlyphMask;
   graph: SkeletonGraph;
   onInk: (p: Pt) => boolean;
+  clearance: (p: Pt) => number;
 };
 
 export class HarnessCancelledError extends Error {
@@ -56,12 +61,12 @@ export class HarnessCancelledError extends Error {
   }
 }
 
-/** A part of a stored message the harness reads back (the trace a proposal refers to). */
-type ToolPartLike = { type: string; toolCallId?: string; state?: string; output?: unknown };
-
-/** The finished `trace_strokes` output with this call id among stored message parts. */
+/**
+ * The finished trace with this id among stored messages: a `trace_strokes` call, or an admin's
+ * draft edit (traced by the server when it arrived).
+ */
 export function findTraceInMessages(
-  messages: readonly { parts: readonly ToolPartLike[] }[],
+  messages: readonly AgentUIMessage[],
   traceId: string
 ): TraceStrokesOutput | undefined {
   for (const message of messages) {
@@ -71,8 +76,10 @@ export function findTraceInMessages(
         part.toolCallId === traceId &&
         part.state === 'output-available'
       ) {
-        // SAFETY: output of a trace_strokes part this harness produced earlier in the chat.
-        return part.output as TraceStrokesOutput;
+        return part.output;
+      }
+      if (part.type === 'data-draft_edit' && part.data.edit_id === traceId && part.data.trace) {
+        return part.data.trace;
       }
     }
   }
@@ -81,6 +88,29 @@ export function findTraceInMessages(
 
 const glyphKey = (g: TracedGlyph) =>
   `${g.font_family}|${g.font_size}|${g.text_center_offset.join(',')}`;
+
+const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+/** Where an area the admin marked falls on the skeleton and on the edited strokes. */
+function placeMark(mark: DraftMark, graph: SkeletonGraph, strokes: Pt[][]): DraftMarkInfo {
+  const at: Pt = [mark.x, mark.y];
+  const inside = (p: Pt, slack = 0) => dist(p, at) <= mark.r + slack;
+  return {
+    ...mark,
+    strokes: strokes.flatMap((points, index) =>
+      points.some((p) => inside(p, 3)) ? [index + 1] : []
+    ),
+    nodes: graph.nodes.filter((n) => inside([n.x, n.y], 2)).map((n) => n.id),
+    edges: graph.edges.flatMap((edge) => {
+      const share = edge.points.filter((p) => inside(p)).length / edge.points.length;
+      return share > 0 ? [{ id: edge.id, inside: Math.round(share * 100) / 100 }] : [];
+    })
+  };
+}
+
+export type TracedEdit =
+  | { ok: true; trace: TraceStrokesOutput; mark_info: DraftMarkInfo[]; image: string }
+  | { ok: false; error: string };
 
 const glyphOf = (gesture: HarnessGesture): TracedGlyph => ({
   font_family: gesture.font_family,
@@ -105,7 +135,13 @@ export function createGestureHarness(deps: {
     if (!session) {
       session = (async () => {
         const mask = await rasterizeGlyph(gesture, env);
-        return { gesture, mask, graph: buildSkeletonGraph(mask), onInk: inkLookup(mask, 2) };
+        return {
+          gesture,
+          mask,
+          graph: buildSkeletonGraph(mask),
+          onInk: inkLookup(mask, 2),
+          clearance: inkClearance(mask)
+        };
       })();
       session.catch(() => sessions.delete(key));
       sessions.set(key, session);
@@ -163,13 +199,14 @@ export function createGestureHarness(deps: {
     };
   }
 
-  async function trace(input: TraceStrokesInput, signal: AbortSignal): Promise<TraceStrokesOutput> {
-    const { gesture, mask, graph, onInk } = await openSession(input.gesture_id);
+  /** Build and check a plan's strokes; the images are left to the caller. */
+  async function traceCore(input: TraceStrokesInput, signal: AbortSignal) {
+    const { gesture, mask, graph, onInk, clearance } = await openSession(input.gesture_id);
     if (signal.aborted) throw new HarnessCancelledError();
     const onStrictInk = inkLookup(mask, 0.5);
     const built = input.strokes.map((spec, index) => {
       try {
-        return buildStroke(spec, graph, onStrictInk);
+        return buildStroke(spec, graph, onStrictInk, clearance);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Stroke ${index + 1}: ${message}`);
@@ -179,7 +216,7 @@ export function createGestureHarness(deps: {
     const evaluation = evaluateDraft({ graph, strokes, onInk, saved: savedStrokes(gesture) });
     const width = DEFAULTS.GESTURE_BRUSH_WIDTH;
     const drawn = strokes.map((points) => ({ points, width }));
-    return {
+    const output: TraceStrokesOutput = {
       gesture_id: gesture.id,
       glyph: glyphOf(gesture),
       ok: evaluation.ok,
@@ -192,6 +229,8 @@ export function createGestureHarness(deps: {
           end: points.at(-1)!,
           off_ink: evaluation.perStroke[index]!.off_ink
         };
+        const label = input.strokes[index]!.label;
+        if (label) stroke.label = label;
         const reference = evaluation.perStroke[index]!.reference;
         if (reference) {
           stroke.reference = reference;
@@ -203,11 +242,57 @@ export function createGestureHarness(deps: {
       retraced: evaluation.retraced,
       missed_dots: evaluation.missed_dots,
       issues: evaluation.issues,
-      images: {
-        strokes: renderStrokesImage(env, mask, drawn, { uncovered: evaluation.gaps }),
-        order: renderOrderStrip(env, mask, drawn, graph.box)
-      }
+      images: {}
     };
+    return { output, mask, graph, drawn, gaps: evaluation.gaps };
+  }
+
+  async function trace(input: TraceStrokesInput, signal: AbortSignal): Promise<TraceStrokesOutput> {
+    const { output, mask, graph, drawn, gaps } = await traceCore(input, signal);
+    output.images = {
+      strokes: renderStrokesImage(env, mask, drawn, { uncovered: gaps }),
+      order: renderOrderStrip(env, mask, drawn, graph.box)
+    };
+    return output;
+  }
+
+  /**
+   * The admin's edit of a draft: trace the edited plan on the glyph the draft was traced on,
+   * place the marked areas on the skeleton, and draw the strokes with the marks for the model.
+   * A plan that no longer fits comes back as an error for the agent to read.
+   */
+  async function traceEdit(
+    input: {
+      gesture_id: number;
+      base: TraceStrokesOutput;
+      strokes: StrokeSpec[];
+      marks: DraftMark[];
+    },
+    signal: AbortSignal
+  ): Promise<TracedEdit> {
+    const gesture = await deps.loadGesture(input.gesture_id);
+    if (glyphKey(glyphOf(gesture)) !== glyphKey(input.base.glyph)) {
+      return {
+        ok: false,
+        error: 'The glyph font, size or position changed since the draft was traced.'
+      };
+    }
+    try {
+      const { output, mask, graph, drawn, gaps } = await traceCore(
+        { gesture_id: input.gesture_id, strokes: input.strokes },
+        signal
+      );
+      const strokes = output.strokes.map((s) => s.points);
+      return {
+        ok: true,
+        trace: output,
+        mark_info: input.marks.map((mark) => placeMark(mark, graph, strokes)),
+        image: renderStrokesImage(env, mask, drawn, { uncovered: gaps, marks: input.marks })
+      };
+    } catch (error) {
+      if (error instanceof HarnessCancelledError) throw error;
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   async function propose(input: ProposeGestureInput): Promise<ProposeGestureOutput> {
@@ -260,6 +345,7 @@ export function createGestureHarness(deps: {
   return {
     inspect: checked(inspect),
     trace: checked(trace),
+    traceEdit: checked(traceEdit),
     propose: checked((input: ProposeGestureInput) => propose(input))
   };
 }

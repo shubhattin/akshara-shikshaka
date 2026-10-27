@@ -8,6 +8,7 @@ import { useTRPC } from '~/api/client';
 import type { AppRouter } from '~/api/trpc_router';
 import { AGENT_KIND_META, type AgentKind } from '~/agents/agent_kinds';
 import { coerceAgentModelId, type AgentModelId } from '~/agents/models';
+import type { DraftEditData } from '~/agents/gesture_creator/schemas';
 import type { AgentUIMessage } from '~/agents/ui_message';
 import { Button } from '~/components/ui/button';
 import {
@@ -38,6 +39,21 @@ const toUserParts = ({ text, refs }: ComposerMessage): AgentUIMessage['parts'] =
   ...refs.map((data) => ({ type: 'data-gesture_ref' as const, data })),
   { type: 'text', text }
 ];
+
+/** The newest draft of the chat: the last finished trace or admin edit. */
+function latestDraftId(messages: AgentUIMessage[]): string | null {
+  for (let m = messages.length - 1; m >= 0; m--) {
+    const parts = messages[m]!.parts;
+    for (let p = parts.length - 1; p >= 0; p--) {
+      const part = parts[p]!;
+      if (part.type === 'tool-trace_strokes' && part.state === 'output-available') {
+        return part.toolCallId;
+      }
+      if (part.type === 'data-draft_edit') return part.data.edit_id;
+    }
+  }
+  return null;
+}
 
 /**
  * A cheap fingerprint of a conversation: the message ids plus how far the last one has got (part
@@ -311,6 +327,16 @@ export function AgentChat({ data, fetchedAt }: { data: AgentChatData; fetchedAt:
   const queue = useMessageQueue({ idle: !replying, status, send: sendNow });
   const composerRef = useRef<ComposerHandle>(null);
 
+  /** The draft editor's edit: sent straight away (its Send waits for the agent to finish). */
+  const sendDraftEdit = (edit: DraftEditData, note: string) => {
+    if (replying) return;
+    queue.resume();
+    markSent();
+    const parts: AgentUIMessage['parts'] = [{ type: 'data-draft_edit', data: edit }];
+    if (note) parts.push({ type: 'text', text: note });
+    void sendMessage({ parts }, { body: { model } });
+  };
+
   /** Composer / suggestion send: straight out when idle, queued while the agent works. */
   const send = (message: ComposerMessage) => {
     if (replying) return queue.enqueue(message);
@@ -353,9 +379,18 @@ export function AgentChat({ data, fetchedAt }: { data: AgentChatData; fetchedAt:
   }, [busy, fetchedAt, data.chat.streaming, data.messages, ownsReply, messages, setMessages]);
 
   const empty = messages.length === 0 && !busy;
+  const latestDraft = useMemo(() => latestDraftId(messages), [messages]);
 
   return (
-    <AgentChatProvider value={{ chatId: chat.id, agentKind: chat.agent_kind, replying }}>
+    <AgentChatProvider
+      value={{
+        chatId: chat.id,
+        agentKind: chat.agent_kind,
+        replying,
+        latestDraftId: latestDraft,
+        sendDraftEdit
+      }}
+    >
       <div className="flex h-full min-h-0 flex-col">
         <header className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
           <MobileHistoryButton />

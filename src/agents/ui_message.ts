@@ -1,5 +1,7 @@
 import type { UIMessage } from 'ai';
 import type {
+  DraftEditData,
+  DraftImageData,
   InspectGlyphInput,
   InspectGlyphOutput,
   ProposeGestureInput,
@@ -77,6 +79,12 @@ export type GestureRefData = {
   context?: string;
 };
 
-export type AgentDataTypes = { gesture_ref: GestureRefData };
+export type AgentDataTypes = {
+  gesture_ref: GestureRefData;
+  /** The admin's edit of a Gesture Creator draft (see `draft_edit_schema`) */
+  draft_edit: DraftEditData;
+  /** The edited draft with its marked areas, drawn by the server for the model */
+  draft_image: DraftImageData;
+};
 
 export type AgentUIMessage = UIMessage<AgentMessageMetadata, AgentDataTypes, AgentUITools>;

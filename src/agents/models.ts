@@ -8,7 +8,8 @@ export const AGENT_MODEL_IDS = [
   'gpt-6-luna',
   'gpt-6.1-sol',
   'claude-sonnet-5.5',
-  'claude-opus-5.5'
+  'claude-opus-5.5',
+  'deepseek-v4.1-flash'
 ] as const;
 
 export type AgentModelId = (typeof AGENT_MODEL_IDS)[number];
@@ -33,6 +34,11 @@ export const AGENT_MODELS = {
     label: 'Claude Opus 5.5',
     hint: 'Best quality — heavier analysis',
     providerModelId: 'anthropic/claude-opus-5.5'
+  },
+  'deepseek-v4.1-flash': {
+    label: 'DeepSeek V4.1 Flash',
+    hint: 'Fast and cheap — gesture tracing default',
+    providerModelId: 'deepseek/deepseek-v4.1-flash'
   }
 } as const satisfies Record<AgentModelId, { label: string; hint: string; providerModelId: string }>;
 

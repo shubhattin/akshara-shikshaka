@@ -16,7 +16,8 @@ import {
   findAgentChat,
   listAgentChats,
   loadAgentMessages,
-  renameAgentChat
+  renameAgentChat,
+  requestChatStop
 } from '~/agents/server/chat_store';
 
 const chat_id_schema = z.string().min(1).max(64);
@@ -46,6 +47,11 @@ const create_chat_route = protectedAdminProcedure
 const rename_chat_route = protectedAdminProcedure
   .input(z.object({ id: chat_id_schema, title: z.string().trim().min(1).max(120) }))
   .mutation(({ input, ctx }) => runTrpcEffect(renameAgentChat({ ...input, user_id: ctx.user.id })));
+
+/** Stop the chat's reply for real: it otherwise keeps generating server-side once the tab lets go. */
+const stop_reply_route = protectedAdminProcedure
+  .input(z.object({ id: chat_id_schema }))
+  .mutation(({ input, ctx }) => runTrpcEffect(requestChatStop(input.id, ctx.user.id)));
 
 const delete_chat_route = protectedAdminProcedure
   .input(z.object({ id: chat_id_schema }))
@@ -92,6 +98,7 @@ export const agents_router = t.router({
   create_chat: create_chat_route,
   rename_chat: rename_chat_route,
   delete_chat: delete_chat_route,
+  stop_reply: stop_reply_route,
   get_context: get_context_route,
   list_mentionable_gestures: list_mentionable_gestures_route,
   get_gesture: get_gesture_route,

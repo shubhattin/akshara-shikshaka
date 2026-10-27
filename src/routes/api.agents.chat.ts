@@ -7,7 +7,9 @@ import { agent_model_id_schema } from '~/agents/models';
 import { createAgent } from '~/agents/server/create_agent';
 import {
   findAgentChat,
+  isChatStopRequested,
   loadAgentMessages,
+  requestChatStop,
   saveAgentMessages,
   setChatStreaming
 } from '~/agents/server/chat_store';
@@ -48,7 +50,10 @@ const firstText = (message: AgentUIMessage) =>
     .join(' ')
     .trim();
 
-/** The turn that ended on a browser tool call is saved as its stream closes: wait for it. */
+/**
+ * Wait until the chat's in-flight turn is saved: the step that ended on a browser tool call, or
+ * a stopped reply still landing. Otherwise its late save would drop the turn that follows.
+ */
 const waitForSavedTurn = Effect.fn('agents.wait_for_saved_turn')(function* (
   chatId: string,
   userId: string
@@ -59,9 +64,44 @@ const waitForSavedTurn = Effect.fn('agents.wait_for_saved_turn')(function* (
     yield* Effect.sleep('250 millis');
   }
   return yield* Effect.fail(
-    BadRequestError.make({ message: 'The previous step is still being saved' })
+    BadRequestError.make({
+      message: 'The previous reply is still being saved, try again in a moment'
+    })
   );
 });
+
+/** The chat once any in-flight turn is saved; a new message stops that turn first. */
+const chatForTurn = Effect.fn('agents.chat_for_turn')(function* (
+  chatId: string,
+  userId: string,
+  isToolResult: boolean
+) {
+  const chat = yield* findAgentChat(chatId, userId);
+  if (!chat.streaming) return chat;
+  // Send now, or Stop then send: the new message replaces whatever is still replying.
+  if (!isToolResult) yield* requestChatStop(chatId, userId);
+  return yield* waitForSavedTurn(chatId, userId);
+});
+
+const STOP_POLL_MS = 1_000;
+
+/**
+ * Aborts the reply when an explicit Stop is recorded for the chat. The request may be served by
+ * another instance than the Stop, so this polls the database rather than listening in memory.
+ */
+function watchForStop(chatId: string, controller: AbortController) {
+  const timer = setInterval(() => {
+    void appRuntime
+      .runPromise(isChatStopRequested(chatId))
+      .then((stop) => {
+        if (stop) controller.abort();
+      })
+      .catch(() => undefined);
+  }, STOP_POLL_MS);
+  const clear = () => clearInterval(timer);
+  controller.signal.addEventListener('abort', clear, { once: true });
+  return clear;
+}
 
 async function handleChat(request: Request): Promise<Response> {
   if (!isSameOriginRequest(request)) {
@@ -80,9 +120,7 @@ async function handleChat(request: Request): Promise<Response> {
   return runRouteEffect(
     Effect.gen(function* () {
       const isToolResult = incomingRaw.role === 'assistant';
-      const chat = isToolResult
-        ? yield* waitForSavedTurn(id, user.id)
-        : yield* findAgentChat(id, user.id);
+      const chat = yield* chatForTurn(id, user.id, isToolResult);
       if (isToolResult && chat.agent_kind !== 'gesture_creator') {
         return yield* Effect.fail(
           BadRequestError.make({ message: 'This chat has no browser tools' })
@@ -164,6 +202,12 @@ async function handleChat(request: Request): Promise<Response> {
       const meter = createReplyMeter(model, isToolResult ? messages.at(-1)?.metadata : undefined);
 
       yield* setChatStreaming(id, true);
+      const stop = new AbortController();
+      // The Gesture Creator needs the open page to run its tools: stop when the page goes.
+      if (chat.agent_kind === 'gesture_creator') {
+        request.signal.addEventListener('abort', () => stop.abort(), { once: true });
+      }
+      const stopWatching = watchForStop(id, stop);
       const result = yield* Effect.promise(async () =>
         agent.stream({
           prompt: withHistoryCacheBreakpoint(
@@ -172,10 +216,14 @@ async function handleChat(request: Request): Promise<Response> {
               convertDataPart: gestureRefToModelText
             })
           ),
-          // The Gesture Creator needs the open page to run its tools: stop when the page goes.
-          abortSignal: chat.agent_kind === 'gesture_creator' ? request.signal : undefined
+          abortSignal: stop.signal
         })
-      ).pipe(Effect.onError(() => Effect.ignore(setChatStreaming(id, false))));
+      ).pipe(
+        Effect.onError(() => {
+          stopWatching();
+          return Effect.ignore(setChatStreaming(id, false));
+        })
+      );
 
       return result.toUIMessageStreamResponse<AgentUIMessage>({
         originalMessages: messages,
@@ -192,10 +240,12 @@ async function handleChat(request: Request): Promise<Response> {
               saveAgentMessages({ chatId: id, messages: finished, model, title })
             );
           } finally {
+            stopWatching();
             await appRuntime.runPromise(setChatStreaming(id, false));
           }
         },
         onError: (error) => {
+          stopWatching();
           void appRuntime.runPromise(setChatStreaming(id, false));
           return error instanceof Error ? error.message : 'The agent failed to reply.';
         }

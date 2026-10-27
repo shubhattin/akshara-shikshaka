@@ -1,6 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Ref
+} from 'react';
 import { useChat } from '@ai-sdk/react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useBlocker } from '@tanstack/react-router';
 import type { inferRouterOutputs } from '@trpc/server';
 import {
@@ -50,9 +58,11 @@ import { hasPendingMessage, takePendingMessage } from '../pending_message';
 import { MobileHistoryButton } from '../sidebar/AgentsSidebar';
 import { AgentChatProvider } from './agent_chat_context';
 import { AssistantMessage, ThinkingLine, UserMessage } from './AgentMessage';
-import { ChatComposer, type ComposerMessage } from './ChatComposer';
+import { ChatComposer, type ComposerHandle, type ComposerMessage } from './ChatComposer';
 import { ChatCost } from './ChatCost';
 import { ModelPicker } from './ModelPicker';
+import { QueuedMessages } from './QueuedMessages';
+import { useMessageQueue } from './use_message_queue';
 
 export type AgentChatData = inferRouterOutputs<AppRouter>['agents']['get_chat'];
 
@@ -346,6 +356,7 @@ function RunBanner({
 }
 
 function ComposerBar({
+  composerRef,
   busy,
   runActive,
   isCreator,
@@ -355,6 +366,7 @@ function ComposerBar({
   onStop,
   onModelChange
 }: {
+  composerRef: Ref<ComposerHandle>;
   busy: boolean;
   runActive: boolean;
   isCreator: boolean;
@@ -367,6 +379,8 @@ function ComposerBar({
   const composerBusy = busy || runActive;
   return (
     <ChatComposer
+      ref={composerRef}
+      canQueue
       busy={composerBusy}
       onStop={() => void (isCreator ? onCancelRun() : onStop())}
       stopLabel={isCreator ? 'Cancel attempt' : 'Stop'}
@@ -500,7 +514,7 @@ export function AgentChat({ data }: { data: AgentChatData }) {
     }
   }, [chat.id, model, sendMessage, resetTurnRefs]);
 
-  const send = (message: ComposerMessage) => {
+  const sendNow = (message: ComposerMessage) => {
     beginTurn();
     void sendMessage({ parts: toUserParts(message) }, { body: { model } });
   };
@@ -513,11 +527,44 @@ export function AgentChat({ data }: { data: AgentChatData }) {
     await stop();
     // SAFETY: as in onToolCall — the tool names come from the parts themselves.
     const submit = addToolOutput as (args: GestureToolSubmit) => Promise<void>;
-    for (const payload of pendingCancelPayloads(messagesRef.current.at(-1))) {
-      void submit(payload);
-    }
+    // awaited so a message sent right after (Send now) follows the cancelled calls
+    await Promise.all(pendingCancelPayloads(messagesRef.current.at(-1)).map(submit));
     setLiveRun(false);
   }, [stop, addToolOutput]);
+
+  const idle = !busy && !runActive;
+  const queue = useMessageQueue({ idle, status, send: sendNow });
+  const composerRef = useRef<ComposerHandle>(null);
+
+  /** Composer / suggestion send: straight out when idle, queued while the agent works. */
+  const send = (message: ComposerMessage) => {
+    if (!idle) return queue.enqueue(message);
+    queue.resume();
+    sendNow(message);
+  };
+
+  const stopOnServer = useMutation(trpc.agents.stop_reply.mutationOptions());
+
+  /** Stop button / Send now: the reply would otherwise keep generating (and saving) server-side. */
+  const stopReply = async () => {
+    queue.pause();
+    stopOnServer.mutate({ id: chat.id });
+    await (isCreator ? cancelRun() : stop());
+  };
+
+  /** Interrupt the current reply and send a queued message in its place. */
+  const sendQueuedNow = async (id: string) => {
+    const message = queue.take(id);
+    if (!message) return;
+    if (!idle) await stopReply();
+    queue.resume();
+    sendNow(message);
+  };
+
+  const editQueued = (id: string) => {
+    const message = queue.take(id);
+    if (message) composerRef.current?.restore(message);
+  };
 
   // A reply generated elsewhere (background stream, another tab) lands in the DB while this
   // view is idle: adopt it so refresh / back-navigation shows the finished turn.
@@ -588,6 +635,7 @@ export function AgentChat({ data }: { data: AgentChatData }) {
             agentKind={chat.agent_kind}
             onSend={send}
             onRetry={() => {
+              queue.resume();
               beginTurn();
               void regenerate({ body: { model } });
             }}
@@ -598,16 +646,24 @@ export function AgentChat({ data }: { data: AgentChatData }) {
           <RunBanner
             runActive={runActive}
             runningTools={runningTools}
-            onCancel={() => void cancelRun()}
+            onCancel={() => void stopReply()}
+          />
+          <QueuedMessages
+            queue={queue.queue}
+            paused={queue.paused && idle}
+            onEdit={editQueued}
+            onSendNow={(id) => void sendQueuedNow(id)}
+            onRemove={queue.remove}
           />
           <ComposerBar
+            composerRef={composerRef}
             busy={busy}
             runActive={runActive}
             isCreator={isCreator}
             model={model}
             onSend={send}
-            onCancelRun={() => void cancelRun()}
-            onStop={() => void stop()}
+            onCancelRun={() => void stopReply()}
+            onStop={() => void stopReply()}
             onModelChange={setModel}
           />
         </div>

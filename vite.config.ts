@@ -20,6 +20,11 @@ const config = defineConfig(({ mode }) => {
     resolve: {
       tsconfigPaths: true
     },
+    // Native (.node) server-only package: the dep scanner reaches it through server route
+    // imports, but it must never be pre-bundled for the browser.
+    optimizeDeps: {
+      exclude: ['@napi-rs/canvas']
+    },
     plugins: [
       devtools(),
       tailwindcss(),

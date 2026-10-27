@@ -27,8 +27,8 @@ export const resolveAgentModel = Effect.fn('agents.resolve_model')(function* (
 export const createAgent = Effect.fn('agents.create_agent')(function* (
   modelId: AgentModelId,
   kind: AgentKind,
-  /** The stored conversation (the Gesture Creator's proposals refer back to its traces). */
-  history: readonly AgentUIMessage[] = []
+  /** The conversation so far (the Gesture Creator's proposals refer back to its traces). */
+  history: () => readonly AgentUIMessage[] = () => []
 ) {
   const model = yield* resolveAgentModel(modelId);
   const searchModel = yield* resolveAgentModel(AGENT_UTILITY_MODEL);

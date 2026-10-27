@@ -7,7 +7,8 @@ import {
 } from 'ai';
 import { Effect } from 'effect';
 import { z } from 'zod';
-import { gestureRefToModelText, AGENT_DATA_SCHEMAS } from '~/agents/gesture_refs';
+import { dataPartToModel, AGENT_DATA_SCHEMAS } from '~/agents/gesture_refs';
+import { findTraceInMessages } from '~/agents/gesture_creator/harness';
 import { agent_model_id_schema } from '~/agents/models';
 import { createAgent } from '~/agents/server/create_agent';
 import {
@@ -25,7 +26,9 @@ import {
   withHistoryCacheBreakpoint,
   withResolvedRefs
 } from '~/agents/server/chat_messages';
+import { resolveDraftEdit, withoutDraftParts } from '~/agents/server/draft_edits';
 import { resolveGestureRefs } from '~/agents/server/gesture_refs';
+import { createServerGestureHarness } from '~/agents/tools/gesture_creator_tools';
 import { generateChatTitle } from '~/agents/server/chat_title';
 import { createReplyMeter } from '~/agents/server/cost';
 import { trackReplyProgress } from '~/agents/server/reply_progress';
@@ -119,7 +122,9 @@ async function handleChat(request: Request): Promise<Response> {
     Effect.gen(function* () {
       const chat = yield* chatForTurn(id, user.id);
       const previous = yield* loadAgentMessages(id);
-      const { agent, tools } = yield* createAgent(model, chat.agent_kind, previous);
+      // What the tools look traces up in: the stored history, then the new message too.
+      let known: readonly AgentUIMessage[] = previous;
+      const { agent, tools } = yield* createAgent(model, chat.agent_kind, () => known);
 
       const validatedIncoming = yield* Effect.tryPromise({
         try: () =>
@@ -146,13 +151,27 @@ async function handleChat(request: Request): Promise<Response> {
         catch: () => BadRequestError.make({ message: 'Invalid message' })
       });
       // Fill a new message's @ mentions from the database, never from the client.
-      const messages = [
-        ...validated.slice(0, -1),
-        withResolvedRefs(
-          validated.at(-1)!,
-          yield* resolveGestureRefs(newMessageRefs(validated.at(-1)!))
-        )
-      ];
+      const withRefs = withResolvedRefs(
+        validated.at(-1)!,
+        yield* resolveGestureRefs(newMessageRefs(validated.at(-1)!))
+      );
+      const earlier = validated.slice(0, -1);
+      // An admin's draft edit is traced here; the client's copy of the result is never used.
+      const incoming =
+        chat.agent_kind === 'gesture_creator'
+          ? yield* Effect.tryPromise({
+              try: (signal) =>
+                resolveDraftEdit(
+                  withRefs,
+                  earlier,
+                  createServerGestureHarness((traceId) => findTraceInMessages(earlier, traceId)),
+                  signal
+                ),
+              catch: () => BadRequestError.make({ message: 'Could not trace the edited draft' })
+            })
+          : withoutDraftParts(withRefs);
+      const messages = [...earlier, incoming];
+      known = messages;
 
       // Title the chat in parallel with the first reply.
       const titlePromise =
@@ -171,7 +190,7 @@ async function handleChat(request: Request): Promise<Response> {
           prompt: withHistoryCacheBreakpoint(
             await convertToModelMessages<AgentUIMessage>(pruneHarnessImages(messages), {
               tools,
-              convertDataPart: gestureRefToModelText
+              convertDataPart: dataPartToModel
             })
           ),
           abortSignal: stop.signal

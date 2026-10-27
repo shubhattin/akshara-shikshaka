@@ -6,6 +6,9 @@ import type { AgentUIMessage } from '~/agents/ui_message';
 import { Bubble, BubbleContent } from '~/components/ui/bubble';
 import { Message, MessageContent } from '~/components/ui/message';
 import { Trace, TraceIcon, TraceLine, TraceTitle } from '~/components/ui/trace';
+import { DraftEditor } from '../gesture/DraftEditor';
+import { draftFromTrace } from '../gesture/draft_state';
+import { SentDraftEdit } from '../gesture/SentDraftEdit';
 import { GestureProposalCard } from '../gesture/GestureProposalCard';
 import { GestureRefChips } from '../mentions/GestureRefChips';
 import { InspectGlyphStep, TraceStrokesStep } from '../tools/GlyphToolSteps';
@@ -14,7 +17,8 @@ import { SqlQueryStep } from '../tools/SqlQueryStep';
 import { WebSearchStep } from '../tools/WebSearchStep';
 import { AgentMarkdown } from './AgentMarkdown';
 import { ReplyCost } from './ChatCost';
-import { groupParts, messageText, type StepPart } from './message_parts';
+import { useAgentChatContext } from './agent_chat_context';
+import { groupParts, messageText, type AgentPart, type StepPart } from './message_parts';
 
 function StepRow({ part, streaming }: { part: StepPart; streaming: boolean }) {
   switch (part.type) {
@@ -58,17 +62,45 @@ function MentionText({ text, tokens }: { text: string; tokens: string[] }) {
   );
 }
 
+/** The latest trace in a run of steps, if it is the chat's newest draft. */
+function latestTraceIn(parts: StepPart[], latestDraftId: string | null) {
+  if (!latestDraftId) return null;
+  for (const part of parts) {
+    if (
+      part.type === 'tool-trace_strokes' &&
+      part.state === 'output-available' &&
+      part.toolCallId === latestDraftId
+    ) {
+      return draftFromTrace(part.toolCallId, part.input, part.output);
+    }
+  }
+  return null;
+}
+
+type DraftEditPart = Extract<AgentPart, { type: 'data-draft_edit' }>;
+
+/** The admin's draft edit in their message, as sent (editable again while it is the newest draft). */
+function UserDraftEdit({ part }: { part: DraftEditPart }) {
+  const { latestDraftId } = useAgentChatContext();
+  return <SentDraftEdit edit={part.data} latest={part.data.edit_id === latestDraftId} />;
+}
+
 export function UserMessage({ message }: { message: AgentUIMessage }) {
   const refs = messageGestureRefs(message);
+  const text = messageText(message);
+  const edit = message.parts.find((part): part is DraftEditPart => part.type === 'data-draft_edit');
   return (
     <Message align="end">
-      <MessageContent className="items-end gap-1.5">
+      <MessageContent className="w-full items-end gap-1.5">
         <GestureRefChips refs={refs} className="justify-end" />
-        <Bubble align="end" variant="muted">
-          <BubbleContent className="whitespace-pre-wrap">
-            <MentionText text={messageText(message)} tokens={refs.map(mentionToken)} />
-          </BubbleContent>
-        </Bubble>
+        {edit ? <UserDraftEdit part={edit} /> : null}
+        {text.trim() ? (
+          <Bubble align="end" variant="muted">
+            <BubbleContent className="whitespace-pre-wrap">
+              <MentionText text={text} tokens={refs.map(mentionToken)} />
+            </BubbleContent>
+          </Bubble>
+        ) : null}
       </MessageContent>
     </Message>
   );
@@ -82,6 +114,7 @@ export function AssistantMessage({
   message: AgentUIMessage;
   streaming: boolean;
 }) {
+  const { agentKind, latestDraftId } = useAgentChatContext();
   const groups = groupParts(message.parts);
   // Between steps (a tool finished, the next step has not streamed yet) show that work continues.
   const lastPart = message.parts.filter((part) => part.type !== 'step-start').at(-1);
@@ -98,14 +131,20 @@ export function AssistantMessage({
         {groups.map((group, index) => {
           const isLast = index === groups.length - 1;
           switch (group.kind) {
-            case 'steps':
+            case 'steps': {
+              const draft =
+                agentKind === 'gesture_creator' ? latestTraceIn(group.parts, latestDraftId) : null;
               return (
-                <Trace key={group.key}>
-                  {group.parts.map((part, partIndex) => (
-                    <StepRow key={partIndex} part={part} streaming={streaming} />
-                  ))}
-                </Trace>
+                <Fragment key={group.key}>
+                  <Trace>
+                    {group.parts.map((part, partIndex) => (
+                      <StepRow key={partIndex} part={part} streaming={streaming} />
+                    ))}
+                  </Trace>
+                  {draft ? <DraftEditor key={draft.id} source={draft} title="Draft" /> : null}
+                </Fragment>
               );
+            }
             case 'text':
               return (
                 <AgentMarkdown key={group.key} streaming={streaming && isLast}>

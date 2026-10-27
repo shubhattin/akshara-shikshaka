@@ -43,7 +43,8 @@ import {
   MdFiberManualRecord,
   MdDragHandle,
   MdReplay,
-  MdEdit
+  MdEdit,
+  MdSwapHoriz
 } from 'react-icons/md';
 import { toast } from 'sonner';
 import { cn } from '~/lib/utils';
@@ -982,6 +983,23 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
     }
   };
 
+  /** Same stroke, drawn from its other end (capture timings still count from its new start). */
+  const reverseGesture = (gestureIndex: number) => {
+    clearGestureVisualization();
+    setGestureData((prev: Gesture[]) =>
+      prev.map((g) => {
+        if (g.index !== gestureIndex) return g;
+        const reversed: Gesture = { ...g, points: [...g.points].reverse() };
+        if (g.timings) {
+          const end = g.timings.at(-1) ?? 0;
+          reversed.timings = [...g.timings].reverse().map((t) => end - t);
+        }
+        if (g.pressures) reversed.pressures = [...g.pressures].reverse();
+        return reversed;
+      })
+    );
+  };
+
   const onSelect = (gestureIndex: number | null) => {
     clearGestureVisualization();
     setSelectedGestureIndex(gestureIndex);
@@ -1022,6 +1040,20 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
         <MdDragHandle className="h-4 w-4 text-muted-foreground" />
       </div>
       <span className="text-sm">Gesture {gesture.index + 1}</span>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 w-6 p-0"
+        title="Reverse the direction of this stroke"
+        aria-label={`Reverse gesture ${gesture.index + 1}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          reverseGesture(gesture.index);
+        }}
+        disabled={disabled || gesture.points.length < 2}
+      >
+        <MdSwapHoriz className="h-3 w-3" />
+      </Button>
       <Button
         size="sm"
         variant="ghost"

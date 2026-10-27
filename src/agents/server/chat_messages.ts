@@ -41,7 +41,8 @@ export function closeDanglingToolCalls(messages: AgentUIMessage[]): AgentUIMessa
 
 /**
  * Harness images are large: keep them only for the latest inspect_glyph per gesture and the two
- * latest traces. The stored conversation keeps every image; only the model's copy is trimmed.
+ * latest traces (the agent's or the admin's draft edits). The stored conversation keeps every
+ * image; only the model's copy is trimmed.
  */
 export function pruneHarnessImages(messages: AgentUIMessage[]): AgentUIMessage[] {
   const keep = new Set<string>();
@@ -59,6 +60,9 @@ export function pruneHarnessImages(messages: AgentUIMessage[]): AgentUIMessage[]
       } else if (part.type === 'tool-trace_strokes' && part.state === 'output-available') {
         if (traces < 2) keep.add(part.toolCallId);
         traces++;
+      } else if (part.type === 'data-draft_image') {
+        if (traces < 2) keep.add(part.data.edit_id);
+        traces++;
       }
     }
   }
@@ -72,6 +76,9 @@ export function pruneHarnessImages(messages: AgentUIMessage[]): AgentUIMessage[]
       ) {
         // SAFETY: same output with the images swapped for a marker.
         return { ...part, output: { ...part.output, images: {}, images_omitted: true } } as Part;
+      }
+      if (part.type === 'data-draft_image' && !keep.has(part.data.edit_id)) {
+        return { ...part, data: { ...part.data, url: '' } };
       }
       return part;
     })

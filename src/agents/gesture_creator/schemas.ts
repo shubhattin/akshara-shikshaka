@@ -20,6 +20,14 @@ export const isGestureCreatorToolName = (name: string): name is GestureCreatorTo
 
 const point_schema = z.tuple([z.number(), z.number()]);
 
+const stroke_label_schema = z
+  .string()
+  .max(40)
+  .optional()
+  .describe(
+    'The part of the akṣara this stroke draws, 1–3 plain words shown to the admin, e.g. "Vertical bar", "Loop", "Headline". No direction, no ids.'
+  );
+
 // ---------------------------------------------------------------- inspect_glyph
 
 export const inspect_glyph_input_schema = z.object({
@@ -86,7 +94,8 @@ export const stroke_spec_schema = z.union([
         .min(1)
         .describe(
           'Node, edge, node, edge, … e.g. ["N2","E2","N4","E1","N6"]. Loop edges take a direction: "E4:cw" / "E4:ccw" (as seen on screen). Lift the pen mid-edge with "E2|to=240,120" (stop near that point) or start mid-edge with "E2|from=240,120".'
-        )
+        ),
+      label: stroke_label_schema
     })
     .strict(),
   z
@@ -96,10 +105,16 @@ export const stroke_spec_schema = z.union([
         .min(2)
         .describe(
           'Freehand: canvas points along the centre of the glyph stroke, in drawing order, ~10–25 px apart; a smooth curve is fitted through them.'
-        )
+        ),
+      label: stroke_label_schema
     })
     .strict(),
-  z.object({ dot: point_schema.describe('A dot (bindu, nukta…): its centre') }).strict()
+  z
+    .object({
+      dot: point_schema.describe('A dot (bindu, nukta…): its centre'),
+      label: stroke_label_schema
+    })
+    .strict()
 ]);
 export type StrokeSpec = z.infer<typeof stroke_spec_schema>;
 
@@ -119,6 +134,8 @@ export type ReferenceCheck = {
 
 export type TracedStroke = {
   index: number;
+  /** The plan's name for the part this stroke draws */
+  label?: string;
   points: [number, number][];
   length: number;
   start: [number, number];
@@ -198,3 +215,71 @@ export type ProposedGesture = z.infer<typeof proposed_gesture_schema>;
 export type ProposeGestureOutput =
   | { ok: true; proposal: ProposedGesture }
   | { ok: false; error: string };
+
+// ---------------------------------------------------------------- admin draft edits
+
+/**
+ * The admin's edit of a draft in the draft editor: the strokes reordered, reversed, split,
+ * joined or deleted, plus areas marked on the glyph with notes. Sent as a `data-draft_edit` part
+ * of a user message; the server traces the edited plan when the message arrives (`trace`,
+ * `context`), so the agent can propose it like one of its own traces.
+ */
+
+export const MAX_DRAFT_MARKS = 6;
+
+export const draft_mark_schema = z.object({
+  /** "A", "B", … as drawn on the glyph */
+  id: z.string().min(1).max(2),
+  x: z.number().min(0).max(400),
+  y: z.number().min(0).max(400),
+  r: z.number().min(4).max(200),
+  note: z.string().max(300)
+});
+export type DraftMark = z.infer<typeof draft_mark_schema>;
+
+/** How an edited stroke came about, for the summary the agent reads. */
+export const draft_stroke_origin_schema = z.object({
+  /** 1-based numbers of the strokes of the base draft it is made of (two when joined) */
+  from: z.array(z.int().positive()).min(1).max(12),
+  reversed: z.boolean(),
+  /** One half of a stroke the admin split: 1 = first, 2 = second */
+  split_part: z.union([z.literal(1), z.literal(2)]).optional()
+});
+export type DraftStrokeOrigin = z.infer<typeof draft_stroke_origin_schema>;
+
+export type DraftMarkInfo = DraftMark & {
+  /** 1-based strokes of the edited plan passing through the area */
+  strokes: number[];
+  nodes: string[];
+  /** Skeleton edges inside the area and the share of each that lies inside */
+  edges: { id: string; inside: number }[];
+};
+
+export const draft_edit_schema = z.object({
+  /** Id of this edit; its trace is proposed with `propose_gesture({ trace_id: edit_id })` */
+  edit_id: z.string().min(1).max(64),
+  gesture_id: z.int().positive(),
+  /** The draft edited: a trace_strokes call id, or an earlier edit's id */
+  base_id: z.string().min(1).max(200),
+  strokes: z.array(stroke_spec_schema).min(1).max(12),
+  origins: z.array(draft_stroke_origin_schema).min(1).max(12),
+  /** 1-based strokes of the base draft the admin deleted */
+  deleted: z.array(z.int().positive()).max(12),
+  marks: z.array(draft_mark_schema).max(MAX_DRAFT_MARKS),
+  /** Points of the edited strokes as the admin saw them (display only, never proposed) */
+  preview: z.array(z.array(point_schema)).max(12),
+  // Filled by the server when the message arrives; anything the client sends here is replaced.
+  trace: z.custom<TraceStrokesOutput>().optional(),
+  mark_info: z.custom<DraftMarkInfo[]>().optional(),
+  error: z.string().optional(),
+  context: z.string().optional()
+});
+export type DraftEditData = z.infer<typeof draft_edit_schema>;
+
+/** The draft with the admin's marks drawn on it, for the model (filled by the server). */
+export const draft_image_schema = z.object({
+  edit_id: z.string().min(1).max(64),
+  /** PNG data URL; emptied in older messages to save context */
+  url: z.string()
+});
+export type DraftImageData = z.infer<typeof draft_image_schema>;

@@ -7,6 +7,7 @@ import { z } from 'zod';
 export const AGENT_MODEL_IDS = [
   'gpt-6-luna',
   'gpt-6.1-sol',
+  'gemini-3.7-flash',
   'claude-sonnet-5.5',
   'claude-opus-5.5'
 ] as const;
@@ -23,6 +24,11 @@ export const AGENT_MODELS = {
     label: 'GPT-6.1 Sol',
     hint: 'Stronger reasoning — harder questions',
     providerModelId: 'openai/gpt-6.1-sol'
+  },
+  'gemini-3.7-flash': {
+    label: 'Gemini 3.7 Flash',
+    hint: 'Fast with a huge context — long inputs and multi-step work',
+    providerModelId: 'google/gemini-3.7-flash'
   },
   'claude-sonnet-5.5': {
     label: 'Claude Sonnet 5.5',

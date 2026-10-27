@@ -5,6 +5,7 @@ import { z } from 'zod';
  * the actual cost charged (cache discounts included), which the chat adds up.
  */
 export const AGENT_MODEL_IDS = [
+  'gemini-3.7-flash',
   'gpt-6-luna',
   'gpt-6.1-sol',
   'claude-sonnet-5.5',
@@ -14,6 +15,11 @@ export const AGENT_MODEL_IDS = [
 export type AgentModelId = (typeof AGENT_MODEL_IDS)[number];
 
 export const AGENT_MODELS = {
+  'gemini-3.7-flash': {
+    label: 'Gemini 3.7 Flash',
+    hint: 'Sharp vision at a low price — tracing gestures',
+    providerModelId: 'google/gemini-3.7-flash'
+  },
   'gpt-6-luna': {
     label: 'GPT-6 Luna',
     hint: 'Fast and cheap — everyday questions',
@@ -45,7 +51,7 @@ export function coerceAgentModelId(id: string): AgentModelId {
 }
 
 /** Model a new chat starts with. */
-export const AGENT_DEFAULT_MODEL = 'gpt-6-luna' satisfies AgentModelId;
+export const AGENT_DEFAULT_MODEL = 'gemini-3.7-flash' satisfies AgentModelId;
 
 /** Cheap model for chores: chat titles, web search summaries. */
 export const AGENT_UTILITY_MODEL = 'gpt-6-luna' satisfies AgentModelId;

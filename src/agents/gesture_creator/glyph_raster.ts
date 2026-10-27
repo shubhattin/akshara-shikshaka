@@ -1,7 +1,7 @@
 import { CANVAS_DIMS } from '~/tools/stroke_data/types';
 import { GLYPH_FONT_SCALE, glyphTextPosition } from '~/tools/stroke_data/glyph_layout';
 import { context2d, type CanvasEnv } from './canvas_env';
-import type { GlyphMask } from './skeleton';
+import { distanceTransform, type GlyphMask } from './skeleton';
 
 /** Raster pixels per canvas unit: an 800×800 raster for the 400×400 canvas. */
 export const RASTER_SCALE = 2;
@@ -65,5 +65,17 @@ export function inkLookup(mask: GlyphMask, slack = 0) {
       }
     }
     return false;
+  };
+}
+
+/** Distance from a canvas point to the nearest non-ink pixel, in canvas units (0 off the ink). */
+export function inkClearance(mask: GlyphMask) {
+  const { data, width, height, scale } = mask;
+  const dt = distanceTransform(data, width, height);
+  return ([x, y]: readonly [number, number]) => {
+    const px = Math.round(x * scale);
+    const py = Math.round(y * scale);
+    if (px < 0 || py < 0 || px >= width || py >= height) return 0;
+    return dt[py * width + px]! / scale;
   };
 }

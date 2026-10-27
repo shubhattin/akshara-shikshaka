@@ -4,7 +4,7 @@ import type { Gesture } from '~/tools/stroke_data/types';
 import { DEFAULTS } from '~/components/pages/gesture_add_edit/gesture_add_edit_state';
 import { evaluateDraft } from './evaluate';
 import type { CanvasEnv } from './canvas_env';
-import { inkLookup, rasterizeGlyph } from './glyph_raster';
+import { inkClearance, inkLookup, rasterizeGlyph } from './glyph_raster';
 import {
   renderGlyphImage,
   renderOrderStrip,
@@ -52,6 +52,7 @@ type Session = {
   mask: GlyphMask;
   graph: SkeletonGraph;
   onInk: (p: Pt) => boolean;
+  clearance: (p: Pt) => number;
 };
 
 export class HarnessCancelledError extends Error {
@@ -134,7 +135,13 @@ export function createGestureHarness(deps: {
     if (!session) {
       session = (async () => {
         const mask = await rasterizeGlyph(gesture, env);
-        return { gesture, mask, graph: buildSkeletonGraph(mask), onInk: inkLookup(mask, 2) };
+        return {
+          gesture,
+          mask,
+          graph: buildSkeletonGraph(mask),
+          onInk: inkLookup(mask, 2),
+          clearance: inkClearance(mask)
+        };
       })();
       session.catch(() => sessions.delete(key));
       sessions.set(key, session);
@@ -194,12 +201,12 @@ export function createGestureHarness(deps: {
 
   /** Build and check a plan's strokes; the images are left to the caller. */
   async function traceCore(input: TraceStrokesInput, signal: AbortSignal) {
-    const { gesture, mask, graph, onInk } = await openSession(input.gesture_id);
+    const { gesture, mask, graph, onInk, clearance } = await openSession(input.gesture_id);
     if (signal.aborted) throw new HarnessCancelledError();
     const onStrictInk = inkLookup(mask, 0.5);
     const built = input.strokes.map((spec, index) => {
       try {
-        return buildStroke(spec, graph, onStrictInk);
+        return buildStroke(spec, graph, onStrictInk, clearance);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Stroke ${index + 1}: ${message}`);

@@ -12,7 +12,8 @@ import {
   type MentionScriptFilter
 } from './mention_search';
 
-const RESULT_LIMIT = 40;
+/** Results per page: the list grows by this much on scroll, ↓ at the end, or Show more. */
+const PAGE_SIZE = 40;
 
 export const mentionOptionId = (listId: string, index: number) => `${listId}-option-${index}`;
 
@@ -86,7 +87,8 @@ function searchMenuResults(
   index: ReturnType<typeof buildMentionIndex> | null,
   script: MentionScriptFilter,
   category: MentionCategoryFilter,
-  refs: GestureRefData[]
+  refs: GestureRefData[],
+  limit: number
 ) {
   return active && index
     ? searchMentions(index, {
@@ -94,7 +96,7 @@ function searchMenuResults(
         script,
         category,
         exclude: new Set(refs.map((ref) => ref.id)),
-        limit: RESULT_LIMIT
+        limit
       })
     : { results: [], total: 0 };
 }
@@ -113,6 +115,11 @@ function menuResultKey(
   category: MentionCategoryFilter
 ) {
   return `${active?.query ?? ''}|${script}|${category}`;
+}
+
+/** Pages shown for this query and filters; a new query starts again at one page. */
+function resolvePages(pages: { key: string; count: number }, resultKey: string) {
+  return pages.key === resultKey ? pages.count : 1;
 }
 
 function resolveActiveIndex(highlight: { key: string; index: number }, resultKey: string) {
@@ -158,6 +165,7 @@ export function useGestureMentions({
   const [script, setScript] = useState<MentionScriptFilter>('all');
   const [category, setCategory] = useState<MentionCategoryFilter>('all');
   const [highlight, setHighlight] = useState({ key: '', index: 0 });
+  const [pages, setPages] = useState({ key: '', count: 1 });
 
   const refs = picked.filter((ref) => tokenPattern(mentionToken(ref)).test(text));
   const trigger = triggerAtCaret(caret, text);
@@ -177,11 +185,16 @@ export function useGestureMentions({
   const index = useMentionIndex(gestures);
   const loading = isMenuLoading(used, list_q.isPending);
 
-  const search = searchMenuResults(active, index, script, category, refs);
+  const resultKey = menuResultKey(active, script, category);
+  const pageCount = resolvePages(pages, resultKey);
+  const search = searchMenuResults(active, index, script, category, refs, pageCount * PAGE_SIZE);
+  const hasMore = search.total > search.results.length;
+  const loadMore = () => {
+    if (hasMore) setPages({ key: resultKey, count: pageCount + 1 });
+  };
   const open = active !== null;
   const navigable = isMenuNavigable(open, loading, search.results.length);
 
-  const resultKey = menuResultKey(active, script, category);
   const activeIndex = resolveActiveIndex(highlight, resultKey);
   const setActiveIndex = (next: number) => setHighlight({ key: resultKey, index: next });
   const atLimit = refs.length >= MAX_GESTURE_REFS;
@@ -237,8 +250,11 @@ export function useGestureMentions({
     event.preventDefault();
     const count = search.results.length;
     if (action === 'close') setDismissedStart(active.start);
-    else if (action === 'next') setActiveIndex((activeIndex + 1) % count);
-    else if (action === 'previous') setActiveIndex((activeIndex - 1 + count) % count);
+    else if (action === 'next') {
+      // past the last loaded row: load the next page and step into it
+      if (activeIndex + 1 >= count && hasMore) loadMore();
+      setActiveIndex(activeIndex + 1 >= count && !hasMore ? 0 : activeIndex + 1);
+    } else if (action === 'previous') setActiveIndex((activeIndex - 1 + count) % count);
     else if (action === 'pick') {
       const gesture = search.results[activeIndex];
       if (gesture) pick(gesture);
@@ -285,6 +301,8 @@ export function useGestureMentions({
       },
       results: search.results,
       total: search.total,
+      hasMore,
+      onLoadMore: loadMore,
       loading,
       error: !!list_q.error,
       atLimit,

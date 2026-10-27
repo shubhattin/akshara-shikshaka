@@ -10,6 +10,7 @@ const KA = {
   script_id: 1,
   font_family: 'Nirmala_UI',
   font_size: 18,
+  // SAFETY: literal pair matches the fixed 2-tuple shape of text_center_offset.
   text_center_offset: [0, 0] as [number, number],
   gestures: []
 };

@@ -10,8 +10,8 @@ export function ChatPage({ chatId }: { chatId: string }) {
   const chat_q = useQuery(
     trpc.agents.get_chat.queryOptions(
       { id: chatId },
-      // useChat owns the messages once mounted; refetches only refresh chat metadata.
-      // While a reply streams in the background, poll so it appears when it lands.
+      // useChat owns the messages once mounted; refetches refresh chat metadata, and while a
+      // reply runs on the server they carry its step-by-step snapshots.
       {
         refetchOnWindowFocus: false,
         retry: false,
@@ -46,5 +46,5 @@ export function ChatPage({ chatId }: { chatId: string }) {
     );
   }
 
-  return <AgentChat key={chatId} data={chat_q.data} />;
+  return <AgentChat key={chatId} data={chat_q.data} fetchedAt={chat_q.dataUpdatedAt} />;
 }

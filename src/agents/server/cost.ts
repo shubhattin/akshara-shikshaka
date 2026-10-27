@@ -28,14 +28,12 @@ const addUsage = (a: Usage | undefined, b: Usage): Usage => ({
 const searchCost = z.object({ cost: z.number() });
 
 /**
- * Running cost and token totals of one reply, for `messageMetadata`. A Gesture Creator reply can
- * span several requests (it pauses for browser tools): `base` is what the stored message already
- * counted, so the totals keep adding up instead of being replaced. Totals are emitted after every
- * step, so a cancelled reply still records what it cost.
+ * Running cost and token totals of one reply, for `messageMetadata`. Totals are emitted after
+ * every step, so a stopped reply still records what it cost.
  */
-export function createReplyMeter(model: AgentModelId, base: AgentMessageMetadata | undefined) {
-  let cost = base?.cost ?? 0;
-  let usage = base?.usage;
+export function createReplyMeter(model: AgentModelId) {
+  let cost = 0;
+  let usage: AgentMessageMetadata['usage'];
   return (part: TextStreamPart<ToolSet>): AgentMessageMetadata | undefined => {
     if (part.type === 'start') return { model };
     if (part.type === 'tool-result' && part.toolName === 'web_search') {

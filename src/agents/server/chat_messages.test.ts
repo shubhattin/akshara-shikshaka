@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentUIMessage } from '~/agents/ui_message';
-import {
-  closeDanglingToolCalls,
-  mergeClientToolOutputs,
-  pruneHarnessImages
-} from './chat_messages';
+import { closeDanglingToolCalls, pruneHarnessImages } from './chat_messages';
 
 type Part = AgentUIMessage['parts'][number];
 
@@ -61,61 +57,6 @@ const trace = (toolCallId: string): Part => ({
     issues: [],
     images: { strokes: 'data:image/png;base64,AA' }
   }
-});
-
-describe('mergeClientToolOutputs', () => {
-  it('takes only the browser results of pending harness calls', () => {
-    const stored = assistant([
-      { type: 'text', text: 'stored text' },
-      inspect('c1', 1, 'input-available'),
-      {
-        type: 'tool-sql_query',
-        toolCallId: 'c2',
-        state: 'input-available',
-        input: { purpose: 'x', query: 'select 1' }
-      }
-    ]);
-    const incoming = assistant([
-      { type: 'text', text: 'tampered text' },
-      {
-        type: 'tool-inspect_glyph',
-        toolCallId: 'c1',
-        state: 'output-available',
-        input: { gesture_id: 999 },
-        output: {
-          gesture_id: 1,
-          text: 'a',
-          script: 'Latn',
-          font_family: 'sans',
-          font_size: 16,
-          text_center_offset: [0, 0],
-          glyph_box: [0, 0, 10, 10],
-          stroke_width: 2,
-          nodes: [],
-          edges: [],
-          dots: [],
-          existing_strokes: 0,
-          images: {}
-        }
-      },
-      {
-        type: 'tool-sql_query',
-        toolCallId: 'c2',
-        state: 'output-available',
-        input: { purpose: 'x', query: 'select 1' },
-        output: { columns: ['a'], rows: [['1']], row_count: 1, truncated: false, duration_ms: 1 }
-      }
-    ]);
-    const merged = mergeClientToolOutputs(stored, incoming);
-    expect(merged.parts[0]).toMatchObject({ text: 'stored text' });
-    expect(merged.parts[1]).toMatchObject({
-      state: 'output-available',
-      output: { gesture_id: 1 },
-      input: { gesture_id: 1 }
-    });
-    // a server tool's result never comes from the client
-    expect(merged.parts[2]).toMatchObject({ state: 'input-available' });
-  });
 });
 
 describe('closeDanglingToolCalls', () => {

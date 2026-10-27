@@ -1,6 +1,6 @@
-import { FONT_LIST } from '~/state/font_list';
 import { CANVAS_DIMS } from '~/tools/stroke_data/types';
 import { GLYPH_FONT_SCALE, glyphTextPosition } from '~/tools/stroke_data/glyph_layout';
+import { context2d, type CanvasEnv } from './canvas_env';
 import type { GlyphMask } from './skeleton';
 
 /** Raster pixels per canvas unit: an 800×800 raster for the 400×400 canvas. */
@@ -13,62 +13,40 @@ export type GlyphSource = {
   text_center_offset: readonly [number, number];
 };
 
-const fontLoads = new Map<string, Promise<void>>();
-
-/** Load a gesture font as a FontFace under its family key, like the editor does. */
-export function ensureGlyphFont(family: string): Promise<void> {
-  let load = fontLoads.get(family);
-  if (!load) {
-    const entry = Object.values(FONT_LIST)
-      .flat()
-      .find((font) => font?.font_family === family);
-    if (!entry) return Promise.reject(new Error(`Unknown font family ${family}`));
-    load = new FontFace(family, `url(${entry.url})`).load().then((face) => {
-      document.fonts.add(face);
-    });
-    load.catch(() => fontLoads.delete(family));
-    fontLoads.set(family, load);
-  }
-  return load;
+/**
+ * Draw the background glyph where the editor's Konva text puts it: box = text width × font size
+ * (Konva's single-line client rect), positioned by `glyphTextPosition` and rounded, drawn on the
+ * alphabetic baseline at Konva's offset of (ascent − descent) / 2 + lineHeight / 2 with the
+ * font-box metrics of "M".
+ */
+function drawGlyphText(ctx: CanvasRenderingContext2D, source: GlyphSource) {
+  const fontSize = source.font_size * GLYPH_FONT_SCALE;
+  ctx.font = `normal normal ${fontSize}px ${source.font_family}`;
+  const box = { width: ctx.measureText(source.text).width, height: fontSize };
+  const [x, y] = glyphTextPosition(box, source.text_center_offset);
+  const m = ctx.measureText('M');
+  const ascent = m.fontBoundingBoxAscent ?? m.actualBoundingBoxAscent;
+  const descent = m.fontBoundingBoxDescent ?? m.actualBoundingBoxDescent;
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'black';
+  ctx.fillText(source.text, Math.round(x), Math.round(y) + (ascent - descent) / 2 + fontSize / 2);
 }
 
-/**
- * Render the gesture's background glyph exactly as the editor places it (same Konva text,
- * same measurement and offset) into an ink mask at RASTER_SCALE.
- */
-export async function rasterizeGlyph(source: GlyphSource): Promise<GlyphMask> {
-  await ensureGlyphFont(source.font_family);
-  const { default: Konva } = await import('konva');
-  const container = document.createElement('div');
-  const stage = new Konva.Stage({
-    container,
-    width: CANVAS_DIMS.width,
-    height: CANVAS_DIMS.height
-  });
-  try {
-    const layer = new Konva.Layer();
-    stage.add(layer);
-    const node = new Konva.Text({
-      text: source.text,
-      fontSize: source.font_size * GLYPH_FONT_SCALE,
-      fontFamily: source.font_family,
-      fill: 'black'
-    });
-    layer.add(node);
-    const box = node.getClientRect({ skipShadow: true, skipStroke: true });
-    const [x, y] = glyphTextPosition(box, source.text_center_offset);
-    node.position({ x: Math.round(x), y: Math.round(y) });
-    layer.draw();
-    const canvas = layer.toCanvas({ pixelRatio: RASTER_SCALE });
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas 2D is not available');
-    const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const mask = new Uint8Array(width * height);
-    for (let i = 0; i < mask.length; i++) mask[i] = data[i * 4 + 3]! >= 128 ? 1 : 0;
-    return { data: mask, width, height, scale: RASTER_SCALE };
-  } finally {
-    stage.destroy();
-  }
+/** Render the gesture's background glyph, placed exactly like the editor, into an ink mask. */
+export async function rasterizeGlyph(source: GlyphSource, env: CanvasEnv): Promise<GlyphMask> {
+  await env.loadGlyphFont(source.font_family);
+  const canvas = env.createCanvas(
+    CANVAS_DIMS.width * RASTER_SCALE,
+    CANVAS_DIMS.height * RASTER_SCALE
+  );
+  const ctx = context2d(canvas);
+  ctx.scale(RASTER_SCALE, RASTER_SCALE);
+  drawGlyphText(ctx, source);
+  const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const mask = new Uint8Array(width * height);
+  for (let i = 0; i < mask.length; i++) mask[i] = data[i * 4 + 3]! >= 128 ? 1 : 0;
+  return { data: mask, width, height, scale: RASTER_SCALE };
 }
 
 /** Is a canvas point on (or within `slack` units of) the glyph ink? */

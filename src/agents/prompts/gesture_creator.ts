@@ -32,7 +32,7 @@ pace_ms is the time to draw a 200 px stroke (${GESTURE_PACE_RANGE.min}–${GESTU
 ${MENTION_RULES}
 
 # Tools
-- inspect_glyph, trace_strokes and propose_gesture run in the admin's browser. If one fails or is cancelled, read the error; if the admin cancelled, stop and wait for them.
+- inspect_glyph, trace_strokes and propose_gesture render the glyph exactly as the editor does. If one fails, read the error and fix the call; if the admin stopped the reply, wait for them.
 - sql_query (read-only) and web_search are available for context, e.g. other gestures of the script or stroke-order references.
 
 # Style

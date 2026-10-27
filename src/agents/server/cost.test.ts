@@ -44,7 +44,7 @@ describe('openrouterCost', () => {
 
 describe('createReplyMeter', () => {
   it('adds up steps and web searches', () => {
-    const meter = createReplyMeter('gpt-6-luna', undefined);
+    const meter = createReplyMeter('gpt-6-luna');
     expect(meter(startPart())).toEqual({ model: 'gpt-6-luna' });
     meter(step(0.01, 1000, 800, 50));
     meter(webSearchPart(0.02));
@@ -54,22 +54,6 @@ describe('createReplyMeter', () => {
       inputTokens: 2200,
       cachedInputTokens: 1800,
       outputTokens: 130
-    });
-  });
-
-  it('continues from what a resumed reply already counted', () => {
-    const meter = createReplyMeter('claude-opus-5.5', {
-      model: 'claude-opus-5.5',
-      cost: 0.1,
-      usage: { inputTokens: 5000, outputTokens: 400, cachedInputTokens: 4000, reasoningTokens: 100 }
-    });
-    const result = meter(step(0.02, 6000, 5500, 300));
-    expect(result?.cost).toBeCloseTo(0.12);
-    expect(result?.usage).toMatchObject({
-      inputTokens: 11000,
-      cachedInputTokens: 9500,
-      outputTokens: 700,
-      reasoningTokens: 100
     });
   });
 });

@@ -61,7 +61,7 @@ export function GestureProposalCard({
 
 function ProposalBody({ proposal, toolCallId }: { proposal: ProposedGesture; toolCallId: string }) {
   const trpc = useTRPC();
-  const { runActive } = useAgentChatContext();
+  const { replying } = useAgentChatContext();
   const [open, setOpen] = useState(false);
   const background = useGlyphBackground(proposal);
   const current_q = useQuery(trpc.agents.get_gesture.queryOptions({ id: proposal.gesture_id }));
@@ -106,10 +106,10 @@ function ProposalBody({ proposal, toolCallId }: { proposal: ProposedGesture; too
             : ''}
         </p>
         <div className="mt-auto flex flex-wrap items-center gap-2">
-          <Button size="sm" onClick={() => setOpen(true)} disabled={runActive}>
+          <Button size="sm" onClick={() => setOpen(true)} disabled={replying}>
             {applied ? 'Review / apply again' : 'Apply gesture'}
           </Button>
-          {runActive ? (
+          {replying ? (
             <span className="text-xs text-muted-foreground">
               Available when the agent finishes.
             </span>

@@ -1,8 +1,8 @@
 import { get_script_from_id } from '~/state/lang_list';
 import type { Gesture } from '~/tools/stroke_data/types';
-import type { AgentUITools } from '~/agents/ui_message';
 import { DEFAULTS } from '~/components/pages/gesture_add_edit/gesture_add_edit_state';
 import { evaluateDraft } from './evaluate';
+import type { CanvasEnv } from './canvas_env';
 import { inkLookup, rasterizeGlyph } from './glyph_raster';
 import {
   renderGlyphImage,
@@ -11,10 +11,6 @@ import {
   renderStrokesImage
 } from './render_images';
 import {
-  inspect_glyph_input_schema,
-  propose_gesture_input_schema,
-  trace_strokes_input_schema,
-  type GestureCreatorToolName,
   type HarnessImages,
   type InspectGlyphInput,
   type InspectGlyphOutput,
@@ -29,8 +25,9 @@ import { buildSkeletonGraph, type GlyphMask, type SkeletonGraph } from './skelet
 import { buildStroke, pathLength } from './strokes';
 
 /**
- * The Gesture Creator's tools, run in the admin's browser: the glyph is rendered with the same
- * font and placement as the editor, so the model traces exactly what learners will see.
+ * The Gesture Creator's tools. They run on the server (see `server/gesture_harness.ts`), with the
+ * glyph rendered in the same font and placement as the editor, so the model traces exactly what
+ * learners will see.
  */
 
 export type HarnessGesture = {
@@ -53,14 +50,33 @@ type Session = {
   onInk: (p: Pt) => boolean;
 };
 
-/** A part of an earlier message the harness reads back (the trace a proposal refers to). */
-type ToolPartLike = { type: string; toolCallId?: string; state?: string; output?: unknown };
-type MessageLike = { parts: readonly ToolPartLike[] };
-
 export class HarnessCancelledError extends Error {
   constructor() {
     super('Cancelled by the admin');
   }
+}
+
+/** A part of a stored message the harness reads back (the trace a proposal refers to). */
+type ToolPartLike = { type: string; toolCallId?: string; state?: string; output?: unknown };
+
+/** The finished `trace_strokes` output with this call id among stored message parts. */
+export function findTraceInMessages(
+  messages: readonly { parts: readonly ToolPartLike[] }[],
+  traceId: string
+): TraceStrokesOutput | undefined {
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (
+        part.type === 'tool-trace_strokes' &&
+        part.toolCallId === traceId &&
+        part.state === 'output-available'
+      ) {
+        // SAFETY: output of a trace_strokes part this harness produced earlier in the chat.
+        return part.output as TraceStrokesOutput;
+      }
+    }
+  }
+  return undefined;
 }
 
 const glyphKey = (g: TracedGlyph) =>
@@ -73,8 +89,12 @@ const glyphOf = (gesture: HarnessGesture): TracedGlyph => ({
 });
 
 export function createGestureHarness(deps: {
+  env: CanvasEnv;
   loadGesture: (id: number) => Promise<HarnessGesture>;
+  /** An earlier trace of this chat by its tool call id (what a proposal refers to). */
+  findTrace: (traceId: string) => TraceStrokesOutput | undefined;
 }) {
+  const { env } = deps;
   /** Rendered glyph + skeleton per gesture and glyph settings (stable node/edge ids across calls). */
   const sessions = new Map<string, Promise<Session>>();
 
@@ -84,7 +104,7 @@ export function createGestureHarness(deps: {
     let session = sessions.get(key);
     if (!session) {
       session = (async () => {
-        const mask = await rasterizeGlyph(gesture);
+        const mask = await rasterizeGlyph(gesture, env);
         return { gesture, mask, graph: buildSkeletonGraph(mask), onInk: inkLookup(mask, 2) };
       })();
       session.catch(() => sessions.delete(key));
@@ -105,11 +125,12 @@ export function createGestureHarness(deps: {
     if (signal.aborted) throw new HarnessCancelledError();
     const saved = savedStrokes(gesture).filter((s) => s.length > 0);
     const images: HarnessImages = {
-      glyph: renderGlyphImage(mask),
-      skeleton: renderSkeletonImage(mask, graph)
+      glyph: renderGlyphImage(env, mask),
+      skeleton: renderSkeletonImage(env, mask, graph)
     };
     if (input.show_existing !== false && saved.length > 0) {
       images.saved = renderStrokesImage(
+        env,
         mask,
         saved.map((points, index) => ({
           points,
@@ -183,29 +204,14 @@ export function createGestureHarness(deps: {
       missed_dots: evaluation.missed_dots,
       issues: evaluation.issues,
       images: {
-        strokes: renderStrokesImage(mask, drawn, { uncovered: evaluation.gaps }),
-        order: renderOrderStrip(mask, drawn, graph.box)
+        strokes: renderStrokesImage(env, mask, drawn, { uncovered: evaluation.gaps }),
+        order: renderOrderStrip(env, mask, drawn, graph.box)
       }
     };
   }
 
-  async function propose(
-    input: ProposeGestureInput,
-    messages: readonly MessageLike[]
-  ): Promise<ProposeGestureOutput> {
-    let traced: TraceStrokesOutput | undefined;
-    for (const message of messages) {
-      for (const part of message.parts) {
-        if (
-          part.type === 'tool-trace_strokes' &&
-          part.toolCallId === input.trace_id &&
-          part.state === 'output-available'
-        ) {
-          // SAFETY: output of a trace_strokes part this harness produced earlier in the chat.
-          traced = part.output as TraceStrokesOutput;
-        }
-      }
-    }
+  async function propose(input: ProposeGestureInput): Promise<ProposeGestureOutput> {
+    const traced = deps.findTrace(input.trace_id);
     if (!traced) {
       return {
         ok: false,
@@ -244,26 +250,17 @@ export function createGestureHarness(deps: {
     };
   }
 
+  const checked =
+    <I, O>(run: (input: I, signal: AbortSignal) => Promise<O>) =>
+    (input: I, signal: AbortSignal) => {
+      if (signal.aborted) throw new HarnessCancelledError();
+      return run(input, signal);
+    };
+
   return {
-    async run(
-      tool: GestureCreatorToolName,
-      input: AgentUITools[keyof AgentUITools]['input'],
-      ctx: { messages: readonly MessageLike[]; signal: AbortSignal }
-    ): Promise<InspectGlyphOutput | TraceStrokesOutput | ProposeGestureOutput> {
-      if (ctx.signal.aborted) throw new HarnessCancelledError();
-      switch (tool) {
-        case 'inspect_glyph':
-          return inspect(inspect_glyph_input_schema.parse(input), ctx.signal);
-        case 'trace_strokes':
-          return trace(trace_strokes_input_schema.parse(input), ctx.signal);
-        case 'propose_gesture':
-          return propose(propose_gesture_input_schema.parse(input), ctx.messages);
-      }
-    },
-    /** Glyph render for previews (the apply dialog draws strokes over it). */
-    async glyphMask(id: number) {
-      return (await openSession(id)).mask;
-    }
+    inspect: checked(inspect),
+    trace: checked(trace),
+    propose: checked((input: ProposeGestureInput) => propose(input))
   };
 }
 

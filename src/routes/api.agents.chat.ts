@@ -1,5 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { consumeStream, convertToModelMessages, createIdGenerator, validateUIMessages } from 'ai';
+import {
+  convertToModelMessages,
+  createIdGenerator,
+  createUIMessageStreamResponse,
+  validateUIMessages
+} from 'ai';
 import { Effect } from 'effect';
 import { z } from 'zod';
 import { gestureRefToModelText, AGENT_DATA_SCHEMAS } from '~/agents/gesture_refs';
@@ -15,7 +20,6 @@ import {
 } from '~/agents/server/chat_store';
 import {
   closeDanglingToolCalls,
-  mergeClientToolOutputs,
   newMessageRefs,
   pruneHarnessImages,
   withHistoryCacheBreakpoint,
@@ -24,6 +28,7 @@ import {
 import { resolveGestureRefs } from '~/agents/server/gesture_refs';
 import { generateChatTitle } from '~/agents/server/chat_title';
 import { createReplyMeter } from '~/agents/server/cost';
+import { trackReplyProgress } from '~/agents/server/reply_progress';
 import type { AgentUIMessage } from '~/agents/ui_message';
 import { enqueueBackground } from '~/effect/background';
 import { BadRequestError } from '~/effect/errors';
@@ -34,11 +39,8 @@ import { isSameOriginRequest } from '~/lib/same_origin';
 
 const body_schema = z.object({
   id: z.string().min(1).max(64),
-  /**
-   * The new user message (history is loaded from the database), or — in a Gesture Creator chat —
-   * the last assistant message carrying the results of tools the browser ran.
-   */
-  message: z.object({ id: z.string().min(1), role: z.enum(['user', 'assistant']) }).passthrough(),
+  /** The new user message; history is loaded from the database. */
+  message: z.object({ id: z.string().min(1), role: z.literal('user') }).passthrough(),
   model: agent_model_id_schema
 });
 
@@ -51,8 +53,8 @@ const firstText = (message: AgentUIMessage) =>
     .trim();
 
 /**
- * Wait until the chat's in-flight turn is saved: the step that ended on a browser tool call, or
- * a stopped reply still landing. Otherwise its late save would drop the turn that follows.
+ * Wait until the chat's in-flight turn is saved (a stopped reply still landing). Otherwise its
+ * late save would drop the turn that follows.
  */
 const waitForSavedTurn = Effect.fn('agents.wait_for_saved_turn')(function* (
   chatId: string,
@@ -71,15 +73,11 @@ const waitForSavedTurn = Effect.fn('agents.wait_for_saved_turn')(function* (
 });
 
 /** The chat once any in-flight turn is saved; a new message stops that turn first. */
-const chatForTurn = Effect.fn('agents.chat_for_turn')(function* (
-  chatId: string,
-  userId: string,
-  isToolResult: boolean
-) {
+const chatForTurn = Effect.fn('agents.chat_for_turn')(function* (chatId: string, userId: string) {
   const chat = yield* findAgentChat(chatId, userId);
   if (!chat.streaming) return chat;
   // Send now, or Stop then send: the new message replaces whatever is still replying.
-  if (!isToolResult) yield* requestChatStop(chatId, userId);
+  yield* requestChatStop(chatId, userId);
   return yield* waitForSavedTurn(chatId, userId);
 });
 
@@ -119,29 +117,10 @@ async function handleChat(request: Request): Promise<Response> {
 
   return runRouteEffect(
     Effect.gen(function* () {
-      const isToolResult = incomingRaw.role === 'assistant';
-      const chat = yield* chatForTurn(id, user.id, isToolResult);
-      if (isToolResult && chat.agent_kind !== 'gesture_creator') {
-        return yield* Effect.fail(
-          BadRequestError.make({ message: 'This chat has no browser tools' })
-        );
-      }
+      const chat = yield* chatForTurn(id, user.id);
       const previous = yield* loadAgentMessages(id);
-      const { agent, tools } = yield* createAgent(model, chat.agent_kind);
+      const { agent, tools } = yield* createAgent(model, chat.agent_kind, previous);
 
-      // The stored id check runs on the boundary-typed fields; the full shape is
-      // decoded next so only validated messages enter the conversation.
-      const incomingId = incomingRaw.id;
-      if (isToolResult) {
-        const stored = previous.at(-1);
-        if (stored?.id !== incomingId || stored.role !== 'assistant') {
-          return yield* Effect.fail(
-            BadRequestError.make({
-              message: 'Those tool results belong to an older step of this chat'
-            })
-          );
-        }
-      }
       const validatedIncoming = yield* Effect.tryPromise({
         try: () =>
           validateUIMessages<AgentUIMessage>({
@@ -152,26 +131,10 @@ async function handleChat(request: Request): Promise<Response> {
         catch: () => BadRequestError.make({ message: 'Invalid message' })
       });
 
-      let conversation: AgentUIMessage[];
-      if (isToolResult) {
-        const stored = previous.at(-1);
-        if (stored?.id !== validatedIncoming.id || stored.role !== 'assistant') {
-          return yield* Effect.fail(
-            BadRequestError.make({
-              message: 'Those tool results belong to an older step of this chat'
-            })
-          );
-        }
-        conversation = [
-          ...previous.slice(0, -1),
-          mergeClientToolOutputs(stored, validatedIncoming)
-        ];
-      } else {
-        // A retry resends a message that may already be stored: replay history up to it.
-        const resent = previous.findIndex((message) => message.id === validatedIncoming.id);
-        const history = resent === -1 ? previous : previous.slice(0, resent);
-        conversation = [...history, validatedIncoming];
-      }
+      // A retry resends a message that may already be stored: replay history up to it.
+      const resent = previous.findIndex((message) => message.id === validatedIncoming.id);
+      const history = resent === -1 ? previous : previous.slice(0, resent);
+      const conversation = [...history, validatedIncoming];
 
       const validated = yield* Effect.tryPromise({
         try: () =>
@@ -183,30 +146,25 @@ async function handleChat(request: Request): Promise<Response> {
         catch: () => BadRequestError.make({ message: 'Invalid message' })
       });
       // Fill a new message's @ mentions from the database, never from the client.
-      const messages = isToolResult
-        ? validated
-        : [
-            ...validated.slice(0, -1),
-            withResolvedRefs(
-              validated.at(-1)!,
-              yield* resolveGestureRefs(newMessageRefs(validated.at(-1)!))
-            )
-          ];
+      const messages = [
+        ...validated.slice(0, -1),
+        withResolvedRefs(
+          validated.at(-1)!,
+          yield* resolveGestureRefs(newMessageRefs(validated.at(-1)!))
+        )
+      ];
 
       // Title the chat in parallel with the first reply.
       const titlePromise =
-        !isToolResult && !chat.title && messages.length === 1
+        !chat.title && messages.length === 1
           ? appRuntime.runPromise(generateChatTitle(firstText(messages[0]!)))
           : null;
 
-      const meter = createReplyMeter(model, isToolResult ? messages.at(-1)?.metadata : undefined);
+      const meter = createReplyMeter(model);
 
       yield* setChatStreaming(id, true);
+      // Only an explicit Stop ends the reply: closing or reloading the tab leaves it running.
       const stop = new AbortController();
-      // The Gesture Creator needs the open page to run its tools: stop when the page goes.
-      if (chat.agent_kind === 'gesture_creator') {
-        request.signal.addEventListener('abort', () => stop.abort(), { once: true });
-      }
       const stopWatching = watchForStop(id, stop);
       const result = yield* Effect.promise(async () =>
         agent.stream({
@@ -225,16 +183,15 @@ async function handleChat(request: Request): Promise<Response> {
         })
       );
 
-      return result.toUIMessageStreamResponse<AgentUIMessage>({
+      let progress: ReturnType<typeof trackReplyProgress<AgentUIMessage>> | undefined;
+      const stream = result.toUIMessageStream<AgentUIMessage>({
         originalMessages: messages,
         generateMessageId,
-        // Keep generating (and saving) even if the admin closes the tab mid-reply.
-        consumeSseStream: ({ stream }) =>
-          appRuntime.runSync(enqueueBackground(() => consumeStream({ stream }))),
-        // Actual cost and tokens, continuing from the stored message when resuming after tools.
+        // Actual cost and tokens of every step.
         messageMetadata: ({ part }) => meter(part),
         onFinish: async ({ messages: finished }) => {
           try {
+            await progress?.settle();
             const title = titlePromise ? await titlePromise : undefined;
             await appRuntime.runPromise(
               saveAgentMessages({ chatId: id, messages: finished, model, title })
@@ -246,10 +203,23 @@ async function handleChat(request: Request): Promise<Response> {
         },
         onError: (error) => {
           stopWatching();
-          void appRuntime.runPromise(setChatStreaming(id, false));
+          void progress?.settle().then(() => appRuntime.runPromise(setChatStreaming(id, false)));
           return error instanceof Error ? error.message : 'The agent failed to reply.';
         }
       });
+
+      // One copy to the client, one read here to the end: the reply keeps generating (and is
+      // saved after every step) even if the admin closes or reloads the tab.
+      const [toClient, toServer] = stream.tee();
+      const tracked = trackReplyProgress<AgentUIMessage>(toServer, (reply) =>
+        appRuntime.runPromise(
+          saveAgentMessages({ chatId: id, messages: [...messages, reply], model })
+        )
+      );
+      progress = tracked;
+      appRuntime.runSync(enqueueBackground(() => tracked.done));
+
+      return createUIMessageStreamResponse({ stream: toClient });
     }),
     { onSuccess: (response) => response }
   );

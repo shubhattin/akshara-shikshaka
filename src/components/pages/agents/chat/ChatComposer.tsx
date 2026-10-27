@@ -1,5 +1,5 @@
-import { useRef, useState, type ReactNode } from 'react';
-import { ArrowUpIcon, AtSignIcon, SquareIcon } from 'lucide-react';
+import { useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
+import { ArrowUpIcon, AtSignIcon, ListPlusIcon, SquareIcon } from 'lucide-react';
 import type { GestureRefData } from '~/agents/ui_message';
 import {
   InputGroup,
@@ -14,8 +14,14 @@ import { useGestureMentions } from '../mentions/use_gesture_mentions';
 
 export type ComposerMessage = { text: string; refs: GestureRefData[] };
 
+export type ComposerHandle = {
+  /** Put a message back in the field (a queued message being edited), after any draft. */
+  restore: (message: ComposerMessage) => void;
+};
+
 /**
  * Message field: Enter sends, Shift+Enter adds a line, Stop while the agent replies.
+ * With `canQueue`, sending while busy still goes through `onSend` (the chat queues it).
  * `@` mentions a gesture (any script), attaching it as context.
  */
 export function ChatComposer({
@@ -25,7 +31,9 @@ export function ChatComposer({
   placeholder = 'Message the agent…',
   toolbar,
   autoFocus,
-  stopLabel = 'Stop'
+  stopLabel = 'Stop',
+  canQueue = false,
+  ref
 }: {
   onSend: (message: ComposerMessage) => void;
   onStop?: () => void;
@@ -35,13 +43,28 @@ export function ChatComposer({
   toolbar?: ReactNode;
   autoFocus?: boolean;
   stopLabel?: string;
+  canQueue?: boolean;
+  ref?: Ref<ComposerHandle>;
 }) {
   const [text, setText] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const groupRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentions = useGestureMentions({ text, setText, textareaRef });
-  const canSend = text.trim().length > 0 && !busy;
+  const canSend = text.trim().length > 0 && (!busy || canQueue);
+  const queueing = busy && canQueue;
+
+  useImperativeHandle(ref, () => ({
+    restore: (message) => {
+      const draft = text.trim();
+      setText(draft ? `${draft}\n${message.text}` : message.text);
+      mentions.setRefs((prev) => [
+        ...prev,
+        ...message.refs.filter((item) => !prev.some((entry) => entry.id === item.id))
+      ]);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+  }));
 
   return (
     <form
@@ -107,6 +130,25 @@ export function ChatComposer({
             </TooltipTrigger>
             <TooltipContent>Mention a gesture (@)</TooltipContent>
           </Tooltip>
+          {queueing ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <InputGroupButton
+                    type="submit"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="rounded-full disabled:opacity-50"
+                    disabled={!canSend}
+                    aria-label="Queue message"
+                  />
+                }
+              >
+                <ListPlusIcon />
+              </TooltipTrigger>
+              <TooltipContent>Queue — sends when the reply ends (Enter)</TooltipContent>
+            </Tooltip>
+          ) : null}
           {busy && onStop ? (
             <InputGroupButton
               type="button"

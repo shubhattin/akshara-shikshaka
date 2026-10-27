@@ -5,6 +5,7 @@ import { Stage, Layer, Text, Path } from 'react-konva';
 import type Konva from 'konva';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { CANVAS_DIMS, type GesturePoints } from '~/tools/stroke_data/types';
+import { GLYPH_FONT_SCALE, glyphTextPosition } from '~/tools/stroke_data/glyph_layout';
 import { getLiveStrokePath } from '~/tools/stroke_data/stroke_render';
 import { appendSample, EMPTY_RECORDING } from '~/tools/stroke_data/recording';
 import { KonvaGestureStroke } from '~/components/gesture/KonvaGestureStroke';
@@ -55,10 +56,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     canvas_text_center_offset_atoms
   );
 
-  const BASE_TEXT_CORRDINATES = [
-    CANVAS_DIMS.width / 2 - textBox.width / 2 + canvasTextCenterOffset[0],
-    CANVAS_DIMS.height / 2 - textBox.height / 2 + textBox.height * 0.06 + canvasTextCenterOffset[1]
-  ];
+  const BASE_TEXT_CORRDINATES = glyphTextPosition(textBox, canvasTextCenterOffset);
 
   // version of useEffect that runs before brower repaints the screen
   useLayoutEffect(() => {
@@ -116,8 +114,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
     const newX = textNode.x();
     const newY = textNode.y();
     // Calculate the offset from the original center position
-    const centerX = CANVAS_DIMS.width / 2 - textBox.width / 2;
-    const centerY = CANVAS_DIMS.height / 2 - textBox.height / 2 + textBox.height * 0.06;
+    const [centerX, centerY] = glyphTextPosition(textBox);
     const offsetX = Math.round(newX - centerX);
     const offsetY = Math.round(newY - centerY);
     // Update the offset state
@@ -294,7 +291,7 @@ const KonvaCanvas = forwardRef<Konva.Stage>((_, ref) => {
             x={Math.round(BASE_TEXT_CORRDINATES[0])}
             y={Math.round(BASE_TEXT_CORRDINATES[1])}
             text={text}
-            fontSize={fontSize * 15}
+            fontSize={fontSize * GLYPH_FONT_SCALE}
             fontFamily={currentFontLoaded ? fontFamily : 'Arial'}
             fill="black"
             visible={mainTextPathVisible}

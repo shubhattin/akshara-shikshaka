@@ -17,11 +17,14 @@ type Playback = { done: number; reveal: number | null };
 export function GesturePreview({
   gestures,
   className,
-  showStrokeOrder = true
+  showStrokeOrder = true,
+  backgroundSrc
 }: {
   gestures: Gesture[];
   className?: string;
   showStrokeOrder?: boolean;
+  /** Image drawn under the strokes on the full canvas (e.g. the glyph being traced) */
+  backgroundSrc?: string;
 }) {
   const ordered = [...gestures].sort((a, b) => a.index - b.index);
   const [playback, setPlayback] = useState<Playback | null>(null);
@@ -66,6 +69,15 @@ export function GesturePreview({
         role="img"
         aria-label={`Gesture with ${ordered.length} stroke${ordered.length === 1 ? '' : 's'}`}
       >
+        {backgroundSrc ? (
+          <image
+            href={backgroundSrc}
+            x={0}
+            y={0}
+            width={CANVAS_DIMS.width}
+            height={CANVAS_DIMS.height}
+          />
+        ) : null}
         {visible.map((gesture) => (
           <path key={gesture.index} d={getStrokeRender(gesture).path} fill={gesture.color} />
         ))}

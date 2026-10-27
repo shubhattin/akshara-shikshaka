@@ -1,13 +1,19 @@
+import { Fragment } from 'react';
 import { isToolUIPart } from 'ai';
 import { BotIcon } from 'lucide-react';
+import { mentionToken, messageGestureRefs } from '~/agents/gesture_refs';
 import type { AgentUIMessage } from '~/agents/ui_message';
 import { Bubble, BubbleContent } from '~/components/ui/bubble';
 import { Message, MessageContent } from '~/components/ui/message';
 import { Trace, TraceIcon, TraceLine, TraceTitle } from '~/components/ui/trace';
+import { GestureProposalCard } from '../gesture/GestureProposalCard';
+import { GestureRefChips } from '../mentions/GestureRefChips';
+import { InspectGlyphStep, TraceStrokesStep } from '../tools/GlyphToolSteps';
 import { ReasoningStep } from '../tools/ReasoningStep';
 import { SqlQueryStep } from '../tools/SqlQueryStep';
 import { WebSearchStep } from '../tools/WebSearchStep';
 import { AgentMarkdown } from './AgentMarkdown';
+import { ReplyCost } from './ChatCost';
 import { groupParts, messageText, type StepPart } from './message_parts';
 
 function StepRow({ part, streaming }: { part: StepPart; streaming: boolean }) {
@@ -18,6 +24,10 @@ function StepRow({ part, streaming }: { part: StepPart; streaming: boolean }) {
       return <SqlQueryStep part={part} streaming={streaming} />;
     case 'tool-web_search':
       return <WebSearchStep part={part} streaming={streaming} />;
+    case 'tool-inspect_glyph':
+      return <InspectGlyphStep part={part} streaming={streaming} />;
+    case 'tool-trace_strokes':
+      return <TraceStrokesStep part={part} streaming={streaming} />;
   }
 }
 
@@ -32,12 +42,32 @@ export function ThinkingLine() {
   );
 }
 
+/** Message text with each mentioned gesture's `@akṣara#id` highlighted. */
+function MentionText({ text, tokens }: { text: string; tokens: string[] }) {
+  if (tokens.length === 0) return text;
+  const escaped = tokens.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const pieces = text.split(new RegExp(`(${escaped.join('|')})`, 'gu'));
+  return pieces.map((piece, index) =>
+    tokens.includes(piece) ? (
+      <span key={index} className="font-medium text-primary">
+        {piece}
+      </span>
+    ) : (
+      <Fragment key={index}>{piece}</Fragment>
+    )
+  );
+}
+
 export function UserMessage({ message }: { message: AgentUIMessage }) {
+  const refs = messageGestureRefs(message);
   return (
     <Message align="end">
-      <MessageContent>
+      <MessageContent className="items-end gap-1.5">
+        <GestureRefChips refs={refs} className="justify-end" />
         <Bubble align="end" variant="muted">
-          <BubbleContent className="whitespace-pre-wrap">{messageText(message)}</BubbleContent>
+          <BubbleContent className="whitespace-pre-wrap">
+            <MentionText text={messageText(message)} tokens={refs.map(mentionToken)} />
+          </BubbleContent>
         </Bubble>
       </MessageContent>
     </Message>
@@ -82,9 +112,14 @@ export function AssistantMessage({
                   {group.text}
                 </AgentMarkdown>
               );
+            case 'proposal':
+              return (
+                <GestureProposalCard key={group.key} part={group.part} streaming={streaming} />
+              );
           }
         })}
         {waiting ? <ThinkingLine /> : null}
+        {!streaming ? <ReplyCost metadata={message.metadata} /> : null}
       </MessageContent>
     </Message>
   );

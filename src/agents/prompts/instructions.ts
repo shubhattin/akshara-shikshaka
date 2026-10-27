@@ -1,6 +1,8 @@
 import type { SystemModelMessage } from 'ai';
+import type { AgentKind } from '~/agents/agent_kinds';
 import { describeDatabaseSchema } from '~/agents/db_schema/describe_schema';
 import { GENERAL_SYSTEM_PROMPT } from './general';
+import { GESTURE_CREATOR_SYSTEM_PROMPT } from './gesture_creator';
 import { buildLanguagesContext } from './languages';
 
 export type InstructionSection = {
@@ -13,9 +15,11 @@ export type InstructionSection = {
  * Everything the agent reads before the conversation, most stable first. The cache breakpoint
  * goes after the last section, so every turn of a chat reuses the whole prefix.
  */
-export function agentInstructionSections(): InstructionSection[] {
+export function agentInstructionSections(kind: AgentKind = 'general'): InstructionSection[] {
+  const systemPrompt =
+    kind === 'gesture_creator' ? GESTURE_CREATOR_SYSTEM_PROMPT : GENERAL_SYSTEM_PROMPT;
   return [
-    { id: 'system_prompt', title: 'System prompt', content: GENERAL_SYSTEM_PROMPT },
+    { id: 'system_prompt', title: 'System prompt', content: systemPrompt },
     {
       id: 'database_schema',
       title: 'Database schema',

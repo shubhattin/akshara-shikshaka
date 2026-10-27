@@ -1,9 +1,9 @@
 import { useState } from 'react';
+import { AgentKindIcon } from '../AgentKindIcon';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import {
   ArrowLeftIcon,
-  MessageSquareTextIcon,
   MoreHorizontalIcon,
   PanelLeftIcon,
   PencilIcon,
@@ -113,7 +113,7 @@ function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
                             : 'text-foreground/80 hover:bg-muted/60 hover:text-foreground'
                         )}
                       >
-                        <MessageSquareTextIcon className="size-4 shrink-0 text-muted-foreground" />
+                        <AgentKindIcon kind={chat.agent_kind} />
                         <span className="min-w-0 flex-1 truncate">{chat.title || 'New chat'}</span>
                         {chat.streaming ? (
                           <span

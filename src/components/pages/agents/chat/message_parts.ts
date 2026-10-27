@@ -8,16 +8,26 @@ export type AgentToolPart<N extends keyof AgentUITools> = Extract<AgentPart, { t
 export type StepPart =
   | Extract<AgentPart, { type: 'reasoning' }>
   | AgentToolPart<'sql_query'>
-  | AgentToolPart<'web_search'>;
+  | AgentToolPart<'web_search'>
+  | AgentToolPart<'inspect_glyph'>
+  | AgentToolPart<'trace_strokes'>;
 
 export type PartGroup =
   | { kind: 'steps'; key: string; parts: StepPart[] }
-  | { kind: 'text'; key: string; text: string };
+  | { kind: 'text'; key: string; text: string }
+  | { kind: 'proposal'; key: string; part: AgentToolPart<'propose_gesture'> };
 
-const isStep = (part: AgentPart): part is StepPart =>
-  part.type === 'reasoning' || part.type === 'tool-sql_query' || part.type === 'tool-web_search';
+const STEP_TYPES = new Set<string>([
+  'reasoning',
+  'tool-sql_query',
+  'tool-web_search',
+  'tool-inspect_glyph',
+  'tool-trace_strokes'
+]);
 
-/** Consecutive steps share one trace; text stands on its own. */
+const isStep = (part: AgentPart): part is StepPart => STEP_TYPES.has(part.type);
+
+/** Consecutive steps share one trace; text and proposals stand on their own. */
 export function groupParts(parts: AgentPart[]): PartGroup[] {
   const groups: PartGroup[] = [];
   parts.forEach((part, index) => {
@@ -25,6 +35,8 @@ export function groupParts(parts: AgentPart[]): PartGroup[] {
       const last = groups.at(-1);
       if (last?.kind === 'steps') last.parts.push(part);
       else groups.push({ kind: 'steps', key: `steps-${index}`, parts: [part] });
+    } else if (part.type === 'tool-propose_gesture') {
+      groups.push({ kind: 'proposal', key: `proposal-${index}`, part });
     } else if (part.type === 'text' && part.text.trim()) {
       groups.push({ kind: 'text', key: `text-${index}`, text: part.text });
     }

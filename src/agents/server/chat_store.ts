@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { agent_chats, agent_messages } from '~/db/schema';
 import { dbRunHttp, dbTransaction } from '~/effect/database';
 import { NotFoundError } from '~/effect/errors';
+import type { AgentKind } from '~/agents/agent_kinds';
 import type { AgentModelId } from '~/agents/models';
 import type { AgentUIMessage } from '~/agents/ui_message';
 
@@ -13,6 +14,7 @@ const ownedChat = (id: string, user_id: string) =>
 export const createAgentChat = Effect.fn('agents.create_chat')(function* (input: {
   id: string;
   model: AgentModelId;
+  agent_kind: AgentKind;
   user_id: string;
 }) {
   const [chat] = yield* dbRunHttp('agents.insert_chat', (client) =>
@@ -27,6 +29,7 @@ export const listAgentChats = Effect.fn('agents.list_chats')(function* (user_id:
       .select({
         id: agent_chats.id,
         title: agent_chats.title,
+        agent_kind: agent_chats.agent_kind,
         updated_at: agent_chats.updated_at,
         streaming: agent_chats.streaming
       })
@@ -151,14 +154,46 @@ export const renameAgentChat = Effect.fn('agents.rename_chat')(function* (input:
   );
 });
 
-/** Mark a chat as (not) streaming — set when a reply starts, cleared when it lands or fails. */
+/**
+ * Mark a chat as (not) streaming — set when a reply starts, cleared when it lands or fails.
+ * A new reply also clears any stop request left from the last one.
+ */
 export const setChatStreaming = Effect.fn('agents.set_streaming')(function* (
   id: string,
   streaming: boolean
 ) {
   yield* dbRunHttp('agents.set_streaming', (client) =>
-    client.update(agent_chats).set({ streaming }).where(eq(agent_chats.id, id)).returning()
+    client
+      .update(agent_chats)
+      .set(streaming ? { streaming, stop_requested_at: null } : { streaming })
+      .where(eq(agent_chats.id, id))
+      .returning()
   );
+});
+
+/** Ask the reply streaming for this chat to stop (it may run on another server instance). */
+export const requestChatStop = Effect.fn('agents.request_stop')(function* (
+  id: string,
+  user_id: string
+) {
+  yield* dbRunHttp('agents.request_stop', (client) =>
+    client
+      .update(agent_chats)
+      .set({ stop_requested_at: sql`now()` })
+      .where(and(ownedChat(id, user_id), eq(agent_chats.streaming, true)))
+      .returning()
+  );
+});
+
+export const isChatStopRequested = Effect.fn('agents.is_stop_requested')(function* (id: string) {
+  const [chat] = yield* dbRunHttp('agents.is_stop_requested', (client) =>
+    client
+      .select({ stop_requested_at: agent_chats.stop_requested_at })
+      .from(agent_chats)
+      .where(eq(agent_chats.id, id))
+      .limit(1)
+  );
+  return chat?.stop_requested_at != null;
 });
 
 export const deleteAgentChat = Effect.fn('agents.delete_chat')(function* (

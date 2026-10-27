@@ -194,17 +194,19 @@ describe('draft parts elsewhere', () => {
     expect(withoutDraftParts(message).parts).toEqual([{ type: 'text', text: 'hi' }]);
   });
 
-  it('keeps only the two newest draft images for the model', () => {
+  it('drops old draft images with old traces, a batch at a time', () => {
     const image = (edit_id: string): AgentUIMessage => ({
       id: edit_id,
       role: 'user',
       parts: [{ type: 'data-draft_image', data: { edit_id, url: 'data:image/png;base64,AA' } }]
     });
-    const pruned = pruneHarnessImages([image('e1'), image('e2'), image('e3')]);
+    const edits = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6'];
+    const pruned = pruneHarnessImages(edits.map(image));
     const urls = pruned.map((m) => {
       const part = m.parts[0]!;
       return part.type === 'data-draft_image' ? part.data.url : null;
     });
-    expect(urls).toEqual(['', 'data:image/png;base64,AA', 'data:image/png;base64,AA']);
+    const AA = 'data:image/png;base64,AA';
+    expect(urls).toEqual(['', '', '', '', AA, AA]);
   });
 });

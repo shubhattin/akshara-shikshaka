@@ -39,15 +39,35 @@ export function closeDanglingToolCalls(messages: AgentUIMessage[]): AgentUIMessa
   });
 }
 
+/** Traces whose images the model always sees: the newest ones. */
+const KEEP_TRACE_IMAGES = 2;
 /**
- * Harness images are large: keep them only for the latest inspect_glyph per gesture and the two
- * latest traces (the agent's or the admin's draft edits). The stored conversation keeps every
+ * Older trace images are dropped this many at a time, so the history the model reads only
+ * changes every few traces: each change re-bills everything after it as uncached input.
+ */
+const PRUNE_BATCH = 4;
+
+/** Ids of the image-bearing traces (the agent's traces and the admin's draft edits), in order. */
+function traceImageIds(messages: AgentUIMessage[]): string[] {
+  return messages.flatMap((message) =>
+    message.parts.flatMap((part) => {
+      if (part.type === 'tool-trace_strokes' && part.state === 'output-available') {
+        return [part.toolCallId];
+      }
+      return part.type === 'data-draft_image' ? [part.data.edit_id] : [];
+    })
+  );
+}
+
+/**
+ * Harness images are large: the model sees them only for the latest inspect_glyph per gesture
+ * and the newest traces — at least the last 2, and older ones until a batch of 4 can go at once,
+ * so the cached history stays the same for several turns. The stored conversation keeps every
  * image; only the model's copy is trimmed.
  */
 export function pruneHarnessImages(messages: AgentUIMessage[]): AgentUIMessage[] {
   const keep = new Set<string>();
   const inspected = new Set<number>();
-  let traces = 0;
   for (let m = messages.length - 1; m >= 0; m--) {
     const parts = messages[m]!.parts;
     for (let p = parts.length - 1; p >= 0; p--) {
@@ -57,15 +77,13 @@ export function pruneHarnessImages(messages: AgentUIMessage[]): AgentUIMessage[]
           inspected.add(part.output.gesture_id);
           keep.add(part.toolCallId);
         }
-      } else if (part.type === 'tool-trace_strokes' && part.state === 'output-available') {
-        if (traces < 2) keep.add(part.toolCallId);
-        traces++;
-      } else if (part.type === 'data-draft_image') {
-        if (traces < 2) keep.add(part.data.edit_id);
-        traces++;
       }
     }
   }
+  const traces = traceImageIds(messages);
+  const cutoff =
+    Math.floor(Math.max(0, traces.length - KEEP_TRACE_IMAGES) / PRUNE_BATCH) * PRUNE_BATCH;
+  traces.slice(cutoff).forEach((id) => keep.add(id));
   return messages.map((message) => ({
     ...message,
     parts: message.parts.map((part): Part => {
@@ -100,20 +118,43 @@ export const withResolvedRefs = (
   ]
 });
 
+const EPHEMERAL = { openrouter: { cacheControl: { type: 'ephemeral' } } } as const;
+
 /**
  * Mark the end of the conversation as a cache breakpoint (the system prompt has the other one).
- * The reply's later steps (after each tool call) and the next turn then read the whole history
- * from cache instead of paying for it again. Ignored by models that cache automatically.
+ * The route marks the history; `prepareStep` marks each later step of the reply, so the tool
+ * results it adds are cached too instead of being paid in full on every step. Providers that
+ * cache automatically ignore it.
+ *
+ * A tool message's own mark is copied onto every result in it, and Anthropic takes at most 4
+ * marks per request: so only its last result is marked.
  */
 export function withHistoryCacheBreakpoint(messages: ModelMessage[]): ModelMessage[] {
   const last = messages.at(-1);
   if (!last) return messages;
-  const marked: ModelMessage = {
-    ...last,
-    providerOptions: {
-      ...last.providerOptions,
-      openrouter: { ...last.providerOptions?.openrouter, cacheControl: { type: 'ephemeral' } }
-    }
-  };
+  let marked: ModelMessage;
+  if (last.role === 'tool') {
+    let at = last.content.length - 1;
+    while (at >= 0 && last.content[at]!.type !== 'tool-result') at--;
+    const final = last.content[at];
+    if (!final || final.type !== 'tool-result') return messages;
+    const content = [...last.content];
+    content[at] = {
+      ...final,
+      providerOptions: {
+        ...final.providerOptions,
+        openrouter: { ...final.providerOptions?.openrouter, ...EPHEMERAL.openrouter }
+      }
+    };
+    marked = { ...last, content };
+  } else {
+    marked = {
+      ...last,
+      providerOptions: {
+        ...last.providerOptions,
+        openrouter: { ...last.providerOptions?.openrouter, ...EPHEMERAL.openrouter }
+      }
+    };
+  }
   return [...messages.slice(0, -1), marked];
 }

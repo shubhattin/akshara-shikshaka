@@ -65,3 +65,38 @@ describe('mentions in the Gesture Creator', () => {
     expect(context.trim().endsWith('</referenced_gesture>')).toBe(true);
   });
 });
+
+describe('style guides', () => {
+  // script_id → a phrase only that script's guide has
+  const GUIDES: [number, string, string][] = [
+    [1, 'Devanagari', 'shirorekha'],
+    [2, 'Telugu', 'talakaṭṭu'],
+    [5, 'Bengali', 'mātrā'],
+    [6, 'Kannada', 'talakaṭṭu'],
+    [7, 'Gujarati', 'no headline'],
+    [8, 'Malayalam', 'Chandrakkala'],
+    [9, 'Odia', 'the hood']
+  ];
+
+  it.each(GUIDES)(
+    'sends the guide of script %i (%s) with its first mention',
+    (script_id, name, phrase) => {
+      const text = renderReferencedGesture(
+        { ...KSHA, script_id },
+        { savedStrokes: false, styleGuide: true }
+      );
+      expect(text).toContain(`<stroke_style_guide script="${name}">`);
+      expect(text).toContain(phrase);
+      expect(text).not.toContain('No style guide for this script yet');
+    }
+  );
+
+  it('falls back to a note for scripts without a guide', () => {
+    const text = renderReferencedGesture(
+      { ...KSHA, script_id: 3 },
+      { savedStrokes: false, styleGuide: true }
+    );
+    expect(text).toContain('<stroke_style_guide script="Tamil">');
+    expect(text).toContain('No style guide for this script yet');
+  });
+});

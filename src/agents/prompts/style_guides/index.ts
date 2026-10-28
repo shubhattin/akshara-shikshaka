@@ -1,5 +1,9 @@
 import type { script_list_type } from '~/state/lang_list';
+import { BENGALI_GUIDE } from './bengali';
 import { DEVANAGARI_GUIDE } from './devanagari';
+import { GUJARATI_GUIDE } from './gujarati';
+import { MALAYALAM_GUIDE } from './malayalam';
+import { ODIA_GUIDE } from './odia';
 import { TELUGU_KANNADA_GUIDE } from './telugu_kannada';
 
 /**
@@ -10,7 +14,11 @@ import { TELUGU_KANNADA_GUIDE } from './telugu_kannada';
 const STYLE_GUIDES = new Map<script_list_type, string>([
   ['Devanagari', DEVANAGARI_GUIDE],
   ['Telugu', TELUGU_KANNADA_GUIDE],
-  ['Kannada', TELUGU_KANNADA_GUIDE]
+  ['Kannada', TELUGU_KANNADA_GUIDE],
+  ['Malayalam', MALAYALAM_GUIDE],
+  ['Odia', ODIA_GUIDE],
+  ['Bengali', BENGALI_GUIDE],
+  ['Gujarati', GUJARATI_GUIDE]
 ]);
 
 const NO_GUIDE = `No style guide for this script yet. Rely on your knowledge of how it is handwritten; web_search a stroke-order reference only when you really don't know (an uncommon conjunct, a regional form).`;

@@ -31,11 +31,11 @@ const IMAGE_CAPTIONS = {
   glyph: 'The glyph on the 400×400 canvas with a coordinate grid (labels every 50).',
   skeleton:
     'Skeleton graph over the faint glyph: coloured, labelled edges (E…), black nodes (N…), dots ringed (D…).',
-  saved:
-    'Strokes currently saved for this gesture: numbered at their start, arrows show direction.',
   strokes:
     'Your draft over the faint glyph: numbered at each start dot, arrows show direction; red dashes = glyph parts no stroke covers.',
-  order: 'Writing order: one panel per stroke, earlier strokes grey, the current one coloured.'
+  order: 'Writing order: one panel per stroke, earlier strokes grey, the current one coloured.',
+  closeups:
+    'Close-ups of the knots (K…) and crossings (N…–N…) with your strokes: check each loop is closed, turns the right way and crosses straight through.'
 } as const satisfies Record<string, string>;
 
 type HarnessImageCaptionName = keyof typeof IMAGE_CAPTIONS;
@@ -49,6 +49,13 @@ function captionForImage(name: string): string {
   return isCaptionName(name) ? IMAGE_CAPTIONS[name] : name;
 }
 
+/**
+ * What older stored outputs carried about the strokes saved for the gesture (an image, a count,
+ * scores against them). The agent works from the glyph alone, so it never sees them.
+ */
+const SAVED_IMAGE = 'saved';
+const isSavedNote = (issue: string) => issue.startsWith('Note: ') && issue.includes('saved');
+
 function imageParts(
   images: HarnessImages | undefined,
   omitted: boolean | undefined
@@ -57,6 +64,7 @@ function imageParts(
     return [{ type: 'text', text: '(Images of this older call are omitted to save context.)' }];
   }
   return Object.entries(images).flatMap(([name, url]): ContentPart[] => {
+    if (name === SAVED_IMAGE) return [];
     const match = /^data:(image\/[a-z]+);base64,(.+)$/.exec(url);
     if (!match) return [];
     return [
@@ -68,12 +76,20 @@ function imageParts(
 
 const inspectGlyphTool = tool<InspectGlyphInput, InspectGlyphOutput>({
   description:
-    "Render a gesture's glyph exactly as learners see it and return its skeleton graph: nodes (pen ends, junctions), edges (centreline runs with ids), dots, plus images of the glyph on a grid, the labelled skeleton and the saved strokes. Call this first for a mentioned gesture.",
+    'Render a gesture\'s glyph exactly as learners see it and return its skeleton graph: nodes (pen ends, junctions), edges (centreline runs with ids), dots, knots (K…: round blobs of ink — filled-in loops, starting curls, ball ends), straight_through (edge ends that run straight into each other at junctions and crossings, "E5@N4" = edge E5 where it meets N4), plus images of the glyph on a grid and the labelled skeleton. Call this first for a mentioned gesture.',
   inputSchema: inspect_glyph_input_schema,
   // produced by our own harness; stored as-is
   outputSchema: z.custom<InspectGlyphOutput>(),
   toModelOutput: ({ output }) => {
-    const { images, images_omitted, ...data } = output;
+    // SAFETY: older stored outputs may still carry `existing_strokes`; it is dropped unseen.
+    const {
+      images,
+      images_omitted,
+      existing_strokes: _saved,
+      ...data
+    } = output as InspectGlyphOutput & {
+      existing_strokes?: number;
+    };
     return {
       type: 'content',
       value: [{ type: 'text', text: JSON.stringify(data) }, ...imageParts(images, images_omitted)]
@@ -83,7 +99,7 @@ const inspectGlyphTool = tool<InspectGlyphInput, InspectGlyphOutput>({
 
 const traceStrokesTool = tool<TraceStrokesInput, TraceStrokesOutput>({
   description:
-    'Draw a draft of the gesture: strokes in writing order, each a walk over the skeleton graph (path), freehand waypoints, or a dot. Returns self-checks (coverage of the glyph, ink, retracing, dots, and scores against the saved strokes if any) and images of the draft and its order. Look at the images, fix and call again until it is right.',
+    'Draw a draft of the gesture: strokes in writing order, each a walk over the skeleton graph (path, optionally with knot loops "K1"), freehand waypoints, or a dot. Returns self-checks (coverage of the glyph, ink, retracing, dots) and images of the draft, its order and close-ups of knots and crossings. Look at the images, fix and call again until it is right.',
   inputSchema: trace_strokes_input_schema,
   outputSchema: z.custom<TraceStrokesOutput>(),
   toModelOutput: ({ toolCallId, output }) => {
@@ -92,11 +108,19 @@ const traceStrokesTool = tool<TraceStrokesInput, TraceStrokesOutput>({
       trace_id: toolCallId,
       ...data,
       // numbered from 1, as in the images and the admin's draft editor
-      strokes: strokes.map(({ points, index, ...stroke }) => ({
-        stroke: index + 1,
-        ...stroke,
-        points: points.length
-      }))
+      issues: data.issues.filter((issue) => !isSavedNote(issue)),
+      strokes: strokes.map((traced) => {
+        // SAFETY: older stored outputs may still carry `reference` (scores against saved strokes).
+        const {
+          points,
+          index,
+          reference: _reference,
+          ...stroke
+        } = traced as typeof traced & {
+          reference?: unknown;
+        };
+        return { stroke: index + 1, ...stroke, points: points.length };
+      })
     };
     return {
       type: 'content',

@@ -191,8 +191,7 @@ describe('evaluateDraft', () => {
     const result = evaluateDraft({
       graph,
       strokes: [line([200, 120], [200, 300]), line([100, 120], [300, 120])],
-      onInk,
-      saved: []
+      onInk
     });
     expect(result.ok).toBe(true);
     expect(result.coverage).toBeGreaterThan(0.95);
@@ -202,24 +201,11 @@ describe('evaluateDraft', () => {
     const result = evaluateDraft({
       graph,
       strokes: [line([100, 120], [300, 120]), line([50, 350], [350, 350])],
-      onInk,
-      saved: []
+      onInk
     });
     expect(result.ok).toBe(false);
     expect(result.issues.join(' ')).toMatch(/covered/);
     expect(result.issues.join(' ')).toMatch(/Stroke 2 leaves the glyph/);
-  });
-
-  it('compares with saved strokes using the practice scorer', () => {
-    const stem = line([200, 120], [200, 300]);
-    const result = evaluateDraft({
-      graph,
-      strokes: [[...stem].reverse(), line([100, 120], [300, 120])],
-      onInk,
-      saved: [stem, line([100, 120], [300, 120])]
-    });
-    expect(result.perStroke[0]!.reference?.against_saved.issue).toBe('backwards');
-    expect(result.perStroke[1]!.reference?.against_saved.passed).toBe(true);
   });
 });
 

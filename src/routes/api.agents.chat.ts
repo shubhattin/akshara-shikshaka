@@ -27,7 +27,7 @@ import {
   withResolvedRefs
 } from '~/agents/server/chat_messages';
 import { resolveDraftEdit, withoutDraftParts } from '~/agents/server/draft_edits';
-import { resolveGestureRefs } from '~/agents/server/gesture_refs';
+import { resolveGestureRefs, withoutSavedStrokes } from '~/agents/server/gesture_refs';
 import { createServerGestureHarness } from '~/agents/tools/gesture_creator_tools';
 import { generateChatTitle } from '~/agents/server/chat_title';
 import { createReplyMeter } from '~/agents/server/cost';
@@ -153,7 +153,11 @@ async function handleChat(request: Request): Promise<Response> {
       // Fill a new message's @ mentions from the database, never from the client.
       const withRefs = withResolvedRefs(
         validated.at(-1)!,
-        yield* resolveGestureRefs(newMessageRefs(validated.at(-1)!))
+        yield* resolveGestureRefs(
+          newMessageRefs(validated.at(-1)!),
+          chat.agent_kind,
+          validated.slice(0, -1)
+        )
       );
       const earlier = validated.slice(0, -1);
       // An admin's draft edit is traced here; the client's copy of the result is never used.
@@ -171,6 +175,11 @@ async function handleChat(request: Request): Promise<Response> {
             })
           : withoutDraftParts(withRefs);
       const messages = [...earlier, incoming];
+      // What the model reads: older images dropped; the Gesture Creator never sees saved strokes.
+      const modelView = (all: AgentUIMessage[]) => {
+        const pruned = pruneHarnessImages(all);
+        return chat.agent_kind === 'gesture_creator' ? withoutSavedStrokes(pruned) : pruned;
+      };
       known = messages;
 
       // Title the chat in parallel with the first reply.
@@ -188,7 +197,7 @@ async function handleChat(request: Request): Promise<Response> {
       const result = yield* Effect.promise(async () =>
         agent.stream({
           prompt: withHistoryCacheBreakpoint(
-            await convertToModelMessages<AgentUIMessage>(pruneHarnessImages(messages), {
+            await convertToModelMessages<AgentUIMessage>(modelView(messages), {
               tools,
               convertDataPart: dataPartToModel
             })

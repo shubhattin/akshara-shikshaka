@@ -40,12 +40,21 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
   if (kind === 'gesture_creator') {
     Object.assign(tools, createGestureCreatorTools(history));
   }
+  // The Gesture Creator draws from the glyph alone: no database reads, so it cannot look up the
+  // strokes saved for a gesture. sql_query stays registered so older chats that used it still
+  // validate.
+  const activeTools =
+    kind === 'gesture_creator'
+      ? // SAFETY: Object.keys of the tools record yields exactly its tool names.
+        (Object.keys(tools) as (keyof AgentTools)[]).filter((name) => name !== 'sql_query')
+      : undefined;
   // Tracing is spatial work: give the creator more room to think.
   const effort = kind === 'gesture_creator' ? 'high' : 'medium';
   const agent = new ToolLoopAgent({
     model,
     instructions: toSystemMessages(agentInstructionSections(kind)),
     tools,
+    activeTools,
     stopWhen: stepCountIs(MAX_STEPS),
     // Move the cache breakpoint onto each step's newest message (the route marks the first step).
     prepareStep: ({ stepNumber, messages }) =>

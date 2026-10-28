@@ -86,7 +86,7 @@ describe('straight strokes on a serif glyph', () => {
       findTrace: () => undefined
     });
     const signal = new AbortController().signal;
-    const glyph = await harness.inspect({ gesture_id: 71, show_existing: false }, signal);
+    const glyph = await harness.inspect({ gesture_id: 71 }, signal);
     // the headline: the two highest free ends, joined through the junction between them
     const [left, right] = glyph.nodes
       .filter((n) => n.kind === 'end')

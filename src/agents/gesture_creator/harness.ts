@@ -6,10 +6,12 @@ import { evaluateDraft } from './evaluate';
 import type { CanvasEnv } from './canvas_env';
 import { inkClearance, inkLookup, rasterizeGlyph } from './glyph_raster';
 import {
+  renderCloseups,
   renderGlyphImage,
   renderOrderStrip,
   renderSkeletonImage,
-  renderStrokesImage
+  renderStrokesImage,
+  type CloseupArea
 } from './render_images';
 import {
   type DraftMark,
@@ -112,6 +114,30 @@ export type TracedEdit =
   | { ok: true; trace: TraceStrokesOutput; mark_info: DraftMarkInfo[]; image: string }
   | { ok: false; error: string };
 
+/** Small places worth a closer look in every draft: knots and crossings. */
+function closeupAreas(graph: SkeletonGraph): CloseupArea[] {
+  const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
+  const knots = graph.knots.map((k) => ({
+    label: k.id,
+    x: k.x,
+    y: k.y,
+    r: k.r + graph.strokeWidth
+  }));
+  const crossings = graph.straight.flatMap((s): CloseupArea[] => {
+    if (!s.via) return [];
+    const [a, b] = s.nodes.map((id) => nodes.get(id)!);
+    return [
+      {
+        label: `${a!.id}–${b!.id}`,
+        x: (a!.x + b!.x) / 2,
+        y: (a!.y + b!.y) / 2,
+        r: 2 * graph.strokeWidth
+      }
+    ];
+  });
+  return [...knots, ...crossings].slice(0, 6);
+}
+
 const glyphOf = (gesture: HarnessGesture): TracedGlyph => ({
   font_family: gesture.font_family,
   font_size: gesture.font_size,
@@ -150,30 +176,17 @@ export function createGestureHarness(deps: {
     return { ...(await session), gesture };
   };
 
-  const savedStrokes = (gesture: HarnessGesture) =>
-    [...gesture.gestures].sort((a, b) => a.index - b.index).map((g) => g.points);
-
   async function inspect(
     input: InspectGlyphInput,
     signal: AbortSignal
   ): Promise<InspectGlyphOutput> {
     const { gesture, mask, graph } = await openSession(input.gesture_id);
     if (signal.aborted) throw new HarnessCancelledError();
-    const saved = savedStrokes(gesture).filter((s) => s.length > 0);
+    // The strokes saved for the gesture are never shown: the agent works from the glyph alone.
     const images: HarnessImages = {
       glyph: renderGlyphImage(env, mask),
       skeleton: renderSkeletonImage(env, mask, graph)
     };
-    if (input.show_existing !== false && saved.length > 0) {
-      images.saved = renderStrokesImage(
-        env,
-        mask,
-        saved.map((points, index) => ({
-          points,
-          width: gesture.gestures[index]?.width ?? DEFAULTS.GESTURE_BRUSH_WIDTH
-        }))
-      );
-    }
     return {
       gesture_id: gesture.id,
       text: gesture.text,
@@ -194,7 +207,8 @@ export function createGestureHarness(deps: {
         end: e.points.at(-1)!
       })),
       dots: graph.dots,
-      existing_strokes: saved.length,
+      knots: graph.knots,
+      straight_through: graph.straight,
       images
     };
   }
@@ -213,7 +227,7 @@ export function createGestureHarness(deps: {
       }
     });
     const strokes = built.map((s) => s.points);
-    const evaluation = evaluateDraft({ graph, strokes, onInk, saved: savedStrokes(gesture) });
+    const evaluation = evaluateDraft({ graph, strokes, onInk });
     const width = DEFAULTS.GESTURE_BRUSH_WIDTH;
     const drawn = strokes.map((points) => ({ points, width }));
     const output: TraceStrokesOutput = {
@@ -231,10 +245,6 @@ export function createGestureHarness(deps: {
         };
         const label = input.strokes[index]!.label;
         if (label) stroke.label = label;
-        const reference = evaluation.perStroke[index]!.reference;
-        if (reference) {
-          stroke.reference = reference;
-        }
         return stroke;
       }),
       coverage: evaluation.coverage,
@@ -253,6 +263,8 @@ export function createGestureHarness(deps: {
       strokes: renderStrokesImage(env, mask, drawn, { uncovered: gaps }),
       order: renderOrderStrip(env, mask, drawn, graph.box)
     };
+    const areas = closeupAreas(graph);
+    if (areas.length > 0) output.images.closeups = renderCloseups(env, mask, drawn, areas);
     return output;
   }
 

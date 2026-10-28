@@ -4,9 +4,11 @@ import { Dialog, DialogContent, DialogTitle } from '~/components/ui/dialog';
 const CAPTIONS = {
   glyph: 'Glyph',
   skeleton: 'Skeleton graph',
+  // only in chats from before the agent stopped seeing saved strokes
   saved: 'Saved strokes',
   strokes: 'Draft',
-  order: 'Writing order'
+  order: 'Writing order',
+  closeups: 'Knots & crossings'
 } as const satisfies Record<string, string>;
 
 type HarnessCaptionName = keyof typeof CAPTIONS;

@@ -4,6 +4,13 @@
  * plans strokes as walks over this graph. Pure array code, no DOM.
  */
 
+import {
+  findKnots,
+  findStraightThrough,
+  type SkeletonKnot,
+  type StraightThrough
+} from './glyph_features';
+
 /** Binary glyph raster: 1 = ink. `scale` raster pixels per canvas unit. */
 export type GlyphMask = { data: Uint8Array; width: number; height: number; scale: number };
 
@@ -32,6 +39,10 @@ export type SkeletonGraph = {
   nodes: SkeletonNode[];
   edges: SkeletonEdge[];
   dots: SkeletonDot[];
+  /** Round blobs of ink: filled-in loops, starting curls, ball ends */
+  knots: SkeletonKnot[];
+  /** Edge ends that run straight into each other at junctions and crossings */
+  straight: StraightThrough[];
   /** Median stroke width of the glyph, canvas units */
   strokeWidth: number;
   /** Ink bounding box, canvas units */
@@ -556,12 +567,24 @@ export function buildSkeletonGraph(input: GlyphMask): SkeletonGraph {
   });
   dots.sort((p, q) => p.y - q.y || p.x - q.x);
   dots.forEach((dot, k) => (dot.id = `D${k + 1}`));
+  const strokeWidth = round1(strokeWidthPx / scale);
 
   return {
     nodes,
     edges,
     dots,
-    strokeWidth: round1(strokeWidthPx / scale),
+    knots: findKnots({
+      dist,
+      w,
+      h,
+      scale,
+      strokeWidthPx,
+      skip: (i) => dotComponents.has(inkLabel[i]!),
+      nodes,
+      edges
+    }),
+    straight: findStraightThrough(nodes, edges, strokeWidth),
+    strokeWidth,
     box
   };
 }

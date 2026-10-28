@@ -1,4 +1,5 @@
 import type { StrokeSpec } from './schemas';
+import type { SkeletonKnot } from './glyph_features';
 import type { SkeletonEdge, SkeletonGraph } from './skeleton';
 
 /**
@@ -418,6 +419,76 @@ function extendEnd(pts: Pt[], atStart: boolean, reach: number, onInk: (p: Pt) =>
   return atStart ? [ext, ...pts] : [...pts, ext];
 }
 
+type LoopDir = 'cw' | 'ccw' | undefined;
+
+/** Knot tokens ("K1", "K1:ccw") anywhere in a path: a small loop drawn where the stroke passes. */
+function splitKnotSteps(graph: SkeletonGraph, path: readonly string[]) {
+  const steps: string[] = [];
+  const loops: { knot: SkeletonKnot; dir: LoopDir }[] = [];
+  for (const token of path) {
+    const match = /^(K\d+)(?::(cw|ccw))?$/.exec(token.trim());
+    if (!match) {
+      steps.push(token);
+      continue;
+    }
+    const knot = graph.knots.find((k) => k.id === match[1]);
+    if (!knot) {
+      const known = graph.knots.map((k) => k.id).join(', ') || 'none';
+      throw new StrokePlanError(`Unknown knot ${match[1]} (knots: ${known})`);
+    }
+    // SAFETY: the regex group only matches 'cw' or 'ccw' (or nothing).
+    loops.push({ knot, dir: match[2] as LoopDir });
+  }
+  return { steps, loops };
+}
+
+/**
+ * A small closed loop where the stroke passes a knot, the way a hand draws the loop a font fills
+ * in: leave the stroke, go once around inside the blob, come back and carry on. Without a
+ * direction the loop turns the way the stroke is already curving round the knot, so it flows.
+ */
+export function spliceLoop(pts: Pt[], knot: SkeletonKnot, dir: LoopDir, strokeWidth: number): Pt[] {
+  const centre: Pt = [knot.x, knot.y];
+  const { index, distance } = nearestIndex(pts, centre);
+  if (distance > knot.r + strokeWidth * 0.6) {
+    throw new StrokePlanError(
+      `This stroke does not pass ${knot.id} (it comes ${Math.round(distance)} px from its centre ${knot.x},${knot.y}); put ${knot.id} in the stroke that runs through it`
+    );
+  }
+  const at = pts[index]!;
+  const before = pts[Math.max(0, index - 3)]!;
+  const after = pts[Math.min(pts.length - 1, index + 3)]!;
+  const len = dist(before, after) || 1;
+  const t: Pt = [(after[0] - before[0]) / len, (after[1] - before[1]) / len];
+  // on screen (y down), the centre of a clockwise turn lies to the right of the travel direction
+  const rightOfTravel = (p: Pt) => t[0] * (p[1] - at[1]) - t[1] * (p[0] - at[0]) > 0;
+  let centreOfLoop: Pt;
+  let radius: number;
+  let clockwise: boolean;
+  if (distance >= 0.35 * knot.r) {
+    // the stroke runs past the blob: circle its centre
+    radius = Math.min(distance, 0.7 * knot.r);
+    const k = radius / distance;
+    centreOfLoop = [at[0] + (centre[0] - at[0]) * k, at[1] + (centre[1] - at[1]) * k];
+    clockwise = dir ? dir === 'cw' : rightOfTravel(centre);
+  } else {
+    // the stroke runs through the middle: a loop to one side of it, inside the blob
+    radius = Math.max(2, 0.5 * knot.r);
+    clockwise = dir !== 'ccw';
+    const side = clockwise ? 1 : -1;
+    centreOfLoop = [at[0] - t[1] * radius * side, at[1] + t[0] * radius * side];
+  }
+  const start = Math.atan2(at[1] - centreOfLoop[1], at[0] - centreOfLoop[0]);
+  const steps = Math.max(24, Math.ceil((2 * Math.PI * radius) / DENSE_STEP));
+  const loop: Pt[] = [];
+  for (let k = 1; k <= steps; k++) {
+    // angles grow clockwise on screen
+    const a = start + (clockwise ? 1 : -1) * ((2 * Math.PI * k) / steps);
+    loop.push([centreOfLoop[0] + Math.cos(a) * radius, centreOfLoop[1] + Math.sin(a) * radius]);
+  }
+  return [...pts.slice(0, index + 1), ...loop, ...pts.slice(index + 1)];
+}
+
 export type BuiltStroke = { points: Pt[]; startNode?: string; endNode?: string };
 
 /** One stroke spec → finished points (canvas units, one decimal). */
@@ -447,7 +518,8 @@ export function buildStroke(
   if ('waypoints' in spec) {
     return { points: finish(smooth(catmullRom(spec.waypoints), WAYPOINT_SIGMA)) };
   }
-  const walk = walkPath(graph, spec.path);
+  const { steps, loops } = splitKnotSteps(graph, spec.path);
+  const walk = walkPath(graph, steps);
   let pts = smooth(walk.pts, PATH_SIGMA);
   const nodes = new Map(graph.nodes.map((n) => [n.id, n]));
   const reach = graph.strokeWidth * 0.45;
@@ -458,5 +530,7 @@ export function buildStroke(
   if (freeEnd) pts = straightenAt(pts, false, graph.strokeWidth, clearance);
   if (freeStart) pts = extendEnd(pts, true, reach, onInk);
   if (freeEnd) pts = extendEnd(pts, false, reach, onInk);
+  for (const loop of loops) pts = spliceLoop(pts, loop.knot, loop.dir, graph.strokeWidth);
+  if (loops.length > 0) pts = smooth(pts, WAYPOINT_SIGMA);
   return { points: finish(pts), startNode: walk.startNode, endNode: walk.endNode };
 }

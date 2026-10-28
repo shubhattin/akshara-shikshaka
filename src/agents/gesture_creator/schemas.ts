@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { AnimationsFunctionsEnumSchema, GestureSchema } from '~/tools/stroke_data/types';
+import type { SkeletonKnot as GlyphKnotInfo, StraightThrough } from './glyph_features';
+
+export type { GlyphKnotInfo, StraightThrough };
 
 /**
  * Tool contracts of the Gesture Creator. The tools run on the server; the chat UI renders their
@@ -31,11 +34,7 @@ const stroke_label_schema = z
 // ---------------------------------------------------------------- inspect_glyph
 
 export const inspect_glyph_input_schema = z.object({
-  gesture_id: z.int().positive().describe('text_gestures id of the mentioned gesture'),
-  show_existing: z
-    .boolean()
-    .optional()
-    .describe('Also render the strokes currently saved for this gesture (if any). Default true.')
+  gesture_id: z.int().positive().describe('text_gestures id of the mentioned gesture')
 });
 export type InspectGlyphInput = z.infer<typeof inspect_glyph_input_schema>;
 
@@ -79,7 +78,10 @@ export type InspectGlyphOutput = {
   nodes: SkeletonNodeInfo[];
   edges: SkeletonEdgeInfo[];
   dots: GlyphDotInfo[];
-  existing_strokes: number;
+  /** Round blobs of ink thicker than the strokes into them (filled-in loops, curls, ball ends); absent in older chats */
+  knots?: GlyphKnotInfo[];
+  /** Edge ends that run straight into each other at junctions and crossings; absent in older chats */
+  straight_through?: StraightThrough[];
   images: HarnessImages;
   images_omitted?: boolean;
 };
@@ -93,7 +95,7 @@ export const stroke_spec_schema = z.union([
         .array(z.string())
         .min(1)
         .describe(
-          'Node, edge, node, edge, … e.g. ["N2","E2","N4","E1","N6"]. Loop edges take a direction: "E4:cw" / "E4:ccw" (as seen on screen). Lift the pen mid-edge with "E2|to=240,120" (stop near that point) or start mid-edge with "E2|from=240,120".'
+          'Node, edge, node, edge, … e.g. ["N2","E2","N4","E1","N6"]. Loop edges take a direction: "E4:cw" / "E4:ccw" (as seen on screen). Lift the pen mid-edge with "E2|to=240,120" (stop near that point) or start mid-edge with "E2|from=240,120". Add a knot anywhere in the path ("K1", "K1:ccw") to draw a small closed loop inside it where the stroke passes.'
         ),
       label: stroke_label_schema
     })
@@ -125,13 +127,6 @@ export const trace_strokes_input_schema = z.object({
 });
 export type TraceStrokesInput = z.infer<typeof trace_strokes_input_schema>;
 
-export type ReferenceCheck = {
-  /** This stroke scored against the saved stroke with the same index (as if a learner drew it) */
-  against_saved: { passed: boolean; score: number; issue: string | null; matched_stroke?: number };
-  /** The saved stroke scored with this draft as the practice reference */
-  saved_against_draft: { passed: boolean; score: number; issue: string | null };
-};
-
 export type TracedStroke = {
   index: number;
   /** The plan's name for the part this stroke draws */
@@ -142,7 +137,6 @@ export type TracedStroke = {
   end: [number, number];
   /** Share of points outside the glyph ink */
   off_ink: number;
-  reference?: ReferenceCheck;
 };
 
 /** The glyph settings a draft was traced against; a proposal is refused if they changed since. */
@@ -155,7 +149,7 @@ export type TracedGlyph = {
 export type TraceStrokesOutput = {
   gesture_id: number;
   glyph: TracedGlyph;
-  /** No blocking issue found (coverage, ink, reference). Still review the images. */
+  /** No blocking issue found (coverage, ink, retracing, dots). Still review the images. */
   ok: boolean;
   strokes: TracedStroke[];
   /** Share of the glyph skeleton covered by some stroke */

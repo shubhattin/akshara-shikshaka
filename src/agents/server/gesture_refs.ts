@@ -4,8 +4,10 @@ import { gesture_categories, gesture_text_key_category_join, text_gestures } fro
 import { dbRunHttp } from '~/effect/database';
 import { get_script_from_id } from '~/state/lang_list';
 import type { Gesture } from '~/tools/stroke_data/types';
+import type { AgentKind } from '~/agents/agent_kinds';
 import { mentionToken } from '~/agents/gesture_refs';
-import type { GestureRefData } from '~/agents/ui_message';
+import { STYLE_GUIDE_TAG, styleGuideBlock } from '~/agents/prompts/style_guides';
+import type { AgentUIMessage, GestureRefData } from '~/agents/ui_message';
 
 type RefGestureRow = {
   id: number;
@@ -29,28 +31,77 @@ const strokeLength = (points: Gesture['points']) => {
 const pointText = (p: Gesture['points'][number] | undefined) =>
   p ? `${Math.round(p[0])},${Math.round(p[1])}` : '—';
 
-/** One mentioned gesture for the model: metadata and a stroke summary, never raw points. */
-export function renderReferencedGesture(row: RefGestureRow): string {
-  const strokes = [...row.gestures]
-    .sort((a, b) => a.index - b.index)
-    .filter((g) => g.points.length > 0);
+const SAVED_STROKES_LINE = /^saved strokes/;
+
+/**
+ * One mentioned gesture for the model: metadata and, for the general agent, a summary of its
+ * saved strokes (never raw points). The Gesture Creator gets no saved strokes: it draws from the
+ * glyph alone, so a draft is never a copy of what is saved.
+ */
+export function renderReferencedGesture(
+  row: RefGestureRow,
+  options: { savedStrokes: boolean; styleGuide: boolean }
+): string {
+  const script = get_script_from_id(row.script_id);
   const lines = [
     `<referenced_gesture id="${row.id}" mention="${mentionToken(row)}">`,
     `text: ${row.text}`,
-    `script: ${get_script_from_id(row.script_id) ?? row.script_id} (script_id ${row.script_id})`,
+    `script: ${script ?? row.script_id} (script_id ${row.script_id})`,
     `category: ${row.category ?? '(none)'}`,
-    `glyph: font ${row.font_family}, size ${row.font_size}, offset ${row.text_center_offset.join(',')}`,
-    strokes.length > 0
-      ? `saved strokes (${strokes.length}), canvas 400×400, y down:`
-      : 'saved strokes: none yet'
+    `glyph: font ${row.font_family}, size ${row.font_size}, offset ${row.text_center_offset.join(',')}`
   ];
-  strokes.forEach((g, k) => {
+  if (options.savedStrokes) {
+    const strokes = [...row.gestures]
+      .sort((a, b) => a.index - b.index)
+      .filter((g) => g.points.length > 0);
     lines.push(
-      `  ${k + 1}. ${pointText(g.points[0])} → ${pointText(g.points.at(-1))}, length ${strokeLength(g.points)}, pace ${g.duration}ms/200px, ${g.anim_fn}, width ${g.width}`
+      strokes.length > 0
+        ? `saved strokes (${strokes.length}), canvas 400×400, y down:`
+        : 'saved strokes: none yet'
     );
-  });
+    strokes.forEach((g, k) => {
+      lines.push(
+        `  ${k + 1}. ${pointText(g.points[0])} → ${pointText(g.points.at(-1))}, length ${strokeLength(g.points)}, pace ${g.duration}ms/200px, ${g.anim_fn}, width ${g.width}`
+      );
+    });
+  }
   lines.push('</referenced_gesture>');
+  if (options.styleGuide && script) lines.push(styleGuideBlock(script));
   return lines.join('\n');
+}
+
+/** Scripts whose style guide an earlier message of the chat already carries. */
+export function guidedScripts(messages: readonly AgentUIMessage[]): Set<number> {
+  const out = new Set<number>();
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (part.type === 'data-gesture_ref' && part.data.context?.includes(`<${STYLE_GUIDE_TAG}`)) {
+        out.add(part.data.script_id);
+      }
+    }
+  }
+  return out;
+}
+
+/** Drop the saved-stroke summary from mentions stored before the Gesture Creator stopped seeing it. */
+function hideSavedStrokes(context: string): string {
+  const lines = context.split('\n');
+  const from = lines.findIndex((line) => SAVED_STROKES_LINE.test(line));
+  if (from === -1) return context;
+  const to = lines.findIndex((line, i) => i > from && line.startsWith('</referenced_gesture>'));
+  return [...lines.slice(0, from), ...lines.slice(to === -1 ? lines.length : to)].join('\n');
+}
+
+/** The Gesture Creator's view of a chat: mentions without saved strokes. */
+export function withoutSavedStrokes(messages: AgentUIMessage[]): AgentUIMessage[] {
+  return messages.map((message) => ({
+    ...message,
+    parts: message.parts.map((part) =>
+      part.type === 'data-gesture_ref' && part.data.context
+        ? { ...part, data: { ...part.data, context: hideSavedStrokes(part.data.context) } }
+        : part
+    )
+  }));
 }
 
 const loadRefGestures = Effect.fn('agents.load_ref_gestures')(function* (ids: number[]) {
@@ -82,23 +133,31 @@ const loadRefGestures = Effect.fn('agents.load_ref_gestures')(function* (ids: nu
 
 /**
  * Fill each `@` mention with its gesture rendered for the model. Mentions of gestures that no
- * longer exist are dropped.
+ * longer exist are dropped. In the Gesture Creator the first mention of each script also carries
+ * that script's style guide.
  */
 export const resolveGestureRefs = Effect.fn('agents.resolve_gesture_refs')(function* (
-  refs: GestureRefData[]
+  refs: GestureRefData[],
+  kind: AgentKind,
+  /** The chat so far: a script's style guide is sent with its first mention only */
+  earlier: readonly AgentUIMessage[]
 ) {
   if (refs.length === 0) return [];
+  const creator = kind === 'gesture_creator';
+  const guided = guidedScripts(earlier);
   const rows = yield* loadRefGestures([...new Set(refs.map((ref) => ref.id))]);
   const byId = new Map(rows.map((row) => [row.id, row]));
   return refs.flatMap((ref): GestureRefData[] => {
     const row = byId.get(ref.id);
     if (!row) return [];
+    const styleGuide = creator && !guided.has(row.script_id);
+    if (styleGuide) guided.add(row.script_id);
     return [
       {
         id: row.id,
         text: row.text,
         script_id: row.script_id,
-        context: renderReferencedGesture(row)
+        context: renderReferencedGesture(row, { savedStrokes: !creator, styleGuide })
       }
     ];
   });

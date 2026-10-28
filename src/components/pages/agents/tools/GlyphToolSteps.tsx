@@ -77,8 +77,8 @@ export function InspectGlyphStep({
           </TraceTitle>
           <TraceDescription>
             {out.nodes.length} nodes · {out.edges.length} edges
-            {out.dots.length ? ` · ${out.dots.length} dots` : ''} · {out.existing_strokes} saved
-            strokes
+            {out.dots.length ? ` · ${out.dots.length} dots` : ''}
+            {out.knots?.length ? ` · ${out.knots.length} knots` : ''}
           </TraceDescription>
         </TraceLine>
       </TraceCollapsibleTrigger>

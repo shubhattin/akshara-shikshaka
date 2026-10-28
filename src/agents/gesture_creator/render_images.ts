@@ -168,6 +168,24 @@ export function renderSkeletonImage(env: CanvasEnv, mask: GlyphMask, graph: Skel
     ctx.strokeText(node.id, x + 10, y + 18);
     ctx.fillText(node.id, x + 10, y + 18);
   }
+  for (const knot of graph.knots) {
+    ctx.save();
+    ctx.strokeStyle = '#ea580c';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 5]);
+    ctx.beginPath();
+    ctx.arc(knot.x * SCALE, knot.y * SCALE, knot.r * SCALE + 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    label(
+      env,
+      ctx,
+      knot.id,
+      (knot.x + knot.r) * SCALE + 16,
+      (knot.y - knot.r) * SCALE - 8,
+      '#ea580c'
+    );
+  }
   for (const dot of graph.dots) {
     ctx.strokeStyle = '#7c3aed';
     ctx.lineWidth = 3;
@@ -315,6 +333,55 @@ export function renderOrderStrip(
     ctx.strokeStyle = '#e5e5e5';
     ctx.strokeRect(ox + 0.5, oy + 0.5, panel - 1, panel - 1);
     label(env, ctx, `Stroke ${index + 1}`, ox + 46, oy + 18, color);
+  });
+  return el.toDataURL('image/png');
+}
+
+export type CloseupArea = { label: string; x: number; y: number; r: number };
+
+/**
+ * Enlarged views of small places that are hard to judge on the full image (knots, crossings):
+ * one panel each, the strokes in their colours with direction arrows.
+ */
+export function renderCloseups(
+  env: CanvasEnv,
+  mask: GlyphMask,
+  strokes: DrawnStroke[],
+  areas: CloseupArea[]
+): string {
+  const panel = 320;
+  const perRow = Math.min(3, Math.max(1, areas.length));
+  const rows = Math.ceil(areas.length / perRow);
+  const { el, ctx } = canvas(env, panel * perRow, panel * rows);
+  areas.forEach((area, index) => {
+    const side = Math.max(48, area.r * 2.6);
+    const k = panel / (side * SCALE);
+    const ox = (index % perRow) * panel;
+    const oy = Math.floor(index / perRow) * panel;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(ox, oy, panel, panel);
+    ctx.clip();
+    ctx.translate(ox, oy);
+    ctx.scale(k, k);
+    ctx.translate(-(area.x - side / 2) * SCALE, -(area.y - side / 2) * SCALE);
+    ctx.drawImage(glyphLayer(env, mask, [205, 205, 205, 255]), 0, 0, SIZE, SIZE);
+    strokes.forEach((stroke, i) => paintStroke(env, ctx, stroke, strokeColor(i), 0.35));
+    strokes.forEach((stroke, i) => {
+      const color = strokeColor(i);
+      const pts = toRaster(stroke.points);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5 / k;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      pts.forEach(([x, y], j) => (j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+      ctx.stroke();
+      arrowsAlong(ctx, pts, color, 40);
+    });
+    ctx.restore();
+    ctx.strokeStyle = '#e5e5e5';
+    ctx.strokeRect(ox + 0.5, oy + 0.5, panel - 1, panel - 1);
+    label(env, ctx, area.label, ox + 60, oy + 18, '#ea580c');
   });
   return el.toDataURL('image/png');
 }

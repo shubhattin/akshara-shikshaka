@@ -16,20 +16,26 @@ export type InstructionSection = {
  * goes after the last section, so every turn of a chat reuses the whole prefix.
  */
 export function agentInstructionSections(kind: AgentKind = 'general'): InstructionSection[] {
-  const systemPrompt =
-    kind === 'gesture_creator' ? GESTURE_CREATOR_SYSTEM_PROMPT : GENERAL_SYSTEM_PROMPT;
+  const languages: InstructionSection = {
+    id: 'languages',
+    title: 'Languages & scripts',
+    content: `<languages>\n${buildLanguagesContext()}\n</languages>`
+  };
+  // The Gesture Creator has no database access (see create_agent), so no schema either.
+  if (kind === 'gesture_creator') {
+    return [
+      { id: 'system_prompt', title: 'System prompt', content: GESTURE_CREATOR_SYSTEM_PROMPT },
+      languages
+    ];
+  }
   return [
-    { id: 'system_prompt', title: 'System prompt', content: systemPrompt },
+    { id: 'system_prompt', title: 'System prompt', content: GENERAL_SYSTEM_PROMPT },
     {
       id: 'database_schema',
       title: 'Database schema',
       content: `<database_schema>\n${describeDatabaseSchema()}\n</database_schema>`
     },
-    {
-      id: 'languages',
-      title: 'Languages & scripts',
-      content: `<languages>\n${buildLanguagesContext()}\n</languages>`
-    }
+    languages
   ];
 }
 

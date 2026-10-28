@@ -40,7 +40,6 @@ const inspect = (
           nodes: [],
           edges: [],
           dots: [],
-          existing_strokes: 0,
           images: { glyph: 'data:image/png;base64,AA' }
         }
       };

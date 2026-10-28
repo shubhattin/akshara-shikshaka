@@ -1,12 +1,10 @@
-import { scoreGlyphStroke } from '~/tools/stroke_data/gesture_scoring';
-import type { GesturePoints } from '~/tools/stroke_data/types';
-import type { ReferenceCheck, TraceStrokesOutput } from './schemas';
+import type { TraceStrokesOutput } from './schemas';
 import type { SkeletonGraph } from './skeleton';
 
 /**
  * Self-checks for a drafted set of strokes: does it cover the whole glyph, stay on the ink,
- * avoid drawing parts twice and hit every dot — and, when the gesture already has saved
- * strokes, how it scores against them with the practice scorer (both ways).
+ * avoid drawing parts twice and hit every dot. Strokes saved for the gesture are never compared:
+ * the draft is judged on the glyph alone.
  */
 
 type Pt = [number, number];
@@ -48,23 +46,11 @@ const nearestDistance = (p: Pt, pts: readonly Pt[]) => {
   return Math.sqrt(best);
 };
 
-const toReference = (score: ReturnType<typeof scoreGlyphStroke>) => {
-  const reference: ReferenceCheck['against_saved'] = {
-    passed: score.passed,
-    score: Math.round(score.score * 100) / 100,
-    issue: score.issue
-  };
-  if (score.matchedStrokeIndex !== undefined) {
-    reference.matched_stroke = score.matchedStrokeIndex + 1;
-  }
-  return reference;
-};
-
 export type DraftEvaluation = Omit<
   TraceStrokesOutput,
   'gesture_id' | 'glyph' | 'images' | 'strokes'
 > & {
-  perStroke: { off_ink: number; reference?: ReferenceCheck }[];
+  perStroke: { off_ink: number }[];
   /** Uncovered skeleton runs with their points, for drawing */
   gaps: { from: Pt; to: Pt; points: Pt[] }[];
 };
@@ -73,8 +59,6 @@ export function evaluateDraft(input: {
   graph: SkeletonGraph;
   strokes: Pt[][];
   onInk: (p: Pt) => boolean;
-  /** Strokes currently saved for the gesture (empty strokes ignored) */
-  saved: GesturePoints[][];
 }): DraftEvaluation {
   const { graph, strokes, onInk } = input;
   const tol = Math.max(4, graph.strokeWidth * 0.55);
@@ -134,18 +118,9 @@ export function evaluateDraft(input: {
     )
     .map((dot) => dot.id);
 
-  const saved = input.saved.filter((s) => s.length > 0);
-  const perStroke = strokes.map((stroke, index) => {
-    const off = stroke.length > 0 ? stroke.filter((p) => !onInk(p)).length / stroke.length : 1;
-    let reference: ReferenceCheck | undefined;
-    if (saved.length > 0 && saved[index]) {
-      reference = {
-        against_saved: toReference(scoreGlyphStroke(stroke, saved, index)),
-        saved_against_draft: toReference(scoreGlyphStroke(saved[index]!, strokes, index))
-      };
-    }
-    return { off_ink: round3(off), reference };
-  });
+  const perStroke = strokes.map((stroke) => ({
+    off_ink: round3(stroke.length > 0 ? stroke.filter((p) => !onInk(p)).length / stroke.length : 1)
+  }));
 
   const issues: string[] = [];
   if (coverage < COVERAGE_OK) {
@@ -169,20 +144,6 @@ export function evaluateDraft(input: {
       `${pct(retraceShare)} of the glyph is drawn by two strokes; check for overlapping strokes`
     );
   if (missedDots.length > 0) issues.push(`Dots not drawn: ${missedDots.join(', ')}`);
-  if (saved.length > 0 && saved.length !== strokes.length) {
-    issues.push(
-      `Note: the saved gesture has ${saved.length} strokes, this draft ${strokes.length}`
-    );
-  }
-  perStroke.forEach((s, index) => {
-    const ref = s.reference?.against_saved;
-    if (ref && !ref.passed) {
-      issues.push(
-        `Note: stroke ${index + 1} does not match saved stroke ${index + 1} (${ref.issue}${ref.matched_stroke ? `, it matches saved stroke ${ref.matched_stroke}` : ''}, score ${ref.score})`
-      );
-    }
-  });
-
   const ok =
     coverage >= COVERAGE_OK &&
     perStroke.every((s) => s.off_ink <= OFF_INK_OK) &&

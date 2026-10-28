@@ -12,7 +12,9 @@ import {
   text_lesson_words,
   text_lessons,
   user_gesture_recordings,
-  user_gesture_recording_vectors
+  user_gesture_recording_vectors,
+  agent_chats,
+  agent_messages
 } from '~/db/schema';
 import {
   AudioAssetsSchemaZod,
@@ -25,7 +27,9 @@ import {
   GestureTextKeyCategoryJoinSchemaZod,
   LessonCategoriesSchemaZod,
   UserGestureRecordingsSchemaZod,
-  UserGestureRecordingVectorsSchemaZod
+  UserGestureRecordingVectorsSchemaZod,
+  AgentChatsSchemaZod,
+  AgentMessagesSchemaZod
 } from '~/db/schema_zod';
 import { z } from 'zod';
 import { type InferInsertModel, sql } from 'drizzle-orm';
@@ -55,13 +59,17 @@ const main = async () => {
       audio_assets: AudioAssetsSchemaZod.array(),
       image_assets: ImageAssetsSchemaZod.array(),
       user_gesture_recordings: UserGestureRecordingsSchemaZod.array(),
-      user_gesture_recording_vectors: UserGestureRecordingVectorsSchemaZod.array()
+      user_gesture_recording_vectors: UserGestureRecordingVectorsSchemaZod.array(),
+      // Optional so backups written before agent chats existed still restore.
+      agent_chats: AgentChatsSchemaZod.array().optional().default([]),
+      agent_messages: AgentMessagesSchemaZod.array().optional().default([])
     })
     .parse(JSON.parse((await readFile(`./out/${in_file_name}`)).toString()));
 
   dbClient_ext.transaction(async (tx) => {
     // deleting all the tables initially
     try {
+      await tx.delete(agent_messages);
       await tx.delete(text_gestures);
       await tx.delete(text_lessons);
       await tx.delete(gesture_text_key_category_join);
@@ -73,6 +81,7 @@ const main = async () => {
       await tx.delete(image_assets);
       await tx.delete(user_gesture_recordings);
       await tx.delete(user_gesture_recording_vectors);
+      await tx.delete(agent_chats);
       console.log(chalk.green('✓ Deleted All Tables Successfully'));
     } catch (e) {
       console.log(chalk.red('✗ Error while deleting tables:'), chalk.yellow(e));
@@ -209,6 +218,28 @@ const main = async () => {
         chalk.red('✗ Error while inserting user gesture recording vectors:'),
         chalk.yellow(e)
       );
+    }
+
+    // inserting agent chats (before agent_messages: FK chat_id)
+    try {
+      await tx.insert(agent_chats).values(data.agent_chats);
+      console.log(
+        chalk.green('✓ Successfully added values into table'),
+        chalk.blue('`agent_chats`')
+      );
+    } catch (e) {
+      console.log(chalk.red('✗ Error while inserting agent chats:'), chalk.yellow(e));
+    }
+
+    // inserting agent messages
+    try {
+      await tx.insert(agent_messages).values(data.agent_messages);
+      console.log(
+        chalk.green('✓ Successfully added values into table'),
+        chalk.blue('`agent_messages`')
+      );
+    } catch (e) {
+      console.log(chalk.red('✗ Error while inserting agent messages:'), chalk.yellow(e));
     }
 
     // resetting SERIAL

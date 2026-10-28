@@ -11,9 +11,13 @@ import {
   lesson_gestures,
   gesture_text_key_category_join,
   user_gesture_recording_vectors,
-  user_gesture_recordings
+  user_gesture_recordings,
+  agent_chats,
+  agent_messages
 } from './schema';
 import { GestureSchema } from '~/tools/stroke_data/types';
+import { agent_model_id_schema } from '~/agents/models';
+import { agent_kind_schema } from '~/agents/agent_kinds';
 
 export const TextGesturesSchemaZod = createSelectSchema(text_gestures, {
   created_at: z.coerce.date(),
@@ -65,3 +69,16 @@ export const UserGestureRecordingsSchemaZod = createSelectSchema(user_gesture_re
 export const UserGestureRecordingVectorsSchemaZod = createSelectSchema(
   user_gesture_recording_vectors
 );
+
+export const AgentChatsSchemaZod = createSelectSchema(agent_chats, {
+  model: agent_model_id_schema,
+  agent_kind: agent_kind_schema,
+  created_at: z.coerce.date(),
+  updated_at: z.coerce.date(),
+  stop_requested_at: z.coerce.date().optional().nullable()
+});
+
+export const AgentMessagesSchemaZod = createSelectSchema(agent_messages, {
+  role: z.enum(['system', 'user', 'assistant']),
+  created_at: z.coerce.date()
+});

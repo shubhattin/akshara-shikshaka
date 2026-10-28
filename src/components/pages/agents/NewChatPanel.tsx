@@ -25,7 +25,7 @@ export function NewChatPanel() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [agentKind, setAgentKind] = useState<AgentKind>('general');
+  const [agentKind, setAgentKind] = useState<AgentKind>('gesture_creator');
   const [pickedModel, setPickedModel] = useState<AgentModelId | null>(null);
   const model = pickedModel ?? AGENT_KIND_META[agentKind].defaultModel;
 

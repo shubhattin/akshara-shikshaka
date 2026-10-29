@@ -16,7 +16,7 @@ import { ReasoningStep } from '../tools/ReasoningStep';
 import { SqlQueryStep } from '../tools/SqlQueryStep';
 import { WebSearchStep } from '../tools/WebSearchStep';
 import { AgentMarkdown } from './AgentMarkdown';
-import { ReplyCost } from './ChatCost';
+import { CopyReplyButton, ReplyCost } from './ChatCost';
 import { useAgentChatContext } from './agent_chat_context';
 import { groupParts, messageText, type AgentPart, type StepPart } from './message_parts';
 
@@ -158,7 +158,12 @@ export function AssistantMessage({
           }
         })}
         {waiting ? <ThinkingLine /> : null}
-        {!streaming ? <ReplyCost metadata={message.metadata} /> : null}
+        {!streaming ? (
+          <div className="flex items-center gap-0.5">
+            <ReplyCost metadata={message.metadata} />
+            <CopyReplyButton text={messageText(message)} />
+          </div>
+        ) : null}
       </MessageContent>
     </Message>
   );

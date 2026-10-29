@@ -9,7 +9,7 @@ import {
   getGestureForAgent,
   listMentionableGestures
 } from '~/agents/server/gestures';
-import { agentInstructionSections } from '~/agents/prompts/instructions';
+import { agentContext } from '~/agents/prompts/instructions';
 import {
   createAgentChat,
   deleteAgentChat,
@@ -60,7 +60,7 @@ const delete_chat_route = protectedAdminProcedure
 /** Everything the agent reads before the conversation, for the Context dialog. */
 const get_context_route = protectedAdminProcedure
   .input(z.object({ agent_kind: agent_kind_schema }))
-  .query(({ input }) => agentInstructionSections(input.agent_kind));
+  .query(({ input }) => agentContext(input.agent_kind));
 
 /** Every gesture (all scripts), for the composer's `@` mention picker. */
 const list_mentionable_gestures_route = protectedAdminProcedure.query(() =>

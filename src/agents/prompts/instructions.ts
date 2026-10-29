@@ -4,6 +4,7 @@ import { describeDatabaseSchema } from '~/agents/db_schema/describe_schema';
 import { GENERAL_SYSTEM_PROMPT } from './general';
 import { GESTURE_CREATOR_SYSTEM_PROMPT } from './gesture_creator';
 import { buildLanguagesContext } from './languages';
+import { styleGuideEntries } from './style_guides';
 
 export type InstructionSection = {
   id: 'system_prompt' | 'database_schema' | 'languages';
@@ -37,6 +38,17 @@ export function agentInstructionSections(kind: AgentKind = 'general'): Instructi
     },
     languages
   ];
+}
+
+/**
+ * What the context dialog shows: the instruction sections, then (Gesture Creator) the script style
+ * guides. The guides are not system messages: each rides with the first mention of its script.
+ */
+export function agentContext(kind: AgentKind = 'general') {
+  return {
+    sections: agentInstructionSections(kind),
+    style_guides: kind === 'gesture_creator' ? styleGuideEntries() : []
+  };
 }
 
 export function toSystemMessages(sections: InstructionSection[]): SystemModelMessage[] {

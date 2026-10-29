@@ -75,7 +75,9 @@ describe('style guides', () => {
     [6, 'Kannada', 'talakaṭṭu'],
     [7, 'Gujarati', 'no headline'],
     [8, 'Malayalam', 'Chandrakkala'],
-    [9, 'Odia', 'the hood']
+    [9, 'Odia', 'the hood'],
+    [3, 'Tamil', 'Puḷḷi'],
+    [4, 'Tamil-Extended', 'Puḷḷi']
   ];
 
   it.each(GUIDES)(
@@ -93,10 +95,12 @@ describe('style guides', () => {
 
   it('falls back to a note for scripts without a guide', () => {
     const text = renderReferencedGesture(
-      { ...KSHA, script_id: 3 },
+      { ...KSHA, script_id: 10 },
       { savedStrokes: false, styleGuide: true }
     );
-    expect(text).toContain('<stroke_style_guide script="Tamil">');
-    expect(text).toContain('No style guide for this script yet');
+    expect(text).toContain(
+      '<stroke_style_guide script="Sinhala">\nNo style guide for this script yet'
+    );
+    expect(text).toContain('Vowel signs by default');
   });
 });

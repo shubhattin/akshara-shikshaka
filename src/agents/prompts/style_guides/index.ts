@@ -34,13 +34,22 @@ a sign standing apart on the left of the consonant comes first, where it stands.
 
 export const STYLE_GUIDE_TAG = 'stroke_style_guide';
 
-/** Scripts with a style guide, each with the text the model reads (for the context dialog). */
-export function styleGuideEntries(): { scripts: script_list_type[]; guide: string }[] {
+/** A guide as Markdown for people: its plain section lines ("Order", "Strokes") become headings. */
+export function styleGuideMarkdown(guide: string): string {
+  return guide
+    .trim()
+    .split('\n')
+    .map((line) => (line && !/^[-\s]/.test(line) ? `### ${line}` : line))
+    .join('\n');
+}
+
+/** Each style guide with the scripts that share it, for the context dialog. */
+export function styleGuideEntries(): { scripts: script_list_type[]; markdown: string }[] {
   const byGuide = new Map<string, script_list_type[]>();
   for (const [script, guide] of STYLE_GUIDES) {
     byGuide.set(guide, [...(byGuide.get(guide) ?? []), script]);
   }
-  return [...byGuide].map(([guide, scripts]) => ({ scripts, guide: guide.trim() }));
+  return [...byGuide].map(([guide, scripts]) => ({ scripts, markdown: styleGuideMarkdown(guide) }));
 }
 
 /** The style guide block for a script, as the model reads it. */

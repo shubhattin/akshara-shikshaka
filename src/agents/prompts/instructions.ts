@@ -4,10 +4,10 @@ import { describeDatabaseSchema } from '~/agents/db_schema/describe_schema';
 import { GENERAL_SYSTEM_PROMPT } from './general';
 import { GESTURE_CREATOR_SYSTEM_PROMPT } from './gesture_creator';
 import { buildLanguagesContext } from './languages';
-import { STYLE_GUIDE_TAG, styleGuideEntries } from './style_guides';
+import { styleGuideEntries } from './style_guides';
 
 export type InstructionSection = {
-  id: 'system_prompt' | 'database_schema' | 'languages' | 'style_guides';
+  id: 'system_prompt' | 'database_schema' | 'languages';
   title: string;
   content: string;
 };
@@ -44,19 +44,11 @@ export function agentInstructionSections(kind: AgentKind = 'general'): Instructi
  * What the context dialog shows: the instruction sections, then (Gesture Creator) the script style
  * guides. The guides are not system messages: each rides with the first mention of its script.
  */
-export function agentContextSections(kind: AgentKind = 'general'): InstructionSection[] {
-  const sections = agentInstructionSections(kind);
-  if (kind !== 'gesture_creator') return sections;
-  const guides = styleGuideEntries().map(
-    ({ scripts, guide }) =>
-      `<${STYLE_GUIDE_TAG} script="${scripts.join(' / ')}">\n${guide}\n</${STYLE_GUIDE_TAG}>`
-  );
-  const note =
-    "Not part of the system prompt: each script's guide is sent once per chat, with the first @ mention of a gesture in that script.";
-  return [
-    ...sections,
-    { id: 'style_guides', title: 'Style guides', content: [note, ...guides].join('\n\n') }
-  ];
+export function agentContext(kind: AgentKind = 'general') {
+  return {
+    sections: agentInstructionSections(kind),
+    style_guides: kind === 'gesture_creator' ? styleGuideEntries() : []
+  };
 }
 
 export function toSystemMessages(sections: InstructionSection[]): SystemModelMessage[] {

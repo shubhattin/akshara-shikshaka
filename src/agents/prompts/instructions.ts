@@ -4,10 +4,11 @@ import { describeDatabaseSchema } from '~/agents/db_schema/describe_schema';
 import { GENERAL_SYSTEM_PROMPT } from './general';
 import { GESTURE_CREATOR_SYSTEM_PROMPT } from './gesture_creator';
 import { buildLanguagesContext } from './languages';
+import { buildSiteContext } from './site';
 import { styleGuideEntries } from './style_guides';
 
 export type InstructionSection = {
-  id: 'system_prompt' | 'database_schema' | 'languages';
+  id: 'system_prompt' | 'database_schema' | 'languages' | 'site';
   title: string;
   content: string;
 };
@@ -22,11 +23,17 @@ export function agentInstructionSections(kind: AgentKind = 'general'): Instructi
     title: 'Languages & scripts',
     content: `<languages>\n${buildLanguagesContext()}\n</languages>`
   };
+  const site: InstructionSection = {
+    id: 'site',
+    title: 'Site links',
+    content: `<site>\n${buildSiteContext()}\n</site>`
+  };
   // The Gesture Creator has no database access (see create_agent), so no schema either.
   if (kind === 'gesture_creator') {
     return [
       { id: 'system_prompt', title: 'System prompt', content: GESTURE_CREATOR_SYSTEM_PROMPT },
-      languages
+      languages,
+      site
     ];
   }
   return [
@@ -36,7 +43,8 @@ export function agentInstructionSections(kind: AgentKind = 'general'): Instructi
       title: 'Database schema',
       content: `<database_schema>\n${describeDatabaseSchema()}\n</database_schema>`
     },
-    languages
+    languages,
+    site
   ];
 }
 

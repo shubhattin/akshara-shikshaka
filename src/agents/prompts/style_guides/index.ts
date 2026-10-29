@@ -45,8 +45,12 @@ export function styleGuideMarkdown(guide: string): string {
 
 /** Each style guide with the scripts that share it, for the context dialog. */
 export function styleGuideEntries(): { scripts: script_list_type[]; markdown: string }[] {
+  // Tamil-Extended reuses the Tamil guide (same handwriting), so it is kept in
+  // STYLE_GUIDES for the model but hidden here to keep the dialog to one "Tamil" row.
+  const HIDDEN_FROM_DIALOG: readonly script_list_type[] = ['Tamil-Extended'];
   const byGuide = new Map<string, script_list_type[]>();
   for (const [script, guide] of STYLE_GUIDES) {
+    if (HIDDEN_FROM_DIALOG.includes(script)) continue;
     byGuide.set(guide, [...(byGuide.get(guide) ?? []), script]);
   }
   return [...byGuide].map(([guide, scripts]) => ({ scripts, markdown: styleGuideMarkdown(guide) }));

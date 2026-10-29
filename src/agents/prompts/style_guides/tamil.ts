@@ -1,5 +1,6 @@
 /**
- * Tamil (and Tamil-Extended). Vowel-sign order from the online-handwriting study of Aparna et
+ * Tamil. Tamil-Extended gestures reuse this guide (same handwriting).
+ * Vowel-sign order from the online-handwriting study of Aparna et
  * al. (IIT Madras / HP Labs, IWFHR 2004), whose automaton reads strokes in written order:
  * ெ / ே / ை, then the consonant, then ா or ள for ொ ோ ௌ; and C+i, C+ī, C+u, C+ū and C+puḷḷi
  * are one block with the consonant. HP Labs LipiTk Tamil traces (as tallied by the

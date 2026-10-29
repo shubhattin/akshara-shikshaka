@@ -13,7 +13,7 @@ describe('context dialog', () => {
       'Odia',
       'Bengali',
       'Gujarati',
-      'Tamil / Tamil-Extended'
+      'Tamil'
     ]);
     expect(style_guides[0]!.markdown.startsWith('### Order\n- Write the akṣara')).toBe(true);
   });

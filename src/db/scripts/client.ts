@@ -2,9 +2,11 @@ import dotenv from 'dotenv';
 import * as schema from '../schema';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { fileURLToPath } from 'url';
 import { dbMode } from '../../tools/kry.server';
 
-dotenv.config({ path: '../../../.env' });
+// relative to this file so scripts in subfolders (`seeds/`) find it too
+dotenv.config({ path: fileURLToPath(new URL('../../../.env', import.meta.url)) });
 
 /** `--prod` / `--preview` select the matching URL; otherwise the local URL. */
 export const dbUrl = {

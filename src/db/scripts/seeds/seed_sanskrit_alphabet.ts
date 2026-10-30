@@ -283,14 +283,16 @@ const seedLessons = async (
   categoryId: Map<string, number>,
   notes: string[]
 ) => {
+  // rows are written in batches: every round trip to a remote database costs ~100-200 ms
   const changes = [];
+  const newLessons: (typeof text_lessons.$inferInsert)[] = [];
   for (const item of ITEMS) {
     const category_id = categoryId.get(item.category)!;
     const lesson =
       before.lessons.find((l) => l.text === item.text) ??
       before.lessons.find((l) => l.text_key === item.key);
     if (!lesson) {
-      await tx.insert(text_lessons).values({
+      newLessons.push({
         lang_id: LANG_ID,
         base_word_script_id: script_list_obj[BASE_SCRIPT],
         text: item.text,
@@ -311,17 +313,20 @@ const seedLessons = async (
       changes.push({ text: item.text, key: item.key, change: 'moved', category: item.category });
     }
   }
+  if (newLessons.length > 0) await tx.insert(text_lessons).values(newLessons);
   printTable('New or moved lessons', changes);
 
   // positions: the items first, then the other lessons of the category in their current order
   const orderChanges = [];
+  const newOrders: { id: number; order: number }[] = [];
+  const allLessons = await tx.query.text_lessons.findMany({
+    columns: { id: true, text: true, order: true, category_id: true },
+    where: (tbl, { eq }) => eq(tbl.lang_id, LANG_ID)
+  });
   for (const { category } of ALPHABET) {
     const category_id = categoryId.get(category)!;
     const rank = new Map(ITEMS.filter((i) => i.category === category).map((i) => [i.text, i.rank]));
-    const lessons = await tx.query.text_lessons.findMany({
-      columns: { id: true, text: true, order: true },
-      where: (tbl, { and, eq }) => and(eq(tbl.category_id, category_id), eq(tbl.lang_id, LANG_ID))
-    });
+    const lessons = allLessons.filter((l) => l.category_id === category_id);
     lessons.sort(
       (a, b) =>
         (rank.get(a.text) ?? Infinity) - (rank.get(b.text) ?? Infinity) ||
@@ -333,14 +338,19 @@ const seedLessons = async (
         notes.push(`lesson ${lesson.text} in ${category} is not in the alphabet; kept after it`);
       }
       if (lesson.order === i + 1) continue;
-      await tx
-        .update(text_lessons)
-        .set({ order: i + 1 })
-        .where(eq(text_lessons.id, lesson.id));
+      newOrders.push({ id: lesson.id, order: i + 1 });
       const existed = before.lessons.some((l) => l.id === lesson.id);
       if (existed)
         orderChanges.push({ text: lesson.text, category, from: lesson.order, to: i + 1 });
     }
+  }
+  if (newOrders.length > 0) {
+    const values = newOrders.map(({ id, order }) => sql`(${id}::int, ${order}::smallint)`);
+    await tx.execute(sql`
+      UPDATE ${text_lessons} AS t SET "order" = v."order", updated_at = NOW()
+      FROM (VALUES ${sql.join(values, sql`, `)}) AS v(id, "order")
+      WHERE t.id = v.id
+    `);
   }
   printTable('Order changes of existing lessons', orderChanges);
 };
@@ -353,6 +363,7 @@ const seedGestures = async (
   notes: string[]
 ) => {
   const rows = [];
+  const newGestures: (typeof text_gestures.$inferInsert)[] = [];
   for (const script of GESTURE_SCRIPTS) {
     const script_id = script_list_obj[script];
     const added: string[] = [];
@@ -373,7 +384,7 @@ const seedGestures = async (
         }
         continue;
       }
-      await tx.insert(text_gestures).values({
+      newGestures.push({
         text,
         text_key: item.key,
         script_id,
@@ -386,6 +397,7 @@ const seedGestures = async (
     }
     rows.push({ script, added: added.length, new: added.join(' '), skipped: skipped.join(', ') });
   }
+  if (newGestures.length > 0) await tx.insert(text_gestures).values(newGestures);
   console.log(chalk.bold('\nNew gestures (no strokes yet)'));
   console.table(rows);
 };
@@ -393,21 +405,25 @@ const seedGestures = async (
 /** 4. Keys into their categories and lesson ↔ gesture links; 5. gesture orders. */
 const linkAndOrder = async (tx: Tx, before: State, categoryId: Map<string, number>) => {
   const joinChanges = [];
+  const joins: (typeof gesture_text_key_lesson_category_join.$inferInsert)[] = [];
   for (const item of ITEMS) {
     const lesson_category_id = categoryId.get(item.category)!;
     const prev = before.joins.find((j) => j.gesture_text_key === item.key);
     if (prev?.lesson_category_id === lesson_category_id) continue;
+    joins.push({ gesture_text_key: item.key, lesson_category_id, lang_id: LANG_ID });
+    joinChanges.push({ key: item.key, category: item.category, change: prev ? 'moved' : 'added' });
+  }
+  if (joins.length > 0) {
     await tx
       .insert(gesture_text_key_lesson_category_join)
-      .values({ gesture_text_key: item.key, lesson_category_id, lang_id: LANG_ID })
+      .values(joins)
       .onConflictDoUpdate({
         target: [
           gesture_text_key_lesson_category_join.gesture_text_key,
           gesture_text_key_lesson_category_join.lang_id
         ],
-        set: { lesson_category_id }
+        set: { lesson_category_id: sql`excluded.lesson_category_id` }
       });
-    joinChanges.push({ key: item.key, category: item.category, change: prev ? 'moved' : 'added' });
   }
   printTable('Gesture key category changes', joinChanges);
 

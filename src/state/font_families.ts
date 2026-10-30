@@ -21,7 +21,16 @@ export const FONT_FAMILIES = [
   'Noto_Sans_Odia',
   // Malayalam
   'Noto_Serif_Malayalam',
-  'Noto_Sans_Malayalam'
+  'Noto_Sans_Malayalam',
+  // Tamil
+  'Noto_Serif_Tamil',
+  'Noto_Sans_Tamil',
+  // Bengali
+  'Noto_Serif_Bengali',
+  'Noto_Sans_Bengali',
+  // Gujarati
+  'Noto_Serif_Gujarati',
+  'Noto_Sans_Gujarati'
 ] as const;
 
 export type FontFamily = (typeof FONT_FAMILIES)[number];
@@ -31,7 +40,16 @@ export const LANGUAGES_ADDED = ['Sanskrit'] as const;
 /**
  * Scripts for which fonts have been specified and set up properly.
  */
-export const FONT_SCRIPTS = ['Devanagari', 'Telugu', 'Kannada', 'Odia', 'Malayalam'] as const;
+export const FONT_SCRIPTS = [
+  'Devanagari',
+  'Telugu',
+  'Kannada',
+  'Odia',
+  'Malayalam',
+  'Tamil',
+  'Bengali',
+  'Gujarati'
+] as const;
 
 export const DEFAULT_FONT_FAMILY = 'Nirmala_UI' satisfies FontFamily;
 export const DEFAULT_FONT_SIZE = 15 as const;

@@ -16,7 +16,7 @@
  *    (other categories follow in their current order),
  * 2. a Sanskrit lesson for every item (no words yet), in its category and at its position;
  *    other lessons in those categories follow,
- * 3. a gesture for every item in every `GESTURE_SCRIPTS` script that can write it on its own
+ * 3. a gesture for every item in every `FONT_SCRIPTS` script that can write it on its own
  *    (new ones have no strokes yet, for the Gesture Creator to fill),
  * 4. the item's key in its category (`gesture_text_key_lesson_category_join`) and the
  *    lesson ↔ gesture links (`lesson_gestures`), as the app does when adding lessons/gestures,
@@ -41,7 +41,7 @@ import {
 } from '../../schema';
 import { dbMode, make_dir, take_input } from '~/tools/kry.server';
 import { lang_list_obj, script_list_obj, type script_list_type } from '~/state/lang_list';
-import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE } from '~/state/font_families';
+import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, FONT_SCRIPTS } from '~/state/font_families';
 
 const apply = process.argv.includes('--apply');
 const clearCache = process.argv.includes('--clear-cache');
@@ -70,17 +70,8 @@ const ALPHABET = [
   { category: 'Sankhya', letters: '० १ २ ३ ४ ५ ६ ७ ८ ९' }
 ];
 
-/** Scripts with a Gesture Creator style guide (Tamil-Extended is not offered for new gestures). */
-const GESTURE_SCRIPTS: script_list_type[] = [
-  'Devanagari',
-  'Telugu',
-  'Kannada',
-  'Tamil',
-  'Bengali',
-  'Gujarati',
-  'Malayalam',
-  'Odia'
-];
+/** The scripts offered in the app (each has fonts and a Gesture Creator style guide). */
+const GESTURE_SCRIPTS: readonly script_list_type[] = FONT_SCRIPTS;
 /**
  * Round-trip but are not letters of the script: Tamil has no anusvara (அம் is a + m) and Bengali
  * has no ळ (ল় is a nukta form).

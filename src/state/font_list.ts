@@ -8,6 +8,12 @@ import notoSansOdia from '@fontsource-variable/noto-sans-oriya/files/noto-sans-o
 import notoSerifOdia from '@fontsource-variable/noto-serif-oriya/files/noto-serif-oriya-oriya-wght-normal.woff2?url';
 import notoSansMalayalam from '@fontsource-variable/noto-sans-malayalam/files/noto-sans-malayalam-malayalam-wght-normal.woff2?url';
 import notoSerifMalayalam from '@fontsource-variable/noto-serif-malayalam/files/noto-serif-malayalam-malayalam-wght-normal.woff2?url';
+import notoSansTamil from '@fontsource-variable/noto-sans-tamil/files/noto-sans-tamil-tamil-wght-normal.woff2?url';
+import notoSerifTamil from '@fontsource-variable/noto-serif-tamil/files/noto-serif-tamil-tamil-wght-normal.woff2?url';
+import notoSansBengali from '@fontsource-variable/noto-sans-bengali/files/noto-sans-bengali-bengali-wght-normal.woff2?url';
+import notoSerifBengali from '@fontsource-variable/noto-serif-bengali/files/noto-serif-bengali-bengali-wght-normal.woff2?url';
+import notoSansGujarati from '@fontsource-variable/noto-sans-gujarati/files/noto-sans-gujarati-gujarati-wght-normal.woff2?url';
+import notoSerifGujarati from '@fontsource-variable/noto-serif-gujarati/files/noto-serif-gujarati-gujarati-wght-normal.woff2?url';
 // local fonts
 import NirmalaUI from '~/fonts/regular/woff2/Nirmala_UI.woff2?url';
 import AdobeDevanagari from '~/fonts/regular/woff2/Adobe_Devanagari.woff2?url';
@@ -38,6 +44,12 @@ const FONT_URLS = {
   Noto_Serif_Odia: notoSerifOdia,
   Noto_Sans_Malayalam: notoSansMalayalam,
   Noto_Serif_Malayalam: notoSerifMalayalam,
+  Noto_Sans_Tamil: notoSansTamil,
+  Noto_Serif_Tamil: notoSerifTamil,
+  Noto_Sans_Bengali: notoSansBengali,
+  Noto_Serif_Bengali: notoSerifBengali,
+  Noto_Sans_Gujarati: notoSansGujarati,
+  Noto_Serif_Gujarati: notoSerifGujarati,
   // local fonts
   Nirmala_UI: NirmalaUI,
   Adobe_Devanagari: AdobeDevanagari,
@@ -86,5 +98,20 @@ export const FONT_LIST: FontList = {
     get_font_entry('Nirmala_UI', 'regular'),
     get_font_entry('Noto_Serif_Malayalam', 'variable'),
     get_font_entry('Noto_Sans_Malayalam', 'variable')
+  ],
+  Tamil: [
+    get_font_entry('Nirmala_UI', 'regular'),
+    get_font_entry('Noto_Serif_Tamil', 'variable'),
+    get_font_entry('Noto_Sans_Tamil', 'variable')
+  ],
+  Bengali: [
+    get_font_entry('Nirmala_UI', 'regular'),
+    get_font_entry('Noto_Serif_Bengali', 'variable'),
+    get_font_entry('Noto_Sans_Bengali', 'variable')
+  ],
+  Gujarati: [
+    get_font_entry('Nirmala_UI', 'regular'),
+    get_font_entry('Noto_Serif_Gujarati', 'variable'),
+    get_font_entry('Noto_Sans_Gujarati', 'variable')
   ]
 };

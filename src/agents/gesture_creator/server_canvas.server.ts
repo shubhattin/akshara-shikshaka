@@ -31,6 +31,18 @@ const GLYPH_FONTS = {
     import('@fontsource-variable/noto-sans-malayalam/files/noto-sans-malayalam-malayalam-wght-normal.woff2?inline'),
   Noto_Serif_Malayalam: () =>
     import('@fontsource-variable/noto-serif-malayalam/files/noto-serif-malayalam-malayalam-wght-normal.woff2?inline'),
+  Noto_Sans_Tamil: () =>
+    import('@fontsource-variable/noto-sans-tamil/files/noto-sans-tamil-tamil-wght-normal.woff2?inline'),
+  Noto_Serif_Tamil: () =>
+    import('@fontsource-variable/noto-serif-tamil/files/noto-serif-tamil-tamil-wght-normal.woff2?inline'),
+  Noto_Sans_Bengali: () =>
+    import('@fontsource-variable/noto-sans-bengali/files/noto-sans-bengali-bengali-wght-normal.woff2?inline'),
+  Noto_Serif_Bengali: () =>
+    import('@fontsource-variable/noto-serif-bengali/files/noto-serif-bengali-bengali-wght-normal.woff2?inline'),
+  Noto_Sans_Gujarati: () =>
+    import('@fontsource-variable/noto-sans-gujarati/files/noto-sans-gujarati-gujarati-wght-normal.woff2?inline'),
+  Noto_Serif_Gujarati: () =>
+    import('@fontsource-variable/noto-serif-gujarati/files/noto-serif-gujarati-gujarati-wght-normal.woff2?inline'),
   Nirmala_UI: () => import('~/fonts/regular/woff2/Nirmala_UI.woff2?inline'),
   Adobe_Devanagari: () => import('~/fonts/regular/woff2/Adobe_Devanagari.woff2?inline'),
   Adobe_Telugu: () => import('~/fonts/regular/woff2/Adobe_Telugu.woff2?inline')

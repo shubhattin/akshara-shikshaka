@@ -34,6 +34,13 @@ const config = defineConfig(({ mode }) => {
         // an undeclared `ssr_exports`, which 500s every request.
         // https://github.com/TanStack/router/issues/8031
         inlineDynamicImports: true,
+        // Agent replies (chat and batch runs) outlive the 300 s default: this route pattern gets
+        // its own Vercel function. Keep in sync with AGENT_FUNCTION_MAX_SECONDS (~/agents/batch).
+        vercel: {
+          functionRules: {
+            '/api/agents/**': { maxDuration: 800 }
+          }
+        },
         // Runtime picks gnu vs musl, so the whole package (including .node files) is traced.
         traceDeps: ['lipilekhika*', '@napi-rs/canvas*']
       }),

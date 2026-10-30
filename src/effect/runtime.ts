@@ -6,6 +6,7 @@ import { ObjectStorage } from './storage';
 import { AiProvider } from './ai';
 import { ImageProcessor } from './image';
 import { BackgroundWork } from './background';
+import { QStashPublisher } from './qstash';
 
 const InfrastructureLayer = Layer.mergeAll(ImageProcessor.Live, BackgroundWork.Live);
 
@@ -15,7 +16,8 @@ const ConfigDependentLayer = Layer.mergeAll(
   Database.Live,
   RedisClient.Live,
   ObjectStorage.Live,
-  AiProvider.Live
+  AiProvider.Live,
+  QStashPublisher.Live
 ).pipe(Layer.provide(AppConfig.Live));
 
 // the layers are cached and so do not run on every call to the effect

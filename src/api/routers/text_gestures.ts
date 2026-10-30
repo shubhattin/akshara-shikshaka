@@ -120,7 +120,8 @@ export const addTextGestureData = Effect.fn('addTextGestureData')(function* (inp
 /** Who saved a version and why; written with every save as a `text_gesture_revisions` row. */
 export type GestureSaveProvenance =
   | { source: 'manual'; userId: string }
-  | { source: 'agent'; userId: string; chatId: string; toolCallId: string }
+  // a batch proposal whose chat was deleted since still records where it came from: nowhere
+  | { source: 'agent'; userId: string; chatId: string | null; toolCallId: string | null }
   | { source: 'revert'; userId: string; revertedFrom: number };
 
 /**
@@ -186,7 +187,7 @@ export const editTextGestureData = Effect.fn('editTextGestureData')(function* (i
       tool_call_id: provenance.source === 'agent' ? provenance.toolCallId : null,
       reverted_from: provenance.source === 'revert' ? provenance.revertedFrom : null
     });
-    if (provenance.source === 'agent') {
+    if (provenance.source === 'agent' && provenance.chatId !== null) {
       await tx
         .insert(agent_chat_gestures)
         .values({ chat_id: provenance.chatId, text_gesture_id: input.id, applied_at: new Date() })

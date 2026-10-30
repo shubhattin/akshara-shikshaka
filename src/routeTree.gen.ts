@@ -27,7 +27,11 @@ import { Route as authAuthAudio_assetsIndexRouteImport } from './routes/(auth)/_
 import { Route as authAuthGesturesIndexRouteImport } from './routes/(auth)/_auth/gestures/index'
 import { Route as authAuthImage_assetsIndexRouteImport } from './routes/(auth)/_auth/image_assets/index'
 import { Route as authAuthLessonsIndexRouteImport } from './routes/(auth)/_auth/lessons/index'
+import { Route as AdminAgentsBatchesIndexRouteImport } from './routes/admin/agents/batches/index'
+import { Route as AdminAgentsBatchesBatchIdRouteImport } from './routes/admin/agents/batches/$batchId'
 import { Route as AdminAgentsGesturesGestureIdRouteImport } from './routes/admin/agents/gestures/$gestureId'
+import { Route as ApiAgentsBatchFailedRouteImport } from './routes/api.agents.batch.failed'
+import { Route as ApiAgentsBatchRunRouteImport } from './routes/api.agents.batch.run'
 import { Route as authAuthAudio_assetsEditIdRouteImport } from './routes/(auth)/_auth/audio_assets/edit/$id'
 import { Route as authAuthGesturesEditIdRouteImport } from './routes/(auth)/_auth/gestures/edit/$id'
 import { Route as authAuthImage_assetsEditIdRouteImport } from './routes/(auth)/_auth/image_assets/edit/$id'
@@ -124,12 +128,33 @@ const authAuthLessonsIndexRoute = authAuthLessonsIndexRouteImport.update({
   path: '/lessons/',
   getParentRoute: () => authAuthRoute,
 } as any)
+const AdminAgentsBatchesIndexRoute = AdminAgentsBatchesIndexRouteImport.update({
+  id: '/batches/',
+  path: '/batches/',
+  getParentRoute: () => AdminAgentsRouteRoute,
+} as any)
+const AdminAgentsBatchesBatchIdRoute =
+  AdminAgentsBatchesBatchIdRouteImport.update({
+    id: '/batches/$batchId',
+    path: '/batches/$batchId',
+    getParentRoute: () => AdminAgentsRouteRoute,
+  } as any)
 const AdminAgentsGesturesGestureIdRoute =
   AdminAgentsGesturesGestureIdRouteImport.update({
     id: '/gestures/$gestureId',
     path: '/gestures/$gestureId',
     getParentRoute: () => AdminAgentsRouteRoute,
   } as any)
+const ApiAgentsBatchFailedRoute = ApiAgentsBatchFailedRouteImport.update({
+  id: '/api/agents/batch/failed',
+  path: '/api/agents/batch/failed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentsBatchRunRoute = ApiAgentsBatchRunRouteImport.update({
+  id: '/api/agents/batch/run',
+  path: '/api/agents/batch/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const authAuthAudio_assetsEditIdRoute =
   authAuthAudio_assetsEditIdRouteImport.update({
     id: '/audio_assets/edit/$id',
@@ -166,12 +191,16 @@ export interface FileRoutesByFullPath {
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn/': typeof publicLearnIndexRoute
   '/admin/agents/': typeof AdminAgentsIndexRoute
+  '/admin/agents/batches/$batchId': typeof AdminAgentsBatchesBatchIdRoute
   '/admin/agents/gestures/$gestureId': typeof AdminAgentsGesturesGestureIdRoute
+  '/api/agents/batch/failed': typeof ApiAgentsBatchFailedRoute
+  '/api/agents/batch/run': typeof ApiAgentsBatchRunRoute
   '/analytics/': typeof authAuthAnalyticsIndexRoute
   '/audio_assets/': typeof authAuthAudio_assetsIndexRoute
   '/gestures/': typeof authAuthGesturesIndexRoute
   '/image_assets/': typeof authAuthImage_assetsIndexRoute
   '/lessons/': typeof authAuthLessonsIndexRoute
+  '/admin/agents/batches/': typeof AdminAgentsBatchesIndexRoute
   '/audio_assets/edit/$id': typeof authAuthAudio_assetsEditIdRoute
   '/gestures/edit/$id': typeof authAuthGesturesEditIdRoute
   '/image_assets/edit/$id': typeof authAuthImage_assetsEditIdRoute
@@ -188,12 +217,16 @@ export interface FileRoutesByTo {
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn': typeof publicLearnIndexRoute
   '/admin/agents': typeof AdminAgentsIndexRoute
+  '/admin/agents/batches/$batchId': typeof AdminAgentsBatchesBatchIdRoute
   '/admin/agents/gestures/$gestureId': typeof AdminAgentsGesturesGestureIdRoute
+  '/api/agents/batch/failed': typeof ApiAgentsBatchFailedRoute
+  '/api/agents/batch/run': typeof ApiAgentsBatchRunRoute
   '/analytics': typeof authAuthAnalyticsIndexRoute
   '/audio_assets': typeof authAuthAudio_assetsIndexRoute
   '/gestures': typeof authAuthGesturesIndexRoute
   '/image_assets': typeof authAuthImage_assetsIndexRoute
   '/lessons': typeof authAuthLessonsIndexRoute
+  '/admin/agents/batches': typeof AdminAgentsBatchesIndexRoute
   '/audio_assets/edit/$id': typeof authAuthAudio_assetsEditIdRoute
   '/gestures/edit/$id': typeof authAuthGesturesEditIdRoute
   '/image_assets/edit/$id': typeof authAuthImage_assetsEditIdRoute
@@ -214,12 +247,16 @@ export interface FileRoutesById {
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/(public)/learn/': typeof publicLearnIndexRoute
   '/admin/agents/': typeof AdminAgentsIndexRoute
+  '/admin/agents/batches/$batchId': typeof AdminAgentsBatchesBatchIdRoute
   '/admin/agents/gestures/$gestureId': typeof AdminAgentsGesturesGestureIdRoute
+  '/api/agents/batch/failed': typeof ApiAgentsBatchFailedRoute
+  '/api/agents/batch/run': typeof ApiAgentsBatchRunRoute
   '/(auth)/_auth/analytics/': typeof authAuthAnalyticsIndexRoute
   '/(auth)/_auth/audio_assets/': typeof authAuthAudio_assetsIndexRoute
   '/(auth)/_auth/gestures/': typeof authAuthGesturesIndexRoute
   '/(auth)/_auth/image_assets/': typeof authAuthImage_assetsIndexRoute
   '/(auth)/_auth/lessons/': typeof authAuthLessonsIndexRoute
+  '/admin/agents/batches/': typeof AdminAgentsBatchesIndexRoute
   '/(auth)/_auth/audio_assets/edit/$id': typeof authAuthAudio_assetsEditIdRoute
   '/(auth)/_auth/gestures/edit/$id': typeof authAuthGesturesEditIdRoute
   '/(auth)/_auth/image_assets/edit/$id': typeof authAuthImage_assetsEditIdRoute
@@ -240,12 +277,16 @@ export interface FileRouteTypes {
     | '/api/trpc/$'
     | '/learn/'
     | '/admin/agents/'
+    | '/admin/agents/batches/$batchId'
     | '/admin/agents/gestures/$gestureId'
+    | '/api/agents/batch/failed'
+    | '/api/agents/batch/run'
     | '/analytics/'
     | '/audio_assets/'
     | '/gestures/'
     | '/image_assets/'
     | '/lessons/'
+    | '/admin/agents/batches/'
     | '/audio_assets/edit/$id'
     | '/gestures/edit/$id'
     | '/image_assets/edit/$id'
@@ -262,12 +303,16 @@ export interface FileRouteTypes {
     | '/api/trpc/$'
     | '/learn'
     | '/admin/agents'
+    | '/admin/agents/batches/$batchId'
     | '/admin/agents/gestures/$gestureId'
+    | '/api/agents/batch/failed'
+    | '/api/agents/batch/run'
     | '/analytics'
     | '/audio_assets'
     | '/gestures'
     | '/image_assets'
     | '/lessons'
+    | '/admin/agents/batches'
     | '/audio_assets/edit/$id'
     | '/gestures/edit/$id'
     | '/image_assets/edit/$id'
@@ -287,12 +332,16 @@ export interface FileRouteTypes {
     | '/api/trpc/$'
     | '/(public)/learn/'
     | '/admin/agents/'
+    | '/admin/agents/batches/$batchId'
     | '/admin/agents/gestures/$gestureId'
+    | '/api/agents/batch/failed'
+    | '/api/agents/batch/run'
     | '/(auth)/_auth/analytics/'
     | '/(auth)/_auth/audio_assets/'
     | '/(auth)/_auth/gestures/'
     | '/(auth)/_auth/image_assets/'
     | '/(auth)/_auth/lessons/'
+    | '/admin/agents/batches/'
     | '/(auth)/_auth/audio_assets/edit/$id'
     | '/(auth)/_auth/gestures/edit/$id'
     | '/(auth)/_auth/image_assets/edit/$id'
@@ -308,6 +357,8 @@ export interface RootRouteChildren {
   ApiAgentsChatRoute: typeof ApiAgentsChatRoute
   ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
   publicLearnIndexRoute: typeof publicLearnIndexRoute
+  ApiAgentsBatchFailedRoute: typeof ApiAgentsBatchFailedRoute
+  ApiAgentsBatchRunRoute: typeof ApiAgentsBatchRunRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -438,12 +489,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authAuthLessonsIndexRouteImport
       parentRoute: typeof authAuthRoute
     }
+    '/admin/agents/batches/': {
+      id: '/admin/agents/batches/'
+      path: '/batches'
+      fullPath: '/admin/agents/batches/'
+      preLoaderRoute: typeof AdminAgentsBatchesIndexRouteImport
+      parentRoute: typeof AdminAgentsRouteRoute
+    }
+    '/admin/agents/batches/$batchId': {
+      id: '/admin/agents/batches/$batchId'
+      path: '/batches/$batchId'
+      fullPath: '/admin/agents/batches/$batchId'
+      preLoaderRoute: typeof AdminAgentsBatchesBatchIdRouteImport
+      parentRoute: typeof AdminAgentsRouteRoute
+    }
     '/admin/agents/gestures/$gestureId': {
       id: '/admin/agents/gestures/$gestureId'
       path: '/gestures/$gestureId'
       fullPath: '/admin/agents/gestures/$gestureId'
       preLoaderRoute: typeof AdminAgentsGesturesGestureIdRouteImport
       parentRoute: typeof AdminAgentsRouteRoute
+    }
+    '/api/agents/batch/failed': {
+      id: '/api/agents/batch/failed'
+      path: '/api/agents/batch/failed'
+      fullPath: '/api/agents/batch/failed'
+      preLoaderRoute: typeof ApiAgentsBatchFailedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agents/batch/run': {
+      id: '/api/agents/batch/run'
+      path: '/api/agents/batch/run'
+      fullPath: '/api/agents/batch/run'
+      preLoaderRoute: typeof ApiAgentsBatchRunRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/(auth)/_auth/audio_assets/edit/$id': {
       id: '/(auth)/_auth/audio_assets/edit/$id'
@@ -480,14 +559,18 @@ interface AdminAgentsRouteRouteChildren {
   AdminAgentsChatIdRoute: typeof AdminAgentsChatIdRoute
   AdminAgentsQueueRoute: typeof AdminAgentsQueueRoute
   AdminAgentsIndexRoute: typeof AdminAgentsIndexRoute
+  AdminAgentsBatchesBatchIdRoute: typeof AdminAgentsBatchesBatchIdRoute
   AdminAgentsGesturesGestureIdRoute: typeof AdminAgentsGesturesGestureIdRoute
+  AdminAgentsBatchesIndexRoute: typeof AdminAgentsBatchesIndexRoute
 }
 
 const AdminAgentsRouteRouteChildren: AdminAgentsRouteRouteChildren = {
   AdminAgentsChatIdRoute: AdminAgentsChatIdRoute,
   AdminAgentsQueueRoute: AdminAgentsQueueRoute,
   AdminAgentsIndexRoute: AdminAgentsIndexRoute,
+  AdminAgentsBatchesBatchIdRoute: AdminAgentsBatchesBatchIdRoute,
   AdminAgentsGesturesGestureIdRoute: AdminAgentsGesturesGestureIdRoute,
+  AdminAgentsBatchesIndexRoute: AdminAgentsBatchesIndexRoute,
 }
 
 const AdminAgentsRouteRouteWithChildren =
@@ -544,6 +627,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAgentsChatRoute: ApiAgentsChatRoute,
   ApiTrpcSplatRoute: ApiTrpcSplatRoute,
   publicLearnIndexRoute: publicLearnIndexRoute,
+  ApiAgentsBatchFailedRoute: ApiAgentsBatchFailedRoute,
+  ApiAgentsBatchRunRoute: ApiAgentsBatchRunRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

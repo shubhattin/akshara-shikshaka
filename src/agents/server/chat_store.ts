@@ -8,6 +8,7 @@ import type { AgentModelId } from '~/agents/models';
 import type { AgentUIMessage } from '~/agents/ui_message';
 import { chatGestureLinks, type ChatGestureLink } from './chat_gestures';
 import { savedStrokeCount } from './stroke_count';
+import { STALE_RUN_MS } from '~/agents/batch';
 
 /**
  * Record the gestures a chat mentioned or proposed. Links only grow (a retried turn keeps its
@@ -57,6 +58,7 @@ export const createAgentChat = Effect.fn('agents.create_chat')(function* (input:
   agent_kind: AgentKind;
   user_id: string;
   focus_gesture_id?: number | null;
+  title?: string;
 }) {
   const focus = input.focus_gesture_id ?? null;
   if (focus !== null && input.agent_kind !== 'gesture_creator') {
@@ -102,7 +104,7 @@ export const listAgentChats = Effect.fn('agents.list_chats')(function* () {
         title: agent_chats.title,
         agent_kind: agent_chats.agent_kind,
         updated_at: agent_chats.updated_at,
-        streaming: agent_chats.streaming,
+        streaming: liveStreaming,
         user_id: agent_chats.user_id,
         focus_gesture_id: agent_chats.focus_gesture_id,
         focus_text: text_gestures.text,
@@ -135,7 +137,7 @@ export const listChatsForGesture = Effect.fn('agents.list_chats_for_gesture')(fu
         title: agent_chats.title,
         agent_kind: agent_chats.agent_kind,
         updated_at: agent_chats.updated_at,
-        streaming: agent_chats.streaming,
+        streaming: liveStreaming,
         user_id: agent_chats.user_id,
         focused: sql<boolean>`${agent_chats.focus_gesture_id} is not null`.mapWith(Boolean),
         last_proposal_at: agent_chat_gestures.last_proposal_at,
@@ -270,6 +272,22 @@ export const renameAgentChat = Effect.fn('agents.rename_chat')(function* (input:
  * Mark a chat as (not) streaming — set when a reply starts, cleared when it lands or fails.
  * A new reply also clears any stop request left from the last one.
  */
+/** `isChatStreaming` in SQL, for lists (the sidebar stops pulsing for a killed reply). */
+export const liveStreaming =
+  sql<boolean>`(${agent_chats.streaming} and ${agent_chats.streaming_started_at} > now() - make_interval(secs => ${STALE_RUN_MS / 1000}))`.mapWith(
+    Boolean
+  );
+
+/**
+ * Whether a reply is really still streaming: a function killed mid-reply (timeout, crash) never
+ * clears the flag, so one started longer ago than any function may run is over.
+ */
+export const isChatStreaming = (chat: { streaming: boolean; streaming_started_at: Date | null }) =>
+  chat.streaming &&
+  // rows stuck before the start time was recorded have none
+  chat.streaming_started_at !== null &&
+  Date.now() - chat.streaming_started_at.getTime() < STALE_RUN_MS;
+
 export const setChatStreaming = Effect.fn('agents.set_streaming')(function* (
   id: string,
   streaming: boolean
@@ -277,7 +295,11 @@ export const setChatStreaming = Effect.fn('agents.set_streaming')(function* (
   yield* dbRunHttp('agents.set_streaming', (client) =>
     client
       .update(agent_chats)
-      .set(streaming ? { streaming, stop_requested_at: null } : { streaming })
+      .set(
+        streaming
+          ? { streaming, streaming_started_at: sql`now()`, stop_requested_at: null }
+          : { streaming, streaming_started_at: null }
+      )
       .where(eq(agent_chats.id, id))
       .returning()
   );

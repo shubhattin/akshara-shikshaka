@@ -141,6 +141,13 @@
       "when": 1793376717963,
       "tag": "0019_gesture_order_from_lessons",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793380049427,
+      "tag": "0020_agent_batches",
+      "breakpoints": true
     }
   ]
 }

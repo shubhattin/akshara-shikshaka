@@ -24,6 +24,8 @@ import type { AgentModelId } from '~/agents/models';
 import type { AgentKind } from '~/agents/agent_kinds';
 import type { AgentMessageMetadata, AgentUIMessage } from '~/agents/ui_message';
 import type { ReviewStatus, RevisionSource } from '~/agents/gesture_review';
+import type { BatchAutoApply, BatchItemStatus, BatchReference } from '~/agents/batch';
+import type { ProposedGesture } from '~/agents/gesture_creator/schemas';
 
 export const text_gestures = pgTable(
   'text_gestures',
@@ -280,6 +282,11 @@ export const agent_chats = pgTable(
     user_id: text().notNull(),
     /** True while a reply is streaming for this chat (possibly in the background). */
     streaming: boolean().notNull().default(false),
+    /**
+     * When the streaming reply started. A function killed mid-reply never clears `streaming`;
+     * one older than the longest function run is treated as over.
+     */
+    streaming_started_at: timestamp({ withTimezone: true }),
     /** Set by an explicit Stop; the streaming reply (on whichever instance) polls it and aborts. */
     stop_requested_at: timestamp({ withTimezone: true }),
     created_at: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -335,6 +342,66 @@ export const agent_chat_gestures = pgTable(
   (table) => [
     primaryKey({ columns: [table.chat_id, table.text_gesture_id] }),
     index('agent_chat_gestures_gesture_idx').on(table.text_gesture_id)
+  ]
+);
+
+/** A mass run of the Gesture Creator: one focused chat per gesture, queued through QStash. */
+export const agent_batches = pgTable('agent_batches', {
+  id: serial().primaryKey(),
+  title: text().notNull().default(''),
+  /** Better Auth user id of the admin who started it. */
+  user_id: text().notNull(),
+  model: text().notNull().$type<AgentModelId>(),
+  /** The first message of every run's chat. */
+  prompt: text().notNull(),
+  reference: text().notNull().default('none').$type<BatchReference>(),
+  auto_apply: text().notNull().default('never').$type<BatchAutoApply>(),
+  parallelism: smallint().notNull(),
+  /** No run starts once the batch has cost this much (USD). */
+  budget_usd: real(),
+  /** Runs not started yet are skipped; running ones are asked to stop. */
+  cancelled_at: timestamp({ withTimezone: true }),
+  created_at: timestamp({ withTimezone: true }).notNull().defaultNow()
+});
+
+/** One gesture of a batch: its run, its proposal (kept even if the chat is deleted), its review. */
+export const agent_batch_items = pgTable(
+  'agent_batch_items',
+  {
+    id: serial().primaryKey(),
+    batch_id: integer()
+      .notNull()
+      .references(() => agent_batches.id, { onDelete: 'cascade' }),
+    text_gesture_id: integer()
+      .notNull()
+      .references(() => text_gestures.id, { onDelete: 'cascade' }),
+    status: text().notNull().default('queued').$type<BatchItemStatus>(),
+    /** The run's focused chat (reused when a run is retried). */
+    chat_id: text().references(() => agent_chats.id, { onDelete: 'set null' }),
+    /** The `propose_gesture` call the proposal came from. */
+    tool_call_id: text(),
+    proposal: jsonb().$type<ProposedGesture>(),
+    /** `text_gestures.revision` when the run started: the version the proposal replaces. */
+    based_on_revision: integer(),
+    /** The revision the proposal was saved as (applied). */
+    applied_revision: integer(),
+    /** USD the run's replies cost (OpenRouter's charged amount). */
+    cost: real().notNull().default(0),
+    /** Why the run failed or ended without a proposal (the agent's last words). */
+    error: text(),
+    /** Run attempts (QStash retries and manual re-runs). */
+    attempts: smallint().notNull().default(0),
+    qstash_message_id: text(),
+    started_at: timestamp({ withTimezone: true }),
+    finished_at: timestamp({ withTimezone: true }),
+    reviewed_by: text(),
+    reviewed_at: timestamp({ withTimezone: true }),
+    created_at: timestamp({ withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    unique('agent_batch_items_batch_gesture_unique').on(table.batch_id, table.text_gesture_id),
+    index('agent_batch_items_gesture_idx').on(table.text_gesture_id),
+    index('agent_batch_items_status_idx').on(table.batch_id, table.status)
   ]
 );
 

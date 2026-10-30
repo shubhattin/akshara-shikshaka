@@ -5,6 +5,7 @@ import { Link, useParams } from '@tanstack/react-router';
 import {
   ArrowLeftIcon,
   ChevronRightIcon,
+  LayersIcon,
   ListChecksIcon,
   MoreHorizontalIcon,
   PanelLeftIcon,
@@ -267,6 +268,16 @@ function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
             title="Review queue"
           >
             <ListChecksIcon />
+          </Button>
+          <Button
+            render={<Link to="/admin/agents/batches" onClick={onNavigate} />}
+            nativeButton={false}
+            variant="outline"
+            size="icon"
+            aria-label="Batches"
+            title="Batches"
+          >
+            <LayersIcon />
           </Button>
         </div>
         <InputGroup className="h-8">

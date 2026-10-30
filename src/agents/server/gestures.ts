@@ -10,7 +10,7 @@ import { dbRunHttp } from '~/effect/database';
 import { BadRequestError, NotFoundError } from '~/effect/errors';
 import { transliterateTexts } from '~/lib/transliterateTexts.server';
 import { DEFAULT_GESTURE_CATEGORY_LANG_ID, get_script_from_id } from '~/state/lang_list';
-import { proposed_gesture_schema } from '~/agents/gesture_creator/schemas';
+import { proposed_gesture_schema, type ProposedGesture } from '~/agents/gesture_creator/schemas';
 import { editTextGestureData } from '~/api/routers/text_gestures';
 import { findAgentChat, loadAgentMessages } from './chat_store';
 import { savedStrokeCount } from './stroke_count';
@@ -167,6 +167,30 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
       BadRequestError.make({ message: 'That proposal is not for this chat’s gesture' })
     );
   }
+  return yield* saveProposal({
+    proposal,
+    chatId: input.chatId,
+    toolCallId: input.toolCallId,
+    userId: input.userId,
+    replaceExisting: input.replaceExisting,
+    expectedRevision: input.expectedRevision
+  });
+});
+
+/**
+ * Save a proposal's strokes to its gesture, as the agent drew them: refused when the gesture was
+ * replaced or its glyph moved since (the strokes would no longer fit), and when it has strokes
+ * the admin did not agree to replace.
+ */
+export const saveProposal = Effect.fn('agents.save_proposal')(function* (input: {
+  proposal: ProposedGesture;
+  chatId: string | null;
+  toolCallId: string | null;
+  userId: string;
+  replaceExisting: boolean;
+  expectedRevision: number;
+}) {
+  const { proposal } = input;
   const current = yield* getGestureForAgent(proposal.gesture_id);
   if (current.uuid !== proposal.uuid) {
     return yield* Effect.fail(
@@ -192,7 +216,7 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
       BadRequestError.make({ message: 'This gesture already has strokes; confirm replacing them' })
     );
   }
-  yield* editTextGestureData({
+  const saved = yield* editTextGestureData({
     id: current.id,
     uuid: current.uuid,
     gestures: proposal.gestures,
@@ -207,5 +231,5 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
       toolCallId: input.toolCallId
     }
   });
-  return { applied: true as const, gesture_id: current.id };
+  return { applied: true as const, gesture_id: current.id, revision: saved.revision };
 });

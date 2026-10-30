@@ -105,7 +105,9 @@ export const getGesturesByCategory = Effect.fn('getGesturesByCategory')(function
       id: text_gestures.id,
       text: text_gestures.text,
       text_key: text_gestures.text_key,
-      order: text_gestures.order
+      order: text_gestures.order,
+      updated_at: text_gestures.updated_at,
+      stroke_count: sql<number>`jsonb_array_length(${text_gestures.gestures})`.mapWith(Number)
     };
     if (input.category_id > 0) {
       const gestures = await db

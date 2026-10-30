@@ -6,7 +6,6 @@ import { Link } from '@tanstack/react-router';
 import { FaBookOpen, FaVolumeUp, FaPencilAlt } from 'react-icons/fa';
 import { MdRecordVoiceOver, MdDraw } from 'react-icons/md';
 import { BsStars } from 'react-icons/bs';
-import { lazy, Suspense } from 'react';
 import { cn } from '~/lib/utils';
 import { buttonVariants } from '~/components/ui/button';
 import { IoLanguage } from 'react-icons/io5';
@@ -29,8 +28,6 @@ const itemVariants = {
     y: 0
   }
 };
-
-const ManageMenuList = lazy(() => import('./-ManageMenuList'));
 
 /** Decorative Indic glyphs — mid + edges; limited set on small screens. */
 const floatingChars = [
@@ -208,9 +205,7 @@ export default function Home() {
               transition={{ delay: 0.5, duration: 0.5 }}
               className="flex flex-wrap justify-center gap-4"
             >
-              <Suspense fallback={StartLearningButton}>
-                <ManageMenuList>{StartLearningButton}</ManageMenuList>
-              </Suspense>
+              {StartLearningButton}
             </motion.div>
           </motion.div>
         </div>

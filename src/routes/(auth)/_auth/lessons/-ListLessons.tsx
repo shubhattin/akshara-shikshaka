@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { useTRPC } from '~/api/client';
+import { useCategorySearchParam } from '~/hooks/useCategorySearchParam';
 import { Skeleton } from '~/components/ui/skeleton';
 import { ArrowRightLeft, ChevronsUpDown, CircleHelp, Pencil, Undo2 } from 'lucide-react';
 import {
@@ -14,7 +15,8 @@ import { Input } from '~/components/ui/input';
 import { Button } from '~/components/ui/button';
 import { lang_list_obj, type lang_list_type } from '~/state/lang_list';
 import Cookie from 'js-cookie';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { LessonCard, LessonsOverviewSummary, type LessonOverview } from './-LessonCard';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { LESSON_LANG_ID_COOKIE_KEY } from '~/state/cookie';
 import type { lesson_categories } from '~/db/schema';
@@ -72,7 +74,6 @@ import {
   arrayMove
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Link } from '@tanstack/react-router';
 import {
   Accordion,
   AccordionContent,
@@ -89,6 +90,9 @@ import { LANGUAGES_ADDED } from '~/state/font_list';
 import { buttonVariants } from '~/components/ui/button';
 
 type Props = {
+  /** `?category=` of the page */
+  search_category?: number;
+  set_search_category: (category_id: number) => void;
   init_lang_id: number;
   init_lesson_categories: Pick<
     InferSelectModel<typeof lesson_categories>,
@@ -110,7 +114,7 @@ const selected_category_id_atom = atomWithStorage<number | null>(
 );
 
 // oxlint-disable-next-line complexity -- ListLessons handles language/category selection and dialogs; refactor into smaller components deferred
-function ListLessons({ init_lesson_categories }: Props) {
+function ListLessons({ init_lesson_categories, search_category, set_search_category }: Props) {
   const trpc = useTRPC();
   const [langId, setLangId] = useAtom(lang_id_atom);
   const [manageOpen, setManageOpen] = useState(false);
@@ -128,6 +132,12 @@ function ListLessons({ init_lesson_categories }: Props) {
 
   const [open, setOpen] = useState(false);
   const [selectedCategoryID, setSelectedCategoryID] = useAtom(selected_category_id_atom);
+  useCategorySearchParam({
+    selected: selectedCategoryID,
+    setSelected: setSelectedCategoryID,
+    searchCategory: search_category,
+    setSearchCategory: set_search_category
+  });
 
   const categories_q = useQuery(
     trpc.text_lessons.categories.get_categories.queryOptions(
@@ -137,6 +147,20 @@ function ListLessons({ init_lesson_categories }: Props) {
   );
 
   const categories = categories_q.data ?? [];
+
+  // keep a valid category selected: the first one when none is stored, or the stored one is gone
+  useEffect(() => {
+    if (!categories_q.isSuccess || categories_q.isPlaceholderData) return;
+    const list = categories_q.data;
+    if (selectedCategoryID === 0 || list.some((c) => c.id === selectedCategoryID)) return;
+    setSelectedCategoryID(list[0]?.id ?? 0);
+  }, [
+    categories_q.isSuccess,
+    categories_q.isPlaceholderData,
+    categories_q.data,
+    selectedCategoryID,
+    setSelectedCategoryID
+  ]);
 
   const category_lessons_q = useQuery(
     trpc.text_lessons.categories.get_text_lessons.queryOptions(
@@ -152,7 +176,7 @@ function ListLessons({ init_lesson_categories }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-3 rounded-xl border bg-card/50 p-3">
         <Select
           items={langItems}
           value={langId?.toString()}
@@ -174,63 +198,61 @@ function ListLessons({ init_lesson_categories }: Props) {
             ))}
           </SelectContent>
         </Select>
-      </div>
-      <div className="flex flex-wrap items-center justify-center gap-4">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger
-            role="combobox"
-            aria-expanded={open}
-            className={cn(buttonVariants({ variant: 'outline' }), 'w-50 justify-between')}
-          >
-            {selectedCategoryID !== null
-              ? categories.find((category) => category.id === selectedCategoryID)?.name ||
-                (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
-              : 'Select category...'}
-            <ChevronsUpDown className="opacity-50" />
-          </PopoverTrigger>
-          <PopoverContent className="w-50 p-0">
-            <Command>
-              <CommandInput placeholder="Search category..." className="h-9" />
-              <CommandList>
-                <CommandEmpty>No category found.</CommandEmpty>
-                <CommandGroup>
-                  {categories.map((category) => (
+        <div className="flex items-center gap-1">
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger
+              role="combobox"
+              aria-expanded={open}
+              className={cn(buttonVariants({ variant: 'outline' }), 'w-50 justify-between')}
+            >
+              {selectedCategoryID !== null
+                ? categories.find((category) => category.id === selectedCategoryID)?.name ||
+                  (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
+                : 'Select category...'}
+              <ChevronsUpDown className="opacity-50" />
+            </PopoverTrigger>
+            <PopoverContent className="w-50 p-0">
+              <Command>
+                <CommandInput placeholder="Search category..." className="h-9" />
+                <CommandList>
+                  <CommandEmpty>No category found.</CommandEmpty>
+                  <CommandGroup>
+                    {categories.map((category) => (
+                      <CommandItem
+                        key={category.id}
+                        value={category.name}
+                        keywords={[category.id.toString()]}
+                        data-checked={selectedCategoryID === category.id ? 'true' : undefined}
+                        className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
+                        onSelect={() => {
+                          setSelectedCategoryID(category.id);
+                          setOpen(false);
+                        }}
+                      >
+                        {category.name}
+                      </CommandItem>
+                    ))}
                     <CommandItem
-                      key={category.id}
-                      value={category.name}
-                      keywords={[category.id.toString()]}
-                      data-checked={selectedCategoryID === category.id ? 'true' : undefined}
+                      value="Uncategorized"
+                      keywords={['0']}
+                      data-checked={selectedCategoryID === 0 ? 'true' : undefined}
                       className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
                       onSelect={() => {
-                        setSelectedCategoryID(
-                          selectedCategoryID === category.id ? null : category.id
-                        );
+                        setSelectedCategoryID(0);
                         setOpen(false);
                       }}
                     >
-                      {category.name}
+                      Uncategorized
                     </CommandItem>
-                  ))}
-                  <CommandItem
-                    value="Uncategorized"
-                    keywords={['0']}
-                    data-checked={selectedCategoryID === 0 ? 'true' : undefined}
-                    className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
-                    onSelect={() => {
-                      setSelectedCategoryID(selectedCategoryID === 0 ? null : 0);
-                      setOpen(false);
-                    }}
-                  >
-                    Uncategorized
-                  </CommandItem>
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-        <Button variant="ghost" size="icon" onClick={() => setManageOpen(true)}>
-          <TiEdit className="size-5" />
-        </Button>
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          <Button variant="ghost" size="icon" onClick={() => setManageOpen(true)}>
+            <TiEdit className="size-5" />
+          </Button>
+        </div>
       </div>
       {langId ? (
         <ManageCategoriesDialog
@@ -260,29 +282,27 @@ function ListLessons({ init_lesson_categories }: Props) {
           Please select a category to view lessons.
         </div>
       ) : (
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() => setEditOpen(true)}
-              disabled={category_lessons_q.isLoading || !category_lessons_q.data}
-              className="border-sky-500 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-200"
-            >
-              <Pencil data-icon="inline-start" />
-              Edit Order
-            </Button>
-          </div>
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
           {category_lessons_q.isLoading ? (
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-md border p-3">
-                  <Skeleton className="h-5 w-1/3" />
-                  <Skeleton className="h-5 w-1/5" />
-                </div>
+            <div className={LESSON_GRID_CLASS}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-44 w-full rounded-xl" />
               ))}
             </div>
           ) : category_lessons_q.data ? (
-            <DisplayLessonsSection data={category_lessons_q.data} />
+            <DisplayLessonsSection
+              data={category_lessons_q.data}
+              actions={
+                <Button
+                  variant="outline"
+                  onClick={() => setEditOpen(true)}
+                  className="border-sky-500 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-200"
+                >
+                  <Pencil data-icon="inline-start" />
+                  Edit Order
+                </Button>
+              }
+            />
           ) : null}
         </div>
       )}
@@ -581,23 +601,62 @@ function draftSignature(
   });
 }
 
-function DisplayLessonsSection({ data }: { data: { type: string; lessons: LessonItem[] } }) {
+const LESSON_GRID_CLASS = 'grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3';
+
+function LessonGrid({
+  lessons,
+  overview
+}: {
+  lessons: LessonItem[];
+  overview: Map<number, LessonOverview>;
+}) {
+  return (
+    <div className={LESSON_GRID_CLASS}>
+      {lessons.map((l) => (
+        <LessonCard key={l.id} lesson={l} overview={overview.get(l.id)} />
+      ))}
+    </div>
+  );
+}
+
+function DisplayLessonsSection({
+  data,
+  actions
+}: {
+  data: { type: string; lessons: LessonItem[] };
+  actions: React.ReactNode;
+}) {
+  const trpc = useTRPC();
+  const lessonIds = useMemo(() => data.lessons.map((l) => l.id).sort((a, b) => a - b), [data]);
+  const overview_q = useQuery(
+    trpc.text_lessons.categories.get_text_lessons_overview.queryOptions(
+      { lesson_ids: lessonIds },
+      // lessons are edited on their own page, so check again whenever the list is shown
+      { enabled: lessonIds.length > 0, staleTime: 0, placeholderData: keepPreviousData }
+    )
+  );
+  const overview = useMemo(
+    () => new Map((overview_q.data ?? []).map((row) => [row.id, row])),
+    [overview_q.data]
+  );
+
+  const header = (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border bg-card/50 px-4 py-3">
+      <LessonsOverviewSummary lessonIds={lessonIds} overview={overview} />
+      {actions}
+    </div>
+  );
+
   if (data.type === 'uncategorized') {
     return (
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
-        {data.lessons.map((l) => (
-          <Card key={l.id} className="p-0 transition-colors hover:bg-muted/60">
-            <Link
-              to="/lessons/edit/$id"
-              params={{ id: String(l.id) }}
-              className="block truncate p-2.5 font-medium"
-            >
-              {l.text}
-            </Link>
-          </Card>
-        ))}
-        {data.lessons.length === 0 && (
-          <div className="col-span-full text-sm text-muted-foreground">No lessons.</div>
+      <div className="flex flex-col gap-6">
+        {header}
+        {data.lessons.length > 0 ? (
+          <LessonGrid lessons={data.lessons} overview={overview} />
+        ) : (
+          <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+            No lessons.
+          </div>
         )}
       </div>
     );
@@ -606,7 +665,8 @@ function DisplayLessonsSection({ data }: { data: { type: string; lessons: Lesson
   const { ordered, unordered } = splitLessons(data.lessons);
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
+      {header}
       {unordered.length > 0 && (
         <section className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
@@ -614,20 +674,11 @@ function DisplayLessonsSection({ data }: { data: { type: string; lessons: Lesson
             <span className="rounded-md border border-yellow-600/40 bg-yellow-500/15 px-1.5 py-0.5 text-xs font-medium text-yellow-700 dark:border-yellow-500/40 dark:text-yellow-400">
               unlisted
             </span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
+              {unordered.length}
+            </span>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {unordered.map((l) => (
-              <Card key={l.id} className="p-0 transition-colors hover:bg-muted/60">
-                <Link
-                  to="/lessons/edit/$id"
-                  params={{ id: String(l.id) }}
-                  className="block truncate p-2.5 font-medium"
-                >
-                  {l.text}
-                </Link>
-              </Card>
-            ))}
-          </div>
+          <LessonGrid lessons={unordered} overview={overview} />
         </section>
       )}
       <section className="flex flex-col gap-3">
@@ -635,6 +686,9 @@ function DisplayLessonsSection({ data }: { data: { type: string; lessons: Lesson
           <h3 className="text-base font-semibold">Ordered</h3>
           <span className="rounded-md border border-green-600/40 bg-green-500/15 px-1.5 py-0.5 text-xs font-medium text-green-700 dark:border-green-500/40 dark:text-green-400">
             listed
+          </span>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
+            {ordered.length}
           </span>
           <Popover>
             <PopoverTrigger
@@ -660,24 +714,11 @@ function DisplayLessonsSection({ data }: { data: { type: string; lessons: Lesson
           </Popover>
         </div>
         {ordered.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {ordered.map((l) => (
-              <Card key={l.id} className="p-0 transition-colors hover:bg-muted/60">
-                <Link
-                  to="/lessons/edit/$id"
-                  params={{ id: String(l.id) }}
-                  className="flex items-center gap-2 p-2"
-                >
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
-                    {l.order}
-                  </span>
-                  <span className="truncate font-medium">{l.text}</span>
-                </Link>
-              </Card>
-            ))}
-          </div>
+          <LessonGrid lessons={ordered} overview={overview} />
         ) : (
-          <div className="text-sm text-muted-foreground">No ordered lessons.</div>
+          <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+            No ordered lessons.
+          </div>
         )}
       </section>
     </div>

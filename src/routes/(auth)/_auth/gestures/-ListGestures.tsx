@@ -2,8 +2,8 @@
 import { Link } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTRPC } from '~/api/client';
+import { useCategorySearchParam } from '~/hooks/useCategorySearchParam';
 import { Card, CardContent } from '~/components/ui/card';
-import { Skeleton } from '~/components/ui/skeleton';
 import {
   Select,
   SelectContent,
@@ -93,10 +93,14 @@ import { TiEdit } from 'react-icons/ti';
 import { atomWithStorage } from 'jotai/utils';
 import { cn } from '~/lib/utils';
 import { buttonVariants } from '~/components/ui/button';
+import { GestureCard, GestureCardSkeleton } from './-GestureCard';
 
 type CategoryModel = Pick<InferSelectModel<typeof lesson_categories>, 'id' | 'name' | 'order'>;
 
 type Props = {
+  /** `?category=` of the page */
+  search_category?: number;
+  set_search_category: (category_id: number) => void;
   init_script_id: number;
   /** Gestures are grouped by the lesson categories of this language */
   init_lang_id: number;
@@ -119,13 +123,24 @@ const selected_category_id_atom = atomWithStorage<number | null>(
 );
 
 // oxlint-disable-next-line complexity -- ListGestures orchestrates category selection and dialogs; extract to smaller hooks deferred
-function ListGestures({ init_lang_id, init_gesture_categories }: Props) {
+function ListGestures({
+  init_lang_id,
+  init_gesture_categories,
+  search_category,
+  set_search_category
+}: Props) {
   const trpc = useTRPC();
   const [scriptId, setScriptId] = useAtom(script_id_atom);
   const [langId, setLangId] = useAtom(lang_id_atom);
   const [editOpen, setEditOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedCategoryID, setSelectedCategoryID] = useAtom(selected_category_id_atom);
+  useCategorySearchParam({
+    selected: selectedCategoryID,
+    setSelected: setSelectedCategoryID,
+    searchCategory: search_category,
+    setSearchCategory: set_search_category
+  });
 
   const scriptOptions = FONT_SCRIPTS.map((name) => ({
     name,
@@ -157,6 +172,20 @@ function ListGestures({ init_lang_id, init_gesture_categories }: Props) {
   );
   const categories = categories_q.data ?? [];
 
+  // keep a valid category selected: the first one when none is stored, or the stored one is gone
+  useEffect(() => {
+    if (!categories_q.isSuccess || categories_q.isPlaceholderData) return;
+    const list = categories_q.data;
+    if (selectedCategoryID === 0 || list.some((c) => c.id === selectedCategoryID)) return;
+    setSelectedCategoryID(list[0]?.id ?? 0);
+  }, [
+    categories_q.isSuccess,
+    categories_q.isPlaceholderData,
+    categories_q.data,
+    selectedCategoryID,
+    setSelectedCategoryID
+  ]);
+
   const category_gestures_q = useQuery(
     trpc.text_gestures.categories.get_gestures.queryOptions(
       { category_id: selectedCategoryID!, script_id: scriptId, lang_id: langId },
@@ -171,7 +200,7 @@ function ListGestures({ init_lang_id, init_gesture_categories }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-center gap-3">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-3 rounded-xl border bg-card/50 p-3">
         <Select
           items={scriptItems}
           value={scriptId?.toString()}
@@ -213,67 +242,65 @@ function ListGestures({ init_lang_id, init_gesture_categories }: Props) {
             ))}
           </SelectContent>
         </Select>
-      </div>
-      <div className="flex flex-wrap items-center justify-center gap-4">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger
-            role="combobox"
-            aria-expanded={open}
-            className={cn(buttonVariants({ variant: 'outline' }), 'w-50 justify-between')}
-          >
-            {selectedCategoryID !== null
-              ? categories.find((category) => category.id === selectedCategoryID)?.name ||
-                (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
-              : 'Select category...'}
-            <ChevronsUpDown className="opacity-50" />
-          </PopoverTrigger>
-          <PopoverContent className="w-50 p-0">
-            <Command>
-              <CommandInput placeholder="Search category..." className="h-9" />
-              <CommandList>
-                <CommandEmpty>No category found.</CommandEmpty>
-                <CommandGroup>
-                  {categories.map((category) => (
+        <div className="flex items-center gap-1">
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger
+              role="combobox"
+              aria-expanded={open}
+              className={cn(buttonVariants({ variant: 'outline' }), 'w-50 justify-between')}
+            >
+              {selectedCategoryID !== null
+                ? categories.find((category) => category.id === selectedCategoryID)?.name ||
+                  (selectedCategoryID === 0 ? 'Uncategorized' : 'Select category...')
+                : 'Select category...'}
+              <ChevronsUpDown className="opacity-50" />
+            </PopoverTrigger>
+            <PopoverContent className="w-50 p-0">
+              <Command>
+                <CommandInput placeholder="Search category..." className="h-9" />
+                <CommandList>
+                  <CommandEmpty>No category found.</CommandEmpty>
+                  <CommandGroup>
+                    {categories.map((category) => (
+                      <CommandItem
+                        key={category.id}
+                        value={category.name}
+                        keywords={[category.id.toString()]}
+                        data-checked={selectedCategoryID === category.id ? 'true' : undefined}
+                        className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
+                        onSelect={() => {
+                          setSelectedCategoryID(category.id);
+                          setOpen(false);
+                        }}
+                      >
+                        {category.name}
+                      </CommandItem>
+                    ))}
                     <CommandItem
-                      key={category.id}
-                      value={category.name}
-                      keywords={[category.id.toString()]}
-                      data-checked={selectedCategoryID === category.id ? 'true' : undefined}
+                      value="Uncategorized"
+                      keywords={['0']}
+                      data-checked={selectedCategoryID === 0 ? 'true' : undefined}
                       className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
                       onSelect={() => {
-                        setSelectedCategoryID(
-                          selectedCategoryID === category.id ? null : category.id
-                        );
+                        setSelectedCategoryID(0);
                         setOpen(false);
                       }}
                     >
-                      {category.name}
+                      Uncategorized
                     </CommandItem>
-                  ))}
-                  <CommandItem
-                    value="Uncategorized"
-                    keywords={['0']}
-                    data-checked={selectedCategoryID === 0 ? 'true' : undefined}
-                    className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
-                    onSelect={() => {
-                      setSelectedCategoryID(selectedCategoryID === 0 ? null : 0);
-                      setOpen(false);
-                    }}
-                  >
-                    Uncategorized
-                  </CommandItem>
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-        <Link
-          to="/lessons"
-          title="Categories are the lesson categories, managed on the Lessons page"
-          className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}
-        >
-          <TiEdit className="size-5" />
-        </Link>
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          <Link
+            to="/lessons"
+            title="Categories are the lesson categories, managed on the Lessons page"
+            className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}
+          >
+            <TiEdit className="size-5" />
+          </Link>
+        </div>
       </div>
 
       {selectedCategoryID !== null && category_gestures_q.data ? (
@@ -294,29 +321,27 @@ function ListGestures({ init_lang_id, init_gesture_categories }: Props) {
           Please select a category to view gestures.
         </div>
       ) : (
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() => setEditOpen(true)}
-              disabled={category_gestures_q.isLoading || !category_gestures_q.data}
-              className="border-sky-500 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-200"
-            >
-              <Pencil data-icon="inline-start" />
-              Edit Order
-            </Button>
-          </div>
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4">
           {category_gestures_q.isLoading ? (
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-md border p-3">
-                  <Skeleton className="h-5 w-1/3" />
-                  <Skeleton className="h-5 w-1/5" />
-                </div>
+            <div className={GESTURE_GRID_CLASS}>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <GestureCardSkeleton key={i} />
               ))}
             </div>
           ) : category_gestures_q.data ? (
-            <DisplayGesturesSection data={category_gestures_q.data} />
+            <DisplayGesturesSection
+              data={category_gestures_q.data}
+              actions={
+                <Button
+                  variant="outline"
+                  onClick={() => setEditOpen(true)}
+                  className="border-sky-500 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-200"
+                >
+                  <Pencil data-icon="inline-start" />
+                  Edit Order
+                </Button>
+              }
+            />
           ) : null}
         </div>
       )}
@@ -324,14 +349,16 @@ function ListGestures({ init_lang_id, init_gesture_categories }: Props) {
   );
 }
 
-type GestureItem = { id: number; text: string; text_key: string; order: number | null };
-
-type PendingMove = {
+type GestureItem = {
   id: number;
   text: string;
   text_key: string;
-  target_category_id: number | null;
+  order: number | null;
+  updated_at: Date;
+  stroke_count: number;
 };
+
+type PendingMove = GestureItem & { target_category_id: number | null };
 
 function splitGestures(gestures: GestureItem[]) {
   const unordered = gestures.filter((g) => g.order === null);
@@ -356,73 +383,108 @@ function draftSignature(
   });
 }
 
-function DisplayGesturesSection({ data }: { data: { type: string; gestures: GestureItem[] } }) {
-  if (data.type === 'uncategorized') {
-    return (
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10">
-        {data.gestures.map((g) => (
-          <Card key={g.id} className="p-0 transition-colors hover:bg-muted/60">
-            <Link
-              to="/gestures/edit/$id"
-              params={{ id: String(g.id) }}
-              className="block truncate p-2.5 text-center font-medium"
-            >
-              {g.text}
-            </Link>
-          </Card>
-        ))}
-        {data.gestures.length === 0 && (
-          <div className="col-span-full text-sm text-muted-foreground">No gestures.</div>
-        )}
-      </div>
-    );
-  }
+type StrokeFilter = 'all' | 'recorded' | 'empty';
 
-  const { ordered, unordered } = splitGestures(data.gestures);
+const STROKE_FILTERS: { value: StrokeFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'recorded', label: 'Recorded' },
+  { value: 'empty', label: 'Empty' }
+];
+
+const GESTURE_GRID_CLASS = 'grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-3';
+
+function DisplayGesturesSection({
+  data,
+  actions
+}: {
+  data: { type: string; gestures: GestureItem[] };
+  actions: React.ReactNode;
+}) {
+  const [filter, setFilter] = useState<StrokeFilter>('all');
+  const total = data.gestures.length;
+  const recorded = data.gestures.filter((g) => g.stroke_count > 0).length;
+  const matches = (g: GestureItem) =>
+    filter === 'all' || (filter === 'recorded') === g.stroke_count > 0;
+
+  const sections =
+    data.type === 'uncategorized'
+      ? [{ key: 'all', title: null, items: data.gestures }]
+      : (() => {
+          const { ordered, unordered } = splitGestures(data.gestures);
+          return [
+            { key: 'unordered', title: 'Unordered', items: unordered },
+            { key: 'ordered', title: 'Ordered', items: ordered }
+          ].filter((sec) => sec.key === 'ordered' || sec.items.length > 0);
+        })();
 
   return (
-    <div className="flex flex-col gap-8">
-      {unordered.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <h3 className="text-base font-semibold text-muted-foreground">Unordered</h3>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-            {unordered.map((g) => (
-              <Card key={g.id} className="p-0 transition-colors hover:bg-muted/60">
-                <Link
-                  to="/gestures/edit/$id"
-                  params={{ id: String(g.id) }}
-                  className="block truncate p-2.5 text-center font-medium"
-                >
-                  {g.text}
-                </Link>
-              </Card>
-            ))}
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border bg-card/50 px-4 py-3">
+        <div className="flex min-w-48 flex-1 flex-col gap-1.5">
+          <div className="flex items-baseline gap-2 text-sm">
+            <span className="font-semibold tabular-nums">
+              {recorded}/{total}
+            </span>
+            <span className="text-muted-foreground">gestures recorded</span>
           </div>
-        </section>
-      )}
-      <section className="flex flex-col gap-3">
-        <h3 className="text-base font-semibold">Ordered</h3>
-        {ordered.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
-            {ordered.map((g) => (
-              <Card key={g.id} className="p-0 transition-colors hover:bg-muted/60">
-                <Link
-                  to="/gestures/edit/$id"
-                  params={{ id: String(g.id) }}
-                  className="flex items-center gap-2 p-2"
-                >
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
-                    {g.order}
-                  </span>
-                  <span className="truncate font-medium">{g.text}</span>
-                </Link>
-              </Card>
-            ))}
+          <div className="h-1.5 w-full max-w-64 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all"
+              style={{ width: `${total ? (recorded / total) * 100 : 0}%` }}
+            />
           </div>
-        ) : (
-          <div className="text-sm text-muted-foreground">No ordered gestures.</div>
-        )}
-      </section>
+        </div>
+        <div className="flex items-center rounded-lg border bg-background p-0.5" role="group">
+          {STROKE_FILTERS.map((f) => (
+            <Button
+              key={f.value}
+              size="sm"
+              variant={filter === f.value ? 'secondary' : 'ghost'}
+              aria-pressed={filter === f.value}
+              onClick={() => setFilter(f.value)}
+              className="h-7"
+            >
+              {f.label}
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {f.value === 'all' ? total : f.value === 'recorded' ? recorded : total - recorded}
+              </span>
+            </Button>
+          ))}
+        </div>
+        {actions}
+      </div>
+
+      {sections.map((sec) => {
+        const items = sec.items.filter(matches);
+        return (
+          <section key={sec.key} className="flex flex-col gap-3">
+            {sec.title ? (
+              <h3
+                className={cn(
+                  'flex items-center gap-2 text-base font-semibold',
+                  sec.key === 'unordered' && 'text-muted-foreground'
+                )}
+              >
+                {sec.title}
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
+                  {items.length}
+                </span>
+              </h3>
+            ) : null}
+            {items.length > 0 ? (
+              <div className={GESTURE_GRID_CLASS}>
+                {items.map((g) => (
+                  <GestureCard key={g.id} item={g} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                {sec.items.length === 0 ? 'No gestures.' : 'No gestures match this filter.'}
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -529,21 +591,14 @@ function EditCategoryGesturesDialog({
     removeFromLists(item.id);
     setPendingMoves((prev) => [
       ...prev.filter((m) => m.id !== item.id),
-      {
-        id: item.id,
-        text: item.text,
-        text_key: item.text_key,
-        target_category_id
-      }
+      { ...item, order: null, target_category_id }
     ]);
   }
 
   function undoPendingMove(move: PendingMove) {
     setPendingMoves((prev) => prev.filter((m) => m.id !== move.id));
-    setUnordered((prev) => [
-      { id: move.id, text: move.text, text_key: move.text_key, order: null },
-      ...prev
-    ]);
+    const { target_category_id: _, ...item } = move;
+    setUnordered((prev) => [item, ...prev]);
   }
 
   const add_to_category_mut = useMutation(

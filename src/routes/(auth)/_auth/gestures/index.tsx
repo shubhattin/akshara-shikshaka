@@ -16,7 +16,8 @@ import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 import { Effect } from 'effect';
 import { getGestureCategories } from '~/api/routers/gesture_categories';
 import { runLoaderEffect } from '~/effect/run';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { category_search_schema } from '~/hooks/useCategorySearchParam';
 
 const loadGesturesIndex = Effect.fn('loadGesturesIndex')(function* () {
   const script_id = get_script_id_from_cookie(getCookie(SCRIPT_ID_COOKIE_KEY));
@@ -34,6 +35,7 @@ const loader$ = createServerFn({ method: 'GET' })
   .handler(() => runLoaderEffect(loadGesturesIndex()));
 
 export const Route = createFileRoute('/(auth)/_auth/gestures/')({
+  validateSearch: category_search_schema,
   loader: async () => await loader$(),
   head: () => routeHeadFromPageMeta({ title: 'Text Gesture List' }),
   component: GesturesIndexRoute
@@ -41,6 +43,13 @@ export const Route = createFileRoute('/(auth)/_auth/gestures/')({
 
 function GesturesIndexRoute() {
   const { init_script_id, init_lang_id, init_gesture_categories } = Route.useLoaderData();
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const setSearchCategory = useCallback(
+    (category: number) =>
+      void navigate({ search: (prev) => ({ ...prev, category }), replace: true }),
+    [navigate]
+  );
   const [addOpen, setAddOpen] = useState(false);
 
   return (
@@ -63,6 +72,8 @@ function GesturesIndexRoute() {
       </div>
       <AddGestureDialog open={addOpen} onOpenChange={setAddOpen} init_script_id={init_script_id} />
       <ListGestures
+        search_category={search.category}
+        set_search_category={setSearchCategory}
         init_script_id={init_script_id}
         init_lang_id={init_lang_id}
         init_gesture_categories={init_gesture_categories}

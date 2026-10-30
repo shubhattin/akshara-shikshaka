@@ -13,7 +13,8 @@ import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 import { Effect } from 'effect';
 import { getLessonCategories } from '~/api/routers/lesson_categories';
 import { runLoaderEffect } from '~/effect/run';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
+import { category_search_schema } from '~/hooks/useCategorySearchParam';
 
 const loadLessonsIndex = Effect.fn('loadLessonsIndex')(function* () {
   const lang_id = get_lesson_lang_id_from_cookie(getCookie(LESSON_LANG_ID_COOKIE_KEY));
@@ -26,6 +27,7 @@ const loader$ = createServerFn({ method: 'GET' })
   .handler(() => runLoaderEffect(loadLessonsIndex()));
 
 export const Route = createFileRoute('/(auth)/_auth/lessons/')({
+  validateSearch: category_search_schema,
   loader: async () => await loader$(),
   head: () => routeHeadFromPageMeta({ title: 'Text Lessons' }),
   component: LessonsIndexRoute
@@ -33,6 +35,13 @@ export const Route = createFileRoute('/(auth)/_auth/lessons/')({
 
 function LessonsIndexRoute() {
   const { init_lang_id, init_lesson_categories } = Route.useLoaderData();
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const setSearchCategory = useCallback(
+    (category: number) =>
+      void navigate({ search: (prev) => ({ ...prev, category }), replace: true }),
+    [navigate]
+  );
   const [addOpen, setAddOpen] = useState(false);
 
   return (
@@ -54,7 +63,12 @@ function LessonsIndexRoute() {
         </Button>
       </div>
       <AddLessonDialog open={addOpen} onOpenChange={setAddOpen} init_lang_id={init_lang_id} />
-      <ListLessons init_lang_id={init_lang_id} init_lesson_categories={init_lesson_categories} />
+      <ListLessons
+        search_category={search.category}
+        set_search_category={setSearchCategory}
+        init_lang_id={init_lang_id}
+        init_lesson_categories={init_lesson_categories}
+      />
     </div>
   );
 }

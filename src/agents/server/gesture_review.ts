@@ -1,7 +1,9 @@
 import { Effect } from 'effect';
-import { and, desc, eq, gte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, sql } from 'drizzle-orm';
 import {
   agent_chats,
+  gesture_text_key_lesson_category_join,
+  lesson_categories,
   text_gesture_revisions,
   text_gestures,
   user_gesture_recordings
@@ -14,6 +16,7 @@ import { MAX_AGENT_NOTES_LENGTH, withNote, type ReviewStatus } from '~/agents/ge
 import { getGestureForAgent } from './gestures';
 import { listChatsForGesture } from './chat_store';
 import { savedStrokeCount } from './stroke_count';
+import { DEFAULT_GESTURE_CATEGORY_LANG_ID } from '~/state/lang_list';
 
 /** Display names for admin ids; history still shows (without names) if the lookup fails. */
 const userNames = (ids: (string | null)[]) =>
@@ -234,7 +237,7 @@ const PRACTICE_WINDOW_DAYS = 30;
  */
 export const getReviewQueue = Effect.fn('gesture_review.queue')(function* () {
   const since = new Date(Date.now() - PRACTICE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-  const [gestures, practice, focused] = yield* Effect.all(
+  const [gestures, categories, practice, focused] = yield* Effect.all(
     [
       dbRunHttp('gesture_review.queue_gestures', (client) =>
         client
@@ -247,9 +250,25 @@ export const getReviewQueue = Effect.fn('gesture_review.queue')(function* () {
             review_status: text_gestures.review_status,
             review_note: text_gestures.review_note,
             revision: text_gestures.revision,
-            updated_at: text_gestures.updated_at
+            updated_at: text_gestures.updated_at,
+            // categories of the default language, as the agents see them (null: uncategorized)
+            category_id: gesture_text_key_lesson_category_join.lesson_category_id
           })
           .from(text_gestures)
+          .leftJoin(
+            gesture_text_key_lesson_category_join,
+            and(
+              eq(gesture_text_key_lesson_category_join.gesture_text_key, text_gestures.text_key),
+              eq(gesture_text_key_lesson_category_join.lang_id, DEFAULT_GESTURE_CATEGORY_LANG_ID)
+            )
+          )
+      ),
+      dbRunHttp('gesture_review.queue_categories', (client) =>
+        client
+          .select({ id: lesson_categories.id, name: lesson_categories.name })
+          .from(lesson_categories)
+          .where(eq(lesson_categories.lang_id, DEFAULT_GESTURE_CATEGORY_LANG_ID))
+          .orderBy(asc(lesson_categories.order))
       ),
       dbRunHttp('gesture_review.queue_practice', (client) =>
         client
@@ -285,6 +304,8 @@ export const getReviewQueue = Effect.fn('gesture_review.queue')(function* () {
   const chatsBy = new Map(focused.map((row) => [row.gesture_id, row]));
   return {
     practice_window_days: PRACTICE_WINDOW_DAYS,
+    /** Lesson categories of the default language, in lesson order, for the category filter */
+    categories,
     gestures: gestures.map((gesture) => {
       const stats = practiceBy.get(practiceKey(gesture.text, gesture.script_id));
       const chats = chatsBy.get(gesture.id);

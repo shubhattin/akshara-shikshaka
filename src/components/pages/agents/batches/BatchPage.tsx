@@ -26,6 +26,8 @@ import { MobileHistoryButton } from '../sidebar/AgentsSidebar';
 import { timeAgo } from '../gesture_hub/time';
 import { BatchProgress } from './BatchProgress';
 import { BatchReviewGrid } from './BatchReviewGrid';
+import { FilterSelect, type FilterOption } from '../gesture_hub/FilterSelect';
+import { matchesCategory, type CategoryFilter } from '~/agents/review_queue';
 import { BatchStatusBadge } from './BatchStatusBadge';
 import { formatDuration, formatEta, formatUsd, runSeconds } from './batch_format';
 import { invalidateBatch } from './batch_invalidate';
@@ -72,6 +74,9 @@ function BatchItemRow({
             {get_script_from_id(item.script_id) ?? item.script_id} #{item.text_gesture_id}
           </Link>
           <BatchStatusBadge status={item.status} stuck={item.stuck} />
+          {item.category ? (
+            <span className="text-xs text-muted-foreground">{item.category}</span>
+          ) : null}
           <span className="text-xs text-muted-foreground">
             {item.attempts} {item.attempts === 1 ? 'attempt' : 'attempts'}
             {duration ? ` · ${duration}` : ''} · {formatUsd(item.cost)}
@@ -128,6 +133,8 @@ export function BatchPage({ batchId }: { batchId: number }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<ItemFilter>('all');
+  const [script, setScript] = useState<number | 'all'>('all');
+  const [category, setCategory] = useState<CategoryFilter>('all');
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   const batch_q = useQuery(
@@ -187,7 +194,45 @@ export function BatchPage({ batchId }: { batchId: number }) {
   const rerunnable = counts.failed + counts.no_proposal + counts.cancelled + stuckCount;
   const avg = formatDuration(counts.avg_seconds);
   const eta = formatEta(eta_seconds);
-  const rows = filter === 'all' ? items : items.filter((item) => item.status === filter);
+  // script and category narrow everything below; the status tabs count within them
+  const scoped = items.filter(
+    (item) =>
+      (script === 'all' || item.script_id === script) && matchesCategory(item.category_id, category)
+  );
+  const scopedIds = new Set(scoped.map((item) => item.id));
+  const rows = filter === 'all' ? scoped : scoped.filter((item) => item.status === filter);
+  const scriptOptions: FilterOption[] = [
+    { value: 'all', label: 'All scripts', count: items.length },
+    ...[...new Set(items.map((item) => item.script_id))]
+      .sort((a, b) => a - b)
+      .map((id) => ({
+        value: String(id),
+        label: get_script_from_id(id) ?? String(id),
+        count: items.filter((item) => item.script_id === id).length
+      }))
+  ];
+  const inScript = items.filter((item) => script === 'all' || item.script_id === script);
+  // categories in the order the items list them (lesson order within a script)
+  const categories = [
+    ...new Map(
+      items.flatMap((item) =>
+        item.category_id === null ? [] : ([[item.category_id, item.category ?? '']] as const)
+      )
+    )
+  ];
+  const categoryOptions: FilterOption[] = [
+    { value: 'all', label: 'All categories', count: inScript.length },
+    ...categories.map(([id, name]) => ({
+      value: String(id),
+      label: name,
+      count: inScript.filter((item) => item.category_id === id).length
+    })),
+    {
+      value: 'none',
+      label: 'Uncategorized',
+      count: inScript.filter((item) => item.category_id === null).length
+    }
+  ];
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -240,6 +285,23 @@ export function BatchPage({ batchId }: { batchId: number }) {
               ) : null}
             </p>
           </section>
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterSelect
+              label="Script"
+              value={String(script)}
+              options={scriptOptions}
+              onChange={(value) => setScript(value === 'all' ? 'all' : Number(value))}
+            />
+            <FilterSelect
+              label="Category"
+              value={String(category)}
+              options={categoryOptions}
+              onChange={(value) =>
+                setCategory(value === 'all' || value === 'none' ? value : Number(value))
+              }
+              className="min-w-44"
+            />
+          </div>
           <Tabs
             value={filter}
             onValueChange={(value) =>
@@ -251,19 +313,21 @@ export function BatchPage({ batchId }: { batchId: number }) {
             <TabsList className="flex-wrap">
               <TabsTrigger value="all">
                 All
-                <span className="ml-1 text-xs text-muted-foreground">{items.length}</span>
+                <span className="ml-1 text-xs text-muted-foreground">{scoped.length}</span>
               </TabsTrigger>
               {BATCH_ITEM_STATUSES.map((status) => (
                 <TabsTrigger key={status} value={status}>
                   {BATCH_ITEM_STATUS_META[status].label}
                   <span className="ml-1 text-xs text-muted-foreground">
-                    {items.filter((item) => item.status === status).length}
+                    {scoped.filter((item) => item.status === status).length}
                   </span>
                 </TabsTrigger>
               ))}
             </TabsList>
           </Tabs>
-          {filter === 'proposed' ? <BatchReviewGrid batchId={batchId} /> : null}
+          {filter === 'proposed' ? (
+            <BatchReviewGrid batchId={batchId} visibleIds={scopedIds} />
+          ) : null}
           {rows.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">Nothing here.</p>
           ) : (

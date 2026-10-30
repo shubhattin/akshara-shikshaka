@@ -1,7 +1,14 @@
 import { Effect } from 'effect';
 import { and, asc, desc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { agent_batch_items, agent_batches, agent_chats, text_gestures } from '~/db/schema';
+import {
+  agent_batch_items,
+  agent_batches,
+  agent_chats,
+  gesture_text_key_lesson_category_join,
+  lesson_categories,
+  text_gestures
+} from '~/db/schema';
 import { dbRunHttp } from '~/effect/database';
 import {
   AiProviderError,
@@ -14,7 +21,7 @@ import {
 import { enqueueBackground } from '~/effect/background';
 import { QStashPublisher } from '~/effect/qstash';
 import { resolveAuthUserNames } from '~/lib/auth_users.server';
-import { get_script_from_id } from '~/state/lang_list';
+import { DEFAULT_GESTURE_CATEGORY_LANG_ID, get_script_from_id } from '~/state/lang_list';
 import {
   AGENT_FUNCTION_MAX_SECONDS,
   BATCH_RETRIES,
@@ -712,11 +719,25 @@ export const getBatch = Effect.fn('batches.get')(function* (batchId: number) {
         review_status: text_gestures.review_status,
         started_at: agent_batch_items.started_at,
         finished_at: agent_batch_items.finished_at,
-        reviewed_at: agent_batch_items.reviewed_at
+        reviewed_at: agent_batch_items.reviewed_at,
+        category_id: gesture_text_key_lesson_category_join.lesson_category_id,
+        category: lesson_categories.name
       })
       .from(agent_batch_items)
       .innerJoin(text_gestures, eq(text_gestures.id, agent_batch_items.text_gesture_id))
       .leftJoin(agent_chats, eq(agent_chats.id, agent_batch_items.chat_id))
+      // categories of the default language (null: uncategorized)
+      .leftJoin(
+        gesture_text_key_lesson_category_join,
+        and(
+          eq(gesture_text_key_lesson_category_join.gesture_text_key, text_gestures.text_key),
+          eq(gesture_text_key_lesson_category_join.lang_id, DEFAULT_GESTURE_CATEGORY_LANG_ID)
+        )
+      )
+      .leftJoin(
+        lesson_categories,
+        eq(lesson_categories.id, gesture_text_key_lesson_category_join.lesson_category_id)
+      )
       .where(eq(agent_batch_items.batch_id, batchId))
       .orderBy(asc(text_gestures.script_id), asc(agent_batch_items.id))
   );

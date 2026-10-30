@@ -667,20 +667,6 @@ function DisplayLessonsSection({
   return (
     <div className="flex flex-col gap-6">
       {header}
-      {unordered.length > 0 && (
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold text-muted-foreground">Unordered</h3>
-            <span className="rounded-md border border-yellow-600/40 bg-yellow-500/15 px-1.5 py-0.5 text-xs font-medium text-yellow-700 dark:border-yellow-500/40 dark:text-yellow-400">
-              unlisted
-            </span>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
-              {unordered.length}
-            </span>
-          </div>
-          <LessonGrid lessons={unordered} overview={overview} />
-        </section>
-      )}
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold">Ordered</h3>
@@ -721,6 +707,20 @@ function DisplayLessonsSection({
           </div>
         )}
       </section>
+      {unordered.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold text-muted-foreground">Unordered</h3>
+            <span className="rounded-md border border-yellow-600/40 bg-yellow-500/15 px-1.5 py-0.5 text-xs font-medium text-yellow-700 dark:border-yellow-500/40 dark:text-yellow-400">
+              unlisted
+            </span>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
+              {unordered.length}
+            </span>
+          </div>
+          <LessonGrid lessons={unordered} overview={overview} />
+        </section>
+      )}
     </div>
   );
 }

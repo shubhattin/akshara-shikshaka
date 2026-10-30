@@ -366,8 +366,8 @@ function DisplayGesturesSection({
       : (() => {
           const { ordered, unordered } = splitGestures(data.gestures);
           return [
-            { key: 'unordered', title: 'Unordered', items: unordered },
-            { key: 'ordered', title: 'Ordered', items: ordered }
+            { key: 'ordered', title: 'Ordered', items: ordered },
+            { key: 'unordered', title: 'Unordered', items: unordered }
           ].filter((sec) => sec.key === 'ordered' || sec.items.length > 0);
         })();
 

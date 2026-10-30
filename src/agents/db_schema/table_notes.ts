@@ -48,7 +48,13 @@ export const TABLE_NOTES = new Map<string, string>([
 ]);
 
 /** Tables the agent does not need to know about. */
-export const HIDDEN_TABLES = new Set(['agent_chats', 'agent_messages', 'agent_chat_gestures']);
+export const HIDDEN_TABLES = new Set([
+  'agent_chats',
+  'agent_messages',
+  'agent_chat_gestures',
+  'agent_batches',
+  'agent_batch_items'
+]);
 
 /** `table.column` → type of the JSON stored in it. */
 export const JSONB_COLUMN_TYPES = new Map<string, string>([

@@ -31,6 +31,17 @@ import {
 } from '~/agents/server/gesture_review';
 import { loadFocusContext } from '~/agents/server/focus';
 import { MAX_AGENT_NOTES_LENGTH, review_status_schema } from '~/agents/gesture_review';
+import { create_batch_input_schema } from '~/agents/batch';
+import {
+  acceptItem,
+  cancelBatch,
+  createBatch,
+  getBatch,
+  listBatchProposals,
+  listBatches,
+  rejectItem,
+  rerunItems
+} from '~/agents/server/batches';
 
 const chat_id_schema = z.string().min(1).max(64);
 
@@ -203,7 +214,74 @@ const add_agent_note_route = protectedAdminProcedure
 /** Every gesture with what the review queue ranks it by. */
 const review_queue_route = protectedAdminProcedure.query(() => runTrpcEffect(getReviewQueue()));
 
+// ---------------------------------------------------------------- batches
+
+const batch_id_schema = z.int().positive();
+
+/** Queue one Gesture Creator run per gesture (QStash in production). */
+const create_batch_route = protectedAdminProcedure
+  .input(create_batch_input_schema)
+  .mutation(({ input, ctx }) => runTrpcEffect(createBatch(input, ctx.user.id)));
+
+const list_batches_route = protectedAdminProcedure.query(() => runTrpcEffect(listBatches()));
+
+/** Progress and every item's state; polled while the batch runs. */
+const get_batch_route = protectedAdminProcedure
+  .input(z.object({ batch_id: batch_id_schema }))
+  .query(({ input }) => runTrpcEffect(getBatch(input.batch_id)));
+
+/** Proposals with the strokes saved now, for the review grid. */
+const batch_proposals_route = protectedAdminProcedure
+  .input(
+    z.object({
+      batch_id: batch_id_schema,
+      item_ids: z.array(z.int().positive()).max(500).optional()
+    })
+  )
+  .query(({ input }) =>
+    runTrpcEffect(listBatchProposals({ batchId: input.batch_id, itemIds: input.item_ids }))
+  );
+
+const cancel_batch_route = protectedAdminProcedure
+  .input(z.object({ batch_id: batch_id_schema }))
+  .mutation(({ input }) => runTrpcEffect(cancelBatch(input.batch_id)));
+
+/** Run failed, proposal-less, cancelled or stuck items again (all of them when no ids). */
+const rerun_batch_items_route = protectedAdminProcedure
+  .input(
+    z.object({
+      batch_id: batch_id_schema,
+      item_ids: z.array(z.int().positive()).max(500).optional()
+    })
+  )
+  .mutation(({ input }) =>
+    runTrpcEffect(rerunItems({ batchId: input.batch_id, itemIds: input.item_ids }))
+  );
+
+/** Save an item's proposal to its gesture (and approve it). */
+const accept_batch_item_route = protectedAdminProcedure
+  .input(z.object({ item_id: z.int().positive(), approve: z.boolean().default(true) }))
+  .mutation(({ input, ctx }) =>
+    runTrpcEffect(
+      acceptItem({ itemId: input.item_id, userId: ctx.user.id, approve: input.approve })
+    )
+  );
+
+const reject_batch_item_route = protectedAdminProcedure
+  .input(z.object({ item_id: z.int().positive() }))
+  .mutation(({ input, ctx }) =>
+    runTrpcEffect(rejectItem({ itemId: input.item_id, userId: ctx.user.id }))
+  );
+
 export const agents_router = t.router({
+  create_batch: create_batch_route,
+  list_batches: list_batches_route,
+  get_batch: get_batch_route,
+  batch_proposals: batch_proposals_route,
+  cancel_batch: cancel_batch_route,
+  rerun_batch_items: rerun_batch_items_route,
+  accept_batch_item: accept_batch_item_route,
+  reject_batch_item: reject_batch_item_route,
   list_chats: list_chats_route,
   get_chat: get_chat_route,
   create_chat: create_chat_route,

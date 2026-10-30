@@ -13,6 +13,12 @@ const AppConfigSchema = Schema.Struct({
   openrouterApiKey: Schema.String,
   turnstileSecretKey: Schema.optional(Schema.String),
   betterAuthUrl: Schema.String,
+  qstashUrl: Schema.optional(Schema.String),
+  qstashToken: Schema.String,
+  qstashCurrentSigningKey: Schema.String,
+  qstashNextSigningKey: Schema.String,
+  siteUrl: Schema.optional(Schema.String),
+  isQstashEnabled: Schema.Boolean,
   isDev: Schema.Boolean,
   isProd: Schema.Boolean
 });
@@ -29,6 +35,18 @@ export type AppConfigValues = {
   readonly openrouterApiKey: Redacted.Redacted<string>;
   readonly turnstileSecretKey: Redacted.Redacted<string> | undefined;
   readonly betterAuthUrl: string;
+  /** Regional QStash API (e.g. `https://qstash-us-east-1.upstash.io`); the SDK default otherwise */
+  readonly qstashUrl: string | undefined;
+  readonly qstashToken: Redacted.Redacted<string>;
+  readonly qstashCurrentSigningKey: Redacted.Redacted<string>;
+  readonly qstashNextSigningKey: Redacted.Redacted<string>;
+  /** Public origin QStash calls back (no trailing slash); also the signed `sub` of each message */
+  readonly siteUrl: string | undefined;
+  /**
+   * QStash only delivers to public URLs, so it is on for production deployments; elsewhere
+   * agent batches run in-process.
+   */
+  readonly isQstashEnabled: boolean;
   readonly isDev: boolean;
   readonly isProd: boolean;
 };
@@ -37,6 +55,19 @@ const resolveDbUrl = (env: NodeJS.ProcessEnv): string | undefined => {
   if (env.DB_MODE === 'PROD') return env.PG_DATABASE_URL1 ?? env.PG_DATABASE_URL;
   if (env.DB_MODE === 'PREVIEW') return env.PG_DATABASE_URL2 ?? env.PG_DATABASE_URL;
   return env.PG_DATABASE_URL;
+};
+
+const isProductionDeployment = (env: NodeJS.ProcessEnv): boolean =>
+  env.VERCEL_ENV === 'production' ||
+  (env.VERCEL_ENV === undefined && env.NODE_ENV === 'production');
+
+const resolveSiteUrl = (env: NodeJS.ProcessEnv): string | undefined => {
+  const url =
+    env.VITE_BASE_URL ??
+    (env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : undefined);
+  return url?.replace(/\/+$/, '');
 };
 
 const loadConfig = Effect.fn('loadConfig')(function* () {
@@ -53,6 +84,14 @@ const loadConfig = Effect.fn('loadConfig')(function* () {
     openrouterApiKey: env.OPENROUTER_API_KEY ?? import.meta.env?.OPENROUTER_API_KEY,
     turnstileSecretKey: env.TURNSTILE_SECRET_KEY,
     betterAuthUrl: env.VITE_BETTER_AUTH_URL,
+    qstashUrl: env.QSTASH_URL,
+    qstashToken: env.QSTASH_TOKEN,
+    qstashCurrentSigningKey: env.QSTASH_CURRENT_SIGNING_KEY,
+    qstashNextSigningKey: env.QSTASH_NEXT_SIGNING_KEY,
+    siteUrl: resolveSiteUrl(env),
+    isQstashEnabled: env.QSTASH_ENABLED
+      ? env.QSTASH_ENABLED === 'true'
+      : isProductionDeployment(env),
     isDev: import.meta.env?.DEV === true || env.NODE_ENV === 'development',
     isProd: import.meta.env?.PROD === true || env.NODE_ENV === 'production'
   });
@@ -81,6 +120,12 @@ const loadConfig = Effect.fn('loadConfig')(function* () {
       ? Redacted.make(data.turnstileSecretKey)
       : undefined,
     betterAuthUrl: data.betterAuthUrl,
+    qstashUrl: data.qstashUrl,
+    qstashToken: Redacted.make(data.qstashToken),
+    qstashCurrentSigningKey: Redacted.make(data.qstashCurrentSigningKey),
+    qstashNextSigningKey: Redacted.make(data.qstashNextSigningKey),
+    siteUrl: data.siteUrl,
+    isQstashEnabled: data.isQstashEnabled,
     isDev: data.isDev,
     isProd: data.isProd
   } satisfies AppConfigValues;

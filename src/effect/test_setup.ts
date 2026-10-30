@@ -8,6 +8,9 @@ process.env.AWS_SECRET_ACCESS_KEY = 'test';
 process.env.AWS_S3_FILES_BUCKET_NAME = 'test-bucket';
 process.env.UPSTASH_REDIS_REST_URL = 'https://example.upstash.io';
 process.env.UPSTASH_REDIS_REST_TOKEN = 'token-test';
+process.env.QSTASH_TOKEN = 'qstash-token-test';
+process.env.QSTASH_CURRENT_SIGNING_KEY = 'sig_current_test';
+process.env.QSTASH_NEXT_SIGNING_KEY = 'sig_next_test';
 
 import { afterAll } from 'vitest';
 

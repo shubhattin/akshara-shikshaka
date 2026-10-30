@@ -63,6 +63,7 @@
     "@trpc/client": "^11.18.0",
     "@trpc/server": "^11.18.0",
     "@trpc/tanstack-react-query": "^11.18.0",
+    "@upstash/qstash": "^2.12.1",
     "@upstash/redis": "^1.38.2",
     "@vercel/functions": "^3.8.0",
     "@wavesurfer/react": "^1.0.12",

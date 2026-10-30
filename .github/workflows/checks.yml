@@ -17,6 +17,9 @@ env:
   AWS_S3_FILES_BUCKET_NAME: bucket-123
   UPSTASH_REDIS_REST_URL: https://example.upstash.io
   UPSTASH_REDIS_REST_TOKEN: token-123
+  QSTASH_TOKEN: qstash-token-123
+  QSTASH_CURRENT_SIGNING_KEY: sig_current_123
+  QSTASH_NEXT_SIGNING_KEY: sig_next_123
 
 jobs:
   type_build_check:

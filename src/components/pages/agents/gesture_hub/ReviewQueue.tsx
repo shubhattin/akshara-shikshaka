@@ -11,10 +11,12 @@ import {
   type QueueBucket
 } from '~/agents/review_queue';
 import { Button } from '~/components/ui/button';
+import { Checkbox } from '~/components/ui/checkbox';
 import { Skeleton } from '~/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { get_script_from_id } from '~/state/lang_list';
 import { MobileHistoryButton } from '../sidebar/AgentsSidebar';
+import { StartBatchDialog } from '../batches/StartBatchDialog';
 import { ReviewBadge } from './ReviewBadge';
 
 type ScriptFilter = number | 'all';
@@ -29,6 +31,9 @@ export function ReviewQueue() {
   const queue_q = useQuery(trpc.agents.review_queue.queryOptions());
   const [bucket, setBucket] = useState<QueueBucket>('empty');
   const [script, setScript] = useState<ScriptFilter>('all');
+  /** Gestures picked for a batch run (the dialog reads them when it opens). */
+  const [selected, setSelected] = useState<number[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const all = useMemo(() => queue_q.data?.gestures ?? [], [queue_q.data]);
   const scripts = useMemo(
@@ -101,42 +106,87 @@ export function ReviewQueue() {
           ) : rows.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">Nothing here.</p>
           ) : (
-            <ul className="flex flex-col gap-1">
-              {rows.map((gesture) => (
-                <li
-                  key={gesture.id}
-                  className="flex items-center gap-3 rounded-lg border border-border/60 px-3 py-2"
+            <>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={rows.every((gesture) => selected.includes(gesture.id))}
+                  onCheckedChange={(next) =>
+                    setSelected((current) =>
+                      next === true
+                        ? [...new Set([...current, ...rows.map((gesture) => gesture.id)])]
+                        : current.filter((id) => !rows.some((gesture) => gesture.id === id))
+                    )
+                  }
+                  aria-label="Select all in this tab"
+                />
+                <span className="flex-1 text-xs text-muted-foreground">
+                  {selected.length} selected
+                </span>
+                <Button
+                  size="sm"
+                  disabled={selected.length === 0}
+                  onClick={() => setDialogOpen(true)}
                 >
-                  <span className="w-8 text-center text-xl leading-none">{gesture.text}</span>
-                  <Link
-                    to="/admin/agents/gestures/$gestureId"
-                    params={{ gestureId: String(gesture.id) }}
-                    className="flex min-w-0 flex-1 flex-col no-underline"
+                  Run agents ({selected.length})
+                </Button>
+              </div>
+              <ul className="flex flex-col gap-1">
+                {rows.map((gesture) => (
+                  <li
+                    key={gesture.id}
+                    className="flex items-center gap-3 rounded-lg border border-border/60 px-3 py-2"
                   >
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {get_script_from_id(gesture.script_id) ?? gesture.script_id}{' '}
-                      <span className="font-normal text-muted-foreground">#{gesture.id}</span>
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {gesture.strokes} strokes · v{gesture.revision}
-                      {gesture.attempts > 0
-                        ? ` · ${gesture.attempts} attempts, ${Math.round(failureRate(gesture) * 100)}% unfinished`
-                        : ''}
-                      {gesture.focused_chats > 0 ? ` · ${gesture.focused_chats} focused chats` : ''}
-                      {gesture.review_status === 'needs_work' && gesture.review_note
-                        ? ` · “${gesture.review_note}”`
-                        : ''}
-                    </span>
-                  </Link>
-                  <ReviewBadge status={gesture.review_status} strokes={gesture.strokes} />
-                  <Button size="sm" variant="outline" onClick={() => fix(gesture)}>
-                    {gesture.latest_chat_id ? 'Continue' : 'Fix'}
-                    <ArrowRightIcon />
-                  </Button>
-                </li>
-              ))}
-            </ul>
+                    <Checkbox
+                      checked={selected.includes(gesture.id)}
+                      onCheckedChange={(next) =>
+                        setSelected((current) =>
+                          next === true
+                            ? [...current, gesture.id]
+                            : current.filter((id) => id !== gesture.id)
+                        )
+                      }
+                      aria-label={`Select gesture ${gesture.text} #${gesture.id}`}
+                    />
+                    <span className="w-8 text-center text-xl leading-none">{gesture.text}</span>
+                    <Link
+                      to="/admin/agents/gestures/$gestureId"
+                      params={{ gestureId: String(gesture.id) }}
+                      className="flex min-w-0 flex-1 flex-col no-underline"
+                    >
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {get_script_from_id(gesture.script_id) ?? gesture.script_id}{' '}
+                        <span className="font-normal text-muted-foreground">#{gesture.id}</span>
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {gesture.strokes} strokes · v{gesture.revision}
+                        {gesture.attempts > 0
+                          ? ` · ${gesture.attempts} attempts, ${Math.round(failureRate(gesture) * 100)}% unfinished`
+                          : ''}
+                        {gesture.focused_chats > 0
+                          ? ` · ${gesture.focused_chats} focused chats`
+                          : ''}
+                        {gesture.review_status === 'needs_work' && gesture.review_note
+                          ? ` · “${gesture.review_note}”`
+                          : ''}
+                      </span>
+                    </Link>
+                    <ReviewBadge status={gesture.review_status} strokes={gesture.strokes} />
+                    <Button size="sm" variant="outline" onClick={() => fix(gesture)}>
+                      {gesture.latest_chat_id ? 'Continue' : 'Fix'}
+                      <ArrowRightIcon />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
+          {dialogOpen ? (
+            <StartBatchDialog
+              gestureIds={selected}
+              open={dialogOpen}
+              onOpenChange={setDialogOpen}
+            />
+          ) : null}
         </div>
       </div>
     </div>

@@ -143,3 +143,48 @@ export const runRouteEffect = async <A, E, R>(
   await reportBoundaryFailure(exit.cause, 'route');
   return Response.json({ error: 'Unexpected server error' }, { status: 500 });
 };
+
+/**
+ * QStash retries every non-2xx answer, 4xx included; only 489 with this header stops it (the
+ * message goes to the DLQ and its failure callback).
+ */
+const QSTASH_NON_RETRYABLE_STATUS = 489;
+
+/**
+ * Run an Effect at a QStash delivery boundary. Known request errors (bad payload, missing
+ * record, conflict) answer 489 non-retryable; infrastructure errors and defects answer 500,
+ * which QStash retries.
+ */
+export const runQstashEffect = async <A, E, R>(
+  effect: Effect.Effect<A, E, R>,
+  options?: {
+    onSuccess?: (value: A) => Response;
+  }
+): Promise<Response> => {
+  const exit = await appRuntime.runPromiseExit(
+    // SAFETY: boundary effects reach here with R = never; annotateLogs adds no requirements
+    effect.pipe(Effect.annotateLogs({ boundary: 'qstash' })) as Effect.Effect<A, E>
+  );
+
+  if (Exit.isSuccess(exit)) {
+    return options?.onSuccess?.(exit.value) ?? new Response('OK', { status: 200 });
+  }
+
+  const failure = Cause.findErrorOption(exit.cause);
+  if (Option.isSome(failure) && isKnownError(failure.value)) {
+    const status = httpStatusForError(failure.value);
+    const body = { error: toTrpcMessage(failure.value), tag: failure.value._tag };
+    if (status >= 500) {
+      await reportBoundaryFailure(exit.cause, 'qstash');
+      return Response.json(body, { status });
+    }
+    return Response.json(body, {
+      status: QSTASH_NON_RETRYABLE_STATUS,
+      headers: { 'Upstash-NonRetryable-Error': 'true' }
+    });
+  }
+
+  console.error('[qstash] unexpected effect defect', Cause.pretty(exit.cause));
+  await reportBoundaryFailure(exit.cause, 'qstash');
+  return Response.json({ error: 'Unexpected server error' }, { status: 500 });
+};

@@ -1,29 +1,99 @@
 import { Effect } from 'effect';
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
-import { agent_chats, agent_messages } from '~/db/schema';
-import { dbRunHttp, dbTransaction } from '~/effect/database';
-import { NotFoundError } from '~/effect/errors';
+import { agent_chat_gestures, agent_chats, agent_messages, text_gestures } from '~/db/schema';
+import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
+import { BadRequestError, NotFoundError } from '~/effect/errors';
 import type { AgentKind } from '~/agents/agent_kinds';
 import type { AgentModelId } from '~/agents/models';
 import type { AgentUIMessage } from '~/agents/ui_message';
+import { chatGestureLinks, type ChatGestureLink } from './chat_gestures';
 
-/** Chats are private to the admin who started them. */
-const ownedChat = (id: string, user_id: string) =>
-  and(eq(agent_chats.id, id), eq(agent_chats.user_id, user_id));
+/**
+ * Record the gestures a chat mentioned or proposed. Links only grow (a retried turn keeps its
+ * old ones); gestures deleted since are skipped.
+ */
+async function linkChatGestures(tx: DbTransaction, chatId: string, links: ChatGestureLink[]) {
+  if (links.length === 0) return;
+  const existing = await tx
+    .select({ id: text_gestures.id })
+    .from(text_gestures)
+    .where(
+      inArray(
+        text_gestures.id,
+        links.map((link) => link.gesture_id)
+      )
+    );
+  const known = new Set(existing.map((row) => row.id));
+  const rows = links.filter((link) => known.has(link.gesture_id));
+  if (rows.length === 0) return;
+  await tx
+    .insert(agent_chat_gestures)
+    .values(
+      rows.map((link) => ({
+        chat_id: chatId,
+        text_gesture_id: link.gesture_id,
+        last_proposal_at: link.proposed ? new Date() : null
+      }))
+    )
+    .onConflictDoUpdate({
+      target: [agent_chat_gestures.chat_id, agent_chat_gestures.text_gesture_id],
+      // a turn with a new proposal moves it; one without keeps the last
+      set: {
+        last_proposal_at: sql`coalesce(excluded.last_proposal_at, ${agent_chat_gestures.last_proposal_at})`
+      }
+    });
+}
+
+/**
+ * Chats are shared: every admin sees and continues every chat (`user_id` records who started
+ * it). Access is checked by the admin-only routes, not here.
+ */
+const chatById = (id: string) => eq(agent_chats.id, id);
 
 export const createAgentChat = Effect.fn('agents.create_chat')(function* (input: {
   id: string;
   model: AgentModelId;
   agent_kind: AgentKind;
   user_id: string;
+  focus_gesture_id?: number | null;
 }) {
-  const [chat] = yield* dbRunHttp('agents.insert_chat', (client) =>
-    client.insert(agent_chats).values(input).returning()
-  );
-  return chat!;
+  const focus = input.focus_gesture_id ?? null;
+  if (focus !== null && input.agent_kind !== 'gesture_creator') {
+    return yield* Effect.fail(
+      BadRequestError.make({ message: 'Only Gesture Creator chats can focus on a gesture' })
+    );
+  }
+  const chat = yield* dbTransaction('agents.insert_chat', async (tx) => {
+    if (focus !== null) {
+      const [gesture] = await tx
+        .select({ id: text_gestures.id })
+        .from(text_gestures)
+        .where(eq(text_gestures.id, focus))
+        .limit(1);
+      if (!gesture) return null;
+    }
+    const [inserted] = await tx
+      .insert(agent_chats)
+      .values({ ...input, focus_gesture_id: focus })
+      .returning();
+    if (focus !== null) {
+      await tx
+        .insert(agent_chat_gestures)
+        .values({ chat_id: inserted!.id, text_gesture_id: focus })
+        .onConflictDoNothing();
+    }
+    return inserted!;
+  });
+  if (!chat) {
+    return yield* Effect.fail(
+      NotFoundError.make({ resource: 'text_gesture', message: 'Gesture not found' })
+    );
+  }
+  return chat;
 });
 
-export const listAgentChats = Effect.fn('agents.list_chats')(function* (user_id: string) {
+/** Sidebar rows: every chat, newest first, with its focus gesture (if any). */
+export const listAgentChats = Effect.fn('agents.list_chats')(function* () {
   return yield* dbRunHttp('agents.list_chats', (client) =>
     client
       .select({
@@ -31,18 +101,53 @@ export const listAgentChats = Effect.fn('agents.list_chats')(function* (user_id:
         title: agent_chats.title,
         agent_kind: agent_chats.agent_kind,
         updated_at: agent_chats.updated_at,
-        streaming: agent_chats.streaming
+        streaming: agent_chats.streaming,
+        user_id: agent_chats.user_id,
+        focus_gesture_id: agent_chats.focus_gesture_id,
+        focus_text: text_gestures.text,
+        focus_text_key: text_gestures.text_key,
+        focus_script_id: text_gestures.script_id,
+        focus_review_status: text_gestures.review_status,
+        focus_strokes: sql<number | null>`jsonb_array_length(${text_gestures.gestures})`
       })
       .from(agent_chats)
-      .where(eq(agent_chats.user_id, user_id))
+      .leftJoin(text_gestures, eq(text_gestures.id, agent_chats.focus_gesture_id))
       .orderBy(desc(agent_chats.updated_at))
-      .limit(300)
+      .limit(500)
   );
 });
 
-export const findAgentChat = Effect.fn('agents.find_chat')(function* (id: string, user_id: string) {
+/**
+ * Chats about one gesture: those focused on it and the free chats that mentioned or proposed
+ * it, newest first, with when a proposal from each was last applied.
+ */
+export const listChatsForGesture = Effect.fn('agents.list_chats_for_gesture')(function* (
+  gestureId: number
+) {
+  return yield* dbRunHttp('agents.list_chats_for_gesture', (client) =>
+    client
+      .select({
+        id: agent_chats.id,
+        title: agent_chats.title,
+        agent_kind: agent_chats.agent_kind,
+        updated_at: agent_chats.updated_at,
+        streaming: agent_chats.streaming,
+        user_id: agent_chats.user_id,
+        focused: sql<boolean>`${agent_chats.focus_gesture_id} is not null`.mapWith(Boolean),
+        last_proposal_at: agent_chat_gestures.last_proposal_at,
+        applied_at: agent_chat_gestures.applied_at
+      })
+      .from(agent_chat_gestures)
+      .innerJoin(agent_chats, eq(agent_chats.id, agent_chat_gestures.chat_id))
+      .where(eq(agent_chat_gestures.text_gesture_id, gestureId))
+      .orderBy(desc(agent_chats.updated_at))
+      .limit(200)
+  );
+});
+
+export const findAgentChat = Effect.fn('agents.find_chat')(function* (id: string) {
   const [chat] = yield* dbRunHttp('agents.find_chat', (client) =>
-    client.select().from(agent_chats).where(ownedChat(id, user_id)).limit(1)
+    client.select().from(agent_chats).where(chatById(id)).limit(1)
   );
   if (!chat) {
     return yield* Effect.fail(
@@ -129,6 +234,7 @@ export const saveAgentMessages = Effect.fn('agents.save_messages')(function* (in
         )
       );
     }
+    await linkChatGestures(tx, input.chatId, chatGestureLinks(messages));
     await tx
       .update(agent_chats)
       .set({
@@ -142,15 +248,10 @@ export const saveAgentMessages = Effect.fn('agents.save_messages')(function* (in
 
 export const renameAgentChat = Effect.fn('agents.rename_chat')(function* (input: {
   id: string;
-  user_id: string;
   title: string;
 }) {
   yield* dbRunHttp('agents.rename_chat', (client) =>
-    client
-      .update(agent_chats)
-      .set({ title: input.title })
-      .where(ownedChat(input.id, input.user_id))
-      .returning()
+    client.update(agent_chats).set({ title: input.title }).where(chatById(input.id)).returning()
   );
 });
 
@@ -172,15 +273,12 @@ export const setChatStreaming = Effect.fn('agents.set_streaming')(function* (
 });
 
 /** Ask the reply streaming for this chat to stop (it may run on another server instance). */
-export const requestChatStop = Effect.fn('agents.request_stop')(function* (
-  id: string,
-  user_id: string
-) {
+export const requestChatStop = Effect.fn('agents.request_stop')(function* (id: string) {
   yield* dbRunHttp('agents.request_stop', (client) =>
     client
       .update(agent_chats)
       .set({ stop_requested_at: sql`now()` })
-      .where(and(ownedChat(id, user_id), eq(agent_chats.streaming, true)))
+      .where(and(chatById(id), eq(agent_chats.streaming, true)))
       .returning()
   );
 });
@@ -196,11 +294,8 @@ export const isChatStopRequested = Effect.fn('agents.is_stop_requested')(functio
   return chat?.stop_requested_at != null;
 });
 
-export const deleteAgentChat = Effect.fn('agents.delete_chat')(function* (
-  id: string,
-  user_id: string
-) {
+export const deleteAgentChat = Effect.fn('agents.delete_chat')(function* (id: string) {
   yield* dbRunHttp('agents.delete_chat', (client) =>
-    client.delete(agent_chats).where(ownedChat(id, user_id)).returning()
+    client.delete(agent_chats).where(chatById(id)).returning()
   );
 });

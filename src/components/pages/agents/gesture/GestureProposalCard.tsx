@@ -11,6 +11,7 @@ import type { Gesture } from '~/tools/stroke_data/types';
 import { useAgentChatContext } from '../chat/agent_chat_context';
 import type { AgentToolPart } from '../chat/message_parts';
 import { ApplyGestureDialog } from './ApplyGestureDialog';
+import { useAppliedRevisions } from './FocusBar';
 import { useGlyphBackground } from './use_glyph_background';
 
 /** Same strokes (points and timing) as what is saved now? Then the proposal was applied. */
@@ -65,7 +66,9 @@ function ProposalBody({ proposal, toolCallId }: { proposal: ProposedGesture; too
   const [open, setOpen] = useState(false);
   const background = useGlyphBackground(proposal);
   const current_q = useQuery(trpc.agents.get_gesture.queryOptions({ id: proposal.gesture_id }));
-  const applied = current_q.data ? sameStrokes(current_q.data.gestures, proposal.gestures) : false;
+  const savedNow = current_q.data ? sameStrokes(current_q.data.gestures, proposal.gestures) : false;
+  const appliedAs = useAppliedRevisions(proposal.gesture_id).get(toolCallId);
+  const applied = savedNow || appliedAs !== undefined;
   const first = proposal.gestures[0];
 
   return (
@@ -94,7 +97,8 @@ function ProposalBody({ proposal, toolCallId }: { proposal: ProposedGesture; too
           {applied ? (
             <span className="flex items-center gap-1 rounded-md border border-emerald-500/40 px-1.5 py-px text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
               <CheckCircle2Icon className="size-3" />
-              Applied
+              {appliedAs !== undefined ? `Applied as v${appliedAs}` : 'Applied'}
+              {appliedAs !== undefined && !savedNow ? ' (since replaced)' : ''}
             </span>
           ) : null}
         </div>

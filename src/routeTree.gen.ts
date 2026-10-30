@@ -19,6 +19,7 @@ import { Route as AuthPopupDoneRouteImport } from './routes/auth/popup-done'
 import { Route as publicLearnIndexRouteImport } from './routes/(public)/learn/index'
 import { Route as AdminAgentsIndexRouteImport } from './routes/admin/agents/index'
 import { Route as AdminAgentsChatIdRouteImport } from './routes/admin/agents/$chatId'
+import { Route as AdminAgentsQueueRouteImport } from './routes/admin/agents/queue'
 import { Route as ApiAgentsChatRouteImport } from './routes/api.agents.chat'
 import { Route as ApiTrpcSplatRouteImport } from './routes/api.trpc.$'
 import { Route as authAuthAnalyticsIndexRouteImport } from './routes/(auth)/_auth/analytics/index'
@@ -26,6 +27,7 @@ import { Route as authAuthAudio_assetsIndexRouteImport } from './routes/(auth)/_
 import { Route as authAuthGesturesIndexRouteImport } from './routes/(auth)/_auth/gestures/index'
 import { Route as authAuthImage_assetsIndexRouteImport } from './routes/(auth)/_auth/image_assets/index'
 import { Route as authAuthLessonsIndexRouteImport } from './routes/(auth)/_auth/lessons/index'
+import { Route as AdminAgentsGesturesGestureIdRouteImport } from './routes/admin/agents/gestures/$gestureId'
 import { Route as authAuthAudio_assetsEditIdRouteImport } from './routes/(auth)/_auth/audio_assets/edit/$id'
 import { Route as authAuthGesturesEditIdRouteImport } from './routes/(auth)/_auth/gestures/edit/$id'
 import { Route as authAuthImage_assetsEditIdRouteImport } from './routes/(auth)/_auth/image_assets/edit/$id'
@@ -80,6 +82,11 @@ const AdminAgentsChatIdRoute = AdminAgentsChatIdRouteImport.update({
   path: '/$chatId',
   getParentRoute: () => AdminAgentsRouteRoute,
 } as any)
+const AdminAgentsQueueRoute = AdminAgentsQueueRouteImport.update({
+  id: '/queue',
+  path: '/queue',
+  getParentRoute: () => AdminAgentsRouteRoute,
+} as any)
 const ApiAgentsChatRoute = ApiAgentsChatRouteImport.update({
   id: '/api/agents/chat',
   path: '/api/agents/chat',
@@ -117,6 +124,12 @@ const authAuthLessonsIndexRoute = authAuthLessonsIndexRouteImport.update({
   path: '/lessons/',
   getParentRoute: () => authAuthRoute,
 } as any)
+const AdminAgentsGesturesGestureIdRoute =
+  AdminAgentsGesturesGestureIdRouteImport.update({
+    id: '/gestures/$gestureId',
+    path: '/gestures/$gestureId',
+    getParentRoute: () => AdminAgentsRouteRoute,
+  } as any)
 const authAuthAudio_assetsEditIdRoute =
   authAuthAudio_assetsEditIdRouteImport.update({
     id: '/audio_assets/edit/$id',
@@ -148,10 +161,12 @@ export interface FileRoutesByFullPath {
   '/': typeof publicIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/agents/$chatId': typeof AdminAgentsChatIdRoute
+  '/admin/agents/queue': typeof AdminAgentsQueueRoute
   '/api/agents/chat': typeof ApiAgentsChatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn/': typeof publicLearnIndexRoute
   '/admin/agents/': typeof AdminAgentsIndexRoute
+  '/admin/agents/gestures/$gestureId': typeof AdminAgentsGesturesGestureIdRoute
   '/analytics/': typeof authAuthAnalyticsIndexRoute
   '/audio_assets/': typeof authAuthAudio_assetsIndexRoute
   '/gestures/': typeof authAuthGesturesIndexRoute
@@ -168,10 +183,12 @@ export interface FileRoutesByTo {
   '/': typeof publicIndexRoute
   '/admin': typeof AdminIndexRoute
   '/admin/agents/$chatId': typeof AdminAgentsChatIdRoute
+  '/admin/agents/queue': typeof AdminAgentsQueueRoute
   '/api/agents/chat': typeof ApiAgentsChatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/learn': typeof publicLearnIndexRoute
   '/admin/agents': typeof AdminAgentsIndexRoute
+  '/admin/agents/gestures/$gestureId': typeof AdminAgentsGesturesGestureIdRoute
   '/analytics': typeof authAuthAnalyticsIndexRoute
   '/audio_assets': typeof authAuthAudio_assetsIndexRoute
   '/gestures': typeof authAuthGesturesIndexRoute
@@ -192,10 +209,12 @@ export interface FileRoutesById {
   '/(public)/': typeof publicIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/agents/$chatId': typeof AdminAgentsChatIdRoute
+  '/admin/agents/queue': typeof AdminAgentsQueueRoute
   '/api/agents/chat': typeof ApiAgentsChatRoute
   '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/(public)/learn/': typeof publicLearnIndexRoute
   '/admin/agents/': typeof AdminAgentsIndexRoute
+  '/admin/agents/gestures/$gestureId': typeof AdminAgentsGesturesGestureIdRoute
   '/(auth)/_auth/analytics/': typeof authAuthAnalyticsIndexRoute
   '/(auth)/_auth/audio_assets/': typeof authAuthAudio_assetsIndexRoute
   '/(auth)/_auth/gestures/': typeof authAuthGesturesIndexRoute
@@ -216,10 +235,12 @@ export interface FileRouteTypes {
     | '/'
     | '/admin/'
     | '/admin/agents/$chatId'
+    | '/admin/agents/queue'
     | '/api/agents/chat'
     | '/api/trpc/$'
     | '/learn/'
     | '/admin/agents/'
+    | '/admin/agents/gestures/$gestureId'
     | '/analytics/'
     | '/audio_assets/'
     | '/gestures/'
@@ -236,10 +257,12 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/admin/agents/$chatId'
+    | '/admin/agents/queue'
     | '/api/agents/chat'
     | '/api/trpc/$'
     | '/learn'
     | '/admin/agents'
+    | '/admin/agents/gestures/$gestureId'
     | '/analytics'
     | '/audio_assets'
     | '/gestures'
@@ -259,10 +282,12 @@ export interface FileRouteTypes {
     | '/(public)/'
     | '/admin/'
     | '/admin/agents/$chatId'
+    | '/admin/agents/queue'
     | '/api/agents/chat'
     | '/api/trpc/$'
     | '/(public)/learn/'
     | '/admin/agents/'
+    | '/admin/agents/gestures/$gestureId'
     | '/(auth)/_auth/analytics/'
     | '/(auth)/_auth/audio_assets/'
     | '/(auth)/_auth/gestures/'
@@ -357,6 +382,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAgentsChatIdRouteImport
       parentRoute: typeof AdminAgentsRouteRoute
     }
+    '/admin/agents/queue': {
+      id: '/admin/agents/queue'
+      path: '/queue'
+      fullPath: '/admin/agents/queue'
+      preLoaderRoute: typeof AdminAgentsQueueRouteImport
+      parentRoute: typeof AdminAgentsRouteRoute
+    }
     '/api/agents/chat': {
       id: '/api/agents/chat'
       path: '/api/agents/chat'
@@ -406,6 +438,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authAuthLessonsIndexRouteImport
       parentRoute: typeof authAuthRoute
     }
+    '/admin/agents/gestures/$gestureId': {
+      id: '/admin/agents/gestures/$gestureId'
+      path: '/gestures/$gestureId'
+      fullPath: '/admin/agents/gestures/$gestureId'
+      preLoaderRoute: typeof AdminAgentsGesturesGestureIdRouteImport
+      parentRoute: typeof AdminAgentsRouteRoute
+    }
     '/(auth)/_auth/audio_assets/edit/$id': {
       id: '/(auth)/_auth/audio_assets/edit/$id'
       path: '/audio_assets/edit/$id'
@@ -439,12 +478,16 @@ declare module '@tanstack/react-router' {
 
 interface AdminAgentsRouteRouteChildren {
   AdminAgentsChatIdRoute: typeof AdminAgentsChatIdRoute
+  AdminAgentsQueueRoute: typeof AdminAgentsQueueRoute
   AdminAgentsIndexRoute: typeof AdminAgentsIndexRoute
+  AdminAgentsGesturesGestureIdRoute: typeof AdminAgentsGesturesGestureIdRoute
 }
 
 const AdminAgentsRouteRouteChildren: AdminAgentsRouteRouteChildren = {
   AdminAgentsChatIdRoute: AdminAgentsChatIdRoute,
+  AdminAgentsQueueRoute: AdminAgentsQueueRoute,
   AdminAgentsIndexRoute: AdminAgentsIndexRoute,
+  AdminAgentsGesturesGestureIdRoute: AdminAgentsGesturesGestureIdRoute,
 }
 
 const AdminAgentsRouteRouteWithChildren =

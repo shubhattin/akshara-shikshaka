@@ -152,11 +152,14 @@ function buildTextareaAria(open: boolean, listId: string, navigable: boolean, ac
 export function useGestureMentions({
   text,
   setText,
-  textareaRef
+  textareaRef,
+  enabled = true
 }: {
   text: string;
   setText: (text: string) => void;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
+  /** Off in a focused chat: `@` is plain text there */
+  enabled?: boolean;
 }) {
   const trpc = useTRPC();
   const listId = useId();
@@ -168,7 +171,7 @@ export function useGestureMentions({
   const [pages, setPages] = useState({ key: '', count: 1 });
 
   const refs = picked.filter((ref) => tokenPattern(mentionToken(ref)).test(text));
-  const trigger = triggerAtCaret(caret, text);
+  const trigger = enabled ? triggerAtCaret(caret, text) : null;
   const [dismissedStart, setDismissedStart] = useDismissedStart(trigger);
   const completed = isCompletedTrigger(trigger, refs);
   const active = resolveActiveTrigger(trigger, dismissedStart, completed);

@@ -33,6 +33,7 @@ export function ChatComposer({
   autoFocus,
   stopLabel = 'Stop',
   canQueue = false,
+  mentions: mentionsEnabled = true,
   ref
 }: {
   onSend: (message: ComposerMessage) => void;
@@ -44,13 +45,20 @@ export function ChatComposer({
   autoFocus?: boolean;
   stopLabel?: string;
   canQueue?: boolean;
+  /** `@` mentions of gestures (off in a focused chat, which has its one gesture) */
+  mentions?: boolean;
   ref?: Ref<ComposerHandle>;
 }) {
   const [text, setText] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const groupRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const mentions = useGestureMentions({ text, setText, textareaRef });
+  const mentions = useGestureMentions({
+    text,
+    setText,
+    textareaRef,
+    enabled: mentionsEnabled
+  });
   const canSend = text.trim().length > 0 && (!busy || canQueue);
   const queueing = busy && canQueue;
 
@@ -113,23 +121,27 @@ export function ChatComposer({
         />
         <InputGroupAddon align="block-end" className="gap-1 px-2 pb-2">
           {toolbar}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <InputGroupButton
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="ml-auto rounded-full text-muted-foreground"
-                  aria-label="Mention a gesture"
-                  onClick={mentions.startMention}
-                />
-              }
-            >
-              <AtSignIcon />
-            </TooltipTrigger>
-            <TooltipContent>Mention a gesture (@)</TooltipContent>
-          </Tooltip>
+          {mentionsEnabled ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <InputGroupButton
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="ml-auto rounded-full text-muted-foreground"
+                    aria-label="Mention a gesture"
+                    onClick={mentions.startMention}
+                  />
+                }
+              >
+                <AtSignIcon />
+              </TooltipTrigger>
+              <TooltipContent>Mention a gesture (@)</TooltipContent>
+            </Tooltip>
+          ) : (
+            <span className="ml-auto" />
+          )}
           {queueing ? (
             <Tooltip>
               <TooltipTrigger

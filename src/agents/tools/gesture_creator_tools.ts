@@ -8,12 +8,15 @@ import { appRuntime } from '~/effect/runtime';
 import {
   inspect_glyph_input_schema,
   propose_gesture_input_schema,
+  suggest_gesture_note_input_schema,
   trace_strokes_input_schema,
   type HarnessImages,
   type InspectGlyphInput,
   type InspectGlyphOutput,
   type ProposeGestureInput,
   type ProposeGestureOutput,
+  type SuggestGestureNoteInput,
+  type SuggestGestureNoteOutput,
   type TraceStrokesInput,
   type TraceStrokesOutput
 } from '~/agents/gesture_creator/schemas';
@@ -145,25 +148,56 @@ const proposeGestureTool = tool<ProposeGestureInput, ProposeGestureOutput>({
   })
 });
 
+/** A focused chat's tools work on its gesture only. */
+function assertFocus(focusId: number | null, id: number) {
+  if (focusId !== null && id !== focusId) {
+    throw new Error(
+      `This chat is focused on gesture #${focusId}; it cannot work on #${id}. Ask the admin to start a free chat for that gesture.`
+    );
+  }
+}
+
 /** The harness on the server, reading gestures from the database. */
 export const createServerGestureHarness = (
-  findTrace: (traceId: string) => TraceStrokesOutput | undefined
+  findTrace: (traceId: string) => TraceStrokesOutput | undefined,
+  focusId: number | null = null
 ) =>
   createGestureHarness({
     env: serverCanvasEnv,
-    loadGesture: (id) => appRuntime.runPromise(getGestureForAgent(id)),
+    loadGesture: (id) => {
+      assertFocus(focusId, id);
+      return appRuntime.runPromise(getGestureForAgent(id));
+    },
     findTrace
   });
+
+const suggestGestureNoteTool = tool<SuggestGestureNoteInput, SuggestGestureNoteOutput>({
+  description:
+    'Suggest a short lasting note for a gesture (how to draw it: an order, a direction, a part that is easy to miss). It appears as a card the admin can save to the gesture; later chats focused on it read the saved notes. Nothing is saved until the admin accepts.',
+  inputSchema: suggest_gesture_note_input_schema,
+  outputSchema: z.custom<SuggestGestureNoteOutput>(),
+  toModelOutput: ({ output }) => ({
+    type: 'text',
+    value: output.ok
+      ? `Suggested the note for ${output.text} (#${output.gesture_id}); the admin decides whether to save it.`
+      : `Note not suggested: ${output.error}`
+  })
+});
 
 /**
  * The tools for one request. `history` returns the conversation so far: a proposal refers to its
  * trace by id, which may come from this request, an earlier one, or an admin's draft edit in the
  * new message.
  */
-export function createGestureCreatorTools(history: () => readonly AgentUIMessage[]) {
+export function createGestureCreatorTools(
+  history: () => readonly AgentUIMessage[],
+  /** A focused chat's gesture (null in free chats) */
+  focusId: number | null = null
+) {
   const traces = new Map<string, TraceStrokesOutput>();
   const harness = createServerGestureHarness(
-    (traceId) => traces.get(traceId) ?? findTraceInMessages(history(), traceId)
+    (traceId) => traces.get(traceId) ?? findTraceInMessages(history(), traceId),
+    focusId
   );
   const signalOf = (signal: AbortSignal | undefined) => signal ?? new AbortController().signal;
   return {
@@ -182,6 +216,25 @@ export function createGestureCreatorTools(history: () => readonly AgentUIMessage
     propose_gesture: tool<ProposeGestureInput, ProposeGestureOutput>({
       ...proposeGestureTool,
       execute: (input, { abortSignal }) => harness.propose(input, signalOf(abortSignal))
+    }),
+    suggest_gesture_note: tool<SuggestGestureNoteInput, SuggestGestureNoteOutput>({
+      ...suggestGestureNoteTool,
+      execute: async (input): Promise<SuggestGestureNoteOutput> => {
+        if (focusId !== null && input.gesture_id !== focusId) {
+          return { ok: false, error: `This chat is focused on gesture #${focusId}.` };
+        }
+        const gesture = await appRuntime
+          .runPromise(getGestureForAgent(input.gesture_id))
+          .catch(() => null);
+        if (!gesture) return { ok: false, error: `No gesture #${input.gesture_id}.` };
+        return {
+          ok: true,
+          gesture_id: gesture.id,
+          text: gesture.text,
+          script_id: gesture.script_id,
+          note: input.note.trim()
+        };
+      }
     })
   };
 }

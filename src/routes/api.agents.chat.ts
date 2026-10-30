@@ -29,6 +29,9 @@ import {
 import { resolveDraftEdit, withoutDraftParts } from '~/agents/server/draft_edits';
 import { resolveGestureRefs, withoutSavedStrokes } from '~/agents/server/gesture_refs';
 import { createServerGestureHarness } from '~/agents/tools/gesture_creator_tools';
+import { focusedRefs } from '~/agents/focus';
+import { loadFocusContext } from '~/agents/server/focus';
+import { resolveSavedView } from '~/agents/server/saved_views';
 import { generateChatTitle } from '~/agents/server/chat_title';
 import { createReplyMeter } from '~/agents/server/cost';
 import { trackReplyProgress } from '~/agents/server/reply_progress';
@@ -59,12 +62,9 @@ const firstText = (message: AgentUIMessage) =>
  * Wait until the chat's in-flight turn is saved (a stopped reply still landing). Otherwise its
  * late save would drop the turn that follows.
  */
-const waitForSavedTurn = Effect.fn('agents.wait_for_saved_turn')(function* (
-  chatId: string,
-  userId: string
-) {
+const waitForSavedTurn = Effect.fn('agents.wait_for_saved_turn')(function* (chatId: string) {
   for (let attempt = 0; attempt < 40; attempt++) {
-    const chat = yield* findAgentChat(chatId, userId);
+    const chat = yield* findAgentChat(chatId);
     if (!chat.streaming) return chat;
     yield* Effect.sleep('250 millis');
   }
@@ -76,12 +76,12 @@ const waitForSavedTurn = Effect.fn('agents.wait_for_saved_turn')(function* (
 });
 
 /** The chat once any in-flight turn is saved; a new message stops that turn first. */
-const chatForTurn = Effect.fn('agents.chat_for_turn')(function* (chatId: string, userId: string) {
-  const chat = yield* findAgentChat(chatId, userId);
+const chatForTurn = Effect.fn('agents.chat_for_turn')(function* (chatId: string) {
+  const chat = yield* findAgentChat(chatId);
   if (!chat.streaming) return chat;
   // Send now, or Stop then send: the new message replaces whatever is still replying.
-  yield* requestChatStop(chatId, userId);
-  return yield* waitForSavedTurn(chatId, userId);
+  yield* requestChatStop(chatId);
+  return yield* waitForSavedTurn(chatId);
 });
 
 const STOP_POLL_MS = 1_000;
@@ -120,11 +120,14 @@ async function handleChat(request: Request): Promise<Response> {
 
   return runRouteEffect(
     Effect.gen(function* () {
-      const chat = yield* chatForTurn(id, user.id);
+      const chat = yield* chatForTurn(id);
       const previous = yield* loadAgentMessages(id);
+      // A focused chat works on its gesture only (its notes and siblings are read fresh).
+      const focus =
+        chat.focus_gesture_id === null ? null : yield* loadFocusContext(chat.focus_gesture_id);
       // What the tools look traces up in: the stored history, then the new message too.
       let known: readonly AgentUIMessage[] = previous;
-      const { agent, tools } = yield* createAgent(model, chat.agent_kind, () => known);
+      const { agent, tools } = yield* createAgent(model, chat.agent_kind, () => known, focus);
 
       const validatedIncoming = yield* Effect.tryPromise({
         try: () =>
@@ -150,30 +153,38 @@ async function handleChat(request: Request): Promise<Response> {
           }),
         catch: () => BadRequestError.make({ message: 'Invalid message' })
       });
+      const earlier = validated.slice(0, -1);
+      // A focused chat's first message carries its gesture; other gestures are refused.
+      let refs = newMessageRefs(validated.at(-1)!);
+      if (focus) {
+        const scoped = focusedRefs(refs, earlier, focus.gesture);
+        if (!scoped.ok) return yield* Effect.fail(BadRequestError.make({ message: scoped.error }));
+        refs = scoped.refs;
+      }
       // Fill a new message's @ mentions from the database, never from the client.
       const withRefs = withResolvedRefs(
         validated.at(-1)!,
-        yield* resolveGestureRefs(
-          newMessageRefs(validated.at(-1)!),
-          chat.agent_kind,
-          validated.slice(0, -1)
-        )
+        yield* resolveGestureRefs(refs, chat.agent_kind, earlier)
       );
-      const earlier = validated.slice(0, -1);
       // An admin's draft edit is traced here; the client's copy of the result is never used.
-      const incoming =
+      const edited =
         chat.agent_kind === 'gesture_creator'
           ? yield* Effect.tryPromise({
               try: (signal) =>
                 resolveDraftEdit(
                   withRefs,
                   earlier,
-                  createServerGestureHarness((traceId) => findTraceInMessages(earlier, traceId)),
+                  createServerGestureHarness(
+                    (traceId) => findTraceInMessages(earlier, traceId),
+                    focus?.gesture.id ?? null
+                  ),
                   signal
                 ),
               catch: () => BadRequestError.make({ message: 'Could not trace the edited draft' })
             })
           : withoutDraftParts(withRefs);
+      // Saved strokes the admin chose to show (focused chats only), drawn here.
+      const incoming = yield* resolveSavedView(edited, focus);
       const messages = [...earlier, incoming];
       // What the model reads: older images dropped; the Gesture Creator never sees saved strokes.
       const modelView = (all: AgentUIMessage[]) => {

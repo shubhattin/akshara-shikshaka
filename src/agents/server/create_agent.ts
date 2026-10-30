@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import { stepCountIs, ToolLoopAgent, type Tool } from 'ai';
 import { AiProvider } from '~/effect/ai';
 import type { AgentKind } from '~/agents/agent_kinds';
+import type { FocusContext } from '~/agents/focus';
 import { AGENT_MODELS, AGENT_UTILITY_MODEL, type AgentModelId } from '~/agents/models';
 import { agentInstructionSections, toSystemMessages } from '~/agents/prompts/instructions';
 import { sqlQueryTool } from '~/agents/tools/sql_query';
@@ -29,7 +30,9 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
   modelId: AgentModelId,
   kind: AgentKind,
   /** The conversation so far (the Gesture Creator's proposals refer back to its traces). */
-  history: () => readonly AgentUIMessage[] = () => []
+  history: () => readonly AgentUIMessage[] = () => [],
+  /** A focused chat's gesture: the tools refuse every other one. */
+  focus: FocusContext | null = null
 ) {
   const model = yield* resolveAgentModel(modelId);
   const searchModel = yield* resolveAgentModel(AGENT_UTILITY_MODEL);
@@ -38,7 +41,7 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
     web_search: createWebSearchTool(searchModel)
   };
   if (kind === 'gesture_creator') {
-    Object.assign(tools, createGestureCreatorTools(history));
+    Object.assign(tools, createGestureCreatorTools(history, focus?.gesture.id ?? null));
   }
   // The Gesture Creator draws from the glyph alone: no database reads, so it cannot look up the
   // strokes saved for a gesture. sql_query stays registered so older chats that used it still
@@ -52,7 +55,7 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
   const effort = kind === 'gesture_creator' ? 'high' : 'medium';
   const agent = new ToolLoopAgent({
     model,
-    instructions: toSystemMessages(agentInstructionSections(kind)),
+    instructions: toSystemMessages(agentInstructionSections(kind, focus)),
     tools,
     activeTools,
     stopWhen: stepCountIs(MAX_STEPS),

@@ -277,3 +277,45 @@ export const draft_image_schema = z.object({
   url: z.string()
 });
 export type DraftImageData = z.infer<typeof draft_image_schema>;
+
+// ---------------------------------------------------------------- saved strokes, on request
+
+/**
+ * The admin shows the agent the strokes saved for the focused gesture (to critique them) or for
+ * a sibling script's version (to match its stroke order). The agent otherwise never sees saved
+ * strokes; this part is the explicit exception. Sent as a `data-saved_view` part of a user
+ * message; the server fills the context and adds the image as a `data-draft_image` part with
+ * `edit_id = view_id`.
+ */
+export const saved_view_schema = z.object({
+  view_id: z.string().min(1).max(64),
+  gesture_id: z.int().positive(),
+  /** Why the admin shares it: what is wrong with it, or the order to match */
+  purpose: z.enum(['critique', 'sibling']),
+  marks: z.array(draft_mark_schema).max(MAX_DRAFT_MARKS),
+  // Filled by the server when the message arrives; anything the client sends here is replaced.
+  revision: z.int().optional(),
+  text: z.string().optional(),
+  script_id: z.int().optional(),
+  error: z.string().optional(),
+  context: z.string().optional()
+});
+export type SavedViewData = z.infer<typeof saved_view_schema>;
+
+// ---------------------------------------------------------------- per-gesture notes
+
+export const suggest_gesture_note_input_schema = z.object({
+  gesture_id: z.int().positive().describe('text_gestures id of the gesture the note is about'),
+  note: z
+    .string()
+    .min(1)
+    .max(600)
+    .describe(
+      'One short, lasting fact about drawing this gesture that a later chat should know (stroke order, a part that is easy to miss, a convention the admin confirmed). Not a summary of this chat.'
+    )
+});
+export type SuggestGestureNoteInput = z.infer<typeof suggest_gesture_note_input_schema>;
+
+export type SuggestGestureNoteOutput =
+  | { ok: true; gesture_id: number; text: string; script_id: number; note: string }
+  | { ok: false; error: string };

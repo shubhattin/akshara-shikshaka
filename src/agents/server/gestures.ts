@@ -82,6 +82,12 @@ export const getGestureForAgent = Effect.fn('agents.get_gesture')(function* (id:
         font_size: text_gestures.font_size,
         text_center_offset: text_gestures.text_center_offset,
         gestures: text_gestures.gestures,
+        text_key: text_gestures.text_key,
+        revision: text_gestures.revision,
+        review_status: text_gestures.review_status,
+        review_note: text_gestures.review_note,
+        agent_notes: text_gestures.agent_notes,
+        updated_at: text_gestures.updated_at,
         category: lesson_categories.name
       })
       .from(text_gestures)
@@ -117,8 +123,10 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
   toolCallId: string;
   userId: string;
   replaceExisting: boolean;
+  /** The saved version the admin compared the proposal with. */
+  expectedRevision?: number;
 }) {
-  const chat = yield* findAgentChat(input.chatId, input.userId);
+  const chat = yield* findAgentChat(input.chatId);
   if (chat.agent_kind !== 'gesture_creator') {
     return yield* Effect.fail(
       BadRequestError.make({ message: 'This chat does not create gestures' })
@@ -174,7 +182,14 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
     gestures: proposal.gestures,
     fontFamily: current.font_family,
     fontSize: current.font_size,
-    textCenterOffset: current.text_center_offset
+    textCenterOffset: current.text_center_offset,
+    expectedRevision: input.expectedRevision,
+    provenance: {
+      source: 'agent',
+      userId: input.userId,
+      chatId: input.chatId,
+      toolCallId: input.toolCallId
+    }
   });
   return { applied: true as const, gesture_id: current.id };
 });

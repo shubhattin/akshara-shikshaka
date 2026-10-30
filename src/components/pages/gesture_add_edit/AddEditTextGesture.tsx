@@ -1,6 +1,6 @@
 'use client';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -121,6 +121,7 @@ import { buttonVariants } from '~/components/ui/button';
 import {
   EditorHistoryProvider,
   useEditorHistoryActions,
+  useEditorHistoryState,
   useHistoryTextField
 } from '~/hooks/useEditorHistory';
 import { EditorActionDock } from '~/components/editor/EditorActionDock';
@@ -172,6 +173,10 @@ export type text_data_type = Omit<
 
 type Props = {
   text_data: text_data_type & { id: number; uuid: string };
+  /** Unsaved changes in the editor (the agent panel asks before reloading over them) */
+  onDirtyChange?: (dirty: boolean) => void;
+  /** Saved here: the agent panel's views of this gesture refresh */
+  onSaved?: (gestureId: number) => void;
 };
 
 type GestureCategoryInfo = { id: number; name: string; lang_id: number };
@@ -207,7 +212,11 @@ export default function AddEditTextDataWrapper(props: Props) {
   return (
     <EditorHistoryProvider atoms={GESTURE_HISTORY_ATOMS}>
       <AddEditTextData text_data={props.text_data} stageRef={stageRef} />
-      <SaveEditMode text_data={props.text_data} />
+      <SaveEditMode
+        text_data={props.text_data}
+        onDirtyChange={props.onDirtyChange}
+        onSaved={props.onSaved}
+      />
       <PracticeSection text_data={props.text_data} />
     </EditorHistoryProvider>
   );
@@ -1261,10 +1270,23 @@ const CategoryChangeButton = ({
   );
 };
 
-const SaveEditMode = ({ text_data }: { text_data: Props['text_data'] }) => {
+const SaveEditMode = ({
+  text_data,
+  onDirtyChange,
+  onSaved
+}: Pick<Props, 'text_data' | 'onDirtyChange' | 'onSaved'>) => {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+  const router = useRouter();
   const { beginSave, markSaved } = useEditorHistoryActions();
+  const { isDirty } = useEditorHistoryState();
+  useEffect(() => onDirtyChange?.(isDirty), [isDirty, onDirtyChange]);
+  const chats_q = useQuery(
+    trpc.agents.chats_for_gesture.queryOptions({ gesture_id: text_data.id })
+  );
+  const focusedChats = chats_q.data?.filter((chat) => chat.focused).length ?? 0;
+  /** The version this editor holds: a save made elsewhere since then is a conflict. */
+  const revisionRef = useRef(text_data.revision);
   const gestureData = useAtomValue(gesture_data_atom);
   const script = useAtomValue(script_atom);
   const scriptID = script_list_obj[script]!;
@@ -1277,7 +1299,14 @@ const SaveEditMode = ({ text_data }: { text_data: Props['text_data'] }) => {
 
   const update_text_data_mut = useMutation(
     trpc.text_gestures.edit_text_gesture_data.mutationOptions({
-      onError() {
+      onError(error) {
+        if (error.data?.code === 'CONFLICT') {
+          toast.error(error.message, {
+            duration: 15_000,
+            action: { label: 'Reload', onClick: () => void router.invalidate() }
+          });
+          return;
+        }
         toast.error('Failed to update text');
       }
     })
@@ -1309,13 +1338,16 @@ const SaveEditMode = ({ text_data }: { text_data: Props['text_data'] }) => {
         gestures: gestureData,
         fontFamily,
         fontSize,
-        textCenterOffset
+        textCenterOffset,
+        expectedRevision: revisionRef.current
       },
       {
         onSuccess: (data) => {
           if (!data.updated) return;
+          revisionRef.current = data.revision;
           markSaved();
-          toast.success('Text Updated');
+          onSaved?.(text_data.id);
+          toast.success(`Saved as v${data.revision}`);
         }
       }
     );
@@ -1346,7 +1378,12 @@ const SaveEditMode = ({ text_data }: { text_data: Props['text_data'] }) => {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Sure to Delete</AlertDialogTitle>
-              <AlertDialogDescription>Are you sure to Delete this Text ?</AlertDialogDescription>
+              <AlertDialogDescription>
+                Are you sure to Delete this Text ?
+                {focusedChats > 0
+                  ? ` Its ${focusedChats} focused agent ${focusedChats === 1 ? 'chat is' : 'chats are'} deleted with it, along with its version history.`
+                  : ' Its version history is deleted with it.'}
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>

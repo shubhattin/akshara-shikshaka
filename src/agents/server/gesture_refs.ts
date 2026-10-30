@@ -1,8 +1,12 @@
 import { Effect } from 'effect';
-import { eq, inArray } from 'drizzle-orm';
-import { gesture_categories, gesture_text_key_category_join, text_gestures } from '~/db/schema';
+import { and, eq, inArray } from 'drizzle-orm';
+import {
+  lesson_categories,
+  gesture_text_key_lesson_category_join,
+  text_gestures
+} from '~/db/schema';
 import { dbRunHttp } from '~/effect/database';
-import { get_script_from_id } from '~/state/lang_list';
+import { DEFAULT_GESTURE_CATEGORY_LANG_ID, get_script_from_id } from '~/state/lang_list';
 import type { Gesture } from '~/tools/stroke_data/types';
 import type { AgentKind } from '~/agents/agent_kinds';
 import { mentionToken } from '~/agents/gesture_refs';
@@ -115,16 +119,20 @@ const loadRefGestures = Effect.fn('agents.load_ref_gestures')(function* (ids: nu
         font_size: text_gestures.font_size,
         text_center_offset: text_gestures.text_center_offset,
         gestures: text_gestures.gestures,
-        category: gesture_categories.name
+        category: lesson_categories.name
       })
       .from(text_gestures)
+      // agents see the categories of the default language
       .leftJoin(
-        gesture_text_key_category_join,
-        eq(gesture_text_key_category_join.gesture_text_key, text_gestures.text_key)
+        gesture_text_key_lesson_category_join,
+        and(
+          eq(gesture_text_key_lesson_category_join.gesture_text_key, text_gestures.text_key),
+          eq(gesture_text_key_lesson_category_join.lang_id, DEFAULT_GESTURE_CATEGORY_LANG_ID)
+        )
       )
       .leftJoin(
-        gesture_categories,
-        eq(gesture_categories.id, gesture_text_key_category_join.category_id)
+        lesson_categories,
+        eq(lesson_categories.id, gesture_text_key_lesson_category_join.lesson_category_id)
       )
       .where(inArray(text_gestures.id, ids))
   );

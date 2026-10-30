@@ -463,8 +463,8 @@ function ManageCategoriesDialog({
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Category</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete this category? Lessons within this category will
-                become uncategorized.
+                Are you sure you want to delete this category? Lessons and gestures within this
+                category will become uncategorized.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -2,7 +2,7 @@ import { createFileRoute, notFound } from '@tanstack/react-router';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import GestureEditClient from './-GestureEditClient';
 import { z } from 'zod';
-import { gesture_categories, gesture_text_key_category_join, text_gestures } from '@/db/schema';
+import { gesture_text_key_lesson_category_join, lesson_categories } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
@@ -12,30 +12,26 @@ import { runLoaderEffect } from '~/effect/run';
 
 const getTextGestureForEdit = Effect.fn('getTextGestureForEdit')(function* (id: number) {
   return yield* dbRunHttp('get_text_gesture_for_edit', async (db) => {
-    const [text_data_] = await db
-      .select()
-      .from(text_gestures)
-      .leftJoin(
-        gesture_text_key_category_join,
-        eq(text_gestures.text_key, gesture_text_key_category_join.gesture_text_key)
-      )
-      .leftJoin(
-        gesture_categories,
-        eq(gesture_text_key_category_join.category_id, gesture_categories.id)
-      )
-      .where(eq(text_gestures.id, id))
-      .limit(1);
-    if (!text_data_) return null;
+    const text_data = await db.query.text_gestures.findFirst({
+      where: (tbl, { eq }) => eq(tbl.id, id)
+    });
+    if (!text_data) return null;
 
-    return {
-      ...text_data_.text_gestures,
-      category: text_data_.gesture_categories
-        ? {
-            name: text_data_.gesture_categories.name,
-            id: text_data_.gesture_categories.id
-          }
-        : null
-    };
+    // one lesson category per language, matched by text_key
+    const categories = await db
+      .select({
+        id: lesson_categories.id,
+        name: lesson_categories.name,
+        lang_id: lesson_categories.lang_id
+      })
+      .from(gesture_text_key_lesson_category_join)
+      .innerJoin(
+        lesson_categories,
+        eq(gesture_text_key_lesson_category_join.lesson_category_id, lesson_categories.id)
+      )
+      .where(eq(gesture_text_key_lesson_category_join.gesture_text_key, text_data.text_key));
+
+    return { ...text_data, categories };
   });
 });
 

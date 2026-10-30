@@ -3,7 +3,12 @@ import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import { IoMdAdd, IoMdArrowRoundBack } from 'react-icons/io';
 import { Button } from '~/components/ui/button';
 import { getCookie } from '@tanstack/react-start/server';
-import { get_script_id_from_cookie, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
+import {
+  get_lesson_lang_id_from_cookie,
+  get_script_id_from_cookie,
+  LESSON_LANG_ID_COOKIE_KEY,
+  SCRIPT_ID_COOKIE_KEY
+} from '~/state/cookie';
 import ListGestures from './-ListGestures';
 import AddGestureDialog from './-AddGestureDialog';
 import { createServerFn } from '@tanstack/react-start';
@@ -15,8 +20,13 @@ import { useState } from 'react';
 
 const loadGesturesIndex = Effect.fn('loadGesturesIndex')(function* () {
   const script_id = get_script_id_from_cookie(getCookie(SCRIPT_ID_COOKIE_KEY));
-  const gesture_categories = yield* getGestureCategories();
-  return { init_script_id: script_id, init_gesture_categories: gesture_categories };
+  const lang_id = get_lesson_lang_id_from_cookie(getCookie(LESSON_LANG_ID_COOKIE_KEY));
+  const gesture_categories = yield* getGestureCategories({ lang_id });
+  return {
+    init_script_id: script_id,
+    init_lang_id: lang_id,
+    init_gesture_categories: gesture_categories
+  };
 });
 
 const loader$ = createServerFn({ method: 'GET' })
@@ -30,7 +40,7 @@ export const Route = createFileRoute('/(auth)/_auth/gestures/')({
 });
 
 function GesturesIndexRoute() {
-  const { init_script_id, init_gesture_categories } = Route.useLoaderData();
+  const { init_script_id, init_lang_id, init_gesture_categories } = Route.useLoaderData();
   const [addOpen, setAddOpen] = useState(false);
 
   return (
@@ -54,6 +64,7 @@ function GesturesIndexRoute() {
       <AddGestureDialog open={addOpen} onOpenChange={setAddOpen} init_script_id={init_script_id} />
       <ListGestures
         init_script_id={init_script_id}
+        init_lang_id={init_lang_id}
         init_gesture_categories={init_gesture_categories}
       />
     </div>

@@ -120,6 +120,13 @@
       "when": 1793071901491,
       "tag": "0016_swift_black_bolt",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793340625536,
+      "tag": "0017_gesture_lesson_categories",
+      "breakpoints": true
     }
   ]
 }

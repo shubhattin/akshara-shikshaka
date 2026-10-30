@@ -9,22 +9,21 @@ import { zodTypeText } from './zod_type_text';
 export const TABLE_NOTES = new Map<string, string>([
   [
     'text_gestures',
-    'How to write one akṣara (text) in one script (script_id): ordered strokes in gestures. text_key = the akṣara in a script-neutral key, shared by the same akṣara across scripts and by its text_lessons. font_family/font_size/text_center_offset = how the reference glyph is drawn behind the strokes on the 400×400 canvas. order = position inside its gesture category.'
+    'How to write one akṣara (text) in one script (script_id): ordered strokes in gestures. text_key = the akṣara in a script-neutral key, shared by the same akṣara across scripts and by its text_lessons. font_family/font_size/text_center_offset = how the reference glyph is drawn behind the strokes on the 400×400 canvas. order = position inside its category for this script (see gesture_text_key_lesson_category_join).'
   ],
   [
-    'gesture_categories',
-    'Groups of akṣaras for practice (e.g. vowels, consonants), shared by all scripts; sort by order'
-  ],
-  [
-    'gesture_text_key_category_join',
-    'Which category each text_key belongs to (one category per key)'
+    'gesture_text_key_lesson_category_join',
+    "Groups gestures by lesson category: which lesson_categories row each text_key (its gestures in every script) belongs to. At most one category per key per language (lang_id = the category's language). Filled automatically from the lessons with that key, or set by hand for keys with no lesson"
   ],
   [
     'text_lessons',
     'A lesson for one akṣara/text in one language (lang_id); text is written in base_word_script_id. Optional audio and category; order = position inside its category'
   ],
   ['lesson_gestures', 'Lesson ↔ gesture links (lessons share the gestures of their text_key)'],
-  ['lesson_categories', 'Lesson groups per language; sort by order'],
+  [
+    'lesson_categories',
+    'Lesson and gesture groups per language (e.g. Svara, Vyanjana); sort by order'
+  ],
   [
     'text_lesson_words',
     'Example words of a lesson, ordered by order, with optional picture and pronunciation audio'

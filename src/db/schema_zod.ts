@@ -2,14 +2,13 @@ import { z } from 'zod';
 import { createSelectSchema } from 'drizzle-zod';
 import {
   text_gestures,
-  gesture_categories,
   lesson_categories,
   text_lesson_words,
   audio_assets,
   image_assets,
   text_lessons,
   lesson_gestures,
-  gesture_text_key_category_join,
+  gesture_text_key_lesson_category_join,
   user_gesture_recording_vectors,
   user_gesture_recordings,
   agent_chats,
@@ -31,8 +30,8 @@ export const TextLessonsSchemaZod = createSelectSchema(text_lessons, {
   updated_at: z.coerce.date()
 });
 
-export const GestureTextKeyCategoryJoinSchemaZod = createSelectSchema(
-  gesture_text_key_category_join
+export const GestureTextKeyLessonCategoryJoinSchemaZod = createSelectSchema(
+  gesture_text_key_lesson_category_join
 );
 
 export const LessonGesturesSchemaZod = createSelectSchema(lesson_gestures);
@@ -43,11 +42,6 @@ export const TextLessonWordsSchemaZod = createSelectSchema(text_lesson_words, {
 });
 
 export const LessonCategoriesSchemaZod = createSelectSchema(lesson_categories, {
-  created_at: z.coerce.date(),
-  updated_at: z.coerce.date()
-});
-
-export const GestureCategoriesSchemaZod = createSelectSchema(gesture_categories, {
   created_at: z.coerce.date(),
   updated_at: z.coerce.date()
 });

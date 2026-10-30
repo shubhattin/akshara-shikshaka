@@ -30,6 +30,9 @@ export const ALL_LANG_SCRIPT_LIST = Array.from(new Set([...LANG_LIST, ...SCRIPT_
 export type script_and_lang_list_type = script_list_type | lang_list_type;
 export { lang_list as lang_list_obj, script_list as script_list_obj };
 
+/** Language whose lesson categories group gestures where only one grouping is shown (agents). */
+export const DEFAULT_GESTURE_CATEGORY_LANG_ID = lang_list.Sanskrit;
+
 export const LANG_SCRIPT_MAP = {
   Bengali: 'Bengali',
   Gujarati: 'Gujarati',

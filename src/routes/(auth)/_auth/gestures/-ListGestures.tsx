@@ -11,14 +11,18 @@ import {
   SelectTrigger,
   SelectValue
 } from '~/components/ui/select';
-import { Input } from '~/components/ui/input';
 import { Button } from '~/components/ui/button';
-import { FONT_SCRIPTS } from '~/state/font_list';
-import { script_list_obj, type script_list_type } from '~/state/lang_list';
+import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
+import {
+  lang_list_obj,
+  script_list_obj,
+  type lang_list_type,
+  type script_list_type
+} from '~/state/lang_list';
 import Cookie from 'js-cookie';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
-import type { gesture_categories } from '~/db/schema';
+import { LESSON_LANG_ID_COOKIE_KEY, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
+import type { lesson_categories } from '~/db/schema';
 import type { InferSelectModel } from 'drizzle-orm';
 import { useHydrateAtoms } from 'jotai/react/utils';
 import { atom, useAtom, useAtomValue } from 'jotai';
@@ -90,30 +94,35 @@ import { atomWithStorage } from 'jotai/utils';
 import { cn } from '~/lib/utils';
 import { buttonVariants } from '~/components/ui/button';
 
+type CategoryModel = Pick<InferSelectModel<typeof lesson_categories>, 'id' | 'name' | 'order'>;
+
 type Props = {
   init_script_id: number;
-  init_gesture_categories: Pick<
-    InferSelectModel<typeof gesture_categories>,
-    'id' | 'name' | 'order'
-  >[];
+  /** Gestures are grouped by the lesson categories of this language */
+  init_lang_id: number;
+  init_gesture_categories: CategoryModel[];
 };
 
 const script_id_atom = atom<number>(0);
+const lang_id_atom = atom<number>(0);
 
 export default function ListGesturesWrapper(props: Props) {
-  useHydrateAtoms([[script_id_atom, props.init_script_id]]);
+  useHydrateAtoms([
+    [script_id_atom, props.init_script_id],
+    [lang_id_atom, props.init_lang_id]
+  ]);
   return <ListGestures {...props} />;
 }
 const selected_category_id_atom = atomWithStorage<number | null>(
-  'selected_gesture_category_id',
+  'selected_gesture_lesson_category_id',
   null
 );
 
 // oxlint-disable-next-line complexity -- ListGestures orchestrates category selection and dialogs; extract to smaller hooks deferred
-function ListGestures({ init_gesture_categories }: Props) {
+function ListGestures({ init_lang_id, init_gesture_categories }: Props) {
   const trpc = useTRPC();
   const [scriptId, setScriptId] = useAtom(script_id_atom);
-  const [manageOpen, setManageOpen] = useState(false);
+  const [langId, setLangId] = useAtom(lang_id_atom);
   const [editOpen, setEditOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedCategoryID, setSelectedCategoryID] = useAtom(selected_category_id_atom);
@@ -127,18 +136,30 @@ function ListGestures({ init_gesture_categories }: Props) {
     { label: 'Select a Script', value: null },
     ...scriptOptions.map((o) => ({ label: o.name, value: o.id.toString() }))
   ];
+  const langOptions = LANGUAGES_ADDED.map((name) => ({
+    name,
+    // SAFETY: enum lookup validated - key is from controlled enum list.
+    id: lang_list_obj[name as lang_list_type]
+  }));
+  const langItems = [
+    { label: 'Select a Language', value: null },
+    ...langOptions.map((o) => ({ label: o.name, value: o.id.toString() }))
+  ];
 
   const categories_q = useQuery(
-    trpc.text_gestures.categories.get_categories.queryOptions(void 0, {
-      enabled: !!scriptId,
-      placeholderData: init_gesture_categories
-    })
+    trpc.text_gestures.categories.get_categories.queryOptions(
+      { lang_id: langId },
+      {
+        enabled: !!langId,
+        placeholderData: langId === init_lang_id ? init_gesture_categories : undefined
+      }
+    )
   );
   const categories = categories_q.data ?? [];
 
   const category_gestures_q = useQuery(
     trpc.text_gestures.categories.get_gestures.queryOptions(
-      { category_id: selectedCategoryID!, script_id: scriptId },
+      { category_id: selectedCategoryID!, script_id: scriptId, lang_id: langId },
       { enabled: selectedCategoryID !== null }
     )
   );
@@ -165,6 +186,27 @@ function ListGestures({ init_gesture_categories }: Props) {
           </SelectTrigger>
           <SelectContent>
             {scriptOptions.map((opt) => (
+              <SelectItem key={opt.id} value={opt.id.toString()}>
+                {opt.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          items={langItems}
+          value={langId?.toString()}
+          onValueChange={(val) => {
+            if (!val) return;
+            setLangId(Number(val));
+            setSelectedCategoryID(null);
+            Cookie.set(LESSON_LANG_ID_COOKIE_KEY, val, { expires: 30 });
+          }}
+        >
+          <SelectTrigger className="w-56">
+            <SelectValue placeholder="Select a Language" />
+          </SelectTrigger>
+          <SelectContent>
+            {langOptions.map((opt) => (
               <SelectItem key={opt.id} value={opt.id.toString()}>
                 {opt.name}
               </SelectItem>
@@ -225,20 +267,14 @@ function ListGestures({ init_gesture_categories }: Props) {
             </Command>
           </PopoverContent>
         </Popover>
-        <Button variant="ghost" size="icon" onClick={() => setManageOpen(true)}>
+        <Link
+          to="/lessons"
+          title="Categories are the lesson categories, managed on the Lessons page"
+          className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}
+        >
           <TiEdit className="size-5" />
-        </Button>
+        </Link>
       </div>
-
-      {scriptId ? (
-        <ManageCategoriesDialog
-          open={manageOpen}
-          onOpenChange={setManageOpen}
-          scriptId={scriptId}
-          categories={categories}
-          isLoading={!!categories_q.isLoading}
-        />
-      ) : null}
 
       {selectedCategoryID !== null && category_gestures_q.data ? (
         <EditCategoryGesturesDialog
@@ -285,264 +321,6 @@ function ListGestures({ init_gesture_categories }: Props) {
         </div>
       )}
     </div>
-  );
-}
-
-type CategoryModel = Pick<InferSelectModel<typeof gesture_categories>, 'id' | 'name' | 'order'>;
-
-function ManageCategoriesDialog({
-  open,
-  onOpenChange,
-  scriptId: _scriptId,
-  categories,
-  isLoading
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  scriptId: number;
-  categories: CategoryModel[];
-  isLoading: boolean;
-}) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const [addOpen, setAddOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [categoryList, setCategoryList] = useState<CategoryModel[]>(categories);
-
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- intentional sync from query
-    setCategoryList(categories);
-  }, [categories]);
-
-  const add_category_mut = useMutation(
-    trpc.text_gestures.categories.add_category.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.text_gestures.categories.get_categories.pathFilter());
-        setAddOpen(false);
-        toast.success('Category added');
-      },
-      onError: (err) => {
-        toast.error('Failed to add category' + (err?.message ? `: ${err.message}` : ''));
-      }
-    })
-  );
-
-  const delete_category_mut = useMutation(
-    trpc.text_gestures.categories.delete_category.mutationOptions({
-      onSuccess: async () => {
-        setDeleteId(null);
-        queryClient.invalidateQueries(trpc.text_gestures.categories.get_categories.queryFilter());
-        queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_gestures.queryFilter({
-            category_id: 0
-          })
-        );
-        queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_gestures.queryFilter({
-            category_id: deleteId!
-          })
-        );
-        toast.success('Category deleted');
-      },
-      onError: (err) => {
-        toast.error('Failed to delete category' + (err?.message ? `: ${err.message}` : ''));
-      }
-    })
-  );
-
-  const update_category_list_mut = useMutation(
-    trpc.text_gestures.categories.update_list.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries(trpc.text_gestures.categories.get_categories.pathFilter());
-        toast.success('Categories saved');
-      },
-      onError: (err) => {
-        toast.error('Failed to save categories' + (err?.message ? `: ${err.message}` : ''));
-      }
-    })
-  );
-
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = categoryList.findIndex((c) => c.id === Number(active.id));
-    const newIndex = categoryList.findIndex((c) => c.id === Number(over.id));
-    const moved = arrayMove(categoryList, oldIndex, newIndex).map((c, idx) => ({
-      ...c,
-      order: idx + 1
-    }));
-    setCategoryList(moved);
-  }
-
-  async function handleSave() {
-    await update_category_list_mut.mutateAsync({ categories: categoryList });
-    onOpenChange(false);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Manage Gesture Categories</DialogTitle>
-        </DialogHeader>
-
-        <div className="mb-3 flex items-center justify-between">
-          <Button onClick={() => setAddOpen(true)} size="sm">
-            <Plus data-icon="inline-start" /> Add Category
-          </Button>
-        </div>
-
-        <div className="max-h-[50vh] overflow-y-auto rounded-md border p-2">
-          {isLoading ? (
-            <div className="flex flex-col gap-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Skeleton className="h-8 w-6" />
-                  <Skeleton className="h-8 flex-1" />
-                  <Skeleton className="h-8 w-8" />
-                </div>
-              ))}
-            </div>
-          ) : categoryList.length > 0 ? (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={categoryList.map((c) => String(c.id))}
-                strategy={verticalListSortingStrategy}
-              >
-                <ul className="flex flex-col gap-2">
-                  {categoryList.map((c) => (
-                    <DraggableCategoryRow
-                      key={c.id}
-                      item={c}
-                      onChangeName={(name) =>
-                        setCategoryList((prev) =>
-                          prev.map((x) => (x.id === c.id ? { ...x, name } : x))
-                        )
-                      }
-                      onDelete={() => setDeleteId(c.id)}
-                    />
-                  ))}
-                </ul>
-              </SortableContext>
-            </DndContext>
-          ) : (
-            <div className="py-6 text-center text-sm text-muted-foreground">No categories yet.</div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={isLoading || categoryList.length === 0}>
-            Save
-          </Button>
-        </DialogFooter>
-
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Category</DialogTitle>
-            </DialogHeader>
-            <AddCategoryForm
-              onSubmit={(name) => add_category_mut.mutate({ name })}
-              isSubmitting={add_category_mut.isPending}
-            />
-          </DialogContent>
-        </Dialog>
-
-        <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Category</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this category?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={async () => {
-                  if (deleteId !== null) {
-                    await delete_category_mut.mutateAsync({
-                      category_id: deleteId
-                    });
-                  }
-                }}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function AddCategoryForm({
-  onSubmit,
-  isSubmitting
-}: {
-  onSubmit: (name: string) => void;
-  isSubmitting: boolean;
-}) {
-  const [name, setName] = useState('');
-  return (
-    <div className="flex flex-col gap-4">
-      <Input placeholder="Category name" value={name} onChange={(e) => setName(e.target.value)} />
-      <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={() => setName('')} disabled={isSubmitting}>
-          Clear
-        </Button>
-        <Button onClick={() => onSubmit(name.trim())} disabled={!name.trim() || isSubmitting}>
-          {isSubmitting ? 'Adding…' : 'Add'}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function DraggableCategoryRow({
-  item,
-  onChangeName,
-  onDelete
-}: {
-  item: CategoryModel;
-  onChangeName: (name: string) => void;
-  onDelete: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: String(item.id)
-  });
-  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.6 : 1
-  } as React.CSSProperties;
-
-  return (
-    <li ref={setNodeRef} style={style} className="flex items-center gap-2">
-      <button
-        className="inline-flex h-8 w-6 items-center justify-center rounded border bg-background"
-        {...attributes}
-        {...listeners}
-        aria-label="Drag"
-      >
-        <GripVertical />
-      </button>
-      <Input value={item.name} onChange={(e) => onChangeName(e.target.value)} className="flex-1" />
-      <Button variant="ghost" size="icon" onClick={onDelete} className="text-destructive">
-        <Minus />
-      </Button>
-    </li>
   );
 }
 
@@ -669,6 +447,7 @@ function EditCategoryGesturesDialog({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const scriptId = useAtomValue(script_id_atom);
+  const langId = useAtomValue(lang_id_atom);
 
   const [ordered, setOrdered] = useState<GestureItem[]>([]);
   const [unordered, setUnordered] = useState<GestureItem[]>([]);
@@ -780,9 +559,7 @@ function EditCategoryGesturesDialog({
       for (const move of pendingMoves) {
         await add_to_category_mut.mutateAsync({
           category_id: move.target_category_id,
-          prev_category_id: category_id > 0 ? category_id : undefined,
-          gesture_id: move.id,
-          script_id: scriptId,
+          lang_id: langId,
           gesture_text_key: move.text_key
         });
       }
@@ -802,16 +579,12 @@ function EditCategoryGesturesDialog({
         }
       }
 
-      const targetIds = new Set<number>([category_id]);
-      for (const move of pendingMoves) {
-        targetIds.add(move.target_category_id ?? 0);
-      }
-
       const remainingForCache = [...ordered, ...unordered];
       queryClient.setQueryData(
         trpc.text_gestures.categories.get_gestures.queryKey({
           category_id,
-          script_id: scriptId
+          script_id: scriptId,
+          lang_id: langId
         }),
         {
           type: category_id === 0 ? 'uncategorized' : 'categorized',
@@ -819,13 +592,8 @@ function EditCategoryGesturesDialog({
         }
       );
 
-      await Promise.all(
-        [...targetIds].map((id) =>
-          queryClient.invalidateQueries(
-            trpc.text_gestures.categories.get_gestures.queryFilter({ category_id: id })
-          )
-        )
-      );
+      // a move changes the key's category in every script
+      await queryClient.invalidateQueries(trpc.text_gestures.categories.get_gestures.pathFilter());
 
       toast.success('Changes saved');
       setConfirmSaveOpen(false);
@@ -988,7 +756,10 @@ function DraftAssignCategoryDialog({
   isMove?: boolean;
 }) {
   const trpc = useTRPC();
-  const categories_q = useQuery(trpc.text_gestures.categories.get_categories.queryOptions());
+  const langId = useAtomValue(lang_id_atom);
+  const categories_q = useQuery(
+    trpc.text_gestures.categories.get_categories.queryOptions({ lang_id: langId })
+  );
   const categories = [
     ...(categories_q.data ? categories_q.data.filter((c) => c.id !== excludeCategoryId) : []),
     ...(excludeCategoryId && excludeCategoryId > 0

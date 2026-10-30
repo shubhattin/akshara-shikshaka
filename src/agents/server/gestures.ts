@@ -1,10 +1,14 @@
 import { Effect } from 'effect';
-import { asc, eq, sql } from 'drizzle-orm';
-import { gesture_categories, gesture_text_key_category_join, text_gestures } from '~/db/schema';
+import { and, asc, eq, sql } from 'drizzle-orm';
+import {
+  lesson_categories,
+  gesture_text_key_lesson_category_join,
+  text_gestures
+} from '~/db/schema';
 import { dbRunHttp } from '~/effect/database';
 import { BadRequestError, NotFoundError } from '~/effect/errors';
 import { transliterateTexts } from '~/lib/transliterateTexts.server';
-import { get_script_from_id } from '~/state/lang_list';
+import { DEFAULT_GESTURE_CATEGORY_LANG_ID, get_script_from_id } from '~/state/lang_list';
 import { proposed_gesture_schema } from '~/agents/gesture_creator/schemas';
 import { editTextGestureData } from '~/api/routers/text_gestures';
 import { findAgentChat, loadAgentMessages } from './chat_store';
@@ -17,22 +21,26 @@ export const listMentionableGestures = Effect.fn('agents.list_mentionable_gestur
         id: text_gestures.id,
         text: text_gestures.text,
         script_id: text_gestures.script_id,
-        category_id: gesture_categories.id,
-        category: gesture_categories.name,
+        category_id: lesson_categories.id,
+        category: lesson_categories.name,
         strokes: sql<number>`jsonb_array_length(${text_gestures.gestures})`.mapWith(Number)
       })
       .from(text_gestures)
+      // agents see the categories of the default language
       .leftJoin(
-        gesture_text_key_category_join,
-        eq(gesture_text_key_category_join.gesture_text_key, text_gestures.text_key)
+        gesture_text_key_lesson_category_join,
+        and(
+          eq(gesture_text_key_lesson_category_join.gesture_text_key, text_gestures.text_key),
+          eq(gesture_text_key_lesson_category_join.lang_id, DEFAULT_GESTURE_CATEGORY_LANG_ID)
+        )
       )
       .leftJoin(
-        gesture_categories,
-        eq(gesture_categories.id, gesture_text_key_category_join.category_id)
+        lesson_categories,
+        eq(lesson_categories.id, gesture_text_key_lesson_category_join.lesson_category_id)
       )
       .orderBy(
         asc(text_gestures.script_id),
-        asc(gesture_categories.order),
+        asc(lesson_categories.order),
         asc(text_gestures.order),
         asc(text_gestures.id)
       )
@@ -74,16 +82,20 @@ export const getGestureForAgent = Effect.fn('agents.get_gesture')(function* (id:
         font_size: text_gestures.font_size,
         text_center_offset: text_gestures.text_center_offset,
         gestures: text_gestures.gestures,
-        category: gesture_categories.name
+        category: lesson_categories.name
       })
       .from(text_gestures)
+      // agents see the categories of the default language
       .leftJoin(
-        gesture_text_key_category_join,
-        eq(gesture_text_key_category_join.gesture_text_key, text_gestures.text_key)
+        gesture_text_key_lesson_category_join,
+        and(
+          eq(gesture_text_key_lesson_category_join.gesture_text_key, text_gestures.text_key),
+          eq(gesture_text_key_lesson_category_join.lang_id, DEFAULT_GESTURE_CATEGORY_LANG_ID)
+        )
       )
       .leftJoin(
-        gesture_categories,
-        eq(gesture_categories.id, gesture_text_key_category_join.category_id)
+        lesson_categories,
+        eq(lesson_categories.id, gesture_text_key_lesson_category_join.lesson_category_id)
       )
       .where(eq(text_gestures.id, id))
       .limit(1)

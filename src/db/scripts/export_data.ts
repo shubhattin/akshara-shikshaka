@@ -3,8 +3,7 @@ import { readFile } from 'fs/promises';
 import { dbMode, take_input } from '~/tools/kry.server';
 import {
   audio_assets,
-  gesture_categories,
-  gesture_text_key_category_join,
+  gesture_text_key_lesson_category_join,
   image_assets,
   lesson_categories,
   lesson_gestures,
@@ -23,8 +22,7 @@ import {
   TextGesturesSchemaZod,
   TextLessonsSchemaZod,
   TextLessonWordsSchemaZod,
-  GestureCategoriesSchemaZod,
-  GestureTextKeyCategoryJoinSchemaZod,
+  GestureTextKeyLessonCategoryJoinSchemaZod,
   LessonCategoriesSchemaZod,
   UserGestureRecordingsSchemaZod,
   UserGestureRecordingVectorsSchemaZod,
@@ -49,9 +47,11 @@ const main = async () => {
 
   const data = z
     .object({
-      gesture_categories: GestureCategoriesSchemaZod.array(),
       text_gestures: TextGesturesSchemaZod.array(),
-      gesture_text_key_category_join: GestureTextKeyCategoryJoinSchemaZod.array(),
+      // Optional so backups written before gestures used lesson categories still restore.
+      gesture_text_key_lesson_category_join: GestureTextKeyLessonCategoryJoinSchemaZod.array()
+        .optional()
+        .default([]),
       lesson_categories: LessonCategoriesSchemaZod.array(),
       text_lessons: TextLessonsSchemaZod.array(),
       lesson_gestures: LessonGesturesSchemaZod.array(),
@@ -72,8 +72,7 @@ const main = async () => {
       await tx.delete(agent_messages);
       await tx.delete(text_gestures);
       await tx.delete(text_lessons);
-      await tx.delete(gesture_text_key_category_join);
-      await tx.delete(gesture_categories);
+      await tx.delete(gesture_text_key_lesson_category_join);
       await tx.delete(lesson_categories);
       await tx.delete(lesson_gestures);
       await tx.delete(text_lesson_words);
@@ -109,17 +108,6 @@ const main = async () => {
       console.log(chalk.red('✗ Error while inserting image assets:'), chalk.yellow(e));
     }
 
-    // inserting gesture categories
-    try {
-      await tx.insert(gesture_categories).values(data.gesture_categories);
-      console.log(
-        chalk.green('✓ Successfully added values into table'),
-        chalk.blue('`gesture_categories`')
-      );
-    } catch (e) {
-      console.log(chalk.red('✗ Error while inserting gesture categories:'), chalk.yellow(e));
-    }
-
     // inserting text gestures
     try {
       await tx
@@ -137,20 +125,6 @@ const main = async () => {
       console.log(chalk.red('✗ Error while inserting word_puzzles:'), chalk.yellow(e));
     }
 
-    // inserting gesture text key category join
-    try {
-      await tx.insert(gesture_text_key_category_join).values(data.gesture_text_key_category_join);
-      console.log(
-        chalk.green('✓ Successfully added values into table'),
-        chalk.blue('`gesture_text_key_category_join`')
-      );
-    } catch (e) {
-      console.log(
-        chalk.red('✗ Error while inserting gesture text key category join:'),
-        chalk.yellow(e)
-      );
-    }
-
     // inserting lesson categories
     try {
       await tx.insert(lesson_categories).values(data.lesson_categories);
@@ -160,6 +134,24 @@ const main = async () => {
       );
     } catch (e) {
       console.log(chalk.red('✗ Error while inserting lesson categories:'), chalk.yellow(e));
+    }
+
+    // inserting gesture text key ↔ lesson category join (after lesson categories, for the FK)
+    try {
+      if (data.gesture_text_key_lesson_category_join.length > 0) {
+        await tx
+          .insert(gesture_text_key_lesson_category_join)
+          .values(data.gesture_text_key_lesson_category_join);
+      }
+      console.log(
+        chalk.green('✓ Successfully added values into table'),
+        chalk.blue('`gesture_text_key_lesson_category_join`')
+      );
+    } catch (e) {
+      console.log(
+        chalk.red('✗ Error while inserting gesture text key lesson category join:'),
+        chalk.yellow(e)
+      );
     }
 
     // inserting text lessons
@@ -248,13 +240,10 @@ const main = async () => {
         sql`SELECT setval('"text_gestures_id_seq"', (select MAX(id) from "text_gestures"))`
       );
       await tx.execute(
-        sql`SELECT setval('"gesture_categories_id_seq"', (select MAX(id) from "gesture_categories"))`
-      );
-      await tx.execute(
         sql`SELECT setval('"lesson_categories_id_seq"', (select MAX(id) from "lesson_categories"))`
       );
       await tx.execute(
-        sql`SELECT setval('"gesture_text_key_category_join_id_seq"', (select MAX(id) from "gesture_text_key_category_join"))`
+        sql`SELECT setval('"gesture_text_key_lesson_category_join_id_seq"', (select MAX(id) from "gesture_text_key_lesson_category_join"))`
       );
       await tx.execute(
         sql`SELECT setval('"text_lessons_id_seq"', (select MAX(id) from "text_lessons"))`

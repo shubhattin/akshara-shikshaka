@@ -50,34 +50,6 @@ export const text_gestures = pgTable(
   ]
 );
 
-export const gesture_text_key_category_join = pgTable(
-  'gesture_text_key_category_join',
-  {
-    id: serial().primaryKey(),
-    gesture_text_key: text().notNull().unique(),
-    category_id: integer().notNull()
-  },
-  (table) => [
-    foreignKey({
-      name: 'text_key_category_id_fk',
-      columns: [table.category_id],
-      foreignColumns: [gesture_categories.id]
-    }).onDelete('cascade')
-  ]
-);
-
-// gesture categories are not specific to a script
-// rather they have 12M relation with gestures via the join table
-export const gesture_categories = pgTable('gesture_categories', {
-  id: serial().primaryKey(),
-  name: text().notNull(),
-  order: smallint().notNull(),
-  created_at: timestamp().notNull().defaultNow(),
-  updated_at: timestamp()
-    .notNull()
-    .$onUpdate(() => new Date())
-});
-
 export const text_lessons = pgTable(
   'text_lessons',
   {
@@ -134,6 +106,28 @@ export const lesson_categories = pgTable('lesson_categories', {
     .notNull()
     .$onUpdate(() => new Date())
 });
+
+// Gestures are grouped by the lesson categories, matched by `text_key` (same key for every
+// script). A key is in at most one category per language; `lang_id` mirrors the category's
+// language so the database enforces that.
+export const gesture_text_key_lesson_category_join = pgTable(
+  'gesture_text_key_lesson_category_join',
+  {
+    id: serial().primaryKey(),
+    gesture_text_key: text().notNull(),
+    lesson_category_id: integer()
+      .notNull()
+      .references(() => lesson_categories.id, { onDelete: 'cascade' }),
+    lang_id: smallint().notNull()
+  },
+  (table) => [
+    unique('gesture_text_key_lesson_category_join_key_lang_unique').on(
+      table.gesture_text_key,
+      table.lang_id
+    ),
+    index('gesture_text_key_lesson_category_join_category_idx').on(table.lesson_category_id)
+  ]
+);
 
 export const text_lesson_words = pgTable('text_lesson_words', {
   id: serial().primaryKey(),
@@ -284,16 +278,12 @@ export const lesssonGesturesRelations = relations(lesson_gestures, ({ one }) => 
   })
 }));
 
-export const gestureCategoriesRelations = relations(gesture_categories, ({ many }) => ({
-  gestures: many(text_gestures)
-}));
-
-export const gestureTextKeyCategoryJoinRelations = relations(
-  gesture_text_key_category_join,
+export const gestureTextKeyLessonCategoryJoinRelations = relations(
+  gesture_text_key_lesson_category_join,
   ({ one }) => ({
-    category: one(gesture_categories, {
-      fields: [gesture_text_key_category_join.category_id],
-      references: [gesture_categories.id]
+    category: one(lesson_categories, {
+      fields: [gesture_text_key_lesson_category_join.lesson_category_id],
+      references: [lesson_categories.id]
     })
   })
 );
@@ -303,7 +293,8 @@ export const textGesturesRelations = relations(text_gestures, ({ many, one: _one
 }));
 
 export const lessonCategoriesRelations = relations(lesson_categories, ({ many }) => ({
-  lessons: many(text_lessons)
+  lessons: many(text_lessons),
+  gesture_text_keys: many(gesture_text_key_lesson_category_join)
 }));
 
 export const textLessonsRelations = relations(text_lessons, ({ many, one }) => ({

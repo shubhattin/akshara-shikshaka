@@ -98,15 +98,24 @@ import {
 } from './gesture_add_edit_state';
 import { Checkbox } from '~/components/ui/checkbox';
 import { transliterate } from 'lipilekhika';
-import { FONT_LIST, type FontFamily } from '~/state/font_list';
-import { script_list_obj } from '~/state/lang_list';
-import { get_script_from_id } from '~/state/lang_list';
+import { FONT_LIST, LANGUAGES_ADDED, type FontFamily } from '~/state/font_list';
+import {
+  get_lang_from_id,
+  get_script_from_id,
+  lang_list_obj,
+  script_list_obj,
+  type lang_list_type
+} from '~/state/lang_list';
 import { motion } from 'framer-motion';
 import type { InferSelectModel } from 'drizzle-orm';
 import type { text_gestures } from '~/db/schema';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Cookie from 'js-cookie';
-import { FONT_FAMILY_COOKIE_KEY } from '~/state/cookie';
+import {
+  FONT_FAMILY_COOKIE_KEY,
+  get_lesson_lang_id_from_cookie,
+  LESSON_LANG_ID_COOKIE_KEY
+} from '~/state/cookie';
 import { Provider as JotaiProvider } from 'jotai';
 import { buttonVariants } from '~/components/ui/button';
 import {
@@ -157,20 +166,15 @@ export type text_data_type = Omit<
   id?: number;
   uuid?: string;
   font_family: FontFamily;
-  category?: {
-    id: number;
-    name: string;
-  } | null;
+  /** Lesson categories of its text_key, at most one per language */
+  categories?: GestureCategoryInfo[];
 };
 
 type Props = {
   text_data: text_data_type & { id: number; uuid: string };
 };
 
-type CategoryInfo = {
-  id: number;
-  name: string;
-} | null;
+type GestureCategoryInfo = { id: number; name: string; lang_id: number };
 
 const GESTURE_HISTORY_ATOMS = {
   text: text_atom,
@@ -221,7 +225,7 @@ function AddEditTextData({
   const fontSizeHistory = useHistoryTextField();
   const [fontLoaded, setFontLoaded] = useAtom(font_loaded_atom);
   const [mainTextPathVisible, setMainTextPathVisible] = useAtom(main_text_path_visible_atom);
-  const [category, setCategory] = useState<CategoryInfo>(text_data.category ?? null);
+  const [categories, setCategories] = useState<GestureCategoryInfo[]>(text_data.categories ?? []);
 
   // Gesture Recording State
   const [gestureData, setGestureData] = useAtom(gesture_data_atom);
@@ -485,12 +489,14 @@ function AddEditTextData({
         <div className="flex items-center gap-2">
           <Label className="font-bold">Category</Label>
           <span className="text-sm font-semibold underline">
-            {category?.name ?? 'Uncategorized'}
+            {categories.length > 0
+              ? categories.map((c) => `${c.name} (${get_lang_from_id(c.lang_id)})`).join(', ')
+              : 'Uncategorized'}
           </span>
           <CategoryChangeButton
             text_data={text_data}
-            category={category}
-            onCategoryChanged={setCategory}
+            categories={categories}
+            onCategoriesChanged={setCategories}
           />
         </div>
       </div>
@@ -1088,23 +1094,37 @@ function SortableGestureItem({ gesture, clearGestureVisualization }: SortableGes
 
 const CategoryChangeButton = ({
   text_data,
-  category,
-  onCategoryChanged
+  categories,
+  onCategoriesChanged
 }: {
   text_data: Props['text_data'];
-  category: CategoryInfo;
-  onCategoryChanged: (category: CategoryInfo) => void;
+  categories: GestureCategoryInfo[];
+  onCategoriesChanged: (categories: GestureCategoryInfo[]) => void;
 }) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const script = useAtomValue(script_atom);
   const text = useAtomValue(text_atom);
-  const scriptID = script_list_obj[script]!;
   const [open, setOpen] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(category?.id ?? 0);
+  const [langId, setLangId] = useState<number>(() =>
+    get_lesson_lang_id_from_cookie(Cookie.get(LESSON_LANG_ID_COOKIE_KEY))
+  );
+  const currentCategoryId = categories.find((c) => c.lang_id === langId)?.id ?? 0;
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(currentCategoryId);
 
-  const categories_q = useQuery(trpc.text_gestures.categories.get_categories.queryOptions());
-  const categories = [{ id: 0, name: 'Uncategorized', order: 0 }, ...(categories_q.data ?? [])];
+  const langOptions = LANGUAGES_ADDED.map((name) => ({
+    name,
+    // SAFETY: enum lookup validated - key is from controlled enum list.
+    id: lang_list_obj[name as lang_list_type]
+  }));
+
+  const categories_q = useQuery(
+    trpc.text_gestures.categories.get_categories.queryOptions(
+      { lang_id: langId },
+      { enabled: open }
+    )
+  );
+  const categoryOptions = [{ id: 0, name: 'Uncategorized' }, ...(categories_q.data ?? [])];
 
   const update_category_mut = useMutation(
     trpc.text_gestures.categories.add_update_gesture_category.mutationOptions({
@@ -1117,18 +1137,22 @@ const CategoryChangeButton = ({
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     if (next) {
-      setSelectedCategoryId(category?.id ?? 0);
+      setSelectedCategoryId(currentCategoryId);
     }
+  };
+
+  const handleLangChange = (next: number) => {
+    setLangId(next);
+    setSelectedCategoryId(categories.find((c) => c.lang_id === next)?.id ?? 0);
   };
 
   const handleConfirm = async () => {
     if (selectedCategoryId === null) return;
-    const nextCategoryId = selectedCategoryId === 0 ? null : selectedCategoryId;
-    const prevCategoryId = category?.id;
-    if (nextCategoryId === (prevCategoryId ?? null)) {
+    if (selectedCategoryId === currentCategoryId) {
       setOpen(false);
       return;
     }
+    const nextCategoryId = selectedCategoryId === 0 ? null : selectedCategoryId;
 
     try {
       // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
@@ -1137,33 +1161,18 @@ const CategoryChangeButton = ({
         textKeyFromData ?? (await transliterate(text.trim(), script, 'Normal'));
 
       await update_category_mut.mutateAsync({
-        gesture_id: text_data.id,
         gesture_text_key,
-        script_id: scriptID,
-        category_id: nextCategoryId,
-        prev_category_id: prevCategoryId
+        lang_id: langId,
+        category_id: nextCategoryId
       });
 
-      const nextCategory =
-        nextCategoryId === null ? null : (categories.find((c) => c.id === nextCategoryId) ?? null);
-      onCategoryChanged(nextCategory ? { id: nextCategory.id, name: nextCategory.name } : null);
-
-      const prevId = prevCategoryId ?? 0;
-      const nextId = nextCategoryId ?? 0;
-      await Promise.all([
-        queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_gestures.queryFilter({
-            category_id: prevId,
-            script_id: scriptID
-          })
-        ),
-        queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_gestures.queryFilter({
-            category_id: nextId,
-            script_id: scriptID
-          })
-        )
+      const nextCategory = categoryOptions.find((c) => c.id === nextCategoryId);
+      onCategoriesChanged([
+        ...categories.filter((c) => c.lang_id !== langId),
+        ...(nextCategory ? [{ id: nextCategory.id, name: nextCategory.name, lang_id: langId }] : [])
       ]);
+
+      await queryClient.invalidateQueries(trpc.text_gestures.categories.get_gestures.pathFilter());
 
       toast.success('Category updated');
       setOpen(false);
@@ -1191,14 +1200,35 @@ const CategoryChangeButton = ({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Change Category</DialogTitle>
-            <DialogDescription>Choose a category for this gesture.</DialogDescription>
+            <DialogDescription>
+              Choose a lesson category for this gesture. It applies to the gestures of this akṣara
+              in every script.
+            </DialogDescription>
           </DialogHeader>
+          <Select
+            items={langOptions.map((o) => ({ label: o.name, value: o.id.toString() }))}
+            value={langId.toString()}
+            onValueChange={(val) => {
+              if (val) handleLangChange(Number(val));
+            }}
+          >
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Select a Language" />
+            </SelectTrigger>
+            <SelectContent>
+              {langOptions.map((opt) => (
+                <SelectItem key={opt.id} value={opt.id.toString()}>
+                  {opt.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <RadioGroup
             value={selectedCategoryId?.toString() ?? ''}
             onValueChange={(v) => setSelectedCategoryId(Number(v))}
             className="flex flex-col gap-2"
           >
-            {categories.map((cat) => (
+            {categoryOptions.map((cat) => (
               <div key={cat.id} className="flex items-center gap-2">
                 <RadioGroupItem id={`gesture-edit-cat-${cat.id}`} value={String(cat.id)} />
                 <Label
@@ -1219,7 +1249,7 @@ const CategoryChangeButton = ({
               disabled={
                 selectedCategoryId === null ||
                 update_category_mut.isPending ||
-                selectedCategoryId === (category?.id ?? 0)
+                selectedCategoryId === currentCategoryId
               }
             >
               {update_category_mut.isPending ? 'Updating…' : 'Confirm'}
@@ -1259,10 +1289,7 @@ const SaveEditMode = ({ text_data }: { text_data: Props['text_data'] }) => {
         if (!data.deleted) return;
         toast.success('Text Deleted');
         await queryClient.invalidateQueries(
-          trpc.text_gestures.categories.get_gestures.queryFilter({
-            category_id: text_data.category?.id ?? 0, // 0 -> uncategorized
-            script_id: scriptID
-          })
+          trpc.text_gestures.categories.get_gestures.pathFilter()
         );
         // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
         navigate({ to: '/gestures' } as never);

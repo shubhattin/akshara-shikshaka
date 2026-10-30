@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Effect } from 'effect';
 import { and, eq, inArray } from 'drizzle-orm';
-import { gesture_text_key_category_join, lesson_gestures, text_gestures } from '~/db/schema';
+import { lesson_gestures, text_gestures } from '~/db/schema';
 import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
 import { NotFoundError, BadRequestError } from '~/effect/errors';
 import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
@@ -9,7 +9,11 @@ import { FONT_FAMILIES, type FontFamily } from '~/state/font_list';
 import { GestureSchema } from '~/tools/stroke_data/types';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
-import { gesture_categories_router, reorder_text_gesture_in_category } from './gesture_categories';
+import {
+  attach_text_key_to_lesson_categories,
+  gesture_categories_router,
+  reorder_text_gestures_in_category
+} from './gesture_categories';
 
 type Gesture = z.infer<typeof GestureSchema>;
 
@@ -80,6 +84,7 @@ export const addTextGestureData = Effect.fn('addTextGestureData')(function* (inp
       .returning();
 
     await connect_gestures_to_text_lessons(textKey, inserted.id, tx);
+    await attach_text_key_to_lesson_categories(textKey, tx);
     return { success: true as const, id: inserted.id, uuid: inserted.uuid };
   });
 
@@ -146,25 +151,6 @@ export const deleteTextGestureData = Effect.fn('deleteTextGestureData')(function
   script_id: number;
 }) {
   const outcome = yield* dbTransaction('delete_text_gesture', async (tx) => {
-    const [text_gesture_] = await tx
-      .select({
-        id: text_gestures.id,
-        category_id: gesture_text_key_category_join.category_id
-      })
-      .from(text_gestures)
-      .leftJoin(
-        gesture_text_key_category_join,
-        eq(text_gestures.text_key, gesture_text_key_category_join.gesture_text_key)
-      )
-      .where(
-        and(
-          eq(text_gestures.uuid, input.uuid),
-          eq(text_gestures.id, input.id),
-          eq(text_gestures.script_id, input.script_id)
-        )
-      )
-      .limit(1);
-
     const data = await tx.query.text_gestures.findFirst({
       where: (table, { eq }) =>
         and(
@@ -172,7 +158,7 @@ export const deleteTextGestureData = Effect.fn('deleteTextGestureData')(function
           eq(table.uuid, input.uuid),
           eq(table.script_id, input.script_id)
         ),
-      columns: { id: true },
+      columns: { id: true, text_key: true },
       with: {
         lessons: {
           columns: { text_lesson_id: true }
@@ -180,27 +166,22 @@ export const deleteTextGestureData = Effect.fn('deleteTextGestureData')(function
       }
     });
 
-    if (!text_gesture_) {
+    if (!data) {
       return { ok: false as const };
     }
 
-    if (text_gesture_.category_id) {
-      await reorder_text_gesture_in_category(
-        text_gesture_.category_id,
-        input.script_id,
-        input.id,
-        tx
-      );
+    const categories = await tx.query.gesture_text_key_lesson_category_join.findMany({
+      columns: { lesson_category_id: true },
+      where: (tbl, { eq }) => eq(tbl.gesture_text_key, data.text_key)
+    });
+    for (const { lesson_category_id } of categories) {
+      await reorder_text_gestures_in_category(lesson_category_id, tx, input.id);
     }
     await tx
       .delete(text_gestures)
       .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)));
 
-    return {
-      ok: true as const,
-      category_id: text_gesture_.category_id,
-      lessons: data?.lessons ?? []
-    };
+    return { ok: true as const, lessons: data.lessons };
   });
 
   if (!outcome.ok) {

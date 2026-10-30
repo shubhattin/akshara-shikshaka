@@ -1,11 +1,17 @@
 import { z } from 'zod';
 import { and, eq, max, sql } from 'drizzle-orm';
 import { Effect } from 'effect';
-import { lesson_categories, text_lessons } from '~/db/schema';
+import {
+  gesture_text_key_lesson_category_join,
+  lesson_categories,
+  text_gestures,
+  text_lessons
+} from '~/db/schema';
 import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
 import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
+import { set_text_key_lesson_category } from './gesture_categories';
 import { LessonCategoriesSchemaZod, TextLessonsSchemaZod } from '~/db/schema_zod';
 
 /**
@@ -103,6 +109,15 @@ export const deleteLessonCategory = Effect.fn('deleteLessonCategory')(function* 
       orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
     });
 
+    // its gestures become uncategorized (the join rows cascade), so they lose their order too
+    await tx.execute(sql`
+      UPDATE ${text_gestures} AS t
+      SET "order" = NULL, updated_at = NOW()
+      FROM ${gesture_text_key_lesson_category_join} AS j
+      WHERE j.gesture_text_key = t.text_key
+        AND j.lesson_category_id = ${input.category_id}
+        AND t."order" IS NOT NULL
+    `);
     await tx
       .delete(lesson_categories)
       .where(
@@ -185,10 +200,22 @@ export const addUpdateLessonCategory = Effect.fn('addUpdateLessonCategory')(func
   lesson_id: number;
 }) {
   yield* dbTransaction('add_update_lesson_category', async (tx) => {
-    await tx
+    const [lesson] = await tx
       .update(text_lessons)
       .set({ category_id: input.category_id, order: null })
-      .where(eq(text_lessons.id, input.lesson_id));
+      .where(eq(text_lessons.id, input.lesson_id))
+      .returning();
+    if (lesson && input.category_id) {
+      // the lesson's gestures follow it into the category
+      await set_text_key_lesson_category(
+        {
+          text_key: lesson.text_key,
+          lang_id: lesson.lang_id,
+          lesson_category_id: input.category_id
+        },
+        tx
+      );
+    }
     if (input.prev_category_id) {
       await reorder_text_lesson_in_category(input.prev_category_id, input.lesson_id, tx);
     }

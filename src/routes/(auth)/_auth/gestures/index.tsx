@@ -11,6 +11,7 @@ import {
 } from '~/state/cookie';
 import ListGestures from './-ListGestures';
 import AddGestureDialog from './-AddGestureDialog';
+import { AdminListTabs } from '~/components/admin/AdminListTabs';
 import { createServerFn } from '@tanstack/react-start';
 import { adminServerFnMiddleware } from '@/lib/adminServerFn';
 import { Effect } from 'effect';
@@ -59,6 +60,9 @@ function GesturesIndexRoute() {
           <IoMdArrowRoundBack className="inline-block text-xl" />
           Home Page
         </Link>
+        <div className="ml-auto">
+          <AdminListTabs active="gestures" category={search.category} />
+        </div>
       </div>
       <div className="mt-2 mb-5 flex items-center justify-center gap-4 px-2">
         <Button

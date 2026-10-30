@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { and, eq, inArray, isNotNull, max, sql } from 'drizzle-orm';
 import { Effect } from 'effect';
 import {
-  gesture_text_key_lesson_category_join,
   lesson_categories,
   lesson_gestures,
   text_gestures,
@@ -111,15 +110,7 @@ export const deleteLessonCategory = Effect.fn('deleteLessonCategory')(function* 
       orderBy: (lesson_categories, { asc }) => [asc(lesson_categories.order)]
     });
 
-    // its gestures become uncategorized (the join rows cascade), so they lose their order too
-    await tx.execute(sql`
-      UPDATE ${text_gestures} AS t
-      SET "order" = NULL, updated_at = NOW()
-      FROM ${gesture_text_key_lesson_category_join} AS j
-      WHERE j.gesture_text_key = t.text_key
-        AND j.lesson_category_id = ${input.category_id}
-        AND t."order" IS NOT NULL
-    `);
+    // its lessons and gestures become uncategorized (`set null` / the join rows cascade)
     await tx
       .delete(lesson_categories)
       .where(
@@ -207,8 +198,8 @@ export const addUpdateLessonCategory = Effect.fn('addUpdateLessonCategory')(func
       .set({ category_id: input.category_id, order: null })
       .where(eq(text_lessons.id, input.lesson_id))
       .returning();
-    if (lesson && input.category_id) {
-      // the lesson's gestures follow it into the category
+    if (lesson) {
+      // the lesson's gestures follow it (out of any category when it is uncategorized)
       await set_text_key_lesson_category(
         {
           text_key: lesson.text_key,

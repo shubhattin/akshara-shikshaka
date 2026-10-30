@@ -1,9 +1,10 @@
 import { Effect } from 'effect';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import {
   lesson_categories,
   gesture_text_key_lesson_category_join,
-  text_gestures
+  text_gestures,
+  text_lessons
 } from '~/db/schema';
 import { dbRunHttp } from '~/effect/database';
 import { BadRequestError, NotFoundError } from '~/effect/errors';
@@ -39,10 +40,18 @@ export const listMentionableGestures = Effect.fn('agents.list_mentionable_gestur
         lesson_categories,
         eq(lesson_categories.id, gesture_text_key_lesson_category_join.lesson_category_id)
       )
+      // a gesture's order in its category is its lesson's
+      .leftJoin(
+        text_lessons,
+        and(
+          eq(text_lessons.text_key, text_gestures.text_key),
+          eq(text_lessons.category_id, gesture_text_key_lesson_category_join.lesson_category_id)
+        )
+      )
       .orderBy(
         asc(text_gestures.script_id),
         asc(lesson_categories.order),
-        asc(text_gestures.order),
+        sql`${text_lessons.order} ASC NULLS LAST`,
         asc(text_gestures.id)
       )
   );

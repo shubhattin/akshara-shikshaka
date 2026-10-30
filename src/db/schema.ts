@@ -42,9 +42,7 @@ export const text_gestures = pgTable(
     font_family: text().notNull().default(DEFAULT_FONT_FAMILY).$type<FontFamily>(),
     font_size: smallint().notNull().default(DEFAULT_FONT_SIZE),
     text_center_offset: jsonb().$type<[number, number]>().notNull().default([0, 0]),
-    order: smallint(),
-    // order is "nullable" for text lessons
-    // and should be handled accordingly in the UI and backend
+    // no order of its own: a gesture takes the order of its key's lesson in each language
     /** Bumped on every save; writers pass the revision they saw, so no save silently overwrites another. */
     revision: integer().notNull().default(1),
     review_status: text().notNull().default('unreviewed').$type<ReviewStatus>(),
@@ -150,7 +148,9 @@ export const lesson_categories = pgTable('lesson_categories', {
 
 // Gestures are grouped by the lesson categories, matched by `text_key` (same key for every
 // script). A key is in at most one category per language; `lang_id` mirrors the category's
-// language so the database enforces that.
+// language so the database enforces that. When the key has a lesson in that language, this row
+// follows the lesson's category (none when the lesson is uncategorized) and the gestures take
+// the lesson's order; keys without a lesson are placed here directly and stay unordered.
 export const gesture_text_key_lesson_category_join = pgTable(
   'gesture_text_key_lesson_category_join',
   {

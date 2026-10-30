@@ -6,41 +6,15 @@ import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database'
 import { BadRequestError } from '~/effect/errors';
 import { t, protectedAdminProcedure } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
-import { TextGesturesSchemaZod } from '~/db/schema_zod';
 import { CACHE } from '~/util/cache.server/cache_loaders';
 
-// Gestures are grouped by the lesson categories of a language, matched by `text_key`.
-// `text_gestures.order` is the position inside that category for one script; a key in categories
-// of several languages shares the same order.
-
-/**
- * Renumber the ordered gestures of a category 1..n, separately for each script.
- * @param gesture_id_to_ignore Allow this function to run in parallel with deletes/moves.
- */
-export const reorder_text_gestures_in_category = async (
-  lesson_category_id: number,
-  dbConn: DbTransaction,
-  gesture_id_to_ignore?: number
-) => {
-  await dbConn.execute(sql`
-    UPDATE ${text_gestures} AS t
-    SET "order" = r.new_order, updated_at = NOW()
-    FROM (
-      SELECT g.id, ROW_NUMBER() OVER (PARTITION BY g.script_id ORDER BY g."order", g.id) AS new_order
-      FROM ${text_gestures} AS g
-      JOIN ${gesture_text_key_lesson_category_join} AS j ON j.gesture_text_key = g.text_key
-      WHERE j.lesson_category_id = ${lesson_category_id}
-        AND g."order" IS NOT NULL
-        AND g.id <> ${gesture_id_to_ignore ?? -1}
-    ) AS r
-    WHERE t.id = r.id AND t."order" IS DISTINCT FROM r.new_order
-  `);
-};
+// Gestures are grouped by the lesson categories of a language, matched by `text_key`. A key with
+// a lesson in that language follows the lesson: same category, and its gestures take the
+// lesson's order. Keys without a lesson there are placed by hand and stay unordered.
 
 /**
  * Put `text_key` (its gestures in every script) into `lesson_category_id`, or take it out of its
- * category in `lang_id` when null. Moved gestures lose their order; the category they left is
- * renumbered.
+ * category in `lang_id` when null.
  */
 export const set_text_key_lesson_category = async (
   input: { text_key: string; lang_id: number; lesson_category_id: number | null },
@@ -64,16 +38,11 @@ export const set_text_key_lesson_category = async (
       lang_id: input.lang_id
     });
   }
-  await dbConn
-    .update(text_gestures)
-    .set({ order: null })
-    .where(eq(text_gestures.text_key, input.text_key));
-  if (prev) await reorder_text_gestures_in_category(prev.lesson_category_id, dbConn);
 };
 
 /**
- * A new gesture joins the categories of the lessons with its key, in every language where the
- * key has no category yet.
+ * A new gesture joins the categories of the lessons with its key, in every language where such
+ * a lesson is categorized.
  */
 export const attach_text_key_to_lesson_categories = async (
   text_key: string,
@@ -85,7 +54,8 @@ export const attach_text_key_to_lesson_categories = async (
     FROM ${text_lessons} AS l
     WHERE l.text_key = ${text_key} AND l.category_id IS NOT NULL
     ORDER BY l.lang_id, l.id
-    ON CONFLICT (gesture_text_key, lang_id) DO NOTHING
+    ON CONFLICT (gesture_text_key, lang_id)
+    DO UPDATE SET lesson_category_id = excluded.lesson_category_id
   `);
 };
 
@@ -101,34 +71,42 @@ export const getGesturesByCategory = Effect.fn('getGesturesByCategory')(function
   lang_id: number;
 }) {
   return yield* dbRunHttp('get_gestures_by_category', async (db) => {
+    // the key's lesson in this language, if any
+    const lessonJoin = and(
+      eq(text_lessons.text_key, text_gestures.text_key),
+      eq(text_lessons.lang_id, input.lang_id)
+    );
     const columns = {
       id: text_gestures.id,
       text: text_gestures.text,
       text_key: text_gestures.text_key,
-      order: text_gestures.order,
+      lesson_id: text_lessons.id,
       updated_at: text_gestures.updated_at,
       stroke_count: sql<number>`jsonb_array_length(${text_gestures.gestures})`.mapWith(Number)
     };
     if (input.category_id > 0) {
+      // the lesson's position, while it sits in the same category
+      const order = sql<
+        number | null
+      >`CASE WHEN ${text_lessons.category_id} = ${gesture_text_key_lesson_category_join.lesson_category_id} THEN ${text_lessons.order} END`;
       const gestures = await db
-        .select(columns)
+        .select({ ...columns, order })
         .from(text_gestures)
         .innerJoin(
           gesture_text_key_lesson_category_join,
-          eq(text_gestures.text_key, gesture_text_key_lesson_category_join.gesture_text_key)
-        )
-        .where(
           and(
-            eq(gesture_text_key_lesson_category_join.lesson_category_id, input.category_id),
-            eq(text_gestures.script_id, input.script_id)
+            eq(text_gestures.text_key, gesture_text_key_lesson_category_join.gesture_text_key),
+            eq(gesture_text_key_lesson_category_join.lesson_category_id, input.category_id)
           )
         )
-        .orderBy(asc(text_gestures.order), asc(text_gestures.text));
+        .leftJoin(text_lessons, lessonJoin)
+        .where(eq(text_gestures.script_id, input.script_id))
+        .orderBy(sql`${order} ASC NULLS LAST`, asc(text_gestures.text));
       return { gestures, type: 'categorized' as const };
     }
 
     const gestures = await db
-      .select(columns)
+      .select({ ...columns, order: sql<null>`NULL::smallint` })
       .from(text_gestures)
       .leftJoin(
         gesture_text_key_lesson_category_join,
@@ -137,6 +115,7 @@ export const getGesturesByCategory = Effect.fn('getGesturesByCategory')(function
           eq(gesture_text_key_lesson_category_join.lang_id, input.lang_id)
         )
       )
+      .leftJoin(text_lessons, lessonJoin)
       .where(
         and(
           isNull(gesture_text_key_lesson_category_join.id),
@@ -146,31 +125,6 @@ export const getGesturesByCategory = Effect.fn('getGesturesByCategory')(function
       .orderBy(asc(text_gestures.text));
     return { gestures, type: 'uncategorized' as const };
   });
-});
-
-export const updateGesturesOrder = Effect.fn('updateGesturesOrder')(function* (input: {
-  gestures: Array<{ id: number; order: number | null }>;
-  category_id: number;
-}) {
-  yield* dbTransaction('update_gestures_order', async (tx) => {
-    if (input.gestures.length === 0) return;
-    const value_rows = input.gestures.map(
-      (gesture) => sql`(${gesture.id}::int, ${gesture.order}::smallint)`
-    );
-    await tx.execute(sql`
-      UPDATE ${text_gestures} AS t
-      SET "order" = v."order", updated_at = NOW()
-      FROM (VALUES ${sql.join(value_rows, sql`, `)}) AS v(id, "order")
-      WHERE t.id = v.id
-        AND EXISTS (
-          SELECT 1
-          FROM ${gesture_text_key_lesson_category_join} AS j
-          WHERE j.gesture_text_key = t.text_key
-            AND j.lesson_category_id = ${input.category_id}
-        )
-    `);
-  });
-  return { updated: true as const };
 });
 
 export const addUpdateGestureCategory = Effect.fn('addUpdateGestureCategory')(function* (input: {
@@ -184,7 +138,20 @@ export const addUpdateGestureCategory = Effect.fn('addUpdateGestureCategory')(fu
         columns: { lang_id: true },
         where: (tbl, { eq }) => eq(tbl.id, input.category_id!)
       });
-      if (category?.lang_id !== input.lang_id) return { ok: false as const };
+      if (category?.lang_id !== input.lang_id) {
+        return { ok: false as const, message: 'Category is not in the selected language' };
+      }
+    }
+    const lesson = await tx.query.text_lessons.findFirst({
+      columns: { id: true },
+      where: (tbl, { and, eq }) =>
+        and(eq(tbl.text_key, input.gesture_text_key), eq(tbl.lang_id, input.lang_id))
+    });
+    if (lesson) {
+      return {
+        ok: false as const,
+        message: "This gesture follows its lesson's category; change it on the lesson"
+      };
     }
     await set_text_key_lesson_category(
       {
@@ -197,9 +164,7 @@ export const addUpdateGestureCategory = Effect.fn('addUpdateGestureCategory')(fu
     return { ok: true as const };
   });
   if (!result.ok) {
-    return yield* Effect.fail(
-      BadRequestError.make({ message: 'Category is not in the selected language' })
-    );
+    return yield* Effect.fail(BadRequestError.make({ message: result.message }));
   }
   return { added: true as const };
 });
@@ -211,15 +176,6 @@ const get_categories_route = protectedAdminProcedure
 const get_gestures_route = protectedAdminProcedure
   .input(z.object({ category_id: z.int().min(0), script_id: z.int(), lang_id: z.int() }))
   .query(async ({ input }) => runTrpcEffect(getGesturesByCategory(input)));
-
-const update_gestures_order_route = protectedAdminProcedure
-  .input(
-    z.object({
-      gestures: TextGesturesSchemaZod.pick({ id: true, order: true }).array(),
-      category_id: z.int()
-    })
-  )
-  .mutation(async ({ input }) => runTrpcEffect(updateGesturesOrder(input)));
 
 const add_update_gesture_category_route = protectedAdminProcedure
   .input(
@@ -234,6 +190,5 @@ const add_update_gesture_category_route = protectedAdminProcedure
 export const gesture_categories_router = t.router({
   get_categories: get_categories_route,
   get_gestures: get_gestures_route,
-  update_gestures_order: update_gestures_order_route,
   add_update_gesture_category: add_update_gesture_category_route
 });

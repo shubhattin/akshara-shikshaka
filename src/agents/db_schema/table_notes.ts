@@ -9,11 +9,11 @@ import { zodTypeText } from './zod_type_text';
 export const TABLE_NOTES = new Map<string, string>([
   [
     'text_gestures',
-    'How to write one akṣara (text) in one script (script_id): ordered strokes in gestures. text_key = the akṣara in a script-neutral key, shared by the same akṣara across scripts and by its text_lessons. font_family/font_size/text_center_offset = how the reference glyph is drawn behind the strokes on the 400×400 canvas. order = position inside its category for this script (see gesture_text_key_lesson_category_join). revision = how many times it was saved (see text_gesture_revisions). review_status = unreviewed | needs_work | approved, with review_note. agent_notes = admin notes on how to draw it.'
+    'How to write one akṣara (text) in one script (script_id): ordered strokes in gestures. text_key = the akṣara in a script-neutral key, shared by the same akṣara across scripts and by its text_lessons. font_family/font_size/text_center_offset = how the reference glyph is drawn behind the strokes on the 400×400 canvas. Its category and order come from the lesson with its key in each language (see gesture_text_key_lesson_category_join). revision = how many times it was saved (see text_gesture_revisions). review_status = unreviewed | needs_work | approved, with review_note. agent_notes = admin notes on how to draw it.'
   ],
   [
     'gesture_text_key_lesson_category_join',
-    "Groups gestures by lesson category: which lesson_categories row each text_key (its gestures in every script) belongs to. At most one category per key per language (lang_id = the category's language). Filled automatically from the lessons with that key, or set by hand for keys with no lesson"
+    "Groups gestures by lesson category: which lesson_categories row each text_key (its gestures in every script) belongs to. At most one category per key per language (lang_id = the category's language). Follows the category of the key's lesson in that language, or set by hand for keys with no lesson. Gesture order in a category = that lesson's text_lessons.order (keys with no lesson are unordered)"
   ],
   [
     'text_lessons',

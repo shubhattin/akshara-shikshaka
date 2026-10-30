@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import type { inferRouterOutputs } from '@trpc/server';
-import { Hand, ImageIcon, Info, MicIcon, TypeIcon, Volume2Icon } from 'lucide-react';
+import { ArrowUpRight, Hand, ImageIcon, Info, MicIcon, TypeIcon, Volume2Icon } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
 import type { AppRouter } from '~/api/trpc_router';
@@ -93,9 +93,12 @@ function GestureCoverage({ overview }: { overview: LessonOverview }) {
                 key={script.id}
                 to="/gestures/edit/$id"
                 params={{ id: String(gesture.gesture_id) }}
-                className={cn(className, 'hover:bg-accent')}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(className, 'group/row hover:bg-accent')}
               >
                 {row}
+                <ArrowUpRight className="size-3 shrink-0 text-muted-foreground/50 transition-colors group-hover/row:text-muted-foreground" />
               </Link>
             ) : (
               <div key={script.id} className={className}>

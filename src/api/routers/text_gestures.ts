@@ -16,8 +16,7 @@ import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
 import {
   attach_text_key_to_lesson_categories,
-  gesture_categories_router,
-  reorder_text_gestures_in_category
+  gesture_categories_router
 } from './gesture_categories';
 
 type Gesture = z.infer<typeof GestureSchema>;
@@ -246,13 +245,6 @@ export const deleteTextGestureData = Effect.fn('deleteTextGestureData')(function
       return { ok: false as const };
     }
 
-    const categories = await tx.query.gesture_text_key_lesson_category_join.findMany({
-      columns: { lesson_category_id: true },
-      where: (tbl, { eq }) => eq(tbl.gesture_text_key, data.text_key)
-    });
-    for (const { lesson_category_id } of categories) {
-      await reorder_text_gestures_in_category(lesson_category_id, tx, input.id);
-    }
     await tx
       .delete(text_gestures)
       .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)));

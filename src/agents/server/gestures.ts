@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import {
   lesson_categories,
   gesture_text_key_lesson_category_join,
@@ -12,6 +12,7 @@ import { DEFAULT_GESTURE_CATEGORY_LANG_ID, get_script_from_id } from '~/state/la
 import { proposed_gesture_schema } from '~/agents/gesture_creator/schemas';
 import { editTextGestureData } from '~/api/routers/text_gestures';
 import { findAgentChat, loadAgentMessages } from './chat_store';
+import { savedStrokeCount } from './stroke_count';
 
 /** Gestures for the composer's `@` picker: every one, with a romanized form for search. */
 export const listMentionableGestures = Effect.fn('agents.list_mentionable_gestures')(function* () {
@@ -23,7 +24,7 @@ export const listMentionableGestures = Effect.fn('agents.list_mentionable_gestur
         script_id: text_gestures.script_id,
         category_id: lesson_categories.id,
         category: lesson_categories.name,
-        strokes: sql<number>`jsonb_array_length(${text_gestures.gestures})`.mapWith(Number)
+        strokes: savedStrokeCount
       })
       .from(text_gestures)
       // agents see the categories of the default language
@@ -82,6 +83,12 @@ export const getGestureForAgent = Effect.fn('agents.get_gesture')(function* (id:
         font_size: text_gestures.font_size,
         text_center_offset: text_gestures.text_center_offset,
         gestures: text_gestures.gestures,
+        text_key: text_gestures.text_key,
+        revision: text_gestures.revision,
+        review_status: text_gestures.review_status,
+        review_note: text_gestures.review_note,
+        agent_notes: text_gestures.agent_notes,
+        updated_at: text_gestures.updated_at,
         category: lesson_categories.name
       })
       .from(text_gestures)
@@ -117,8 +124,10 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
   toolCallId: string;
   userId: string;
   replaceExisting: boolean;
+  /** The saved version the admin compared the proposal with. */
+  expectedRevision: number;
 }) {
-  const chat = yield* findAgentChat(input.chatId, input.userId);
+  const chat = yield* findAgentChat(input.chatId);
   if (chat.agent_kind !== 'gesture_creator') {
     return yield* Effect.fail(
       BadRequestError.make({ message: 'This chat does not create gestures' })
@@ -143,6 +152,12 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
     return yield* Effect.fail(BadRequestError.make({ message: 'The proposal is malformed' }));
   }
   const proposal = parsed.data;
+  // A focused chat's proposals are for its gesture only (the tools refuse others, checked again).
+  if (chat.focus_gesture_id !== null && proposal.gesture_id !== chat.focus_gesture_id) {
+    return yield* Effect.fail(
+      BadRequestError.make({ message: 'That proposal is not for this chat’s gesture' })
+    );
+  }
   const current = yield* getGestureForAgent(proposal.gesture_id);
   if (current.uuid !== proposal.uuid) {
     return yield* Effect.fail(
@@ -174,7 +189,14 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
     gestures: proposal.gestures,
     fontFamily: current.font_family,
     fontSize: current.font_size,
-    textCenterOffset: current.text_center_offset
+    textCenterOffset: current.text_center_offset,
+    expectedRevision: input.expectedRevision,
+    provenance: {
+      source: 'agent',
+      userId: input.userId,
+      chatId: input.chatId,
+      toolCallId: input.toolCallId
+    }
   });
   return { applied: true as const, gesture_id: current.id };
 });

@@ -66,15 +66,21 @@ function StyleGuides({ guides }: { guides: StyleGuide[] }) {
 export function ContextDialog({
   open,
   onOpenChange,
-  agentKind
+  agentKind,
+  focusGestureId
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agentKind: AgentKind;
+  /** A focused chat's gesture: its section (notes, sibling scripts) is shown too */
+  focusGestureId?: number | null;
 }) {
   const trpc = useTRPC();
   const context_q = useQuery(
-    trpc.agents.get_context.queryOptions({ agent_kind: agentKind }, { enabled: open })
+    trpc.agents.get_context.queryOptions(
+      { agent_kind: agentKind, focus_gesture_id: focusGestureId ?? undefined },
+      { enabled: open }
+    )
   );
   const sections = context_q.data?.sections ?? [];
   const guides = context_q.data?.style_guides ?? [];

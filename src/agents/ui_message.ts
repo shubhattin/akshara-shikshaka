@@ -6,6 +6,9 @@ import type {
   InspectGlyphOutput,
   ProposeGestureInput,
   ProposeGestureOutput,
+  SavedViewData,
+  SuggestGestureNoteInput,
+  SuggestGestureNoteOutput,
   TraceStrokesInput,
   TraceStrokesOutput
 } from './gesture_creator/schemas';
@@ -50,6 +53,7 @@ export type AgentUITools = {
   inspect_glyph: { input: InspectGlyphInput; output: InspectGlyphOutput };
   trace_strokes: { input: TraceStrokesInput; output: TraceStrokesOutput };
   propose_gesture: { input: ProposeGestureInput; output: ProposeGestureOutput };
+  suggest_gesture_note: { input: SuggestGestureNoteInput; output: SuggestGestureNoteOutput };
 };
 
 export type AgentMessageMetadata = {
@@ -85,6 +89,8 @@ export type AgentDataTypes = {
   draft_edit: DraftEditData;
   /** The edited draft with its marked areas, drawn by the server for the model */
   draft_image: DraftImageData;
+  /** Saved strokes the admin showed the agent (critique, or a sibling script's order) */
+  saved_view: SavedViewData;
 };
 
 export type AgentUIMessage = UIMessage<AgentMessageMetadata, AgentDataTypes, AgentUITools>;

@@ -9,7 +9,7 @@ import { zodTypeText } from './zod_type_text';
 export const TABLE_NOTES = new Map<string, string>([
   [
     'text_gestures',
-    'How to write one akṣara (text) in one script (script_id): ordered strokes in gestures. text_key = the akṣara in a script-neutral key, shared by the same akṣara across scripts and by its text_lessons. font_family/font_size/text_center_offset = how the reference glyph is drawn behind the strokes on the 400×400 canvas. order = position inside its category for this script (see gesture_text_key_lesson_category_join).'
+    'How to write one akṣara (text) in one script (script_id): ordered strokes in gestures. text_key = the akṣara in a script-neutral key, shared by the same akṣara across scripts and by its text_lessons. font_family/font_size/text_center_offset = how the reference glyph is drawn behind the strokes on the 400×400 canvas. order = position inside its category for this script (see gesture_text_key_lesson_category_join). revision = how many times it was saved (see text_gesture_revisions). review_status = unreviewed | needs_work | approved, with review_note. agent_notes = admin notes on how to draw it.'
   ],
   [
     'gesture_text_key_lesson_category_join',
@@ -40,11 +40,15 @@ export const TABLE_NOTES = new Map<string, string>([
   [
     'user_gesture_recording_vectors',
     'Per-stroke result of a practice attempt: index = stroke index, recorded_accuracy 0–1, recorded/drawn vectors are the compared feature vectors (not drawable points)'
+  ],
+  [
+    'text_gesture_revisions',
+    "Every saved version of a gesture: revision_no matches text_gestures.revision when it was saved (the highest is the current one). source = initial (state before history was kept) | manual (saved in the editor) | agent (a Gesture Creator proposal applied; chat_id) | revert (an older version restored; reverted_from = that revision's id)"
   ]
 ]);
 
 /** Tables the agent does not need to know about. */
-export const HIDDEN_TABLES = new Set(['agent_chats', 'agent_messages']);
+export const HIDDEN_TABLES = new Set(['agent_chats', 'agent_messages', 'agent_chat_gestures']);
 
 /** `table.column` → type of the JSON stored in it. */
 export const JSONB_COLUMN_TYPES = new Map<string, string>([
@@ -52,5 +56,10 @@ export const JSONB_COLUMN_TYPES = new Map<string, string>([
     'text_gestures.gestures',
     `${zodTypeText(GestureSchema.array())} — points are raw [x, y] on a 400×400 canvas, width in canvas px, duration in ms. Never select this column to show strokes; embed a gesture preview instead`
   ],
-  ['text_gestures.text_center_offset', '[dx, dy] canvas px offset of the reference glyph']
+  ['text_gestures.text_center_offset', '[dx, dy] canvas px offset of the reference glyph'],
+  [
+    'text_gesture_revisions.gestures',
+    'Same as text_gestures.gestures, as saved in that version. Never select it to show strokes'
+  ],
+  ['text_gesture_revisions.text_center_offset', 'Same as text_gestures.text_center_offset']
 ]);

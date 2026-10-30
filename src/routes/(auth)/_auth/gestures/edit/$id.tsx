@@ -1,6 +1,7 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
 import { routeHeadFromPageMeta } from '~/components/tags/getPageMetaTags';
 import GestureEditClient from './-GestureEditClient';
+import type { AgentPanelView } from '~/components/pages/agents/gesture_hub/GestureAgentPanel';
 import { z } from 'zod';
 import { gesture_text_key_lesson_category_join, lesson_categories } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -52,7 +53,23 @@ const loader$ = createServerFn({ method: 'GET' })
     )
   );
 
+const AGENT_VIEW = /^(list|history|review|chat:[\w-]{1,64})$/;
+
+const isAgentView = (value: string): value is AgentPanelView => AGENT_VIEW.test(value);
+
+const edit_search_schema = z.object({
+  /** The agent panel beside the editor: list | history | review | chat:<id> */
+  agent: z
+    .string()
+    .optional()
+    .catch(undefined)
+    .transform((value): AgentPanelView | undefined =>
+      value !== undefined && isAgentView(value) ? value : undefined
+    )
+});
+
 export const Route = createFileRoute('/(auth)/_auth/gestures/edit/$id')({
+  validateSearch: edit_search_schema,
   loader: async ({ params }) => {
     const { text_data, id } = await loader$({ data: { rawId: params.id } });
     if (!text_data) throw notFound();
@@ -70,6 +87,7 @@ export const Route = createFileRoute('/(auth)/_auth/gestures/edit/$id')({
 
 function GesturesEditRoute() {
   const { text_data, id } = Route.useLoaderData();
+  const { agent } = Route.useSearch();
 
-  return <GestureEditClient text_data={text_data} id={id} />;
+  return <GestureEditClient text_data={text_data} id={id} agent={agent} />;
 }

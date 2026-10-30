@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   pgTable,
   text,
@@ -15,13 +15,15 @@ import {
   pgEnum,
   foreignKey,
   real,
-  boolean
+  boolean,
+  check
 } from 'drizzle-orm/pg-core';
 import { DEFAULT_FONT_FAMILY, DEFAULT_FONT_SIZE, type FontFamily } from '~/state/font_families';
 import type { Gesture } from '~/tools/stroke_data/types';
 import type { AgentModelId } from '~/agents/models';
 import type { AgentKind } from '~/agents/agent_kinds';
 import type { AgentMessageMetadata, AgentUIMessage } from '~/agents/ui_message';
+import type { ReviewStatus, RevisionSource } from '~/agents/gesture_review';
 
 export const text_gestures = pgTable(
   'text_gestures',
@@ -40,13 +42,52 @@ export const text_gestures = pgTable(
     font_family: text().notNull().default(DEFAULT_FONT_FAMILY).$type<FontFamily>(),
     font_size: smallint().notNull().default(DEFAULT_FONT_SIZE),
     text_center_offset: jsonb().$type<[number, number]>().notNull().default([0, 0]),
-    order: smallint()
+    order: smallint(),
     // order is "nullable" for text lessons
     // and should be handled accordingly in the UI and backend
+    /** Bumped on every save; writers pass the revision they saw, so no save silently overwrites another. */
+    revision: integer().notNull().default(1),
+    review_status: text().notNull().default('unreviewed').$type<ReviewStatus>(),
+    review_note: text().notNull().default(''),
+    /** Admin-kept notes the Gesture Creator reads in chats focused on this gesture. */
+    agent_notes: text().notNull().default('')
   },
   (table) => [
     index('text_gestures_text_key_idx').on(table.text_key),
     unique('text_gestures_text_script_id_unique').on(table.text, table.script_id)
+  ]
+);
+
+/** Every saved version of a gesture's strokes and glyph, newest `revision_no` = current. */
+export const text_gesture_revisions = pgTable(
+  'text_gesture_revisions',
+  {
+    id: serial().primaryKey(),
+    text_gesture_id: integer()
+      .notNull()
+      .references(() => text_gestures.id, { onDelete: 'cascade' }),
+    /** `text_gestures.revision` this version was saved as. */
+    revision_no: integer().notNull(),
+    gestures: jsonb().$type<Gesture[]>().notNull(),
+    font_family: text().notNull().$type<FontFamily>(),
+    font_size: smallint().notNull(),
+    text_center_offset: jsonb().$type<[number, number]>().notNull(),
+    source: text().notNull().$type<RevisionSource>(),
+    /** The chat whose proposal was applied (`source = 'agent'`). */
+    chat_id: text().references(() => agent_chats.id, { onDelete: 'set null' }),
+    tool_call_id: text(),
+    /** The revision restored (`source = 'revert'`). */
+    reverted_from: integer(),
+    /** Better Auth user id; null for the backfilled initial versions. */
+    user_id: text(),
+    created_at: timestamp({ withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    unique('text_gesture_revisions_gesture_revision_unique').on(
+      table.text_gesture_id,
+      table.revision_no
+    ),
+    index('text_gesture_revisions_chat_id_idx').on(table.chat_id)
   ]
 );
 
@@ -229,6 +270,11 @@ export const agent_chats = pgTable(
     model: text().notNull().$type<AgentModelId>(),
     /** Which agent the chat talks to; fixed when the chat is created. */
     agent_kind: text().notNull().default('general').$type<AgentKind>(),
+    /**
+     * A focused chat works on this one gesture only (Gesture Creator); fixed when the chat is
+     * created. Null for free chats.
+     */
+    focus_gesture_id: integer().references(() => text_gestures.id, { onDelete: 'cascade' }),
     title: text().notNull().default(''),
     /** Better Auth user id of the admin who started the chat. */
     user_id: text().notNull(),
@@ -240,7 +286,14 @@ export const agent_chats = pgTable(
     /** Bumped on every turn; sorts the sidebar. */
     updated_at: timestamp({ withTimezone: true }).notNull().defaultNow()
   },
-  (table) => [index('agent_chats_updated_at_idx').on(table.updated_at)]
+  (table) => [
+    index('agent_chats_updated_at_idx').on(table.updated_at),
+    index('agent_chats_focus_gesture_id_idx').on(table.focus_gesture_id),
+    check(
+      'agent_chats_focus_only_creator',
+      sql`${table.focus_gesture_id} is null or ${table.agent_kind} = 'gesture_creator'`
+    )
+  ]
 );
 
 /**
@@ -263,6 +316,26 @@ export const agent_messages = pgTable(
     created_at: timestamp({ withTimezone: true }).notNull().defaultNow()
   },
   (table) => [index('agent_messages_chat_id_position_idx').on(table.chat_id, table.position)]
+);
+
+/** Every gesture a chat mentioned or proposed (free and focused chats alike). */
+export const agent_chat_gestures = pgTable(
+  'agent_chat_gestures',
+  {
+    chat_id: text()
+      .notNull()
+      .references(() => agent_chats.id, { onDelete: 'cascade' }),
+    text_gesture_id: integer()
+      .notNull()
+      .references(() => text_gestures.id, { onDelete: 'cascade' }),
+    first_seen_at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    last_proposal_at: timestamp({ withTimezone: true }),
+    applied_at: timestamp({ withTimezone: true })
+  },
+  (table) => [
+    primaryKey({ columns: [table.chat_id, table.text_gesture_id] }),
+    index('agent_chat_gestures_gesture_idx').on(table.text_gesture_id)
+  ]
 );
 
 // relations
@@ -289,7 +362,16 @@ export const gestureTextKeyLessonCategoryJoinRelations = relations(
 );
 
 export const textGesturesRelations = relations(text_gestures, ({ many, one: _one }) => ({
-  lessons: many(lesson_gestures) // via join table
+  lessons: many(lesson_gestures), // via join table
+  revisions: many(text_gesture_revisions),
+  chats: many(agent_chat_gestures)
+}));
+
+export const textGestureRevisionsRelations = relations(text_gesture_revisions, ({ one }) => ({
+  gesture: one(text_gestures, {
+    fields: [text_gesture_revisions.text_gesture_id],
+    references: [text_gestures.id]
+  })
 }));
 
 export const lessonCategoriesRelations = relations(lesson_categories, ({ many }) => ({
@@ -348,8 +430,24 @@ export const userGestureRecordingVectorsRelations = relations(
   })
 );
 
-export const agentChatsRelations = relations(agent_chats, ({ many }) => ({
-  messages: many(agent_messages)
+export const agentChatsRelations = relations(agent_chats, ({ many, one }) => ({
+  messages: many(agent_messages),
+  gestures: many(agent_chat_gestures),
+  focus_gesture: one(text_gestures, {
+    fields: [agent_chats.focus_gesture_id],
+    references: [text_gestures.id]
+  })
+}));
+
+export const agentChatGesturesRelations = relations(agent_chat_gestures, ({ one }) => ({
+  chat: one(agent_chats, {
+    fields: [agent_chat_gestures.chat_id],
+    references: [agent_chats.id]
+  }),
+  gesture: one(text_gestures, {
+    fields: [agent_chat_gestures.text_gesture_id],
+    references: [text_gestures.id]
+  })
 }));
 
 export const agentMessagesRelations = relations(agent_messages, ({ one }) => ({

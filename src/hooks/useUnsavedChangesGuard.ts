@@ -34,8 +34,10 @@ export function useUnsavedChangesGuard(enabled: boolean, message: string = DEFAU
   useBlocker({
     disabled: !enabled,
     enableBeforeUnload: false,
-    shouldBlockFn: () => {
+    shouldBlockFn: ({ current, next }) => {
       if (!enabled) return false;
+      // Same page, other search params (e.g. the editor's agent panel): nothing is lost.
+      if (current.pathname === next.pathname) return false;
       // true = block navigation. Confirm OK means user wants to leave → do not block.
       return !window.confirm(messageRef.current);
     }

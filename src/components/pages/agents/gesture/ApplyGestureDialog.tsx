@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Provider as JotaiProvider } from 'jotai';
 import { TriangleAlertIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -33,10 +33,12 @@ import { Spinner } from '~/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { get_script_from_id } from '~/state/lang_list';
 import { useAgentChatContext } from '../chat/agent_chat_context';
+import { useRefreshGesture } from '../gesture_hub/use_refresh_gesture';
 
 import type { Gesture } from '~/tools/stroke_data/types';
 
 type GestureBaseline = {
+  revision: number;
   gestures: Gesture[];
   font_family: string;
   font_size: number;
@@ -239,7 +241,7 @@ function confirmTitle(hasSaved: boolean, text: string) {
 
 function confirmDescription(hasSaved: boolean, savedCount: number, proposedCount: number) {
   return hasSaved
-    ? `The ${savedCount} saved strokes are overwritten by the ${proposedCount} proposed ones. Learners see the new strokes right away. To undo, apply an older proposal or re-record in the editor.`
+    ? `The ${savedCount} saved strokes are overwritten by the ${proposedCount} proposed ones. Learners see the new strokes right away. The current version stays in the history, so you can restore it later.`
     : `The ${proposedCount} proposed strokes are saved to this gesture and learners see them right away.`;
 }
 
@@ -321,8 +323,8 @@ export function ApplyGestureDialog({
   background?: string;
 }) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const { chatId } = useAgentChatContext();
+  const { chatId, onGestureSaved } = useAgentChatContext();
+  const refreshGesture = useRefreshGesture();
   const [replace, setReplace] = useState<'no' | 'yes'>('no');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [tab, setTab] = useState<'preview' | 'practice'>('preview');
@@ -343,9 +345,8 @@ export function ApplyGestureDialog({
     trpc.agents.apply_gesture.mutationOptions({
       onSuccess: () => {
         toast.success(`Saved the gesture for ${proposal.text}`);
-        void queryClient.invalidateQueries({
-          queryKey: trpc.agents.get_gesture.queryKey({ id: proposal.gesture_id })
-        });
+        refreshGesture(proposal.gesture_id);
+        onGestureSaved?.(proposal.gesture_id);
         setConfirmOpen(false);
         onOpenChange(false);
       },
@@ -423,7 +424,10 @@ export function ApplyGestureDialog({
         toolCallId={toolCallId}
         replace={replace}
         onOpenChange={setConfirmOpen}
-        mutate={(args) => apply_mut.mutate(args)}
+        mutate={(args) => {
+          // the version the admin compared with: a save meanwhile is refused, not overwritten
+          if (current) apply_mut.mutate({ ...args, expected_revision: current.revision });
+        }}
       />
     </>
   );

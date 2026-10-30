@@ -1,6 +1,10 @@
 import type { DataUIPart, FilePart, TextPart } from 'ai';
 import { z } from 'zod';
-import { draft_edit_schema, draft_image_schema } from './gesture_creator/schemas';
+import {
+  draft_edit_schema,
+  draft_image_schema,
+  saved_view_schema
+} from './gesture_creator/schemas';
 import type { AgentDataTypes, AgentUIMessage, GestureRefData } from './ui_message';
 
 /** Gestures one message may mention with `@`; each adds its description to the prompt. */
@@ -17,7 +21,8 @@ export const gesture_ref_schema = z.object({
 export const AGENT_DATA_SCHEMAS = {
   gesture_ref: gesture_ref_schema,
   draft_edit: draft_edit_schema,
-  draft_image: draft_image_schema
+  draft_image: draft_image_schema,
+  saved_view: saved_view_schema
 };
 
 /** How a mention reads inside the message text, e.g. `@क#12`. */
@@ -41,6 +46,8 @@ export function dataPartToModel(part: DataUIPart<AgentDataTypes>): TextPart | Fi
       if (!match) return { type: 'text', text: '(Image of this older draft edit omitted.)' };
       return { type: 'file', mediaType: match[1]!, data: match[2]! };
     }
+    case 'data-saved_view':
+      return part.data.context ? { type: 'text', text: part.data.context } : undefined;
   }
   return undefined;
 }

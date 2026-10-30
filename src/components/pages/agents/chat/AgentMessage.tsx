@@ -9,6 +9,8 @@ import { Trace, TraceIcon, TraceLine, TraceTitle } from '~/components/ui/trace';
 import { DraftEditor } from '../gesture/DraftEditor';
 import { draftFromTrace } from '../gesture/draft_state';
 import { SentDraftEdit } from '../gesture/SentDraftEdit';
+import { NoteSuggestionCard } from '../gesture/NoteSuggestionCard';
+import { SentSavedView } from '../gesture/SavedViewDialog';
 import { GestureProposalCard } from '../gesture/GestureProposalCard';
 import { GestureRefChips } from '../mentions/GestureRefChips';
 import { InspectGlyphStep, TraceStrokesStep } from '../tools/GlyphToolSteps';
@@ -78,6 +80,7 @@ function latestTraceIn(parts: StepPart[], latestDraftId: string | null) {
 }
 
 type DraftEditPart = Extract<AgentPart, { type: 'data-draft_edit' }>;
+type SavedViewPart = Extract<AgentPart, { type: 'data-saved_view' }>;
 
 /** The admin's draft edit in their message, as sent (editable again while it is the newest draft). */
 function UserDraftEdit({ part }: { part: DraftEditPart }) {
@@ -89,11 +92,15 @@ export function UserMessage({ message }: { message: AgentUIMessage }) {
   const refs = messageGestureRefs(message);
   const text = messageText(message);
   const edit = message.parts.find((part): part is DraftEditPart => part.type === 'data-draft_edit');
+  const savedView = message.parts.find(
+    (part): part is SavedViewPart => part.type === 'data-saved_view'
+  );
   return (
     <Message align="end">
       <MessageContent className="w-full items-end gap-1.5">
         <GestureRefChips refs={refs} className="justify-end" />
         {edit ? <UserDraftEdit part={edit} /> : null}
+        {savedView ? <SentSavedView part={savedView} message={message} /> : null}
         {text.trim() ? (
           <Bubble align="end" variant="muted">
             <BubbleContent className="whitespace-pre-wrap">
@@ -155,6 +162,8 @@ export function AssistantMessage({
               return (
                 <GestureProposalCard key={group.key} part={group.part} streaming={streaming} />
               );
+            case 'note':
+              return <NoteSuggestionCard key={group.key} part={group.part} />;
           }
         })}
         {waiting ? <ThinkingLine /> : null}

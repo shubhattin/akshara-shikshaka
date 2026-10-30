@@ -1,11 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useTRPC } from '~/api/client';
+import type { ComponentProps } from 'react';
 import { Button } from '~/components/ui/button';
 import { Skeleton } from '~/components/ui/skeleton';
 import { AgentChat } from './chat/AgentChat';
 
-export function ChatPage({ chatId }: { chatId: string }) {
+type ChatViewProps = Pick<
+  ComponentProps<typeof AgentChat>,
+  'variant' | 'headerStart' | 'onGestureSaved'
+>;
+
+/** A stored chat, loaded and kept in sync: on its own page, or in the editor's agent panel. */
+export function ChatPage({ chatId, ...view }: { chatId: string } & ChatViewProps) {
   const trpc = useTRPC();
   const chat_q = useQuery(
     trpc.agents.get_chat.queryOptions(
@@ -33,6 +40,7 @@ export function ChatPage({ chatId }: { chatId: string }) {
   if (chat_q.isError) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+        {view.headerStart}
         <p className="text-sm text-muted-foreground">{chat_q.error.message}</p>
         <Button
           render={<Link to="/admin/agents" />}
@@ -46,5 +54,5 @@ export function ChatPage({ chatId }: { chatId: string }) {
     );
   }
 
-  return <AgentChat key={chatId} data={chat_q.data} fetchedAt={chat_q.dataUpdatedAt} />;
+  return <AgentChat key={chatId} data={chat_q.data} fetchedAt={chat_q.dataUpdatedAt} {...view} />;
 }

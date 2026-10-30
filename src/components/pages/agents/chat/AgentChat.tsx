@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Ref } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
@@ -8,7 +8,7 @@ import { useTRPC } from '~/api/client';
 import type { AppRouter } from '~/api/trpc_router';
 import { AGENT_KIND_META, type AgentKind } from '~/agents/agent_kinds';
 import { coerceAgentModelId, type AgentModelId } from '~/agents/models';
-import type { DraftEditData } from '~/agents/gesture_creator/schemas';
+import type { DraftEditData, SavedViewData } from '~/agents/gesture_creator/schemas';
 import type { AgentUIMessage } from '~/agents/ui_message';
 import { Button } from '~/components/ui/button';
 import {
@@ -22,6 +22,8 @@ import {
 import { AGENT_SUGGESTIONS } from '../agent_meta';
 import { AgentKindIcon } from '../AgentKindIcon';
 import { ContextDialog } from '../context/ContextDialog';
+import { FocusBar } from '../gesture/FocusBar';
+import { SavedViewButton } from '../gesture/SavedViewDialog';
 import { hasPendingMessage, takePendingMessage } from '../pending_message';
 import { MobileHistoryButton } from '../sidebar/AgentsSidebar';
 import { AgentChatProvider } from './agent_chat_context';
@@ -216,11 +218,21 @@ function TimelineSwitch({
   );
 }
 
+function composerPlaceholder(isCreator: boolean, focused: boolean) {
+  if (focused) return 'Tell the agent how to draw it, or what to fix…';
+  return isCreator
+    ? 'Mention a gesture with @, or tell the agent how to draw…'
+    : 'Ask about gestures, lessons, practice…';
+}
+
 function ComposerBar({
   composerRef,
   replying,
   isCreator,
+  focused,
   model,
+  extraTools,
+  autoFocus,
   onSend,
   onStop,
   onModelChange
@@ -228,7 +240,11 @@ function ComposerBar({
   composerRef: Ref<ComposerHandle>;
   replying: boolean;
   isCreator: boolean;
+  focused: boolean;
   model: AgentModelId;
+  /** More toolbar buttons (a focused chat's "show saved strokes") */
+  extraTools?: ReactNode;
+  autoFocus: boolean;
   onSend: (message: ComposerMessage) => void;
   onStop: () => void;
   onModelChange: (model: AgentModelId) => void;
@@ -241,20 +257,38 @@ function ComposerBar({
       onStop={onStop}
       stopLabel={isCreator ? 'Cancel attempt' : 'Stop'}
       onSend={onSend}
-      placeholder={
-        isCreator
-          ? 'Mention a gesture with @, or tell the agent how to draw…'
-          : 'Ask about gestures, lessons, practice…'
+      mentions={!focused}
+      placeholder={composerPlaceholder(isCreator, focused)}
+      toolbar={
+        <>
+          <ModelPicker value={model} onChange={onModelChange} disabled={replying} />
+          {extraTools}
+        </>
       }
-      toolbar={<ModelPicker value={model} onChange={onModelChange} disabled={replying} />}
-      autoFocus
+      autoFocus={autoFocus}
     />
   );
 }
 
-export function AgentChat({ data, fetchedAt }: { data: AgentChatData; fetchedAt: number }) {
+export function AgentChat({
+  data,
+  fetchedAt,
+  variant = 'page',
+  headerStart,
+  onGestureSaved
+}: {
+  data: AgentChatData;
+  fetchedAt: number;
+  /** `panel`: embedded beside the gesture editor (compact header, no history drawer) */
+  variant?: 'page' | 'panel';
+  /** Leading header content in the panel (its back-to-list button) */
+  headerStart?: ReactNode;
+  onGestureSaved?: (gestureId: number) => void;
+}) {
   const { chat } = data;
   const isCreator = chat.agent_kind === 'gesture_creator';
+  const focusGestureId = chat.focus_gesture_id;
+  const panel = variant === 'panel';
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [model, setModel] = useState<AgentModelId>(() => coerceAgentModelId(chat.model));
@@ -337,6 +371,16 @@ export function AgentChat({ data, fetchedAt }: { data: AgentChatData; fetchedAt:
     void sendMessage({ parts }, { body: { model } });
   };
 
+  /** Saved strokes the admin chose to show (focused chats): sent straight away when idle. */
+  const sendSavedView = (view: SavedViewData, note: string) => {
+    if (replying) return;
+    queue.resume();
+    markSent();
+    const parts: AgentUIMessage['parts'] = [{ type: 'data-saved_view', data: view }];
+    if (note) parts.push({ type: 'text', text: note });
+    void sendMessage({ parts }, { body: { model } });
+  };
+
   /** Composer / suggestion send: straight out when idle, queued while the agent works. */
   const send = (message: ComposerMessage) => {
     if (replying) return queue.enqueue(message);
@@ -388,25 +432,38 @@ export function AgentChat({ data, fetchedAt }: { data: AgentChatData; fetchedAt:
         agentKind: chat.agent_kind,
         replying,
         latestDraftId: latestDraft,
-        sendDraftEdit
+        sendDraftEdit,
+        focusGestureId,
+        sendSavedView,
+        onGestureSaved
       }}
     >
       <div className="flex h-full min-h-0 flex-col">
         <header className="flex items-center gap-2 border-b border-border/70 px-3 py-2">
-          <MobileHistoryButton />
+          {panel ? headerStart : <MobileHistoryButton />}
           <AgentKindIcon kind={chat.agent_kind} size="md" />
           <h1 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
             {chat.title || 'New chat'}
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
-              {AGENT_KIND_META[chat.agent_kind].label}
-            </span>
+            {panel ? null : (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                {focusGestureId === null ? AGENT_KIND_META[chat.agent_kind].label : 'Focused'}
+              </span>
+            )}
           </h1>
           <ChatCost messages={messages} />
-          <Button variant="outline" size="sm" onClick={() => setContextOpen(true)}>
+          <Button
+            variant="outline"
+            size={panel ? 'icon-sm' : 'sm'}
+            aria-label="Context"
+            onClick={() => setContextOpen(true)}
+          >
             <LibraryBigIcon />
-            Context
+            {panel ? null : 'Context'}
           </Button>
         </header>
+        {focusGestureId === null ? null : (
+          <FocusBar gestureId={focusGestureId} messages={messages} compact={panel} />
+        )}
         <BackgroundReplyNotice show={backgroundReply} />
 
         <div className="relative min-h-0 flex-1">
@@ -439,6 +496,13 @@ export function AgentChat({ data, fetchedAt }: { data: AgentChatData; fetchedAt:
             composerRef={composerRef}
             replying={replying}
             isCreator={isCreator}
+            focused={focusGestureId !== null}
+            extraTools={
+              focusGestureId === null ? null : (
+                <SavedViewButton gestureId={focusGestureId} disabled={replying} />
+              )
+            }
+            autoFocus={!panel}
             model={model}
             onSend={send}
             onStop={() => void stopReply()}
@@ -447,7 +511,12 @@ export function AgentChat({ data, fetchedAt }: { data: AgentChatData; fetchedAt:
         </div>
       </div>
 
-      <ContextDialog open={contextOpen} onOpenChange={setContextOpen} agentKind={chat.agent_kind} />
+      <ContextDialog
+        open={contextOpen}
+        onOpenChange={setContextOpen}
+        agentKind={chat.agent_kind}
+        focusGestureId={focusGestureId}
+      />
     </AgentChatProvider>
   );
 }

@@ -9,6 +9,7 @@ import { deliverIfEnabled, markReported, prettyFailureError } from './posthog_er
 const TRPC_CODE_BY_TAG: Partial<Record<KnownError['_tag'], TRPCError['code']>> = {
   NotFoundError: 'NOT_FOUND',
   BadRequestError: 'BAD_REQUEST',
+  ConflictError: 'CONFLICT',
   UnauthorizedError: 'UNAUTHORIZED',
   ConfigError: 'INTERNAL_SERVER_ERROR'
 };
@@ -17,6 +18,7 @@ const toTrpcMessage = (error: KnownError): string => {
   switch (error._tag) {
     case 'NotFoundError':
     case 'BadRequestError':
+    case 'ConflictError':
     case 'ConfigError':
       return error.message;
     case 'UnauthorizedError':
@@ -39,6 +41,8 @@ const httpStatusForError = (error: KnownError): number => {
       return 404;
     case 'BadRequestError':
       return 400;
+    case 'ConflictError':
+      return 409;
     case 'UnauthorizedError':
       return 401;
     default:

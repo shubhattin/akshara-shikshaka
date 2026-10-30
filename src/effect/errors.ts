@@ -55,6 +55,11 @@ export class BadRequestError extends Schema.TaggedError<BadRequestError>()('BadR
   message: Schema.String
 }) {}
 
+/** The record changed since the caller read it (an optimistic-concurrency check failed). */
+export class ConflictError extends Schema.TaggedError<ConflictError>()('ConflictError', {
+  message: Schema.String
+}) {}
+
 export class UnauthorizedError extends Schema.TaggedError<UnauthorizedError>()(
   'UnauthorizedError',
   {
@@ -74,6 +79,7 @@ export const KnownErrorSchema = Schema.Union([
   ConfigError,
   NotFoundError,
   BadRequestError,
+  ConflictError,
   UnauthorizedError
 ]);
 

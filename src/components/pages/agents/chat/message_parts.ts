@@ -15,7 +15,8 @@ export type StepPart =
 export type PartGroup =
   | { kind: 'steps'; key: string; parts: StepPart[] }
   | { kind: 'text'; key: string; text: string }
-  | { kind: 'proposal'; key: string; part: AgentToolPart<'propose_gesture'> };
+  | { kind: 'proposal'; key: string; part: AgentToolPart<'propose_gesture'> }
+  | { kind: 'note'; key: string; part: AgentToolPart<'suggest_gesture_note'> };
 
 const STEP_TYPES = new Set<string>([
   'reasoning',
@@ -27,7 +28,7 @@ const STEP_TYPES = new Set<string>([
 
 const isStep = (part: AgentPart): part is StepPart => STEP_TYPES.has(part.type);
 
-/** Consecutive steps share one trace; text and proposals stand on their own. */
+/** Consecutive steps share one trace; text, proposals and note suggestions stand on their own. */
 export function groupParts(parts: AgentPart[]): PartGroup[] {
   const groups: PartGroup[] = [];
   parts.forEach((part, index) => {
@@ -37,6 +38,8 @@ export function groupParts(parts: AgentPart[]): PartGroup[] {
       else groups.push({ kind: 'steps', key: `steps-${index}`, parts: [part] });
     } else if (part.type === 'tool-propose_gesture') {
       groups.push({ kind: 'proposal', key: `proposal-${index}`, part });
+    } else if (part.type === 'tool-suggest_gesture_note') {
+      groups.push({ kind: 'note', key: `note-${index}`, part });
     } else if (part.type === 'text' && part.text.trim()) {
       groups.push({ kind: 'text', key: `text-${index}`, text: part.text });
     }

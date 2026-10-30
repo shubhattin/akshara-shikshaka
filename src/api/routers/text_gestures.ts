@@ -1,9 +1,14 @@
 import { z } from 'zod';
 import { Effect } from 'effect';
-import { and, eq, inArray } from 'drizzle-orm';
-import { lesson_gestures, text_gestures } from '~/db/schema';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import {
+  agent_chat_gestures,
+  lesson_gestures,
+  text_gesture_revisions,
+  text_gestures
+} from '~/db/schema';
 import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
-import { NotFoundError, BadRequestError } from '~/effect/errors';
+import { NotFoundError, BadRequestError, ConflictError } from '~/effect/errors';
 import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { FONT_FAMILIES, type FontFamily } from '~/state/font_list';
 import { GestureSchema } from '~/tools/stroke_data/types';
@@ -50,6 +55,7 @@ export const addTextGestureData = Effect.fn('addTextGestureData')(function* (inp
   fontFamily: string;
   fontSize: number;
   textCenterOffset: [number, number];
+  userId: string;
 }) {
   const fontFamily = parseFontFamily(input.fontFamily);
   if (!fontFamily) {
@@ -79,10 +85,22 @@ export const addTextGestureData = Effect.fn('addTextGestureData')(function* (inp
         script_id: input.scriptID,
         font_family: fontFamily,
         font_size: input.fontSize,
-        text_center_offset: input.textCenterOffset
+        text_center_offset: input.textCenterOffset,
+        // drawn by an admin in the editor: nothing to review
+        review_status: 'approved'
       })
       .returning();
 
+    await tx.insert(text_gesture_revisions).values({
+      text_gesture_id: inserted.id,
+      revision_no: inserted.revision,
+      gestures: inserted.gestures,
+      font_family: inserted.font_family,
+      font_size: inserted.font_size,
+      text_center_offset: inserted.text_center_offset,
+      source: 'manual',
+      user_id: input.userId
+    });
     await connect_gestures_to_text_lessons(textKey, inserted.id, tx);
     await attach_text_key_to_lesson_categories(textKey, tx);
     return { success: true as const, id: inserted.id, uuid: inserted.uuid };
@@ -100,6 +118,18 @@ export const addTextGestureData = Effect.fn('addTextGestureData')(function* (inp
   return result;
 });
 
+/** Who saved a version and why; written with every save as a `text_gesture_revisions` row. */
+export type GestureSaveProvenance =
+  | { source: 'manual'; userId: string }
+  | { source: 'agent'; userId: string; chatId: string; toolCallId: string }
+  | { source: 'revert'; userId: string; revertedFrom: number };
+
+/**
+ * The one write path for a gesture's strokes and glyph: updates the gesture, bumps its revision
+ * and records the new version. `expectedRevision` is the version the save is based on: a save
+ * based on an older version fails
+ * with a conflict instead of overwriting the newer one.
+ */
 export const editTextGestureData = Effect.fn('editTextGestureData')(function* (input: {
   id: number;
   uuid: string;
@@ -107,6 +137,8 @@ export const editTextGestureData = Effect.fn('editTextGestureData')(function* (i
   fontFamily: string;
   fontSize: number;
   textCenterOffset: [number, number];
+  expectedRevision: number;
+  provenance: GestureSaveProvenance;
 }) {
   const fontFamily = parseFontFamily(input.fontFamily);
   if (!fontFamily) {
@@ -114,25 +146,69 @@ export const editTextGestureData = Effect.fn('editTextGestureData')(function* (i
       BadRequestError.make({ message: `Invalid font family: ${input.fontFamily}` })
     );
   }
-  const updated = yield* dbRunHttp('edit_text_gesture', async (db) => {
-    const rows = await db
+  const { provenance } = input;
+  const outcome = yield* dbTransaction('edit_text_gesture', async (tx) => {
+    const match = and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id));
+    const [row] = await tx
       .update(text_gestures)
       .set({
         gestures: input.gestures,
         font_family: fontFamily,
         font_size: input.fontSize,
         text_center_offset: input.textCenterOffset,
+        revision: sql`${text_gestures.revision} + 1`,
+        // strokes the admin did not draw themselves wait for a review
+        review_status:
+          provenance.source === 'manual' ? sql`${text_gestures.review_status}` : 'unreviewed',
         updated_at: new Date()
       })
-      .where(and(eq(text_gestures.uuid, input.uuid), eq(text_gestures.id, input.id)))
+      .where(and(match, eq(text_gestures.revision, input.expectedRevision)))
       .returning();
-    return rows;
+    if (!row) {
+      const [current] = await tx
+        .select({ revision: text_gestures.revision })
+        .from(text_gestures)
+        .where(match)
+        .limit(1);
+      return current
+        ? ({ ok: false, reason: 'conflict', revision: current.revision } as const)
+        : ({ ok: false, reason: 'missing' } as const);
+    }
+    await tx.insert(text_gesture_revisions).values({
+      text_gesture_id: input.id,
+      revision_no: row.revision,
+      gestures: input.gestures,
+      font_family: fontFamily,
+      font_size: input.fontSize,
+      text_center_offset: input.textCenterOffset,
+      source: provenance.source,
+      user_id: provenance.userId,
+      chat_id: provenance.source === 'agent' ? provenance.chatId : null,
+      tool_call_id: provenance.source === 'agent' ? provenance.toolCallId : null,
+      reverted_from: provenance.source === 'revert' ? provenance.revertedFrom : null
+    });
+    if (provenance.source === 'agent') {
+      await tx
+        .insert(agent_chat_gestures)
+        .values({ chat_id: provenance.chatId, text_gesture_id: input.id, applied_at: new Date() })
+        .onConflictDoUpdate({
+          target: [agent_chat_gestures.chat_id, agent_chat_gestures.text_gesture_id],
+          set: { applied_at: new Date() }
+        });
+    }
+    return { ok: true, revision: row.revision } as const;
   });
 
-  if (updated.length === 0) {
-    return yield* Effect.fail(
-      NotFoundError.make({ resource: 'text_gesture', message: 'Text gesture not found' })
-    );
+  if (!outcome.ok) {
+    return yield* outcome.reason === 'conflict'
+      ? Effect.fail(
+          ConflictError.make({
+            message: `This gesture was saved again since you opened it (now version ${outcome.revision}). Reload to see the latest version.`
+          })
+        )
+      : Effect.fail(
+          NotFoundError.make({ resource: 'text_gesture', message: 'Text gesture not found' })
+        );
   }
 
   yield* invalidateAndRefreshCache({
@@ -142,7 +218,7 @@ export const editTextGestureData = Effect.fn('editTextGestureData')(function* (i
       gesture_uuid: input.uuid
     }
   });
-  return { updated: true as const };
+  return { updated: true as const, revision: outcome.revision };
 });
 
 export const deleteTextGestureData = Effect.fn('deleteTextGestureData')(function* (input: {
@@ -245,7 +321,9 @@ const add_text_gesture_data_route = protectedAdminProcedure
       })
     ])
   )
-  .mutation(async ({ input }) => runTrpcEffect(addTextGestureData(input)));
+  .mutation(async ({ input, ctx }) =>
+    runTrpcEffect(addTextGestureData({ ...input, userId: ctx.user.id }))
+  );
 
 const edit_text_gesture_data_route = protectedAdminProcedure
   .input(
@@ -255,10 +333,16 @@ const edit_text_gesture_data_route = protectedAdminProcedure
       gestures: GestureSchema.array(),
       fontFamily: z.string().min(1),
       fontSize: z.int(),
-      textCenterOffset: z.tuple([z.number(), z.number()])
+      textCenterOffset: z.tuple([z.number(), z.number()]),
+      /** The revision the editor loaded; a newer one saved meanwhile is a conflict. */
+      expectedRevision: z.int().positive()
     })
   )
-  .mutation(async ({ input }) => runTrpcEffect(editTextGestureData(input)));
+  .mutation(async ({ input, ctx }) =>
+    runTrpcEffect(
+      editTextGestureData({ ...input, provenance: { source: 'manual', userId: ctx.user.id } })
+    )
+  );
 
 const delete_text_gesture_data_route = protectedAdminProcedure
   .input(z.object({ id: z.number(), uuid: z.uuid(), script_id: z.int() }))

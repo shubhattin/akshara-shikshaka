@@ -32,7 +32,7 @@ export function BatchStatusBadge({ status, stuck }: { status: BatchItemStatus; s
   if (stuck) {
     return (
       <span
-        title="Running longer than the 14 min a run may take: it was killed, re-run it"
+        title="Running longer than a run may take (about 14 min): it was killed, re-run it"
         className="shrink-0 rounded-md border border-destructive/40 px-1.5 py-px text-[11px] leading-4 font-medium text-destructive"
       >
         Stuck

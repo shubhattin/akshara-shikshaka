@@ -25,7 +25,8 @@ import {
 import { agent_model_id_schema } from '~/agents/models';
 import { proposed_gesture_schema, type ProposedGesture } from '~/agents/gesture_creator/schemas';
 import type { AgentUIMessage } from '~/agents/ui_message';
-import { createAgentChat, loadAgentMessages, requestChatStop } from './chat_store';
+import { appRuntime } from '~/effect/runtime';
+import { createAgentChat, liveStreaming, loadAgentMessages, requestChatStop } from './chat_store';
 import { getGestureForAgent, saveProposal } from './gestures';
 import { listSiblingGestures, setGestureReview } from './gesture_review';
 import { startAgentTurn } from './run_turn';
@@ -60,15 +61,28 @@ const updateItem = (itemId: number, set: Partial<typeof agent_batch_items.$infer
     client.update(agent_batch_items).set(set).where(eq(agent_batch_items.id, itemId)).returning()
   );
 
-/** USD the batch's runs have cost so far. */
-const batchSpent = Effect.fn('batches.spent')(function* (batchId: number) {
+/**
+ * USD the batch has cost so far, counting each other run in flight at the mean cost of the
+ * finished ones (a run's cost is only known once it ends). Runs that start together can still
+ * overshoot the budget by about one run each.
+ */
+const batchSpent = Effect.fn('batches.spent')(function* (batchId: number, ownItemId: number) {
   const [row] = yield* dbRunHttp('batches.spent', (client) =>
     client
-      .select({ spent: sql<number>`coalesce(sum(${agent_batch_items.cost}), 0)`.mapWith(Number) })
+      .select({
+        spent: sql<number>`coalesce(sum(${agent_batch_items.cost}), 0)`.mapWith(Number),
+        mean: sql<number>`coalesce(avg(${agent_batch_items.cost}) filter (where ${agent_batch_items.finished_at} is not null and ${agent_batch_items.cost} > 0), 0)`.mapWith(
+          Number
+        ),
+        running:
+          sql<number>`count(*) filter (where ${agent_batch_items.status} = 'running' and ${agent_batch_items.id} <> ${ownItemId})`.mapWith(
+            Number
+          )
+      })
       .from(agent_batch_items)
       .where(eq(agent_batch_items.batch_id, batchId))
   );
-  return row?.spent ?? 0;
+  return row ? row.spent + row.mean * row.running : 0;
 });
 
 // ---------------------------------------------------------------- dispatch
@@ -123,6 +137,9 @@ export const createBatch = Effect.fn('batches.create')(function* (
   if (!model.success) {
     return yield* Effect.fail(BadRequestError.make({ message: 'Unknown model' }));
   }
+  // no public URL to deliver to: refuse before anything is stored
+  const qstash = yield* QStashPublisher;
+  yield* qstash.ready;
   const gestureIds = [...new Set(input.gesture_ids)];
   const gestures = yield* dbRunHttp('batches.create_gestures', (client) =>
     client
@@ -154,9 +171,18 @@ export const createBatch = Effect.fn('batches.create')(function* (
       .values(gestures.map((g) => ({ batch_id: batch!.id, text_gesture_id: g.id })))
       .returning()
   );
+  // A batch whose messages never went out would sit queued forever: drop it (items cascade).
   yield* dispatchItems(
     batch!,
     items.map((item) => item.id)
+  ).pipe(
+    Effect.tapError(() =>
+      Effect.ignore(
+        dbRunHttp('batches.drop_undispatched', (client) =>
+          client.delete(agent_batches).where(eq(agent_batches.id, batch!.id)).returning()
+        )
+      )
+    )
   );
   return { batch_id: batch!.id, items: items.length };
 });
@@ -196,7 +222,11 @@ const claimItem = Effect.fn('batches.claim')(function* (itemId: number) {
   return item ?? null;
 });
 
-const batchMessageId = (itemId: number) => `batch-item-${itemId}`;
+/**
+ * A new message per run: a re-run adds a turn to the chat instead of replacing its history
+ * (which may hold messages an admin sent since).
+ */
+const batchMessageId = (itemId: number) => `batch-item-${itemId}-${Date.now()}`;
 
 /** The run's first message: the batch prompt, and the reference it asks for. */
 const firstMessage = Effect.fn('batches.first_message')(function* (
@@ -225,6 +255,8 @@ const firstMessage = Effect.fn('batches.first_message')(function* (
   }
   return { id: batchMessageId(item.id), role: 'user' as const, parts };
 });
+
+const CANCEL_POLL_MS = 5_000;
 
 const lastProposal = (messages: AgentUIMessage[]) => {
   for (const message of [...messages].reverse()) {
@@ -302,7 +334,7 @@ export const runBatchItem = Effect.fn('batches.run_item')(function* (
     );
 
   if (batch.cancelled_at) return yield* finish('cancelled', { error: 'The batch was cancelled' });
-  if (batch.budget_usd !== null && (yield* batchSpent(batch.id)) >= batch.budget_usd) {
+  if (batch.budget_usd !== null && (yield* batchSpent(batch.id, item.id)) >= batch.budget_usd) {
     return yield* finish('cancelled', { error: 'The batch reached its budget' });
   }
 
@@ -338,7 +370,21 @@ export const runBatchItem = Effect.fn('batches.run_item')(function* (
       model: batch.model,
       withClientStream: false
     });
-    const outcome = yield* Effect.promise(() => turn.done);
+    // A cancel while the reply streams stops it (cancelBatch's stop may have landed before the
+    // reply started, when there was nothing to stop yet).
+    const runId = chatId;
+    const watchCancel = setInterval(() => {
+      void appRuntime
+        .runPromise(
+          findBatch(batch.id).pipe(
+            Effect.flatMap((latest) => (latest.cancelled_at ? requestChatStop(runId) : Effect.void))
+          )
+        )
+        .catch(() => undefined);
+    }, CANCEL_POLL_MS);
+    const outcome = yield* Effect.promise(() => turn.done).pipe(
+      Effect.ensuring(Effect.sync(() => clearInterval(watchCancel)))
+    );
     const messages = yield* loadAgentMessages(chatId);
     const cost = chatCost(messages);
 
@@ -401,7 +447,15 @@ export const markItemUndeliverable = Effect.fn('batches.mark_undeliverable')(fun
       .where(
         and(
           eq(agent_batch_items.id, itemId),
-          inArray(agent_batch_items.status, ['queued', 'running'])
+          or(
+            eq(agent_batch_items.status, 'queued'),
+            // a live run (a duplicate delivery used up the retries) finishes on its own; a
+            // dead one shows as stuck once stale
+            and(
+              eq(agent_batch_items.status, 'running'),
+              lt(agent_batch_items.started_at, new Date(Date.now() - STALE_RUN_MS))
+            )
+          )
         )
       )
       .returning()
@@ -451,20 +505,12 @@ export const rerunItems = Effect.fn('batches.rerun')(function* (input: {
   itemIds?: number[];
 }) {
   const batch = yield* findBatch(input.batchId);
-  if (batch.cancelled_at) {
-    yield* dbRunHttp('batches.uncancel', (client) =>
-      client
-        .update(agent_batches)
-        .set({ cancelled_at: null })
-        .where(eq(agent_batches.id, batch.id))
-        .returning()
-    );
-  }
   const staleBefore = new Date(Date.now() - STALE_RUN_MS);
   const requeued = yield* dbRunHttp('batches.requeue', (client) =>
     client
       .update(agent_batch_items)
-      .set({ status: 'queued', error: null, finished_at: null })
+      // a fresh cycle: its own QStash retries
+      .set({ status: 'queued', error: null, finished_at: null, attempts: 0 })
       .where(
         and(
           eq(agent_batch_items.batch_id, batch.id),
@@ -474,12 +520,29 @@ export const rerunItems = Effect.fn('batches.rerun')(function* (input: {
             and(
               eq(agent_batch_items.status, 'running'),
               lt(agent_batch_items.started_at, staleBefore)
+            ),
+            // queued long ago and never run: its message was lost
+            and(
+              eq(agent_batch_items.status, 'queued'),
+              lt(
+                sql`coalesce(${agent_batch_items.started_at}, ${agent_batch_items.created_at})`,
+                staleBefore
+              )
             )
           )
         )
       )
       .returning()
   );
+  if (requeued.length > 0 && batch.cancelled_at) {
+    yield* dbRunHttp('batches.uncancel', (client) =>
+      client
+        .update(agent_batches)
+        .set({ cancelled_at: null })
+        .where(eq(agent_batches.id, batch.id))
+        .returning()
+    );
+  }
   yield* dispatchItems(
     { ...batch, cancelled_at: null },
     requeued.map((row) => row.id)
@@ -638,7 +701,7 @@ export const getBatch = Effect.fn('batches.get')(function* (batchId: number) {
         script_id: text_gestures.script_id,
         status: agent_batch_items.status,
         chat_id: agent_batch_items.chat_id,
-        chat_streaming: agent_chats.streaming,
+        chat_streaming: liveStreaming,
         cost: agent_batch_items.cost,
         error: agent_batch_items.error,
         attempts: agent_batch_items.attempts,

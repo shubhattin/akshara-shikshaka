@@ -9,6 +9,7 @@ import {
   BATCH_REFERENCE_META,
   BATCH_REFERENCES,
   DEFAULT_BATCH_PROMPT,
+  MAX_BATCH_GESTURES,
   type BatchAutoApply,
   type BatchReference
 } from '~/agents/batch';
@@ -77,6 +78,10 @@ export function StartBatchDialog({
       Math.max(BATCH_PARALLELISM.min, Math.floor(parallelism) || BATCH_PARALLELISM.default)
     );
     const trimmedTitle = title.trim();
+    if (gestureIds.length > MAX_BATCH_GESTURES) {
+      toast.error(`A batch takes at most ${MAX_BATCH_GESTURES} gestures; select fewer.`);
+      return;
+    }
     const trimmedPrompt = prompt.trim();
     if (!trimmedPrompt) {
       toast.error('The prompt cannot be empty.');

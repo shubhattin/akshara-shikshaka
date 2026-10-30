@@ -42,6 +42,8 @@ export class QStashPublisher extends Context.Service<
   {
     /** False outside production: batches then run in-process (QStash cannot reach localhost). */
     readonly enabled: boolean;
+    /** Fails when QStash is on but there is no public URL to deliver to. */
+    readonly ready: Effect.Effect<void, ConfigError>;
     /**
      * One message per batch item, delivered at most `parallelism` at a time, retried on 5xx and
      * reported to the failure callback once retries run out. Returns the QStash message id per
@@ -79,6 +81,7 @@ export class QStashPublisher extends Context.Service<
 
       return {
         enabled,
+        ready: enabled ? Effect.asVoid(siteUrl()) : Effect.void,
         publishBatchItems: ({ batchId, items, parallelism, retries, timeoutSeconds }) =>
           Effect.gen(function* () {
             if (items.length === 0) return [];

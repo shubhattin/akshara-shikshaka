@@ -61,7 +61,8 @@ const isProductionDeployment = (env: NodeJS.ProcessEnv): boolean =>
   env.VERCEL_ENV === 'production' ||
   (env.VERCEL_ENV === undefined && env.NODE_ENV === 'production');
 
-const resolveSiteUrl = (env: NodeJS.ProcessEnv): string | undefined => {
+/** Public origin of this deployment; QStash publishing and its signature check share it. */
+export const resolveSiteUrl = (env: NodeJS.ProcessEnv): string | undefined => {
   const url =
     env.VITE_BASE_URL ??
     (env.VERCEL_PROJECT_PRODUCTION_URL

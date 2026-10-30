@@ -180,20 +180,26 @@ export function BatchReviewGrid({ batchId }: { batchId: number }) {
   const acceptSelected = async () => {
     setBulkPending(true);
     let ok = 0;
-    let failed = 0;
+    // the ones that failed stay selected, with the first reason shown
+    const failed: number[] = [];
+    let firstError = '';
     for (const itemId of selected) {
       try {
         await bulk_mut.mutateAsync({ item_id: itemId, approve: true });
         ok += 1;
-      } catch {
-        failed += 1;
+      } catch (error) {
+        failed.push(itemId);
+        if (!firstError && error instanceof Error) firstError = error.message;
       }
     }
-    setSelected([]);
+    setSelected(failed);
     setBulkPending(false);
     invalidateBatch(queryClient, trpc, batchId);
-    if (failed === 0) toast.success(`Accepted ${ok} proposals`);
-    else toast.error(`Accepted ${ok}, ${failed} failed`);
+    if (failed.length === 0) toast.success(`Accepted ${ok} proposals`);
+    else
+      toast.error(`Accepted ${ok}; ${failed.length} failed (still selected)`, {
+        description: firstError || undefined
+      });
   };
 
   if (proposals_q.isPending) {

@@ -1,17 +1,12 @@
 import { Receiver } from '@upstash/qstash';
+import { resolveSiteUrl } from '~/effect/config';
 import { qstashTargetUrl, type QstashPath } from '~/effect/qstash';
 
 type VerifyOk = { ok: true; body: unknown };
 type VerifyFail = { ok: false; response: Response };
 export type VerifyQstashResult = VerifyOk | VerifyFail;
 
-const siteUrl = () =>
-  (
-    process.env.VITE_BASE_URL ??
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : undefined)
-  )?.replace(/\/+$/, '');
+const siteUrl = () => resolveSiteUrl(process.env);
 
 /**
  * Verify the QStash signature and return the parsed JSON body, or a 401 Response.

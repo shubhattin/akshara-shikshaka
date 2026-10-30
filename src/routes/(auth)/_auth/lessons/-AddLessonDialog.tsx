@@ -97,11 +97,9 @@ export default function AddLessonDialog({ open, onOpenChange, init_lang_id }: Pr
     trpc.text_lessons.add_text_lesson.mutationOptions({
       onSuccess: async (data) => {
         toast.success('Lesson created');
+        // it lands uncategorized, or in the category its gestures already sit in
         await queryClient.invalidateQueries(
-          trpc.text_lessons.categories.get_text_lessons.queryFilter({
-            category_id: 0,
-            lang_id: langId
-          })
+          trpc.text_lessons.categories.get_text_lessons.pathFilter()
         );
         setConfirmOpen(false);
         onOpenChange(false);

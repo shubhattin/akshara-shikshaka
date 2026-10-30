@@ -26,17 +26,7 @@ import type { lesson_categories } from '~/db/schema';
 import type { InferSelectModel } from 'drizzle-orm';
 import { useHydrateAtoms } from 'jotai/react/utils';
 import { atom, useAtom, useAtomValue } from 'jotai';
-import {
-  ChevronsUpDown,
-  GripVertical,
-  Plus,
-  ArrowUpFromLine,
-  ArrowDownToLine,
-  Minus,
-  ArrowRightLeft,
-  Undo2,
-  Pencil
-} from 'lucide-react';
+import { ArrowRightLeft, ArrowUpRight, ChevronsUpDown, Plus, Undo2 } from 'lucide-react';
 import {
   Command,
   CommandEmpty,
@@ -64,28 +54,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '~/components/ui/alert-dialog';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger
-} from '~/components/ui/accordion';
 import { Label } from '~/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
 import { toast } from 'sonner';
@@ -304,7 +272,7 @@ function ListGestures({
       </div>
 
       {selectedCategoryID !== null && category_gestures_q.data ? (
-        <EditCategoryGesturesDialog
+        <MoveCategoryGesturesDialog
           open={editOpen}
           onOpenChange={setEditOpen}
           category_id={selectedCategoryID}
@@ -337,8 +305,8 @@ function ListGestures({
                   onClick={() => setEditOpen(true)}
                   className="border-sky-500 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-200"
                 >
-                  <Pencil data-icon="inline-start" />
-                  Edit Order
+                  <ArrowRightLeft data-icon="inline-start" />
+                  Move gestures
                 </Button>
               }
             />
@@ -353,6 +321,7 @@ type GestureItem = {
   id: number;
   text: string;
   text_key: string;
+  lesson_id: number | null;
   order: number | null;
   updated_at: Date;
   stroke_count: number;
@@ -366,21 +335,6 @@ function splitGestures(gestures: GestureItem[]) {
     .filter((g) => g.order !== null)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   return { ordered, unordered };
-}
-
-function draftSignature(
-  ordered: GestureItem[],
-  unordered: GestureItem[],
-  pendingMoves: PendingMove[]
-) {
-  return JSON.stringify({
-    ordered: ordered.map((g) => ({ id: g.id, order: g.order })),
-    unordered: unordered.map((g) => g.id),
-    pendingMoves: pendingMoves.map((m) => ({
-      id: m.id,
-      target_category_id: m.target_category_id
-    }))
-  });
 }
 
 type StrokeFilter = 'all' | 'recorded' | 'empty';
@@ -489,7 +443,7 @@ function DisplayGesturesSection({
   );
 }
 
-function EditCategoryGesturesDialog({
+function MoveCategoryGesturesDialog({
   open,
   onOpenChange,
   category_id,
@@ -511,46 +465,23 @@ function EditCategoryGesturesDialog({
   const scriptId = useAtomValue(script_id_atom);
   const langId = useAtomValue(lang_id_atom);
 
-  const [ordered, setOrdered] = useState<GestureItem[]>([]);
-  const [unordered, setUnordered] = useState<GestureItem[]>([]);
   const [pendingMoves, setPendingMoves] = useState<PendingMove[]>([]);
-  const [baselineSig, setBaselineSig] = useState('');
-  const [baselineOrdered, setBaselineOrdered] = useState<GestureItem[]>([]);
-  const [baselineUnordered, setBaselineUnordered] = useState<GestureItem[]>([]);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    if (type === 'uncategorized') {
-      setOrdered([]);
-      setUnordered(gestures.map((g) => ({ ...g })));
-      setBaselineOrdered([]);
-      setBaselineUnordered(gestures.map((g) => ({ ...g })));
-      setPendingMoves([]);
-      setBaselineSig(draftSignature([], gestures, []));
-    } else {
-      const split = splitGestures(gestures);
-      const o = split.ordered.map((g) => ({ ...g }));
-      const u = split.unordered.map((g) => ({ ...g }));
-      setOrdered(o);
-      setUnordered(u);
-      setBaselineOrdered(o.map((g) => ({ ...g })));
-      setBaselineUnordered(u.map((g) => ({ ...g })));
-      setPendingMoves([]);
-      setBaselineSig(draftSignature(o, u, []));
-    }
+    setPendingMoves([]);
     setDiscardOpen(false);
     setConfirmSaveOpen(false);
-    // Only seed draft when the dialog opens — ignore mid-edit query updates.
+    // Only reset the draft when the dialog opens — ignore mid-edit query updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional open-only sync
   }, [open]);
 
-  const isDirty = useMemo(
-    () => draftSignature(ordered, unordered, pendingMoves) !== baselineSig,
-    [ordered, unordered, pendingMoves, baselineSig]
-  );
+  // gestures already moved out are hidden from the list until saved or undone
+  const remaining = gestures.filter((g) => !pendingMoves.some((m) => m.id === g.id));
+  const isDirty = pendingMoves.length > 0;
 
   const categoryNameById = useMemo(() => {
     const map = new Map<number, string>();
@@ -577,18 +508,10 @@ function EditCategoryGesturesDialog({
   }
 
   function handleUndoAll() {
-    setOrdered(baselineOrdered.map((g) => ({ ...g })));
-    setUnordered(baselineUnordered.map((g) => ({ ...g })));
     setPendingMoves([]);
   }
 
-  function removeFromLists(id: number) {
-    setOrdered((prev) => prev.filter((x) => x.id !== id).map((x, i) => ({ ...x, order: i + 1 })));
-    setUnordered((prev) => prev.filter((x) => x.id !== id));
-  }
-
   function handleMoveToCategory(item: GestureItem, target_category_id: number | null) {
-    removeFromLists(item.id);
     setPendingMoves((prev) => [
       ...prev.filter((m) => m.id !== item.id),
       { ...item, order: null, target_category_id }
@@ -597,15 +520,10 @@ function EditCategoryGesturesDialog({
 
   function undoPendingMove(move: PendingMove) {
     setPendingMoves((prev) => prev.filter((m) => m.id !== move.id));
-    const { target_category_id: _, ...item } = move;
-    setUnordered((prev) => [item, ...prev]);
   }
 
   const add_to_category_mut = useMutation(
     trpc.text_gestures.categories.add_update_gesture_category.mutationOptions()
-  );
-  const save_order_mut = useMutation(
-    trpc.text_gestures.categories.update_gestures_order.mutationOptions()
   );
 
   async function runSave() {
@@ -619,32 +537,18 @@ function EditCategoryGesturesDialog({
         });
       }
 
-      if (category_id > 0) {
-        const remaining = [...ordered, ...unordered];
-        if (remaining.length > 0) {
-          const orderChanged =
-            draftSignature(ordered, unordered, []) !==
-            draftSignature(baselineOrdered, baselineUnordered, []);
-          if (orderChanged || pendingMoves.length > 0) {
-            await save_order_mut.mutateAsync({
-              category_id,
-              gestures: remaining.map((g) => ({ id: g.id, order: g.order }))
-            });
-          }
-        }
-      }
-
-      const remainingForCache = [...ordered, ...unordered];
       queryClient.setQueryData(
         trpc.text_gestures.categories.get_gestures.queryKey({
           category_id,
           script_id: scriptId,
           lang_id: langId
         }),
-        {
-          type: category_id === 0 ? 'uncategorized' : 'categorized',
-          gestures: remainingForCache
-        }
+        category_id === 0
+          ? {
+              type: 'uncategorized' as const,
+              gestures: remaining.map((g) => ({ ...g, order: null }))
+            }
+          : { type: 'categorized' as const, gestures: remaining }
       );
 
       // a move changes the key's category in every script
@@ -666,9 +570,11 @@ function EditCategoryGesturesDialog({
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="flex h-[min(90vh,720px)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl lg:max-w-5xl">
           <DialogHeader className="shrink-0 border-b p-4 pr-12">
-            <DialogTitle>Edit {categoryName}</DialogTitle>
+            <DialogTitle>Move gestures in {categoryName}</DialogTitle>
             <DialogDescription>
-              Reorder, unorder, or move gestures. Changes are draft until you save.
+              Gestures with a lesson follow the lesson&apos;s category and order — move the lesson
+              to move them. Only gestures without a lesson can be moved here. Changes are draft
+              until you save.
             </DialogDescription>
           </DialogHeader>
 
@@ -682,22 +588,11 @@ function EditCategoryGesturesDialog({
                 />
               )}
 
-              {type === 'uncategorized' ? (
-                <DraftUncatGesturesEditor
-                  items={unordered}
-                  onMove={handleMoveToCategory}
-                  excludeCategoryId={0}
-                />
-              ) : (
-                <DraftCategorizedGesturesEditor
-                  ordered={ordered}
-                  unordered={unordered}
-                  setOrdered={setOrdered}
-                  setUnordered={setUnordered}
-                  category_id={category_id}
-                  onMove={handleMoveToCategory}
-                />
-              )}
+              <MoveGesturesList
+                items={remaining}
+                excludeCategoryId={type === 'uncategorized' ? 0 : category_id}
+                onMove={handleMoveToCategory}
+              />
             </div>
           </div>
 
@@ -750,7 +645,7 @@ function EditCategoryGesturesDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Save these changes?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will apply order and category changes for this list.
+              This will apply category changes for the moved gestures.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -880,21 +775,27 @@ function DraftAssignCategoryDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Button size="icon" variant="ghost" onClick={() => setOpen(true)}>
+      <Button
+        size="icon"
+        variant="ghost"
+        title="Move to another category"
+        aria-label="Move to another category"
+        onClick={() => setOpen(true)}
+      >
         {isMove ? <ArrowRightLeft /> : <Plus />}
       </Button>
     </>
   );
 }
 
-function DraftUncatGesturesEditor({
+function MoveGesturesList({
   items,
-  onMove,
-  excludeCategoryId
+  excludeCategoryId,
+  onMove
 }: {
   items: GestureItem[];
-  onMove: (item: GestureItem, target: number | null) => void;
   excludeCategoryId: number;
+  onMove: (item: GestureItem, target: number | null) => void;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -902,11 +803,26 @@ function DraftUncatGesturesEditor({
         <Card key={g.id} className="p-0">
           <CardContent className="flex items-center justify-between gap-3 p-3">
             <span className="truncate font-medium">{g.text}</span>
-            <DraftAssignCategoryDialog
-              itemId={g.id}
-              excludeCategoryId={excludeCategoryId}
-              onSelect={(target) => onMove(g, target)}
-            />
+            {g.lesson_id === null ? (
+              <DraftAssignCategoryDialog
+                itemId={g.id}
+                excludeCategoryId={excludeCategoryId}
+                isMove={excludeCategoryId > 0}
+                onSelect={(target) => onMove(g, target)}
+              />
+            ) : (
+              <Link
+                to="/lessons/edit/$id"
+                params={{ id: String(g.lesson_id) }}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open the lesson this gesture follows in a new tab"
+                className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                Follows lesson
+                <ArrowUpRight className="size-3.5" />
+              </Link>
+            )}
           </CardContent>
         </Card>
       ))}
@@ -914,169 +830,5 @@ function DraftUncatGesturesEditor({
         <div className="text-sm text-muted-foreground">No gestures in this list.</div>
       )}
     </div>
-  );
-}
-
-function DraftCategorizedGesturesEditor({
-  ordered,
-  unordered,
-  setOrdered,
-  setUnordered,
-  category_id,
-  onMove
-}: {
-  ordered: GestureItem[];
-  unordered: GestureItem[];
-  setOrdered: React.Dispatch<React.SetStateAction<GestureItem[]>>;
-  setUnordered: React.Dispatch<React.SetStateAction<GestureItem[]>>;
-  category_id: number;
-  onMove: (item: GestureItem, target: number | null) => void;
-}) {
-  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
-
-  function onDragEnd(e: DragEndEvent) {
-    const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const oldIndex = ordered.findIndex((x) => x.id === Number(active.id));
-    const newIndex = ordered.findIndex((x) => x.id === Number(over.id));
-    const moved = arrayMove(ordered, oldIndex, newIndex).map((g, idx) => ({
-      ...g,
-      order: idx + 1
-    }));
-    setOrdered(moved);
-  }
-
-  function sendToTop(item: GestureItem) {
-    setUnordered((prev) => prev.filter((x) => x.id !== item.id));
-    setOrdered((prev) => [{ ...item, order: 1 }, ...prev.map((x, i) => ({ ...x, order: i + 2 }))]);
-  }
-  function sendToBottom(item: GestureItem) {
-    setUnordered((prev) => prev.filter((x) => x.id !== item.id));
-    setOrdered((prev) => [...prev, { ...item, order: prev.length + 1 }]);
-  }
-
-  return (
-    <div className="flex flex-col gap-6">
-      <Accordion defaultValue={['unordered']}>
-        <AccordionItem value="unordered">
-          <AccordionTrigger className="text-base font-semibold">Unordered</AccordionTrigger>
-          <AccordionContent>
-            <div className="flex max-h-[40vh] flex-col gap-2 overflow-y-auto pr-1">
-              {unordered.map((g) => (
-                <Card key={g.id} className="p-0">
-                  <CardContent className="flex flex-wrap items-center justify-between gap-3 p-3">
-                    <span className="font-medium">{g.text}</span>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => sendToTop(g)}>
-                        <ArrowUpFromLine data-icon="inline-start" /> To Top
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => sendToBottom(g)}>
-                        <ArrowDownToLine data-icon="inline-start" /> To Bottom
-                      </Button>
-                      <DraftAssignCategoryDialog
-                        itemId={g.id}
-                        excludeCategoryId={category_id}
-                        isMove
-                        onSelect={(target) => onMove(g, target)}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {unordered.length === 0 && (
-                <div className="text-sm text-muted-foreground">No unordered gestures.</div>
-              )}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
-
-      <div className="flex flex-col gap-3">
-        <h3 className="text-base font-semibold">Ordered</h3>
-        {ordered.length > 0 ? (
-          <div className="max-h-[40vh] overflow-y-auto pr-1">
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-              <SortableContext
-                items={ordered.map((g) => String(g.id))}
-                strategy={verticalListSortingStrategy}
-              >
-                <ul className="flex flex-col gap-2">
-                  {ordered.map((g) => (
-                    <DraftOrderedGestureCard
-                      key={g.id}
-                      item={g}
-                      category_id={category_id}
-                      onUnorder={() => {
-                        setOrdered((prev) =>
-                          prev.filter((x) => x.id !== g.id).map((x, i) => ({ ...x, order: i + 1 }))
-                        );
-                        setUnordered((prev) => [{ ...g, order: null }, ...prev]);
-                      }}
-                      onMove={onMove}
-                    />
-                  ))}
-                </ul>
-              </SortableContext>
-            </DndContext>
-          </div>
-        ) : (
-          <div className="text-sm text-muted-foreground">No ordered gestures.</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DraftOrderedGestureCard({
-  item,
-  category_id,
-  onUnorder,
-  onMove
-}: {
-  item: GestureItem;
-  category_id: number;
-  onUnorder: () => void;
-  onMove: (item: GestureItem, target: number | null) => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: String(item.id)
-  });
-  // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.9 : 1
-  } as React.CSSProperties;
-  return (
-    <li>
-      <Card
-        ref={setNodeRef}
-        style={style}
-        className={isDragging ? 'p-0 ring-2 ring-primary' : 'p-0'}
-      >
-        <CardContent className="flex items-center gap-3 p-2">
-          <button
-            aria-label="Drag"
-            className="inline-flex h-8 w-6 cursor-grab items-center justify-center rounded border bg-background active:cursor-grabbing"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical />
-          </button>
-          <span className="truncate">{item.text}</span>
-          <div className="ml-auto flex items-center gap-1">
-            <Button size="icon" variant="ghost" onClick={onUnorder}>
-              <Minus />
-            </Button>
-            <DraftAssignCategoryDialog
-              itemId={item.id}
-              excludeCategoryId={category_id}
-              isMove
-              onSelect={(target) => onMove(item, target)}
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </li>
   );
 }

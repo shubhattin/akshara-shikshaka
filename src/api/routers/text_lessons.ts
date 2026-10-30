@@ -55,9 +55,22 @@ export const addTextLesson = Effect.fn('addTextLesson')(function* (input: {
       return { ok: false as const, reason: 'already_exists' as const };
     }
 
+    // the key's gestures may already sit in a category of this language: the lesson joins it
+    // (unordered), as a key's gestures always follow its lesson
+    const gesture_category = await tx.query.gesture_text_key_lesson_category_join.findFirst({
+      columns: { lesson_category_id: true },
+      where: (tbl, { and, eq }) => and(eq(tbl.gesture_text_key, text_key), eq(tbl.lang_id, lang_id))
+    });
     const [inserted] = await tx
       .insert(text_lessons)
-      .values({ lang_id, base_word_script_id, audio_id, text, text_key })
+      .values({
+        lang_id,
+        base_word_script_id,
+        audio_id,
+        text,
+        text_key,
+        category_id: gesture_category?.lesson_category_id ?? null
+      })
       .returning();
 
     const addedWords =
@@ -90,6 +103,12 @@ export const addTextLesson = Effect.fn('addTextLesson')(function* (input: {
     cache: CACHE.lessons.text_lesson_info,
     params: { lesson_id: outcome.result.id }
   });
+  if (outcome.result.category_id) {
+    yield* invalidateAndRefreshCache({
+      cache: CACHE.lessons.category_lesson_list,
+      params: { category_id: outcome.result.category_id }
+    });
+  }
 
   return {
     id: outcome.result.id,

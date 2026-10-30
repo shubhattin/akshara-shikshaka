@@ -134,6 +134,13 @@
       "when": 1793354452975,
       "tag": "0018_gesture_revisions_focus_chats",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793376717963,
+      "tag": "0019_gesture_order_from_lessons",
+      "breakpoints": true
     }
   ]
 }

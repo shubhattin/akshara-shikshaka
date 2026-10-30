@@ -19,9 +19,9 @@
  * 3. a gesture for every item in every `FONT_SCRIPTS` script that can write it on its own
  *    (new ones have no strokes yet, for the Gesture Creator to fill),
  * 4. the item's key in its category (`gesture_text_key_lesson_category_join`) and the
- *    lesson ↔ gesture links (`lesson_gestures`), as the app does when adding lessons/gestures,
- * 5. gesture orders per category and script follow `ALPHABET`; other keys in the category
- *    (e.g. Telugu/Kannada short e, o) come after, in their current order.
+ *    lesson ↔ gesture links (`lesson_gestures`), as the app does when adding lessons/gestures.
+ * Gestures take the order of their lesson, so they follow `ALPHABET` in every script; other keys
+ * in the category without a Sanskrit lesson (e.g. Telugu/Kannada short e, o) stay unordered.
  * Anything else (lessons or keys outside `ALPHABET`) is only reported.
  * Before writing, the touched tables are saved to `../out/seed_sanskrit_alphabet_<mode>_<time>.json`.
  */
@@ -131,7 +131,6 @@ const readState = async (tx: Tx) => ({
       text: text_gestures.text,
       text_key: text_gestures.text_key,
       script_id: text_gestures.script_id,
-      order: text_gestures.order,
       strokes: sql<number>`jsonb_array_length(${text_gestures.gestures})`.mapWith(Number)
     })
     .from(text_gestures)
@@ -141,9 +140,6 @@ const readState = async (tx: Tx) => ({
   })
 });
 type State = Awaited<ReturnType<typeof readState>>;
-
-const scriptName = (id: number) =>
-  Object.entries(script_list_obj).find(([, sid]) => sid === id)?.[0] ?? `${id}`;
 
 const printTable = (title: string, rows: object[]) => {
   console.log(chalk.bold(`\n${title} (${rows.length})`));
@@ -182,7 +178,7 @@ const writeBackup = async (state: State) => {
       {
         lesson_categories: state.categories,
         text_lessons: state.lessons,
-        text_gestures: state.gestures.map(({ id, text_key, order }) => ({ id, text_key, order })),
+        text_gestures: state.gestures.map(({ id, text_key }) => ({ id, text_key })),
         gesture_text_key_lesson_category_join: state.joins
       },
       null,
@@ -402,8 +398,8 @@ const seedGestures = async (
   console.table(rows);
 };
 
-/** 4. Keys into their categories and lesson ↔ gesture links; 5. gesture orders. */
-const linkAndOrder = async (tx: Tx, before: State, categoryId: Map<string, number>) => {
+/** 4. Keys into their categories and lesson ↔ gesture links. */
+const linkGestures = async (tx: Tx, before: State, categoryId: Map<string, number>) => {
   const joinChanges = [];
   const joins: (typeof gesture_text_key_lesson_category_join.$inferInsert)[] = [];
   for (const item of ITEMS) {
@@ -437,52 +433,20 @@ const linkAndOrder = async (tx: Tx, before: State, categoryId: Map<string, numbe
     RETURNING text_gesture_id
   `);
   console.log(chalk.bold(`\nLesson ↔ gesture links added: ${links.length}`));
-
-  const ranks = sql.join(
-    ITEMS.map((item) => sql`(${item.key}::text, ${item.rank}::int)`),
-    sql`, `
-  );
-  await tx.execute(sql`
-    UPDATE ${text_gestures} AS t SET "order" = r.new_order, updated_at = NOW()
-    FROM (
-      SELECT g.id,
-        ROW_NUMBER() OVER (
-          PARTITION BY j.lesson_category_id, g.script_id
-          ORDER BY v.rank NULLS LAST, CASE WHEN g."order" >= 1 THEN g."order" END NULLS LAST, g.id
-        ) AS new_order
-      FROM ${text_gestures} AS g
-      JOIN ${gesture_text_key_lesson_category_join} AS j
-        ON j.gesture_text_key = g.text_key AND j.lang_id = ${LANG_ID}
-      LEFT JOIN (VALUES ${ranks}) AS v(text_key, rank) ON v.text_key = g.text_key
-      WHERE j.lesson_category_id IN ${[...categoryId.values()]}
-    ) AS r
-    WHERE t.id = r.id AND t."order" IS DISTINCT FROM r.new_order
-  `);
 };
 
-const reportAfter = (before: State, after: State, categoryIds: number[], notes: string[]) => {
-  const beforeOrder = new Map(before.gestures.map((g) => [g.id, g.order]));
-  printTable(
-    'Order changes of existing gestures',
-    after.gestures
-      .filter((g) => beforeOrder.has(g.id) && beforeOrder.get(g.id) !== g.order)
-      .map((g) => ({
-        script: scriptName(g.script_id),
-        text: g.text,
-        key: g.text_key,
-        from: beforeOrder.get(g.id),
-        to: g.order
-      }))
-  );
-
+const reportAfter = (after: State, categoryIds: number[], notes: string[]) => {
   const extraKeys = after.joins
     .filter(
-      (j) => categoryIds.includes(j.lesson_category_id) && !ITEM_KEYS.includes(j.gesture_text_key)
+      (j) =>
+        categoryIds.includes(j.lesson_category_id) &&
+        !ITEM_KEYS.includes(j.gesture_text_key) &&
+        !after.lessons.some((l) => l.text_key === j.gesture_text_key)
     )
     .map((j) => j.gesture_text_key);
   if (extraKeys.length > 0) {
     notes.push(
-      `keys outside the alphabet in these categories (kept after it): ${extraKeys.join(' ')}`
+      `keys outside the alphabet in these categories (unordered, no Sanskrit lesson): ${extraKeys.join(' ')}`
     );
   }
   const uncategorized = after.lessons.filter((l) => l.category_id === null);
@@ -543,8 +507,8 @@ const main = async () => {
       categoryIds = [...categoryId.values()];
       await seedLessons(tx, before, categoryId, notes);
       await seedGestures(tx, before, scriptTexts, notes);
-      await linkAndOrder(tx, before, categoryId);
-      reportAfter(original, await readState(tx), categoryIds, notes);
+      await linkGestures(tx, before, categoryId);
+      reportAfter(await readState(tx), categoryIds, notes);
 
       if (!apply) throw new DryRun();
     });

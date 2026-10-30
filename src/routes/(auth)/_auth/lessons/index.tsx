@@ -6,6 +6,7 @@ import { Button } from '~/components/ui/button';
 import { IoMdAdd } from 'react-icons/io';
 import ListLessons from './-ListLessons';
 import AddLessonDialog from './-AddLessonDialog';
+import { AdminListTabs } from '~/components/admin/AdminListTabs';
 import { getCookie } from '@tanstack/react-start/server';
 import { get_lesson_lang_id_from_cookie, LESSON_LANG_ID_COOKIE_KEY } from '@/state/cookie';
 import { createServerFn } from '@tanstack/react-start';
@@ -51,6 +52,9 @@ function LessonsIndexRoute() {
           <IoMdArrowRoundBack className="inline-block text-xl" />
           Home Page
         </Link>
+        <div className="ml-auto">
+          <AdminListTabs active="lessons" category={search.category} />
+        </div>
       </div>
       <div className="mt-2 mb-5 flex items-center justify-center gap-4 px-2">
         <Button

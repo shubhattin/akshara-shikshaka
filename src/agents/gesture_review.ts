@@ -27,3 +27,13 @@ export const REVISION_SOURCE_META = {
 
 /** Longest per-gesture note the Gesture Creator reads. */
 export const MAX_AGENT_NOTES_LENGTH = 2000;
+
+/** The notes with one more `- ` line, unless they already hold it. */
+export function withNote(notes: string, note: string) {
+  const current = notes.trim();
+  const line = note.trim();
+  if (current.split('\n').some((existing) => existing.replace(/^-\s*/, '').trim() === line)) {
+    return current;
+  }
+  return current ? `${current}\n- ${line}` : `- ${line}`;
+}

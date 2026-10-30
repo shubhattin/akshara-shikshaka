@@ -2,21 +2,12 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { CheckCircle2Icon, NotebookPenIcon, TriangleAlertIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '~/api/client';
-import { MAX_AGENT_NOTES_LENGTH } from '~/agents/gesture_review';
+import { MAX_AGENT_NOTES_LENGTH, withNote } from '~/agents/gesture_review';
 import { Button } from '~/components/ui/button';
 import { Spinner } from '~/components/ui/spinner';
 import { get_script_from_id } from '~/state/lang_list';
 import type { AgentToolPart } from '../chat/message_parts';
 import { useRefreshGesture } from '../gesture_hub/use_refresh_gesture';
-
-/** The notes with one more line (unless they already hold it). */
-export function withNote(notes: string, note: string) {
-  const current = notes.trim();
-  if (current.split('\n').some((line) => line.replace(/^-\s*/, '').trim() === note.trim())) {
-    return current;
-  }
-  return current ? `${current}\n- ${note.trim()}` : `- ${note.trim()}`;
-}
 
 /**
  * A note the agent suggests keeping for a gesture. Nothing is saved until the admin adds it;
@@ -30,12 +21,15 @@ export function NoteSuggestionCard({ part }: { part: AgentToolPart<'suggest_gest
     trpc.agents.get_gesture.queryOptions({ id: ok?.gesture_id ?? 0 }, { enabled: !!ok })
   );
   const save_mut = useMutation(
-    trpc.agents.set_agent_notes.mutationOptions({
+    trpc.agents.add_agent_note.mutationOptions({
       onSuccess: () => {
         if (ok) refreshGesture(ok.gesture_id);
         toast.success('Note saved to the gesture');
       },
-      onError: (error) => toast.error(error.message)
+      onError: (error) => {
+        toast.error(error.message);
+        if (ok) refreshGesture(ok.gesture_id);
+      }
     })
   );
 
@@ -77,7 +71,7 @@ export function NoteSuggestionCard({ part }: { part: AgentToolPart<'suggest_gest
             size="sm"
             variant="outline"
             disabled={!gesture_q.data || save_mut.isPending || tooLong}
-            onClick={() => save_mut.mutate({ gesture_id: ok.gesture_id, notes: next })}
+            onClick={() => save_mut.mutate({ gesture_id: ok.gesture_id, note: ok.note })}
           >
             {save_mut.isPending ? <Spinner className="size-4" /> : null}
             Add to the gesture’s notes

@@ -126,7 +126,8 @@ export type GestureSaveProvenance =
 
 /**
  * The one write path for a gesture's strokes and glyph: updates the gesture, bumps its revision
- * and records the new version. With `expectedRevision`, a save based on an older version fails
+ * and records the new version. `expectedRevision` is the version the save is based on: a save
+ * based on an older version fails
  * with a conflict instead of overwriting the newer one.
  */
 export const editTextGestureData = Effect.fn('editTextGestureData')(function* (input: {
@@ -136,7 +137,7 @@ export const editTextGestureData = Effect.fn('editTextGestureData')(function* (i
   fontFamily: string;
   fontSize: number;
   textCenterOffset: [number, number];
-  expectedRevision?: number;
+  expectedRevision: number;
   provenance: GestureSaveProvenance;
 }) {
   const fontFamily = parseFontFamily(input.fontFamily);
@@ -161,11 +162,7 @@ export const editTextGestureData = Effect.fn('editTextGestureData')(function* (i
           provenance.source === 'manual' ? sql`${text_gestures.review_status}` : 'unreviewed',
         updated_at: new Date()
       })
-      .where(
-        input.expectedRevision === undefined
-          ? match
-          : and(match, eq(text_gestures.revision, input.expectedRevision))
-      )
+      .where(and(match, eq(text_gestures.revision, input.expectedRevision)))
       .returning();
     if (!row) {
       const [current] = await tx
@@ -338,7 +335,7 @@ const edit_text_gesture_data_route = protectedAdminProcedure
       fontSize: z.int(),
       textCenterOffset: z.tuple([z.number(), z.number()]),
       /** The revision the editor loaded; a newer one saved meanwhile is a conflict. */
-      expectedRevision: z.int().positive().optional()
+      expectedRevision: z.int().positive()
     })
   )
   .mutation(async ({ input, ctx }) =>

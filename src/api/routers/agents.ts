@@ -21,6 +21,7 @@ import {
   requestChatStop
 } from '~/agents/server/chat_store';
 import {
+  addGestureAgentNote,
   getGestureHub,
   getReviewQueue,
   listGestureRevisions,
@@ -83,8 +84,9 @@ const get_context_route = protectedAdminProcedure
   .query(({ input }) =>
     runTrpcEffect(
       Effect.gen(function* () {
+        // only Gesture Creator chats are focused
         const focus =
-          input.focus_gesture_id === undefined
+          input.focus_gesture_id === undefined || input.agent_kind !== 'gesture_creator'
             ? null
             : yield* loadFocusContext(input.focus_gesture_id);
         return agentContext(input.agent_kind, focus);
@@ -110,7 +112,7 @@ const apply_gesture_route = protectedAdminProcedure
       tool_call_id: z.string().min(1).max(200),
       replace_existing: z.boolean(),
       /** The saved version the admin compared against; a newer save meanwhile is a conflict. */
-      expected_revision: z.int().positive().optional()
+      expected_revision: z.int().positive()
     })
   )
   .mutation(({ input, ctx }) =>
@@ -173,9 +175,29 @@ const set_review_route = protectedAdminProcedure
   );
 
 const set_agent_notes_route = protectedAdminProcedure
-  .input(z.object({ gesture_id: gesture_id_schema, notes: z.string().max(MAX_AGENT_NOTES_LENGTH) }))
+  .input(
+    z.object({
+      gesture_id: gesture_id_schema,
+      notes: z.string().max(MAX_AGENT_NOTES_LENGTH),
+      /** The notes the admin started editing from (a change meanwhile is a conflict) */
+      previous_notes: z.string().max(MAX_AGENT_NOTES_LENGTH)
+    })
+  )
   .mutation(({ input }) =>
-    runTrpcEffect(setGestureAgentNotes({ gestureId: input.gesture_id, notes: input.notes }))
+    runTrpcEffect(
+      setGestureAgentNotes({
+        gestureId: input.gesture_id,
+        notes: input.notes,
+        previousNotes: input.previous_notes
+      })
+    )
+  );
+
+/** Add an accepted agent suggestion to the notes. */
+const add_agent_note_route = protectedAdminProcedure
+  .input(z.object({ gesture_id: gesture_id_schema, note: z.string().min(1).max(600) }))
+  .mutation(({ input }) =>
+    runTrpcEffect(addGestureAgentNote({ gestureId: input.gesture_id, note: input.note }))
   );
 
 /** Every gesture with what the review queue ranks it by. */
@@ -198,5 +220,6 @@ export const agents_router = t.router({
   revert_revision: revert_revision_route,
   set_review: set_review_route,
   set_agent_notes: set_agent_notes_route,
+  add_agent_note: add_agent_note_route,
   review_queue: review_queue_route
 });

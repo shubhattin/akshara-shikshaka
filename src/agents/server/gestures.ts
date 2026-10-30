@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import {
   lesson_categories,
   gesture_text_key_lesson_category_join,
@@ -12,6 +12,7 @@ import { DEFAULT_GESTURE_CATEGORY_LANG_ID, get_script_from_id } from '~/state/la
 import { proposed_gesture_schema } from '~/agents/gesture_creator/schemas';
 import { editTextGestureData } from '~/api/routers/text_gestures';
 import { findAgentChat, loadAgentMessages } from './chat_store';
+import { savedStrokeCount } from './stroke_count';
 
 /** Gestures for the composer's `@` picker: every one, with a romanized form for search. */
 export const listMentionableGestures = Effect.fn('agents.list_mentionable_gestures')(function* () {
@@ -23,7 +24,7 @@ export const listMentionableGestures = Effect.fn('agents.list_mentionable_gestur
         script_id: text_gestures.script_id,
         category_id: lesson_categories.id,
         category: lesson_categories.name,
-        strokes: sql<number>`jsonb_array_length(${text_gestures.gestures})`.mapWith(Number)
+        strokes: savedStrokeCount
       })
       .from(text_gestures)
       // agents see the categories of the default language
@@ -124,7 +125,7 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
   userId: string;
   replaceExisting: boolean;
   /** The saved version the admin compared the proposal with. */
-  expectedRevision?: number;
+  expectedRevision: number;
 }) {
   const chat = yield* findAgentChat(input.chatId);
   if (chat.agent_kind !== 'gesture_creator') {
@@ -151,6 +152,12 @@ export const applyProposedGesture = Effect.fn('agents.apply_gesture')(function* 
     return yield* Effect.fail(BadRequestError.make({ message: 'The proposal is malformed' }));
   }
   const proposal = parsed.data;
+  // A focused chat's proposals are for its gesture only (the tools refuse others, checked again).
+  if (chat.focus_gesture_id !== null && proposal.gesture_id !== chat.focus_gesture_id) {
+    return yield* Effect.fail(
+      BadRequestError.make({ message: 'That proposal is not for this chat’s gesture' })
+    );
+  }
   const current = yield* getGestureForAgent(proposal.gesture_id);
   if (current.uuid !== proposal.uuid) {
     return yield* Effect.fail(

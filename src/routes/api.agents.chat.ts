@@ -161,6 +161,10 @@ async function handleChat(request: Request): Promise<Response> {
         if (!scoped.ok) return yield* Effect.fail(BadRequestError.make({ message: scoped.error }));
         refs = scoped.refs;
       }
+      // Stored messages this turn replaces (a retried reply, an empty cancelled one); nothing
+      // else is deleted, so a turn another admin saved meanwhile in this shared chat stays.
+      const kept = new Set(validated.map((message) => message.id));
+      const replacedIds = previous.filter((message) => !kept.has(message.id)).map((m) => m.id);
       // Fill a new message's @ mentions from the database, never from the client.
       const withRefs = withResolvedRefs(
         validated.at(-1)!,
@@ -233,7 +237,7 @@ async function handleChat(request: Request): Promise<Response> {
             await progress?.settle();
             const title = titlePromise ? await titlePromise : undefined;
             await appRuntime.runPromise(
-              saveAgentMessages({ chatId: id, messages: finished, model, title })
+              saveAgentMessages({ chatId: id, messages: finished, model, title, replacedIds })
             );
           } finally {
             stopWatching();
@@ -252,7 +256,7 @@ async function handleChat(request: Request): Promise<Response> {
       const [toClient, toServer] = stream.tee();
       const tracked = trackReplyProgress<AgentUIMessage>(toServer, (reply) =>
         appRuntime.runPromise(
-          saveAgentMessages({ chatId: id, messages: [...messages, reply], model })
+          saveAgentMessages({ chatId: id, messages: [...messages, reply], model, replacedIds })
         )
       );
       progress = tracked;

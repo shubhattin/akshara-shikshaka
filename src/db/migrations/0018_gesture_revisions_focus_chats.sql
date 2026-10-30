@@ -49,15 +49,25 @@ FROM (
 	SELECT m."chat_id",
 		CASE
 			WHEN p->>'type' = 'data-gesture_ref' THEN (p->'data'->>'id')::integer
+			WHEN p->>'type' = 'data-draft_edit' THEN (p->'data'->>'gesture_id')::integer
 			ELSE (p->'output'->'proposal'->>'gesture_id')::integer
 		END AS "gesture_id",
 		m."created_at",
 		CASE WHEN p->>'type' = 'tool-propose_gesture' THEN m."created_at" END AS "proposed_at"
 	FROM "agent_messages" m, jsonb_array_elements(m."parts") p
 	WHERE (p->>'type' = 'data-gesture_ref' AND p->'data'->>'id' ~ '^[0-9]+$')
+		OR (p->>'type' = 'data-draft_edit' AND p->'data'->>'gesture_id' ~ '^[0-9]+$')
 		OR (p->>'type' = 'tool-propose_gesture' AND p->>'state' = 'output-available'
 			AND p->'output'->'proposal'->>'gesture_id' ~ '^[0-9]+$')
 ) links
 INNER JOIN "text_gestures" g ON g."id" = links."gesture_id"
 GROUP BY links."chat_id", links."gesture_id"
-ON CONFLICT DO NOTHING;
+ON CONFLICT DO NOTHING;--> statement-breakpoint
+-- Gestures saved before review existed were drawn and checked by hand: they start approved.
+-- Only strokes changed by an agent proposal (or a restore) from now on wait for a review.
+UPDATE "text_gestures"
+SET "review_status" = 'approved', "review_note" = ''
+WHERE "review_status" = 'unreviewed' AND EXISTS (
+	SELECT 1 FROM jsonb_array_elements("gestures") AS stroke
+	WHERE jsonb_array_length(coalesce(stroke -> 'points', '[]'::jsonb)) > 0
+);

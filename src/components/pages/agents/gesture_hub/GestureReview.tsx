@@ -109,19 +109,27 @@ export function AgentNotesEditor({ gestureId, notes }: { gestureId: number; note
   const trpc = useTRPC();
   const refreshGesture = useRefreshGesture();
   const [draft, setDraft] = useState(notes);
+  /** The saved notes the draft started from: saving checks they did not change meanwhile. */
   const [base, setBase] = useState(notes);
-  // Notes saved elsewhere (a chat's suggestion) replace an unchanged draft.
-  if (notes !== base) {
+  // Notes saved elsewhere (a chat's suggestion) replace an unchanged draft; an edited draft keeps
+  // its base, so saving it is a conflict instead of overwriting them.
+  if (notes !== base && draft === base) {
     setBase(notes);
-    if (draft === base) setDraft(notes);
+    setDraft(notes);
   }
   const notes_mut = useMutation(
     trpc.agents.set_agent_notes.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (_data, saved) => {
+        // what was saved is the new base
+        setBase(saved.notes.trim());
+        setDraft(saved.notes.trim());
         refreshGesture(gestureId);
         toast.success('Notes saved');
       },
-      onError: (error) => toast.error(error.message)
+      onError: (error) => {
+        toast.error(error.message);
+        refreshGesture(gestureId);
+      }
     })
   );
   const dirty = draft.trim() !== notes.trim();
@@ -145,14 +153,23 @@ export function AgentNotesEditor({ gestureId, notes }: { gestureId: number; note
           {draft.length}/{MAX_AGENT_NOTES_LENGTH}
         </span>
         {dirty ? (
-          <Button size="xs" variant="ghost" onClick={() => setDraft(notes)}>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => {
+              setDraft(notes);
+              setBase(notes);
+            }}
+          >
             Discard
           </Button>
         ) : null}
         <Button
           size="xs"
           disabled={!dirty || notes_mut.isPending}
-          onClick={() => notes_mut.mutate({ gesture_id: gestureId, notes: draft })}
+          onClick={() =>
+            notes_mut.mutate({ gesture_id: gestureId, notes: draft, previous_notes: base })
+          }
         >
           {notes_mut.isPending ? <Spinner className="size-3.5" /> : null}
           Save notes

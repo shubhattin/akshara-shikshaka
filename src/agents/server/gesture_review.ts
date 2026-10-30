@@ -6,13 +6,14 @@ import {
   text_gestures,
   user_gesture_recordings
 } from '~/db/schema';
-import { dbRunHttp } from '~/effect/database';
-import { BadRequestError, NotFoundError } from '~/effect/errors';
+import { dbRunHttp, dbTransaction } from '~/effect/database';
+import { BadRequestError, ConflictError, NotFoundError } from '~/effect/errors';
 import { editTextGestureData } from '~/api/routers/text_gestures';
 import { resolveAuthUserNames } from '~/lib/auth_users.server';
-import type { ReviewStatus } from '~/agents/gesture_review';
+import { MAX_AGENT_NOTES_LENGTH, withNote, type ReviewStatus } from '~/agents/gesture_review';
 import { getGestureForAgent } from './gestures';
 import { listChatsForGesture } from './chat_store';
+import { savedStrokeCount } from './stroke_count';
 
 /** Display names for admin ids; history still shows (without names) if the lookup fails. */
 const userNames = (ids: (string | null)[]) =>
@@ -20,7 +21,7 @@ const userNames = (ids: (string | null)[]) =>
     Effect.orElseSucceed(() => new Map<string, string>())
   );
 
-const strokeCount = sql<number>`jsonb_array_length(${text_gestures.gestures})`.mapWith(Number);
+const strokeCount = savedStrokeCount;
 
 /** A gesture's saved versions, newest first, with who saved each. */
 export const listGestureRevisions = Effect.fn('gesture_review.list_revisions')(function* (
@@ -121,20 +122,67 @@ export const setGestureReview = Effect.fn('gesture_review.set_review')(function*
   return { updated: true as const };
 });
 
+const gestureMissing = () =>
+  NotFoundError.make({ resource: 'text_gesture', message: 'Gesture not found' });
+
+/**
+ * Replace the notes. `previousNotes` is what the admin edited: notes changed by someone else
+ * meanwhile are a conflict, not overwritten.
+ */
 export const setGestureAgentNotes = Effect.fn('gesture_review.set_agent_notes')(function* (input: {
   gestureId: number;
   notes: string;
+  previousNotes: string;
 }) {
-  const rows = yield* dbRunHttp('gesture_review.set_agent_notes', (client) =>
-    client
+  const outcome = yield* dbTransaction('gesture_review.set_agent_notes', async (tx) => {
+    const [row] = await tx
+      .select({ agent_notes: text_gestures.agent_notes })
+      .from(text_gestures)
+      .where(eq(text_gestures.id, input.gestureId))
+      .for('update');
+    if (!row) return 'missing' as const;
+    if (row.agent_notes.trim() !== input.previousNotes.trim()) return 'conflict' as const;
+    await tx
       .update(text_gestures)
       .set({ agent_notes: input.notes.trim() })
-      .where(eq(text_gestures.id, input.gestureId))
-      .returning()
-  );
-  if (rows.length === 0) {
+      .where(eq(text_gestures.id, input.gestureId));
+    return 'saved' as const;
+  });
+  if (outcome === 'missing') return yield* Effect.fail(gestureMissing());
+  if (outcome === 'conflict') {
     return yield* Effect.fail(
-      NotFoundError.make({ resource: 'text_gesture', message: 'Gesture not found' })
+      ConflictError.make({
+        message: 'The notes were changed by someone else meanwhile. Reload them and edit again.'
+      })
+    );
+  }
+  return { updated: true as const };
+});
+
+/** Add one line to the notes (an accepted agent suggestion), on top of whatever is saved now. */
+export const addGestureAgentNote = Effect.fn('gesture_review.add_agent_note')(function* (input: {
+  gestureId: number;
+  note: string;
+}) {
+  const outcome = yield* dbTransaction('gesture_review.add_agent_note', async (tx) => {
+    const [row] = await tx
+      .select({ agent_notes: text_gestures.agent_notes })
+      .from(text_gestures)
+      .where(eq(text_gestures.id, input.gestureId))
+      .for('update');
+    if (!row) return 'missing' as const;
+    const next = withNote(row.agent_notes, input.note);
+    if (next.length > MAX_AGENT_NOTES_LENGTH) return 'full' as const;
+    await tx
+      .update(text_gestures)
+      .set({ agent_notes: next })
+      .where(eq(text_gestures.id, input.gestureId));
+    return 'saved' as const;
+  });
+  if (outcome === 'missing') return yield* Effect.fail(gestureMissing());
+  if (outcome === 'full') {
+    return yield* Effect.fail(
+      BadRequestError.make({ message: 'The notes are full; shorten them in the gesture hub.' })
     );
   }
   return { updated: true as const };

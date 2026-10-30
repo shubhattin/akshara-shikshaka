@@ -230,7 +230,8 @@ function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
 
   const needle = search.trim().toLowerCase();
   const chats = all.filter((chat) => matchesSearch(chat, needle));
-  const free = freeChats(chats);
+  // While searching, the Chats tab finds focused chats too.
+  const free = needle ? chats : freeChats(chats);
   const byGesture = groupChatsByGesture(chats);
   const rowProps = { onNavigate, onRename: setRenaming, onDelete: setDeleting };
 

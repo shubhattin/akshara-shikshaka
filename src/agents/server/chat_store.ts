@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { agent_chat_gestures, agent_chats, agent_messages, text_gestures } from '~/db/schema';
 import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
 import { BadRequestError, NotFoundError } from '~/effect/errors';
@@ -7,6 +7,7 @@ import type { AgentKind } from '~/agents/agent_kinds';
 import type { AgentModelId } from '~/agents/models';
 import type { AgentUIMessage } from '~/agents/ui_message';
 import { chatGestureLinks, type ChatGestureLink } from './chat_gestures';
+import { savedStrokeCount } from './stroke_count';
 
 /**
  * Record the gestures a chat mentioned or proposed. Links only grow (a retried turn keeps its
@@ -108,7 +109,10 @@ export const listAgentChats = Effect.fn('agents.list_chats')(function* () {
         focus_text_key: text_gestures.text_key,
         focus_script_id: text_gestures.script_id,
         focus_review_status: text_gestures.review_status,
-        focus_strokes: sql<number | null>`jsonb_array_length(${text_gestures.gestures})`
+        // null for free chats (no focus gesture joined)
+        focus_strokes: sql<
+          number | null
+        >`case when ${text_gestures.id} is null then null else ${savedStrokeCount} end`
       })
       .from(agent_chats)
       .leftJoin(text_gestures, eq(text_gestures.id, agent_chats.focus_gesture_id))
@@ -168,7 +172,8 @@ export const loadAgentMessages = Effect.fn('agents.load_messages')(function* (ch
       })
       .from(agent_messages)
       .where(eq(agent_messages.chat_id, chatId))
-      .orderBy(asc(agent_messages.position))
+      // a turn saved concurrently by another admin can share a position: oldest first
+      .orderBy(asc(agent_messages.position), asc(agent_messages.created_at))
   );
   return rows.map((row): AgentUIMessage => ({
     id: row.id,
@@ -187,6 +192,11 @@ export const saveAgentMessages = Effect.fn('agents.save_messages')(function* (in
   messages: AgentUIMessage[];
   model: AgentModelId;
   title?: string;
+  /**
+   * Stored messages this turn replaced (a retried reply, an empty cancelled one). Only these are
+   * deleted: chats are shared, so rows another admin's turn added meanwhile must stay.
+   */
+  replacedIds?: string[];
 }) {
   yield* dbTransaction('agents.save_messages', async (tx) => {
     // Message ids come from the client: ignore any that belong to another chat instead of
@@ -224,15 +234,16 @@ export const saveAgentMessages = Effect.fn('agents.save_messages')(function* (in
             position: sql`excluded.position`
           }
         });
-      await tx.delete(agent_messages).where(
-        and(
-          eq(agent_messages.chat_id, input.chatId),
-          notInArray(
-            agent_messages.id,
-            messages.map((message) => message.id)
-          )
-        )
+      const replaced = (input.replacedIds ?? []).filter(
+        (id) => !messages.some((message) => message.id === id)
       );
+      if (replaced.length > 0) {
+        await tx
+          .delete(agent_messages)
+          .where(
+            and(eq(agent_messages.chat_id, input.chatId), inArray(agent_messages.id, replaced))
+          );
+      }
     }
     await linkChatGestures(tx, input.chatId, chatGestureLinks(messages));
     await tx

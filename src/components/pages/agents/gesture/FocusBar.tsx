@@ -65,7 +65,8 @@ function CompareDialog({
   saved: Gesture[];
   proposal: ProposedGesture | null;
   background?: string;
-  revision: number;
+  /** Undefined while the gesture loads */
+  revision: number | undefined;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -77,7 +78,7 @@ function CompareDialog({
         <div className="grid gap-4 sm:grid-cols-2">
           <figure className="flex flex-col gap-1.5">
             <figcaption className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              Saved · v{revision} · {saved.length} strokes
+              Saved · v{revision ?? '…'} · {saved.length} strokes
             </figcaption>
             {saved.length > 0 ? (
               <GesturePreview gestures={saved} backgroundSrc={background} />
@@ -301,7 +302,7 @@ export function FocusBar({
         saved={saved}
         proposal={latest?.proposal ?? null}
         background={background}
-        revision={gesture?.revision ?? 0}
+        revision={gesture?.revision}
       />
       {applying ? (
         <ApplyGestureDialog

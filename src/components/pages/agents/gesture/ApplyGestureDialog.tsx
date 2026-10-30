@@ -424,10 +424,10 @@ export function ApplyGestureDialog({
         toolCallId={toolCallId}
         replace={replace}
         onOpenChange={setConfirmOpen}
-        mutate={(args) =>
+        mutate={(args) => {
           // the version the admin compared with: a save meanwhile is refused, not overwritten
-          apply_mut.mutate({ ...args, expected_revision: current?.revision })
-        }
+          if (current) apply_mut.mutate({ ...args, expected_revision: current.revision });
+        }}
       />
     </>
   );

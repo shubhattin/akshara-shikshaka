@@ -13,15 +13,21 @@
         "@dnd-kit/core": "^6.3.1",
         "@dnd-kit/sortable": "^10.0.0",
         "@dnd-kit/utilities": "^3.2.2",
+        "@fontsource-variable/noto-sans-bengali": "^5.3.0",
         "@fontsource-variable/noto-sans-devanagari": "^5.3.0",
+        "@fontsource-variable/noto-sans-gujarati": "^5.3.0",
         "@fontsource-variable/noto-sans-kannada": "^5.3.0",
         "@fontsource-variable/noto-sans-malayalam": "^5.3.0",
         "@fontsource-variable/noto-sans-oriya": "^5.3.0",
+        "@fontsource-variable/noto-sans-tamil": "^5.3.0",
         "@fontsource-variable/noto-sans-telugu": "^5.3.0",
+        "@fontsource-variable/noto-serif-bengali": "^5.3.0",
         "@fontsource-variable/noto-serif-devanagari": "^5.3.0",
+        "@fontsource-variable/noto-serif-gujarati": "^5.3.0",
         "@fontsource-variable/noto-serif-kannada": "^5.3.0",
         "@fontsource-variable/noto-serif-malayalam": "^5.3.0",
         "@fontsource-variable/noto-serif-oriya": "^5.3.0",
+        "@fontsource-variable/noto-serif-tamil": "^5.3.0",
         "@fontsource-variable/noto-serif-telugu": "^5.3.0",
         "@fontsource/roboto": "^5.3.0",
         "@napi-rs/canvas": "^1.0.13",
@@ -292,8 +298,6 @@
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
 
-    "@ecies/ciphers": ["@ecies/ciphers@0.2.6", "", { "peerDependencies": { "@noble/ciphers": "^1.0.0" } }, "sha512-patgsRPKGkhhoBjETV4XxD0En4ui5fbX0hzayqI3M8tvNMGUoUvmyYAIWwlxBc1KX5cturfqByYdj5bYGRpN9g=="],
-
     "@effect/vitest": ["@effect/vitest@4.0.0", "", { "peerDependencies": { "effect": "^4.0.0", "vitest": ">=5.0.0 <6.0.0" } }, "sha512-kGElCPFGtP+CgMCwV/HjJWqtE3zYo6I1+8MSA54l+EI24lPU9p2Efa+TBp1jfkg9j711KKzEqgSAy3VzTsb76Q=="],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.10.0", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-ewvYlk86xUoGI0zQRNq/mC+16R1QeDlKQy21Ki3oSYXNgLb45GV1P6A0M+/s6nyCuNDqe5VpaY84BzXGwVbwFA=="],
@@ -364,7 +368,11 @@
 
     "@floating-ui/utils": ["@floating-ui/utils@0.2.12", "", {}, "sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww=="],
 
+    "@fontsource-variable/noto-sans-bengali": ["@fontsource-variable/noto-sans-bengali@5.3.0", "", {}, "sha512-035m0mzOcsVC1GHFH1ioeXjIFqVhuflGvnn8Xvr6esaZlGErNe1d+Jx2sEN/2WGPhjrT+5wwKPPSO8rbBeQo3w=="],
+
     "@fontsource-variable/noto-sans-devanagari": ["@fontsource-variable/noto-sans-devanagari@5.3.0", "", {}, "sha512-52XBcJS3jRvZ5ugFXJvdKgffXPYnN08LeodXkgCbepOdMKVRVTQu1yj071cq8S3zmUwT6w6XKKXRSQlQkwwNNg=="],
+
+    "@fontsource-variable/noto-sans-gujarati": ["@fontsource-variable/noto-sans-gujarati@5.3.0", "", {}, "sha512-fmQPxALCXOCe6FKaI9ZRu3R28BkhhEWQ3H8QMVCB3xRo6I7iwCZ2KunlIDPAfIDee3cYwucus5ORRqAFa62Ekg=="],
 
     "@fontsource-variable/noto-sans-kannada": ["@fontsource-variable/noto-sans-kannada@5.3.0", "", {}, "sha512-Vywk0r0v6GBEp+smJbSEEdUSebQb1hLsTOWqt/yHcABhkTRphga67hgtUhAenNtgLoFWAw/OV/cuN5Trdzpg5w=="],
 
@@ -372,15 +380,23 @@
 
     "@fontsource-variable/noto-sans-oriya": ["@fontsource-variable/noto-sans-oriya@5.3.0", "", {}, "sha512-+RfEqSVMMYXbCFQI5D6eKUMK87Ad7nrzY+7UnQdbu6AtKZ866fjJP88ymW6lXo/D19uSL6SzeJYM3CSOx/tKQQ=="],
 
+    "@fontsource-variable/noto-sans-tamil": ["@fontsource-variable/noto-sans-tamil@5.3.0", "", {}, "sha512-zyyajkRVJb7Uy6T2+ws2hR+0U7FnJqMfzakls3WgWNZ4ia0EFHLyFAHLZdUV5yiFzHufc701KOxktrwrI3J7FQ=="],
+
     "@fontsource-variable/noto-sans-telugu": ["@fontsource-variable/noto-sans-telugu@5.3.0", "", {}, "sha512-dxmjmdqbAeRYppM94/3zJLQm1sT88n6N56JKMMpxlEobrbv7SmIjnAzMF0LOge5+iVcInqmdQLuJQwiWT1YBcg=="],
 
+    "@fontsource-variable/noto-serif-bengali": ["@fontsource-variable/noto-serif-bengali@5.3.0", "", {}, "sha512-YD4G49G5tXgNLbiKB/kQ6d3UJG9J64X5xFI2GozQUNBTqTo5r7NyIxoN7lU/GeKIU2j55lQefnvLvT3Pw7Yqfg=="],
+
     "@fontsource-variable/noto-serif-devanagari": ["@fontsource-variable/noto-serif-devanagari@5.3.0", "", {}, "sha512-84YrMomsQD13XgFj2fzFUthEI7v1gfzY7zABt61TF7lmkVg+w6ej8LznaDhS3P+ZisBHNhzE3xuvkGhFhWh53w=="],
+
+    "@fontsource-variable/noto-serif-gujarati": ["@fontsource-variable/noto-serif-gujarati@5.3.0", "", {}, "sha512-iNeP8M9I1Ygk3luK8sC6eS7vTLdE5qKuen/kQBCE4bv7PCR6kOg4Be750ZSp7Tk6gCRHpj+HfiUNPUJWSvYOmQ=="],
 
     "@fontsource-variable/noto-serif-kannada": ["@fontsource-variable/noto-serif-kannada@5.3.0", "", {}, "sha512-9VMDPkDcbS49t7fy1aFa0ft/eYIz+gGUYWXv/q9d5u+70CN7iBoze1EKrq3A4bs403XeeqJus9gX9JZutQPtNQ=="],
 
     "@fontsource-variable/noto-serif-malayalam": ["@fontsource-variable/noto-serif-malayalam@5.3.0", "", {}, "sha512-EKfxZzHZqn0XeHEdi9KSxKU3xSnfn8dWSZAGcWXaaVci8i22XN1b6lShVJEhJD9J0VuuXQkHMUgdgI6a4Jg84w=="],
 
     "@fontsource-variable/noto-serif-oriya": ["@fontsource-variable/noto-serif-oriya@5.3.0", "", {}, "sha512-pMDnUiq1Hg/LVTwNQ4wR6rtAIn3IPAvRva178+y1JD0Z5V2yKfHHuP3UFXsmtqJOdlC1h5+H4tdAs6jzu+Fq/g=="],
+
+    "@fontsource-variable/noto-serif-tamil": ["@fontsource-variable/noto-serif-tamil@5.3.0", "", {}, "sha512-zo7vizxKzSX8TB1ln2Oql1j2W2S+3W33G24fgYIyOB5vNkl30F0GrX5b/KHCAMjC5+wOq1i1vC7OjtN3uOOR7A=="],
 
     "@fontsource-variable/noto-serif-telugu": ["@fontsource-variable/noto-serif-telugu@5.3.0", "", {}, "sha512-01G9m9a8xIShMpHVgwYC5/L24msIpNmuOTqSJrYQzS1FfnfvOoz6BrJ533dXno8r90A+EEKdJP9zWeEiPSXuwQ=="],
 
@@ -2250,8 +2266,6 @@
 
     "@dotenvx/dotenvx/execa": ["execa@5.1.1", "", { "dependencies": { "cross-spawn": "^7.0.3", "get-stream": "^6.0.0", "human-signals": "^2.1.0", "is-stream": "^2.0.0", "merge-stream": "^2.0.0", "npm-run-path": "^4.0.1", "onetime": "^5.1.2", "signal-exit": "^3.0.3", "strip-final-newline": "^2.0.0" } }, "sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg=="],
 
-    "@ecies/ciphers/@noble/ciphers": ["@noble/ciphers@1.3.0", "", {}, "sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw=="],
-
     "@esbuild-kit/core-utils/esbuild": ["esbuild@0.18.20", "", { "optionalDependencies": { "@esbuild/android-arm": "0.18.20", "@esbuild/android-arm64": "0.18.20", "@esbuild/android-x64": "0.18.20", "@esbuild/darwin-arm64": "0.18.20", "@esbuild/darwin-x64": "0.18.20", "@esbuild/freebsd-arm64": "0.18.20", "@esbuild/freebsd-x64": "0.18.20", "@esbuild/linux-arm": "0.18.20", "@esbuild/linux-arm64": "0.18.20", "@esbuild/linux-ia32": "0.18.20", "@esbuild/linux-loong64": "0.18.20", "@esbuild/linux-mips64el": "0.18.20", "@esbuild/linux-ppc64": "0.18.20", "@esbuild/linux-riscv64": "0.18.20", "@esbuild/linux-s390x": "0.18.20", "@esbuild/linux-x64": "0.18.20", "@esbuild/netbsd-x64": "0.18.20", "@esbuild/openbsd-x64": "0.18.20", "@esbuild/sunos-x64": "0.18.20", "@esbuild/win32-arm64": "0.18.20", "@esbuild/win32-ia32": "0.18.20", "@esbuild/win32-x64": "0.18.20" }, "bin": { "esbuild": "bin/esbuild" } }, "sha512-ceqxoedUrcayh7Y7ZX6NdbbDzGROiyVBgC4PriJThBKSVPWnnFHZAkfI1lJT8QFkOwH4qOS2SJkS4wvpGl8BpA=="],
 
     "@kobalte/utils/@solid-primitives/event-listener": ["@solid-primitives/event-listener@2.4.6", "", { "dependencies": { "@solid-primitives/utils": "^6.4.1" }, "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-5I0YJcTVYIWoMmgBSROBZGcz+ymhew/pGTg2dHW74BUjFKsV8Li4bOZYl0YAGP4mHw5o4UBd9/BEesqBci3wxw=="],
@@ -2355,6 +2369,8 @@
     "cliui/strip-ansi": ["strip-ansi@6.0.1", "", { "dependencies": { "ansi-regex": "^5.0.1" } }, "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A=="],
 
     "cross-spawn/which": ["which@2.0.2", "", { "dependencies": { "isexe": "^2.0.0" }, "bin": { "node-which": "./bin/node-which" } }, "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA=="],
+
+    "eciesjs/@ecies/ciphers": ["@ecies/ciphers@0.2.6", "", { "peerDependencies": { "@noble/ciphers": "^1.0.0" } }, "sha512-patgsRPKGkhhoBjETV4XxD0En4ui5fbX0hzayqI3M8tvNMGUoUvmyYAIWwlxBc1KX5cturfqByYdj5bYGRpN9g=="],
 
     "eciesjs/@noble/ciphers": ["@noble/ciphers@1.3.0", "", {}, "sha512-2I0gnIVPtfnMw9ee9h1dJG7tp81+8Ob3OJb3Mv37rx5L40/b0i7djjCVvGOVqc9AEIQyvyu1i6ypKdFw8R8gQw=="],
 

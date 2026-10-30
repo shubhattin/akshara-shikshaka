@@ -294,7 +294,7 @@ const COLORS = {
   before: '#2a78d6',
   after: '#eb6834'
 };
-const FONT = `font-family="Noto Sans, Noto Sans Devanagari, Noto Sans Telugu, Noto Sans Kannada, Noto Sans Malayalam, Noto Sans Oriya, sans-serif"`;
+const FONT = `font-family="Noto Sans, Noto Sans Devanagari, Noto Sans Telugu, Noto Sans Kannada, Noto Sans Malayalam, Noto Sans Oriya, Noto Sans Tamil, Noto Sans Bengali, Noto Sans Gujarati, sans-serif"`;
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const text = (x: number, y: number, s: string, attrs = '') => {

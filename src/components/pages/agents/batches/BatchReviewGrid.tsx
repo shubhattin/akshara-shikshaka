@@ -162,7 +162,14 @@ function ReviewCard({
  * and "Accept selected" for the bulk. Only mounted on the To-review tab, so the proposals
  * query runs only there.
  */
-export function BatchReviewGrid({ batchId }: { batchId: number }) {
+export function BatchReviewGrid({
+  batchId,
+  visibleIds
+}: {
+  batchId: number;
+  /** Items the page's script and category filters keep */
+  visibleIds: ReadonlySet<number>;
+}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const proposals_q = useQuery(trpc.agents.batch_proposals.queryOptions({ batch_id: batchId }));
@@ -171,7 +178,9 @@ export function BatchReviewGrid({ batchId }: { batchId: number }) {
 
   const bulk_mut = useMutation(trpc.agents.accept_batch_item.mutationOptions());
 
-  const rows = (proposals_q.data ?? []).filter((row) => row.status === 'proposed');
+  const rows = (proposals_q.data ?? []).filter(
+    (row) => row.status === 'proposed' && visibleIds.has(row.id)
+  );
   const toggle = (id: number) =>
     setSelected((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id]

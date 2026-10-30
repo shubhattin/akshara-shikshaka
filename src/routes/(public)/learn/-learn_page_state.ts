@@ -47,7 +47,7 @@ export const SAVED_COOKIES_KEY = {
 
 export async function saveLearnPageCookies(key: keyof typeof SAVED_COOKIES_KEY, value: any) {
   const cookie = (await import('js-cookie')).default;
-  cookie.set(SAVED_COOKIES_KEY[key].key, JSON.stringify(value));
+  cookie.set(SAVED_COOKIES_KEY[key].key, JSON.stringify(value), { expires: 365, path: '/' });
 }
 
 export function parseLearnPageCookie<K extends keyof typeof SAVED_COOKIES_KEY>(

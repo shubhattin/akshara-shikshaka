@@ -1,10 +1,12 @@
 import { z } from 'zod';
-import { and, eq, max, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, max, sql } from 'drizzle-orm';
 import { Effect } from 'effect';
 import {
   gesture_text_key_lesson_category_join,
   lesson_categories,
+  lesson_gestures,
   text_gestures,
+  text_lesson_words,
   text_lessons
 } from '~/db/schema';
 import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
@@ -242,6 +244,59 @@ export const getCategoryTextLessonList = Effect.fn('getCategoryTextLessonList')(
   return yield* CACHE.lessons.category_lesson_list.get(input);
 });
 
+/**
+ * What each lesson already has, for the admin lessons list: words (with images/audio), its own
+ * audio, and the gesture linked for each script with its stroke count.
+ */
+export const getTextLessonsOverview = Effect.fn('getTextLessonsOverview')(function* (input: {
+  lesson_ids: number[];
+}) {
+  if (input.lesson_ids.length === 0) return [];
+  return yield* dbRunHttp('get_text_lessons_overview', async (db) => {
+    const [lessons, words, gestures] = await Promise.all([
+      db
+        .select({ id: text_lessons.id, has_audio: isNotNull(text_lessons.audio_id) })
+        .from(text_lessons)
+        .where(inArray(text_lessons.id, input.lesson_ids)),
+      db
+        .select({
+          lesson_id: text_lesson_words.text_lesson_id,
+          has_image: isNotNull(text_lesson_words.image_id),
+          has_audio: isNotNull(text_lesson_words.audio_id)
+        })
+        .from(text_lesson_words)
+        .where(inArray(text_lesson_words.text_lesson_id, input.lesson_ids)),
+      db
+        .select({
+          lesson_id: lesson_gestures.text_lesson_id,
+          gesture_id: text_gestures.id,
+          script_id: text_gestures.script_id,
+          stroke_count: sql<number>`jsonb_array_length(${text_gestures.gestures})`.mapWith(Number)
+        })
+        .from(lesson_gestures)
+        .innerJoin(text_gestures, eq(text_gestures.id, lesson_gestures.text_gesture_id))
+        .where(inArray(lesson_gestures.text_lesson_id, input.lesson_ids))
+    ]);
+    return lessons.map((lesson) => {
+      const lesson_words = words.filter((w) => w.lesson_id === lesson.id);
+      return {
+        id: lesson.id,
+        has_audio: lesson.has_audio,
+        word_count: lesson_words.length,
+        words_with_image: lesson_words.filter((w) => w.has_image).length,
+        words_with_audio: lesson_words.filter((w) => w.has_audio).length,
+        gestures: gestures
+          .filter((g) => g.lesson_id === lesson.id)
+          .map(({ gesture_id, script_id, stroke_count }) => ({
+            gesture_id,
+            script_id,
+            stroke_count
+          }))
+      };
+    });
+  });
+});
+
 const get_categories_route = publicProcedure
   .input(z.object({ lang_id: z.int() }))
   .query(async ({ input }) => runTrpcEffect(getLessonCategories(input)));
@@ -266,6 +321,10 @@ const delete_category_route = protectedAdminProcedure
 const get_text_lessons_route = protectedAdminProcedure
   .input(z.object({ category_id: z.int().min(0), lang_id: z.int() }))
   .query(async ({ input }) => runTrpcEffect(getTextLessonsByCategory(input)));
+
+const get_text_lessons_overview_route = protectedAdminProcedure
+  .input(z.object({ lesson_ids: z.array(z.int().positive()).max(500) }))
+  .query(async ({ input }) => runTrpcEffect(getTextLessonsOverview(input)));
 
 const update_text_lessons_order_route = protectedAdminProcedure
   .input(
@@ -296,6 +355,7 @@ export const lesson_categories_router = t.router({
   update_category_list: update_category_list_route,
   delete_category: delete_category_route,
   get_text_lessons: get_text_lessons_route,
+  get_text_lessons_overview: get_text_lessons_overview_route,
   update_text_lessons_order: update_text_lessons_order_route,
   add_update_lesson_category: add_update_lesson_category_route,
   get_category_text_lesson_list: get_category_text_lesson_list_route

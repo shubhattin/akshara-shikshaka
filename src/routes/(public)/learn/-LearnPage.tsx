@@ -1,5 +1,6 @@
 'use client';
-import { useAtom, useAtomValue } from 'jotai';
+import { getDefaultStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { learn_admin_context_atom } from '~/state/learn_admin_context';
 import {
   selected_language_id_atom,
   selected_category_id_atom,
@@ -22,7 +23,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover';
 import { Button } from '~/components/ui/button';
 import { buttonVariants } from '~/components/ui/button';
-import { ChevronsUpDown } from 'lucide-react';
+import { ChevronsUpDown, LayoutGrid } from 'lucide-react';
 import {
   Command,
   CommandEmpty,
@@ -47,9 +48,14 @@ import {
   CarouselPrevious
 } from '~/components/ui/carousel';
 import { HiSpeakerWave } from 'react-icons/hi2';
-import { useSession } from '~/lib/auth-client';
-import { Link } from '@tanstack/react-router';
-import { FaExternalLinkAlt } from 'react-icons/fa';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '~/components/ui/dialog';
 import { motion } from 'framer-motion';
 import { TiTick } from 'react-icons/ti';
 import {
@@ -79,6 +85,9 @@ export default function LearnPageComponent(props: Props) {
     s.set(selected_lesson_id_atom, props.saved_lesson_id ?? null);
     return s;
   }, []); // oxlint-disable-line react-hooks/exhaustive-deps -- store should only be created once on mount; props are initial values only
+
+  const setAdminContext = useSetAtom(learn_admin_context_atom, { store: getDefaultStore() });
+  useEffect(() => () => setAdminContext(null), [setAdminContext]);
 
   return (
     <JotaiProvider store={store} key={`learn_page`}>
@@ -123,6 +132,66 @@ function LearnPage(props: Props) {
     )
   );
   const categories = categories_q.data ?? [];
+
+  // Always keep a category selected: the saved one if it still exists, else the first. The saved
+  // cookie can be empty or stale (e.g. on a client-side navigation, where the loader does not
+  // resolve a fallback like SSR does).
+  useEffect(() => {
+    const list = categories_q.data;
+    if (!list || list.some((category) => category.id === selectedCategoryId)) return;
+    const first = list[0]?.id ?? null;
+    setSelectedCategoryId(first);
+    saveLearnPageCookies('category_id', first);
+  }, [categories_q.data, selectedCategoryId, setSelectedCategoryId]);
+
+  const categorySelect = (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        role="combobox"
+        aria-expanded={open}
+        className={cn(
+          buttonVariants({ variant: 'outline' }),
+          'w-45 justify-between text-base font-semibold'
+        )}
+      >
+        {selectedCategoryId !== null
+          ? (categories.find((category) => category.id === selectedCategoryId)?.name ??
+            'Select category...')
+          : 'Select category...'}
+        <ChevronsUpDown className="opacity-50" />
+      </PopoverTrigger>
+      <PopoverContent className="w-50 p-0">
+        <Command>
+          <CommandInput placeholder="Search category..." className="h-9" />
+          <CommandList>
+            <CommandEmpty>No category found.</CommandEmpty>
+            <CommandGroup>
+              {categories.map((category) => (
+                <CommandItem
+                  key={category.id}
+                  value={category.name}
+                  keywords={[category.id.toString()]}
+                  data-checked={selectedCategoryId === category.id ? 'true' : undefined}
+                  className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
+                  onSelect={() => {
+                    setOpen(false);
+                    if (selectedCategoryId === category.id) return;
+                    // the first lesson of the new category gets selected by LessonsList
+                    setSelectedLessonId(null);
+                    setSelectedCategoryId(category.id);
+                    saveLearnPageCookies('lesson_id', null);
+                    saveLearnPageCookies('category_id', category.id);
+                  }}
+                >
+                  {category.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 
   return (
     <div className="space-y-4">
@@ -173,70 +242,22 @@ function LearnPage(props: Props) {
           </SelectContent>
         </Select>
       </div>
-      <div className="flex flex-wrap items-center justify-center">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger
-            role="combobox"
-            aria-expanded={open}
-            className={cn(
-              buttonVariants({ variant: 'outline' }),
-              'w-45 justify-between text-base font-semibold'
-            )}
-          >
-            {selectedCategoryId !== null
-              ? (categories.find((category) => category.id === selectedCategoryId)?.name ??
-                'Select category...')
-              : 'Select category...'}
-            <ChevronsUpDown className="opacity-50" />
-          </PopoverTrigger>
-          <PopoverContent className="w-50 p-0">
-            <Command>
-              <CommandInput placeholder="Search category..." className="h-9" />
-              <CommandList>
-                <CommandEmpty>No category found.</CommandEmpty>
-                <CommandGroup>
-                  {categories.map((category) => (
-                    <CommandItem
-                      key={category.id}
-                      value={category.name}
-                      keywords={[category.id.toString()]}
-                      data-checked={selectedCategoryId === category.id ? 'true' : undefined}
-                      className="pr-8 hover:bg-accent hover:text-accent-foreground data-[checked=true]:font-medium"
-                      onSelect={() => {
-                        // reset lesson id when category is changed
-                        setSelectedLessonId(null);
-                        setSelectedCategoryId(
-                          selectedCategoryId === category.id ? null : category.id
-                        );
-                        // saving cookies
-                        saveLearnPageCookies('lesson_id', null);
-                        saveLearnPageCookies(
-                          'category_id',
-                          selectedCategoryId === category.id ? null : category.id
-                        );
-                        setOpen(false);
-                      }}
-                    >
-                      {category.name}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
-      <LessonsList {...props} />
+      <LessonsList {...props} categorySelect={categorySelect} />
     </div>
   );
 }
 
-const LessonsList = (props: Props) => {
+const sameLessonIds = (a: { id: number }[], b: { id: number }[]) =>
+  a.length === b.length && a.every((lesson, i) => lesson.id === b[i]?.id);
+
+// oxlint-disable-next-line complexity -- LessonsList wires lesson selection, transliteration and the carousel together
+const LessonsList = (props: Props & { categorySelect: React.ReactNode }) => {
   const trpc = useTRPC();
   const selectedLanguageId = useAtomValue(selected_language_id_atom);
   const selectedScriptId = useAtomValue(selected_script_id_atom);
   const selectedCategoryId = useAtomValue(selected_category_id_atom);
   const [selectedLessonId, setSelectedLessonId] = useAtom(selected_lesson_id_atom);
+  const [indexOpen, setIndexOpen] = useState(false);
   useEffect(() => {
     // preload lipi lekhika data for transliteration
     preloadScriptData(get_script_from_id(selectedScriptId));
@@ -250,7 +271,7 @@ const LessonsList = (props: Props) => {
       }
     )
   );
-  const { data: lessonsData, isSuccess: lessonsIsSuccess, isPending: lessonsIsPending } = lessons_q;
+  const { data: lessonsData, isSuccess: lessonsIsSuccess } = lessons_q;
 
   const [lessonsTransliterated, setTransliteratedLessons] = useState<
     NonNullable<typeof lessons_q.data>
@@ -276,59 +297,58 @@ const LessonsList = (props: Props) => {
     });
   }, [lessonsIsSuccess, lessonsData, selectedLanguageId, selectedScriptId]);
 
-  const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
-  const carouselScrolledToSelectedLesson = useRef(false);
+  // the transliterated list can still be the previous category's while the new one is prepared
+  const lessons =
+    lessonsData && sameLessonIds(lessonsTransliterated, lessonsData) ? lessonsTransliterated : null;
+
+  // Always keep a lesson selected: the saved one if it is in this category, else the first
   useEffect(() => {
-    // currently this effect only runs once and not on category change
-    if (
-      carouselScrolledToSelectedLesson.current ||
-      lessonsIsPending ||
-      !lessonsIsSuccess ||
-      selectedCategoryId === null ||
-      selectedCategoryId === undefined ||
-      !carouselApi
-    )
-      return;
-    const lessons_ = lessonsData;
-    if (!lessons_) return;
-    const idx = lessons_.findIndex((l) => l.id === selectedLessonId);
-    // the not found case due to invalid lesson id is now handled on server itself
-    carouselScrolledToSelectedLesson.current = true;
+    if (!lessonsData || lessonsData.some((lesson) => lesson.id === selectedLessonId)) return;
+    const first = lessonsData[0]?.id ?? null;
+    setSelectedLessonId(first);
+    saveLearnPageCookies('lesson_id', first);
+  }, [lessonsData, selectedLessonId, setSelectedLessonId]);
 
-    if (selectedLessonId === null) {
-      // select first in list if not set initially
-      setSelectedLessonId(lessons_[0]?.id ?? null);
-      return;
-    }
-    if (idx >= 0) {
-      carouselApi.scrollTo(idx);
-    }
-  }, [
-    carouselApi,
-    selectedLessonId,
-    lessonsIsPending,
-    lessonsIsSuccess,
-    lessonsData,
-    selectedCategoryId,
-    setSelectedLessonId
-  ]);
-
-  // Helpers to drive carousel from child Lesson
-  const currentIndex = lessonsTransliterated.findIndex((l) => l.id === selectedLessonId);
-  const hasNext = currentIndex >= 0 && currentIndex < lessonsTransliterated.length - 1;
-  const goToNextLesson = () => {
-    if (!hasNext) return;
-    const nextLesson = lessonsTransliterated[currentIndex + 1];
-    setSelectedLessonId(nextLesson.id);
-    saveLearnPageCookies('lesson_id', nextLesson.id);
-    if (carouselApi) {
-      carouselApi.scrollTo(currentIndex + 1);
-    }
+  const selectLesson = (lesson_id: number) => {
+    if (lesson_id === selectedLessonId) return;
+    setSelectedLessonId(lesson_id);
+    saveLearnPageCookies('lesson_id', lesson_id);
   };
+
+  const currentIndex = lessons?.findIndex((l) => l.id === selectedLessonId) ?? -1;
+  const hasNext = lessons !== null && currentIndex >= 0 && currentIndex < lessons.length - 1;
+  const goToNextLesson = () => {
+    if (hasNext) selectLesson(lessons[currentIndex + 1]!.id);
+  };
+
+  // bring the selected lesson into view, wherever it was selected from (restore, Next, index)
+  const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
+  useEffect(() => {
+    if (!carouselApi || currentIndex < 0) return;
+    const frame = requestAnimationFrame(() => {
+      // slides are rendered by now; let the carousel pick them up before scrolling
+      carouselApi.reInit();
+      if (!carouselApi.slidesInView().includes(currentIndex)) carouselApi.scrollTo(currentIndex);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [carouselApi, currentIndex, lessons]);
 
   const carouselBasicClassName_akshara = 'basis-1/2 sm:basis-1/3 md:basis-1/4';
   return (
-    <div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {props.categorySelect}
+        <AksharaIndexDialog
+          open={indexOpen}
+          onOpenChange={setIndexOpen}
+          lessons={lessons}
+          selectedLessonId={selectedLessonId}
+          onSelect={(lesson_id) => {
+            selectLesson(lesson_id);
+            setIndexOpen(false);
+          }}
+        />
+      </div>
       <div className="flex w-full min-w-0 flex-wrap items-center justify-center">
         <Carousel
           opts={{
@@ -338,32 +358,24 @@ const LessonsList = (props: Props) => {
           className="w-full max-w-[90vw] min-w-0 select-none sm:max-w-[70vw] md:max-w-[60vw]"
         >
           <CarouselContent className="">
-            {lessons_q.isLoading && LOADING_SKELETONS.lessons(carouselBasicClassName_akshara)}
+            {lessons === null && LOADING_SKELETONS.lessons(carouselBasicClassName_akshara)}
 
-            {!lessons_q.isLoading &&
-              lessons_q.isSuccess &&
-              lessonsTransliterated.length > 0 &&
-              lessonsTransliterated.map((lesson) => (
-                <CarouselItem key={lesson.id} className={carouselBasicClassName_akshara}>
-                  <Button
-                    variant={selectedLessonId === lesson.id ? 'default' : 'outline'}
-                    className={cn(
-                      'w-full text-xl transition-all',
-                      selectedLessonId === lesson.id
-                        ? 'border border-blue-600 bg-blue-600 text-white shadow-md ring-2 ring-blue-500/20 hover:bg-blue-700 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600'
-                        : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
-                    )}
-                    onClick={() => {
-                      if (selectedLessonId !== lesson.id) {
-                        setSelectedLessonId(lesson.id);
-                        saveLearnPageCookies('lesson_id', lesson.id);
-                      }
-                    }}
-                  >
-                    {lesson.text}
-                  </Button>
-                </CarouselItem>
-              ))}
+            {lessons?.map((lesson) => (
+              <CarouselItem key={lesson.id} className={carouselBasicClassName_akshara}>
+                <Button
+                  variant={selectedLessonId === lesson.id ? 'default' : 'outline'}
+                  className={cn(
+                    'w-full text-xl transition-all',
+                    selectedLessonId === lesson.id
+                      ? 'border border-blue-600 bg-blue-600 text-white shadow-md ring-2 ring-blue-500/20 hover:bg-blue-700 dark:border-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600'
+                      : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
+                  )}
+                  onClick={() => selectLesson(lesson.id)}
+                >
+                  {lesson.text}
+                </Button>
+              </CarouselItem>
+            ))}
           </CarouselContent>
           <CarouselPrevious className="left-0 sm:-left-12" />
           <CarouselNext className="right-0 sm:-right-12" />
@@ -383,6 +395,81 @@ const LessonsList = (props: Props) => {
         />
       )}
     </div>
+  );
+};
+
+/** Every akshara of the category at once, to jump straight to one */
+const AksharaIndexDialog = ({
+  open,
+  onOpenChange,
+  lessons,
+  selectedLessonId,
+  onSelect
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  lessons: text_lesson_type[] | null;
+  selectedLessonId: number | null;
+  onSelect: (lesson_id: number) => void;
+}) => {
+  const currentIndex = lessons?.findIndex((l) => l.id === selectedLessonId) ?? -1;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger
+        render={
+          <Button
+            variant="outline"
+            className="gap-2 font-semibold"
+            disabled={!lessons || lessons.length === 0}
+            aria-label="Show all aksharas"
+          />
+        }
+      >
+        <LayoutGrid />
+        {lessons && currentIndex >= 0 ? (
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {currentIndex + 1}/{lessons.length}
+          </span>
+        ) : null}
+      </DialogTrigger>
+      <DialogContent className="flex max-h-[85vh] flex-col gap-4 sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>All aksharas</DialogTitle>
+          <DialogDescription>Pick one to jump straight to it.</DialogDescription>
+        </DialogHeader>
+        <div className="-mx-1 grid min-h-0 grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2 overflow-y-auto px-1 py-1">
+          {lessons?.map((lesson, index) => {
+            const selected = lesson.id === selectedLessonId;
+            return (
+              <button
+                key={lesson.id}
+                type="button"
+                autoFocus={selected}
+                aria-current={selected ? 'true' : undefined}
+                onClick={() => onSelect(lesson.id)}
+                className={cn(
+                  'relative flex aspect-square items-center justify-center rounded-xl border text-2xl font-semibold transition-all outline-none',
+                  'hover:-translate-y-0.5 hover:border-blue-500/60 hover:bg-accent hover:shadow-sm',
+                  'focus-visible:ring-2 focus-visible:ring-blue-500',
+                  selected &&
+                    'border-blue-600 bg-blue-600 text-white shadow-md hover:border-blue-600 hover:bg-blue-700 dark:border-blue-500 dark:bg-blue-500'
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute top-1 left-1.5 text-[10px] font-medium tabular-nums',
+                    selected ? 'text-white/80' : 'text-muted-foreground'
+                  )}
+                >
+                  {index + 1}
+                </span>
+                {lesson.text}
+              </button>
+            );
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -423,7 +510,6 @@ const Lesson = ({
   const scriptId = useAtomValue(selected_script_id_atom);
   const selectedLanguageId = useAtomValue(selected_language_id_atom);
   const trpc = useTRPC();
-  const session = useSession();
 
   const lesson_info_q = useQuery(
     trpc.text_lessons.get_text_lesson_info.queryOptions(
@@ -464,6 +550,31 @@ const Lesson = ({
       { enabled: !!selected_gesture }
     )
   );
+
+  // tell the app bar menu what is shown, for its admin "Edit …" links
+  const selectedCategoryId = useAtomValue(selected_category_id_atom);
+  const categories_q = useQuery(
+    trpc.text_lessons.categories.get_categories.queryOptions({ lang_id: selectedLanguageId })
+  );
+  const categoryName = categories_q.data?.find((c) => c.id === selectedCategoryId)?.name;
+  const setAdminContext = useSetAtom(learn_admin_context_atom, { store: getDefaultStore() });
+  useEffect(() => {
+    setAdminContext({
+      lesson: lesson ? { id: lesson.id, text: varnaTransliterated ?? lesson.text } : null,
+      gesture_id: selected_gesture?.id ?? null,
+      category:
+        selectedCategoryId !== null && categoryName
+          ? { id: selectedCategoryId, name: categoryName }
+          : null
+    });
+  }, [
+    setAdminContext,
+    lesson,
+    varnaTransliterated,
+    selected_gesture?.id,
+    selectedCategoryId,
+    categoryName
+  ]);
 
   // Audio playback state for word audios and varna audio
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -708,19 +819,6 @@ const Lesson = ({
             </JotaiProvider>
           )}
       </div>
-      {session.data?.user && session.data.user.role === 'admin' && (
-        <div className="mt-16 flex items-center justify-center">
-          <Link
-            to="/lessons/edit/$id"
-            params={{ id: String(lesson_id ?? 0) }}
-            target="_blank"
-            className="group flex items-center justify-center gap-2 text-blue-600 transition-all hover:text-blue-700 hover:underline dark:text-sky-400 dark:hover:text-blue-300"
-          >
-            <FaExternalLinkAlt className="size-4 text-yellow-500 group-hover:text-yellow-600 dark:text-yellow-400 dark:group-hover:text-yellow-300" />
-            Edit Lesson
-          </Link>
-        </div>
-      )}
     </div>
   );
 };

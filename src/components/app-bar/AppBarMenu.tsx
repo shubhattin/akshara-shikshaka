@@ -26,6 +26,7 @@ import { is_ios_atom, pwa_state_atom } from '../PWA/pwa_state';
 import { useAtom } from 'jotai';
 import { PWAInstallButton } from '../PWA/PWAInit';
 import { IoExtensionPuzzle } from 'react-icons/io5';
+import { AdminMenuSection } from './AdminMenuSection';
 
 export function MenuButton() {
   const { theme, setTheme } = useTheme();
@@ -130,6 +131,8 @@ export function MenuButton() {
             </div>
 
             <Separator className="my-4 bg-slate-200 dark:bg-slate-700" />
+
+            <AdminMenuSection onNavigate={() => setOpen(false)} />
 
             {(pwa_state.install_event_fired || pwa_state.is_installed || isIos) && (
               <>

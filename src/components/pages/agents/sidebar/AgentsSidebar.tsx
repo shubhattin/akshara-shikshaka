@@ -37,6 +37,7 @@ import { DeleteChatDialog, RenameChatDialog } from './ChatActionsDialogs';
 import { groupChatsByDate } from './chat_groups';
 import { freeChats, type SidebarChat } from './gesture_groups';
 import { GestureTree } from './GestureTree';
+import { hasActiveBatchRun } from './sidebar_tree';
 
 type ChatRef = { id: string; title: string };
 
@@ -139,7 +140,10 @@ function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
   const anyStreaming = chats_q.data?.some((chat) => chat.streaming) ?? false;
   const gestures_q = useQuery(
     trpc.agents.sidebar_gestures.queryOptions(undefined, {
-      refetchInterval: anyStreaming ? 5000 : false
+      // also while batch runs wait or run: between runs no chat streams, and a run's item
+      // settles after its chat stops streaming
+      refetchInterval: (query) =>
+        anyStreaming || query.state.data?.gestures.some(hasActiveBatchRun) ? 5000 : false
     })
   );
   const refreshing = chats_q.isFetching || gestures_q.isFetching;

@@ -1,4 +1,4 @@
-import type { BatchItemStatus } from '~/agents/batch';
+import { ACTIVE_ITEM_STATUSES, type BatchItemStatus } from '~/agents/batch';
 import type { ReviewStatus } from '~/agents/gesture_review';
 
 /** A gesture of the sidebar's Gestures tab, as `agents.sidebar_gestures` returns it. */
@@ -58,6 +58,11 @@ export const SIDEBAR_STATUS_META = {
 export const hasPendingProposal = (g: Pick<SidebarGesture, 'batches'>) =>
   g.batches.some((batch) => batch.status === 'proposed');
 
+/** A batch run for this gesture still waits or runs. */
+const ACTIVE = new Set<BatchItemStatus>(ACTIVE_ITEM_STATUSES);
+export const hasActiveBatchRun = (g: Pick<SidebarGesture, 'batches'>) =>
+  g.batches.some((batch) => ACTIVE.has(batch.status));
+
 /** Does the gesture show under this status chip? */
 export function matchesStatus(g: SidebarGesture, status: SidebarStatus): boolean {
   if (status === 'to_review') return hasPendingProposal(g);
@@ -67,6 +72,18 @@ export function matchesStatus(g: SidebarGesture, status: SidebarStatus): boolean
 
 /** One row: a gesture, and (grouped by batch) its item's state in that batch. */
 export type SidebarEntry = { gesture: SidebarGesture; batchStatus: BatchItemStatus | null };
+
+/** Is this row's proposal waiting? Under a batch, only that batch's own item counts. */
+const entryToReview = (e: SidebarEntry) =>
+  e.batchStatus !== null ? e.batchStatus === 'proposed' : hasPendingProposal(e.gesture);
+
+/** Does the row show under any of these status chips (none selected: all)? */
+function entryMatches(e: SidebarEntry, statuses: readonly SidebarStatus[]) {
+  return (
+    statuses.length === 0 ||
+    statuses.some((s) => (s === 'to_review' ? entryToReview(e) : matchesStatus(e.gesture, s)))
+  );
+}
 
 export type SidebarGroup = {
   key: string;
@@ -110,9 +127,7 @@ function group(
   entries: SidebarEntry[],
   extra: Partial<SidebarGroup> = {}
 ): SidebarGroup {
-  const pending = new Set(
-    entries.filter((e) => hasPendingProposal(e.gesture)).map((e) => e.gesture.id)
-  );
+  const pending = new Set(entries.filter(entryToReview).map((e) => e.gesture.id));
   return { key, label, entries, toReview: pending.size, ...extra };
 }
 
@@ -159,7 +174,8 @@ function categoryRank(categories: readonly SidebarCategory[]) {
 
 function batchGroups(
   gestures: SidebarGesture[],
-  categories: readonly SidebarCategory[]
+  categories: readonly SidebarCategory[],
+  statuses: readonly SidebarStatus[]
 ): SidebarGroup[] {
   const rank = categoryRank(categories);
   const order = (a: SidebarEntry, b: SidebarEntry) =>
@@ -171,6 +187,8 @@ function batchGroups(
   for (const gesture of gestures) {
     if (gesture.batches.length === 0) loose.push(entry(gesture));
     for (const item of gesture.batches) {
+      // "To review" lists a gesture only under the batch whose proposal waits
+      if (!entryMatches(entry(gesture, item.status), statuses)) continue;
       let batch = batches.get(item.batch_id);
       if (!batch) batches.set(item.batch_id, (batch = { title: item.batch_title, entries: [] }));
       batch.entries.push(entry(gesture, item.status));
@@ -212,7 +230,7 @@ export function buildSidebarTree(
       .map((g) => entry(g));
     return entries.length > 0 ? [group('recent', 'Recent', entries)] : [];
   }
-  if (filters.mode === 'batch') return batchGroups(gestures, categories);
+  if (filters.mode === 'batch') return batchGroups(gestures, categories, filters.statuses);
   if (filters.script !== 'all') return categoryGroups(gestures, categories, '');
   const scripts = [...new Set(gestures.map((g) => g.script_id))].sort((a, b) => a - b);
   return scripts.map((scriptId) => {

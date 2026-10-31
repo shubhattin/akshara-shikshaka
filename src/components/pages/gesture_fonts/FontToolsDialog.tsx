@@ -333,6 +333,8 @@ export function FontToolsDialog({
         toast.success(`Changed the font of ${result.saved.length} gestures`);
         void queryClient.invalidateQueries(trpc.text_gestures.fonts.list.pathFilter());
         void queryClient.invalidateQueries(trpc.text_gestures.categories.get_gestures.pathFilter());
+        // new versions: back to Unreviewed, and batch proposals for them are superseded
+        void queryClient.invalidateQueries(trpc.agents.pathFilter());
         dispatch({ type: 'reset' });
         setConfirmSave(false);
         onOpenChange(false);

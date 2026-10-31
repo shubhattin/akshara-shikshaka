@@ -88,6 +88,16 @@ export function DeleteChatDialog({ chat, onClose }: { chat: ChatRef | null; onCl
     trpc.agents.delete_chat.mutationOptions({
       onSuccess: (_, input) => {
         void queryClient.invalidateQueries({ queryKey: trpc.agents.list_chats.queryKey() });
+        // its gesture's chat count, and a batch run's item loses its chat
+        for (const filter of [
+          trpc.agents.sidebar_gestures.pathFilter(),
+          trpc.agents.chats_for_gesture.pathFilter(),
+          trpc.agents.gesture_hub.pathFilter(),
+          trpc.agents.review_queue.pathFilter(),
+          trpc.agents.get_batch.pathFilter()
+        ]) {
+          void queryClient.invalidateQueries(filter);
+        }
         if (params.chatId === input.id) void navigate({ to: '/admin/agents' });
         onClose();
       },

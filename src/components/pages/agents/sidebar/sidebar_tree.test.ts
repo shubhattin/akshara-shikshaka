@@ -85,6 +85,32 @@ describe('buildSidebarTree', () => {
     expect(tree.map((t) => t.key)).toEqual(['batch:2', 'batch:1', 'batch:none']);
     expect(tree[0]!.toReview).toBe(1);
     expect(tree[1]!.entries.map((e) => e.batchStatus)).toEqual(['applied', 'failed']);
+    // gesture 1 waits for review in batch 2 only
+    expect(tree[1]!.toReview).toBe(0);
+  });
+
+  it('lists a gesture under "To review" only in the batch whose proposal waits', () => {
+    const gestures = [
+      g({ id: 1, batches: [batch(2, 'proposed'), batch(1, 'applied')] }),
+      g({ id: 2, review_status: 'approved', batches: [batch(1, 'superseded')] })
+    ];
+    const toReview = buildSidebarTree(
+      gestures,
+      categories,
+      { mode: 'batch', script: 'all', statuses: ['to_review'] },
+      name
+    );
+    expect(toReview.map((t) => [t.key, ids(t.entries)])).toEqual([['batch:2', [1]]]);
+    const either = buildSidebarTree(
+      gestures,
+      categories,
+      { mode: 'batch', script: 'all', statuses: ['to_review', 'approved'] },
+      name
+    );
+    expect(either.map((t) => [t.key, ids(t.entries)])).toEqual([
+      ['batch:2', [1]],
+      ['batch:1', [2]]
+    ]);
   });
 
   it('orders recent by activity and filters by status and search', () => {

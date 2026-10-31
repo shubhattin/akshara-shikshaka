@@ -1320,6 +1320,8 @@ const SaveEditMode = ({
         await queryClient.invalidateQueries(
           trpc.text_gestures.categories.get_gestures.pathFilter()
         );
+        // its chats lose their focus and its batch items are gone
+        void queryClient.invalidateQueries(trpc.agents.pathFilter());
         // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
         navigate({ to: '/gestures' } as never);
       },

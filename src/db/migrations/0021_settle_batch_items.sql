@@ -1,6 +1,7 @@
 -- Batch items now follow their gesture's saves (the app keeps them so from now on); settle the
 -- ones left "to review" before that:
--- an item whose run chat had a proposal applied is applied, as the newest save from that chat,
+-- an item whose run proposed, and whose chat had a proposal applied after its last review, is
+-- applied, as the newest save from that chat,
 UPDATE "agent_batch_items" AS i
 SET "status" = 'applied',
   "applied_revision" = r."revision_no",
@@ -15,7 +16,8 @@ FROM (
 ) AS r
 WHERE i."text_gesture_id" = r."text_gesture_id"
   AND i."chat_id" = r."chat_id"
-  AND i."status" NOT IN ('queued', 'running')
+  AND i."status" IN ('proposed', 'applied', 'rejected')
+  AND (i."reviewed_at" IS NULL OR i."reviewed_at" < r."created_at")
   AND (i."status" <> 'applied' OR i."applied_revision" IS DISTINCT FROM r."revision_no");--> statement-breakpoint
 -- and a proposal still waiting for a version that was saved over since is superseded.
 UPDATE "agent_batch_items" AS i

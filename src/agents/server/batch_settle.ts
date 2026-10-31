@@ -1,7 +1,7 @@
-import { and, eq, notInArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { agent_batch_items } from '~/db/schema';
 import type { DbTransaction } from '~/effect/database';
-import { ACTIVE_ITEM_STATUSES } from '~/agents/batch';
+import type { BatchItemStatus } from '~/agents/batch';
 
 /**
  * Batch items follow their gesture, so none stays "to review" once it was settled somewhere
@@ -9,10 +9,15 @@ import { ACTIVE_ITEM_STATUSES } from '~/agents/batch';
  *
  * - A save from a batch run's chat applies that item, whichever of the chat's proposals it was
  *   (the admin may have asked the agent for changes first). This also revives an item that was
- *   rejected or superseded, and moves `applied_revision` to the newest save from the chat.
+ *   rejected or superseded, and moves `applied_revision` to the newest save from the chat. Runs
+ *   that never proposed (failed, no proposal, cancelled) keep their outcome; a run still going
+ *   settles itself (and may auto-apply through this very save).
  * - Any save leaves the other proposals still waiting superseded: each one replaces a version
  *   that is gone (accepting it from the batch page is refused). Its chat can still apply it.
  */
+/** Items whose run ended with a proposal. */
+const PROPOSED_STATUSES: BatchItemStatus[] = ['proposed', 'applied', 'rejected', 'superseded'];
+
 export async function settleBatchItemsOnSave(
   tx: DbTransaction,
   input: { gestureId: number; revision: number; userId: string; chatId: string | null }
@@ -31,8 +36,7 @@ export async function settleBatchItemsOnSave(
         and(
           eq(agent_batch_items.text_gesture_id, input.gestureId),
           eq(agent_batch_items.chat_id, input.chatId),
-          // a run still going settles itself (and may auto-apply through this very save)
-          notInArray(agent_batch_items.status, [...ACTIVE_ITEM_STATUSES])
+          inArray(agent_batch_items.status, PROPOSED_STATUSES)
         )
       );
   }

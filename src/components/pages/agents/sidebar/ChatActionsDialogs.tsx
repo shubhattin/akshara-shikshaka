@@ -94,7 +94,8 @@ export function DeleteChatDialog({ chat, onClose }: { chat: ChatRef | null; onCl
           trpc.agents.chats_for_gesture.pathFilter(),
           trpc.agents.gesture_hub.pathFilter(),
           trpc.agents.review_queue.pathFilter(),
-          trpc.agents.get_batch.pathFilter()
+          trpc.agents.get_batch.pathFilter(),
+          trpc.agents.batch_proposals.pathFilter()
         ]) {
           void queryClient.invalidateQueries(filter);
         }

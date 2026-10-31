@@ -19,6 +19,12 @@ import type { GesturePoints } from './types';
  *   not) and the loop may start anywhere on its path.
  * - open: everything else — start/end points and direction matter; overshooting the ends (common
  *   for the shirorekha) is tolerated.
+ *
+ * Retracing: a stroke often starts or ends by running along ink an earlier stroke already left
+ * (the Kannada/Telugu talakattu over the top of the letter, the Devanagari danda over a bowl's
+ * rising side, the i-mātrā hook of రి closing over the circle). Those runs add nothing new to the
+ * letter, so when the earlier strokes are known (`priorStrokes`) the learner may skip them, draw
+ * them partly or fully, or even run further along the old ink than the reference does.
  */
 
 /** Scores at or above this are accepted. */
@@ -56,6 +62,12 @@ export type GestureScoreOptions = {
    * on-screen scale and input type so a finger on a small phone gets more slack than a mouse.
    */
   minTolerance?: number;
+  /**
+   * Strokes already on the canvas (earlier strokes of the glyph). Where the start or end of the
+   * target runs along them, that run may be skipped, and drawn ink running along them past the
+   * target's ends is ignored.
+   */
+  priorStrokes?: GesturePoints[][];
 };
 
 type Pt = { x: number; y: number };
@@ -72,6 +84,14 @@ const SIZE_NORMALISE_RANGE = [0.8, 1.25] as const;
 const TANGENT_SPAN = 5;
 /** The final score never exceeds the worst single check by more than this */
 const GATE_MARGIN = 0.4;
+/** A retraced run at a stroke's end shorter than this many tolerances is just a junction */
+const MIN_RETRACE_TOLS = 2;
+/** What is left of a stroke after skipping its retraced ends must be at least this long … */
+const MIN_CORE_TOLS = 3;
+/** … and at least this fraction of the stroke; otherwise the stroke is mostly a retrace and must be drawn */
+const MIN_CORE_FRAC = 0.3;
+/** Old ink a drawing may retrace beyond the reference's own retrace, as a fraction of the stroke */
+const EXTRA_RETRACE_FRAC = 0.5;
 
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -344,21 +364,71 @@ const scoreDot = (user: Pt[], target: Pt[], tol: number): GestureScore => {
   );
 };
 
-const scoreLine = (userRaw: Pt[], targetRaw: Pt[], tol: number, glyphSize: number) => {
-  let target = resample(smooth(targetRaw), SAMPLE_SIZE);
-  // Lengths of the smoothed, resampled paths so pointer jitter doesn't inflate the drawn length
+/** Small strokes get a tighter band, otherwise a 20px band swallows the whole shape */
+const bandFor = (target: Pt[], tol: number) =>
+  Math.max(tol, Math.min(2 * tol, 0.25 * boxSize(target)));
+
+/** A loop: ends meet and it's long enough to have a shape (judged by winding, any start point) */
+const isClosed = (target: Pt[], tol: number) => {
+  const len = pathLength(target);
+  return (
+    dist(target[0], target[target.length - 1]) <= Math.max(1.5 * tol, 0.12 * len) && len > 4 * tol
+  );
+};
+
+const scoreLine = (
+  userRaw: Pt[],
+  targetRaw: Pt[],
+  tol: number,
+  glyphSize: number,
+  prior: Pt[][]
+) => {
+  const target = resample(smooth(targetRaw), SAMPLE_SIZE);
+  const closed = isClosed(target, tol);
+  const drawn = resample(smooth(userRaw), SAMPLE_SIZE);
+  let best = scorePath(drawn, target, closed, tol, glyphSize);
+  if (prior.length === 0) return best;
+
+  // Also judge the drawing with the ink it ran along earlier strokes set aside: against the whole
+  // stroke, and — when the stroke starts or ends by retracing old ink — against just its new part
+  // (which may be open even when the whole stroke closes a loop over old ink, like the hook of రి).
+  // So skipping, half-drawing or fully drawing a retrace all pass. The best match counts, so
+  // setting ink aside can only ever help a drawing.
+  const consider = (own: Pt[] | null, ref: Pt[], refClosed: boolean) => {
+    if (!own) return;
+    const scored = scorePath(own, ref, refClosed, tol, glyphSize);
+    if (scored.score > best.score) best = scored;
+  };
+  if (!closed) {
+    const allowance = EXTRA_RETRACE_FRAC * pathLength(target);
+    consider(stripPriorInk(drawn, target, prior, bandFor(target, tol), allowance), target, false);
+  }
+  const runs = retracedEnds(target, prior, tol);
+  const core = withoutRetrace(target, runs);
+  if (core) {
+    const allowance = runs.start + runs.end + EXTRA_RETRACE_FRAC * pathLength(core);
+    const skipped = { start: runs.start > 0, end: runs.end > 0 };
+    const own = stripPriorInk(drawn, core, prior, bandFor(core, tol), allowance, skipped);
+    consider(own ?? drawn, core, isClosed(core, tol));
+  }
+  return best;
+};
+
+/** Score a sampled drawing against a sampled reference path */
+const scorePath = (
+  drawn: Pt[],
+  targetSampled: Pt[],
+  closed: boolean,
+  tol: number,
+  glyphSize: number
+) => {
+  let target = targetSampled;
   const targetLen = pathLength(target);
   const targetBox = boxSize(target);
-
-  const closed =
-    dist(target[0], target[target.length - 1]) <= Math.max(1.5 * tol, 0.12 * targetLen) &&
-    targetLen > 4 * tol;
-  // Small strokes get a tighter band, otherwise a 20px band swallows the whole shape
-  const band = Math.max(tol, Math.min(2 * tol, 0.25 * targetBox));
+  const band = bandFor(target, tol);
 
   // Running past the ends (common for the shirorekha) is cut off and judged on its own, so it
   // doesn't also shift the placement, size and shape of the rest of the stroke
-  const drawn = resample(smooth(userRaw), SAMPLE_SIZE);
   const trim = closed ? null : trimOvershoot(drawn, target, band, targetLen);
   const user = trim ? resample(trim.kept, SAMPLE_SIZE) : drawn;
   const overshoot = trim ? trim.overshoot : 0;
@@ -545,6 +615,75 @@ const trimOvershoot = (drawn: Pt[], target: Pt[], band: number, targetLen: numbe
   return { kept, overshoot: Math.max(0, pathLength(drawn) - keptLen) };
 };
 
+const minDistToAny = (p: Pt, polys: Pt[][]) => {
+  let min = Infinity;
+  for (const poly of polys) min = Math.min(min, distToPolyline(p, poly));
+  return min;
+};
+
+/**
+ * Lengths of the leading and trailing runs of `target` that lie on earlier strokes' ink. Runs
+ * shorter than a junction count as 0, and a stroke that is mostly retrace gets nothing to skip.
+ */
+const retracedEnds = (target: Pt[], prior: Pt[][], tol: number) => {
+  const n = target.length;
+  const onInk = target.map((p) => minDistToAny(p, prior) <= tol);
+  let first = 0;
+  while (first < n && onInk[first]) first++;
+  let last = n - 1;
+  while (last >= first && onInk[last]) last--;
+  const total = pathLength(target);
+  const start = first > 0 ? pathLength(target.slice(0, first)) : 0;
+  const end = last < n - 1 ? pathLength(target.slice(last + 1)) : 0;
+  const minRun = MIN_RETRACE_TOLS * tol;
+  const runs = { start: start >= minRun ? start : 0, end: end >= minRun ? end : 0 };
+  const core = total - runs.start - runs.end;
+  if (core < Math.max(MIN_CORE_TOLS * tol, MIN_CORE_FRAC * total)) return { start: 0, end: 0 };
+  return runs;
+};
+
+/** The reference without its retraced ends; `null` when it has none */
+const withoutRetrace = (target: Pt[], runs: { start: number; end: number }) => {
+  if (runs.start === 0 && runs.end === 0) return null;
+  const n = target.length - 1;
+  const cum = [0];
+  for (let i = 1; i <= n; i++) cum.push(cum[i - 1] + dist(target[i], target[i - 1]));
+  let from = 0;
+  while (from < n && cum[from] < runs.start) from++;
+  let to = n;
+  while (to > from && cum[to] > cum[n] - runs.end) to--;
+  return resample(target.slice(from, to + 1), SAMPLE_SIZE);
+};
+
+/**
+ * Drop leading/trailing parts of the drawing that run along earlier strokes. On the `skipped`
+ * ends everything on old ink goes (the reference's retrace there was dropped too); elsewhere only
+ * old ink away from the reference goes (retracing further than the reference does). At most
+ * `allowance` of ink is dropped — redrawing a whole earlier stroke that happens to cross the
+ * target is not a retrace. `null` when nothing is dropped or too little would be left.
+ */
+const stripPriorInk = (
+  drawn: Pt[],
+  target: Pt[],
+  prior: Pt[][],
+  band: number,
+  allowance: number,
+  skipped = { start: false, end: false }
+) => {
+  const extra = (p: Pt, skippedEnd: boolean) =>
+    minDistToAny(p, prior) <= band && (skippedEnd || distToPolyline(p, target) > band);
+  let first = 0;
+  let last = drawn.length - 1;
+  while (first < last && extra(drawn[first], skipped.start)) first++;
+  while (last > first && extra(drawn[last], skipped.end)) last--;
+  if (first === 0 && last === drawn.length - 1) return null;
+  const kept = drawn.slice(first, last + 1);
+  const keptLen = pathLength(kept);
+  if (kept.length < 2 || keptLen < 0.25 * pathLength(target)) return null;
+  if (pathLength(drawn) - keptLen > allowance) return null;
+  return resample(kept, SAMPLE_SIZE);
+};
+
 /** Score one drawn stroke against its reference stroke */
 export const scoreGesture = (
   userPoints: GesturePoints[],
@@ -562,7 +701,8 @@ export const scoreGesture = (
   if (isDotStroke(targetPoints, options)) return scoreDot(user, target, tol);
   if (pathLength(user) < 0.5 * tol) return failed('incomplete');
 
-  return result(scoreLine(user, target, tol, glyphSize));
+  const prior = (options.priorStrokes ?? []).map(toPts).filter((p) => p.length > 0);
+  return result(scoreLine(user, target, tol, glyphSize, prior));
 };
 
 /** Longest side of the bounding box around all strokes of a glyph */
@@ -581,7 +721,12 @@ export const scoreGlyphStroke = (
   index: number,
   options: Omit<GestureScoreOptions, 'glyphSize'> = {}
 ): GestureScore => {
-  const opts = { ...options, glyphSize: glyphSizeOf(strokes) };
+  // Only the strokes before `index` are on the canvas, also when checking against later strokes
+  const opts = {
+    ...options,
+    glyphSize: glyphSizeOf(strokes),
+    priorStrokes: strokes.slice(0, index)
+  };
   const own = scoreGesture(userPoints, strokes[index] ?? [], opts);
   if (own.passed) return own;
   for (let i = index + 1; i < strokes.length; i++) {

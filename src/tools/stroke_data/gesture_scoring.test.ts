@@ -173,3 +173,59 @@ describe('scoreGesture — edge cases', () => {
     expect(scoreGesture(BOWL, BOWL, { glyphSize: 230 }).score).toBeCloseTo(1, 5);
   });
 });
+
+const deg = (d: number) => (d * Math.PI) / 180;
+
+describe('scoreGlyphStroke — retracing earlier strokes', () => {
+  // Kannada/Telugu-like: a top bar, then a talakattu that runs back along the bar and hooks up
+  const BAR = line(100, 150, 300, 150);
+  const TICK_RETRACE = line(120, 150, 240, 150, 50);
+  const TICK_HOOK = line(240, 150, 255, 40, 40);
+  const TICK = [...TICK_RETRACE, ...TICK_HOOK.slice(1)];
+  const TICK_GLYPH = [BAR, TICK];
+  const tick = (user: GesturePoints[]) => scoreGlyphStroke(user, TICK_GLYPH, 1);
+
+  // రి-like: a circle, then a hook over it that closes by running back along the circle's top
+  const CIRCLE = arc(200, 250, 80, deg(90), deg(450), 120);
+  const HOOK_NEW = arc(200, 177.5, 34, Math.PI, 2 * Math.PI);
+  const HOOK_RETRACE = arc(200, 250, 80, deg(-65), deg(-115), 25);
+  const HOOK = [...HOOK_NEW, ...HOOK_RETRACE.slice(1)];
+  const RI = [CIRCLE, HOOK];
+  const ri = (user: GesturePoints[]) => scoreGlyphStroke(user, RI, 1);
+
+  it('accepts the stroke with the retrace drawn, skipped or half drawn', () => {
+    expect(tick(jitter(TICK)).passed).toBe(true);
+    expect(tick(jitter(TICK_HOOK)).passed).toBe(true);
+    expect(tick(jitter([...line(180, 150, 240, 150, 25), ...TICK_HOOK.slice(1)])).passed).toBe(
+      true
+    );
+  });
+
+  it('accepts a hook that closes over old ink drawn open or closed (రి)', () => {
+    expect(ri(jitter(HOOK)).passed).toBe(true);
+    expect(ri(jitter(HOOK_NEW)).passed).toBe(true);
+  });
+
+  it('accepts running further along old ink than the reference does', () => {
+    expect(tick(jitter([...line(100, 150, 240, 150, 60), ...TICK_HOOK.slice(1)])).passed).toBe(
+      true
+    );
+  });
+
+  it('only allows skipping ink that is already on the canvas', () => {
+    expect(scoreGesture(jitter(TICK_HOOK), TICK, { glyphSize: 200 }).passed).toBe(false);
+  });
+
+  it('rejects drawing only the retraced part', () => {
+    expect(tick(jitter(TICK_RETRACE)).passed).toBe(false);
+  });
+
+  it('rejects skipping the retrace and part of the new ink', () => {
+    expect(tick(jitter(line(240, 150, 248, 95, 20))).passed).toBe(false);
+  });
+
+  it('rejects redrawing an earlier stroke', () => {
+    expect(tick(jitter(BAR)).passed).toBe(false);
+    expect(ri(jitter(CIRCLE)).passed).toBe(false);
+  });
+});

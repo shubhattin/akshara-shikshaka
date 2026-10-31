@@ -1,3 +1,4 @@
+import { listSidebarGestures } from '~/agents/server/sidebar';
 import { Effect } from 'effect';
 import { z } from 'zod';
 import { protectedAdminProcedure, t } from '~/api/trpc_init';
@@ -49,6 +50,11 @@ const gesture_id_schema = z.int().positive();
 
 /** Every chat (chats are shared between admins), newest first. */
 const list_chats_route = protectedAdminProcedure.query(() => runTrpcEffect(listAgentChats()));
+
+/** The sidebar's Gestures tab: gestures with focused chats, their category and batches. */
+const sidebar_gestures_route = protectedAdminProcedure.query(() =>
+  runTrpcEffect(listSidebarGestures())
+);
 
 const get_chat_route = protectedAdminProcedure
   .input(z.object({ id: chat_id_schema }))
@@ -283,6 +289,7 @@ export const agents_router = t.router({
   accept_batch_item: accept_batch_item_route,
   reject_batch_item: reject_batch_item_route,
   list_chats: list_chats_route,
+  sidebar_gestures: sidebar_gestures_route,
   get_chat: get_chat_route,
   create_chat: create_chat_route,
   rename_chat: rename_chat_route,

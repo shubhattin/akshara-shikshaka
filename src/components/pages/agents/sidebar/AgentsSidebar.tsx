@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { AgentKindIcon } from '../AgentKindIcon';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import {
   ArrowLeftIcon,
-  ChevronRightIcon,
   LayersIcon,
   ListChecksIcon,
   MoreHorizontalIcon,
   PanelLeftIcon,
   PencilIcon,
   PlusIcon,
+  RefreshCwIcon,
   SearchIcon,
   Trash2Icon
 } from 'lucide-react';
@@ -26,21 +26,15 @@ import {
 } from '~/components/ui/dropdown-menu';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '~/components/ui/input-group';
 import { Skeleton } from '~/components/ui/skeleton';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '~/components/ui/collapsible';
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import type { AgentKind } from '~/agents/agent_kinds';
 import { useStoredValue } from '~/hooks/use_stored_value';
 import { cn } from '~/lib/utils';
 import { get_script_from_id } from '~/state/lang_list';
-import { ReviewBadge } from '../gesture_hub/ReviewBadge';
 import { DeleteChatDialog, RenameChatDialog } from './ChatActionsDialogs';
 import { groupChatsByDate } from './chat_groups';
-import {
-  freeChats,
-  groupChatsByGesture,
-  type FocusedGestureGroup,
-  type SidebarChat
-} from './gesture_groups';
+import { freeChats, type SidebarChat } from './gesture_groups';
+import { GestureTree } from './GestureTree';
 
 type ChatRef = { id: string; title: string };
 
@@ -117,81 +111,6 @@ function ChatRow({
   );
 }
 
-/** One gesture of the Gestures tab: its chats fold under it; the name opens its hub. */
-function GestureGroupRow({
-  group,
-  activeChatId,
-  activeGestureId,
-  rowProps
-}: {
-  group: FocusedGestureGroup<ListedChat>;
-  activeChatId: string | undefined;
-  activeGestureId: number | null;
-  rowProps: Pick<Parameters<typeof ChatRow>[0], 'onNavigate' | 'onRename' | 'onDelete'>;
-}) {
-  const containsActive = group.chats.some((chat) => chat.id === activeChatId);
-  const [open, setOpen] = useState(containsActive);
-  if (containsActive && !open) setOpen(true);
-  const hubActive = activeGestureId === group.gesture_id;
-  return (
-    <li>
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <div
-          className={cn(
-            'flex items-center gap-1 rounded-lg pr-1 transition-colors',
-            hubActive ? 'bg-muted' : 'hover:bg-muted/60'
-          )}
-        >
-          <CollapsibleTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label={open ? 'Hide chats' : 'Show chats'}
-                className="text-muted-foreground"
-              />
-            }
-          >
-            <ChevronRightIcon className={cn('transition-transform', open && 'rotate-90')} />
-          </CollapsibleTrigger>
-          <Link
-            to="/admin/agents/gestures/$gestureId"
-            params={{ gestureId: String(group.gesture_id) }}
-            onClick={rowProps.onNavigate}
-            className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-sm text-foreground no-underline"
-          >
-            <span className="text-base leading-none font-semibold">{group.text}</span>
-            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-              {get_script_from_id(group.script_id) ?? group.script_id} · {group.chats.length}{' '}
-              {group.chats.length === 1 ? 'chat' : 'chats'}
-            </span>
-            {group.streaming ? (
-              <span
-                title="A chat is replying"
-                className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary"
-              />
-            ) : null}
-            <ReviewBadge status={group.review_status} strokes={group.strokes} />
-          </Link>
-        </div>
-        <CollapsibleContent>
-          <ul className="ml-3 flex flex-col gap-0.5 border-l border-border/70 py-0.5 pl-1.5">
-            {group.chats.map((chat) => (
-              <ChatRow
-                key={chat.id}
-                chat={chat}
-                active={chat.id === activeChatId}
-                showKind={false}
-                {...rowProps}
-              />
-            ))}
-          </ul>
-        </CollapsibleContent>
-      </Collapsible>
-    </li>
-  );
-}
-
 function matchesSearch(chat: ListedChat, needle: string) {
   if (!needle) return true;
   const script =
@@ -208,12 +127,25 @@ const parseTab = (stored: string | null): SidebarTab | null =>
 function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
   const trpc = useTRPC();
   const params = useParams({ strict: false });
+  const queryClient = useQueryClient();
   const chats_q = useQuery(
     trpc.agents.list_chats.queryOptions(undefined, {
       // While any chat streams in the background, keep the list fresh.
       refetchInterval: (query) => (query.state.data?.some((chat) => chat.streaming) ? 3000 : false)
     })
   );
+  const anyStreaming = chats_q.data?.some((chat) => chat.streaming) ?? false;
+  const gestures_q = useQuery(
+    trpc.agents.sidebar_gestures.queryOptions(undefined, {
+      refetchInterval: anyStreaming ? 5000 : false
+    })
+  );
+  const refreshing = chats_q.isFetching || gestures_q.isFetching;
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: trpc.agents.list_chats.queryKey() });
+    void queryClient.invalidateQueries({ queryKey: trpc.agents.sidebar_gestures.queryKey() });
+    void queryClient.invalidateQueries({ queryKey: trpc.agents.list_batches.queryKey() });
+  };
   const [search, setSearch] = useState('');
   const [renaming, setRenaming] = useState<ChatRef | null>(null);
   const [deleting, setDeleting] = useState<ChatRef | null>(null);
@@ -233,7 +165,6 @@ function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
   const chats = all.filter((chat) => matchesSearch(chat, needle));
   // While searching, the Chats tab finds focused chats too.
   const free = needle ? chats : freeChats(chats);
-  const byGesture = groupChatsByGesture(chats);
   const rowProps = { onNavigate, onRename: setRenaming, onDelete: setDeleting };
 
   return (
@@ -279,6 +210,15 @@ function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
           >
             <LayersIcon />
           </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Refresh"
+            title="Refresh chats, gestures and batches"
+            onClick={refresh}
+          >
+            <RefreshCwIcon className={cn(refreshing && 'animate-spin')} />
+          </Button>
         </div>
         <InputGroup className="h-8">
           <InputGroupAddon>
@@ -310,28 +250,34 @@ function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
             ))}
           </div>
         ) : tab === 'gestures' ? (
-          byGesture.length === 0 ? (
-            <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-              {needle
-                ? 'No gestures match.'
-                : 'No focused chats yet. Start one from New chat → Focus on one gesture.'}
-            </p>
+          gestures_q.data ? (
+            <GestureTree
+              gestures={gestures_q.data.gestures}
+              categories={gestures_q.data.categories}
+              chats={all}
+              needle={needle}
+              activeChatId={params.chatId}
+              activeGestureId={activeGestureId}
+              onNavigate={onNavigate}
+              renderChat={(chat) => {
+                const listed = all.find((c) => c.id === chat.id);
+                return listed ? (
+                  <ChatRow
+                    key={listed.id}
+                    chat={listed}
+                    active={listed.id === params.chatId}
+                    showKind={false}
+                    {...rowProps}
+                  />
+                ) : null;
+              }}
+            />
           ) : (
-            byGesture.map((akshara) => (
-              <section key={akshara.text_key} className="mb-2">
-                <ul className="flex flex-col gap-0.5">
-                  {akshara.gestures.map((group) => (
-                    <GestureGroupRow
-                      key={group.gesture_id}
-                      group={group}
-                      activeChatId={params.chatId}
-                      activeGestureId={activeGestureId}
-                      rowProps={rowProps}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ))
+            <div className="flex flex-col gap-1.5 px-1">
+              {Array.from({ length: 6 }, (_, index) => (
+                <Skeleton key={index} className="h-8 w-full" />
+              ))}
+            </div>
           )
         ) : free.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-muted-foreground">
@@ -367,7 +313,7 @@ function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
 /** Chat history beside the conversation (md and up). */
 export function AgentsSidebar() {
   return (
-    <aside className="hidden w-72 shrink-0 flex-col border-r border-border/70 bg-muted/20 pt-3 md:flex">
+    <aside className="hidden w-80 shrink-0 flex-col border-r border-border/70 bg-muted/20 pt-3 md:flex">
       <ChatHistory />
     </aside>
   );

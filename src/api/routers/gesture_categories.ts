@@ -82,7 +82,8 @@ export const getGesturesByCategory = Effect.fn('getGesturesByCategory')(function
       text_key: text_gestures.text_key,
       lesson_id: text_lessons.id,
       updated_at: text_gestures.updated_at,
-      stroke_count: sql<number>`jsonb_array_length(${text_gestures.gestures})`.mapWith(Number)
+      stroke_count: sql<number>`jsonb_array_length(${text_gestures.gestures})`.mapWith(Number),
+      font_family: text_gestures.font_family
     };
     if (input.category_id > 0) {
       // the lesson's position, while it sits in the same category

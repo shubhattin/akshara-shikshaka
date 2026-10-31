@@ -12,7 +12,7 @@ import {
   SelectValue
 } from '~/components/ui/select';
 import { Button } from '~/components/ui/button';
-import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
+import { FONT_SCRIPTS, LANGUAGES_ADDED, type FontFamily } from '~/state/font_list';
 import {
   lang_list_obj,
   script_list_obj,
@@ -26,7 +26,8 @@ import type { lesson_categories } from '~/db/schema';
 import type { InferSelectModel } from 'drizzle-orm';
 import { useHydrateAtoms } from 'jotai/react/utils';
 import { atom, useAtom, useAtomValue } from 'jotai';
-import { ArrowRightLeft, ArrowUpRight, ChevronsUpDown, Plus, Undo2 } from 'lucide-react';
+import { ArrowRightLeft, ArrowUpRight, ChevronsUpDown, Plus, TypeIcon, Undo2 } from 'lucide-react';
+import { FontToolsDialog } from '~/components/pages/gesture_fonts/FontToolsDialog';
 import {
   Command,
   CommandEmpty,
@@ -101,6 +102,7 @@ function ListGestures({
   const [scriptId, setScriptId] = useAtom(script_id_atom);
   const [langId, setLangId] = useAtom(lang_id_atom);
   const [editOpen, setEditOpen] = useState(false);
+  const [fontsOpen, setFontsOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedCategoryID, setSelectedCategoryID] = useAtom(selected_category_id_atom);
   useCategorySearchParam({
@@ -283,6 +285,16 @@ function ListGestures({
           categories={categories}
         />
       ) : null}
+      {selectedCategoryID !== null && fontsOpen ? (
+        <FontToolsDialog
+          open
+          onOpenChange={setFontsOpen}
+          categoryId={selectedCategoryID}
+          categoryName={categoryName}
+          scriptId={scriptId}
+          langId={langId}
+        />
+      ) : null}
 
       {selectedCategoryID === null ? (
         <div className="mx-auto w-full max-w-5xl text-center font-semibold text-muted-foreground">
@@ -300,14 +312,24 @@ function ListGestures({
             <DisplayGesturesSection
               data={category_gestures_q.data}
               actions={
-                <Button
-                  variant="outline"
-                  onClick={() => setEditOpen(true)}
-                  className="border-sky-500 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-200"
-                >
-                  <ArrowRightLeft data-icon="inline-start" />
-                  Move gestures
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setFontsOpen(true)}
+                    title="Inspect and change the glyph fonts of this category"
+                  >
+                    <TypeIcon data-icon="inline-start" />
+                    Fonts
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setEditOpen(true)}
+                    className="border-sky-500 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-200"
+                  >
+                    <ArrowRightLeft data-icon="inline-start" />
+                    Move gestures
+                  </Button>
+                </>
               }
             />
           ) : null}
@@ -325,6 +347,7 @@ type GestureItem = {
   order: number | null;
   updated_at: Date;
   stroke_count: number;
+  font_family: FontFamily;
 };
 
 type PendingMove = GestureItem & { target_category_id: number | null };

@@ -328,7 +328,7 @@ export function FontToolsDialog({
   const dirty = changes.length > 0;
 
   const save_mut = useMutation(
-    trpc.text_gestures.fonts.apply.mutationOptions({
+    trpc.text_gestures.fonts.save.mutationOptions({
       onSuccess: (result) => {
         toast.success(`Changed the font of ${result.saved.length} gestures`);
         void queryClient.invalidateQueries(trpc.text_gestures.fonts.list.pathFilter());

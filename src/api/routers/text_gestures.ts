@@ -513,7 +513,7 @@ const list_category_fonts_route = protectedAdminProcedure
   .input(z.object({ category_id: z.int(), script_id: z.int(), lang_id: z.int() }))
   .query(({ input }) => runTrpcEffect(listCategoryGestureFonts(input)));
 
-const apply_fonts_route = protectedAdminProcedure
+const save_fonts_route = protectedAdminProcedure
   .input(
     z.object({
       changes: z
@@ -576,6 +576,6 @@ export const text_gestures_router = t.router({
   get_gesture_previews: get_gesture_previews_route,
   fonts: t.router({
     list: list_category_fonts_route,
-    apply: apply_fonts_route
+    save: save_fonts_route
   })
 });

@@ -495,6 +495,50 @@ export const cancelBatch = Effect.fn('batches.cancel')(function* (batchId: numbe
   return { cancelled: true as const };
 });
 
+/** Delete a settled batch with its items and their run chats (applied gestures stay). */
+export const deleteBatch = Effect.fn('batches.delete')(function* (batchId: number) {
+  yield* findBatch(batchId);
+  const [counts] = yield* dbRunHttp('batches.delete_counts', (client) =>
+    client
+      .select({
+        queued: sql<number>`count(*) filter (where ${agent_batch_items.status} = 'queued')`.mapWith(
+          Number
+        ),
+        running:
+          sql<number>`count(*) filter (where ${agent_batch_items.status} = 'running')`.mapWith(
+            Number
+          )
+      })
+      .from(agent_batch_items)
+      .where(eq(agent_batch_items.batch_id, batchId))
+  );
+  if (counts && counts.queued + counts.running > 0) {
+    return yield* Effect.fail(
+      BadRequestError.make({ message: 'Cancel the batch before deleting it' })
+    );
+  }
+  const items = yield* dbRunHttp('batches.delete_chat_ids', (client) =>
+    client
+      .select({ chat_id: agent_batch_items.chat_id })
+      .from(agent_batch_items)
+      .where(eq(agent_batch_items.batch_id, batchId))
+  );
+  // items cascade from the batch; chats are set null on the items, so delete them after
+  yield* dbRunHttp('batches.delete', (client) =>
+    client.delete(agent_batches).where(eq(agent_batches.id, batchId)).returning()
+  );
+  const chatIds = items.flatMap((row) => (row.chat_id ? [row.chat_id] : []));
+  if (chatIds.length > 0) {
+    yield* dbRunHttp('batches.delete_chats', (client) =>
+      client.delete(agent_chats).where(inArray(agent_chats.id, chatIds)).returning()
+    );
+  }
+  const qstash = yield* QStashPublisher;
+  // settled batches hold no live messages, but drop any leftovers to save the quota
+  if (qstash.enabled) yield* Effect.ignore(qstash.cancelBatch(batchId));
+  return { deleted: true as const };
+});
+
 /** Run these items again (failed, without a proposal, cancelled, or stuck) in their chats. */
 export const rerunItems = Effect.fn('batches.rerun')(function* (input: {
   batchId: number;

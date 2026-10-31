@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
-import { CopyIcon, RotateCcwIcon } from 'lucide-react';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { CopyIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '~/api/client';
 import type { AppRouter } from '~/api/trpc_router';
@@ -132,10 +132,12 @@ function BatchItemRow({
 export function BatchPage({ batchId }: { batchId: number }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<ItemFilter>('all');
   const [script, setScript] = useState<number | 'all'>('all');
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const batch_q = useQuery(
     trpc.agents.get_batch.queryOptions(
@@ -165,6 +167,19 @@ export function BatchPage({ batchId }: { batchId: number }) {
       onSuccess: (result) => {
         invalidateBatch(queryClient, trpc, batchId);
         toast.success(`Requeued ${result.requeued} runs`);
+      },
+      onError: (error) => toast.error(error.message)
+    })
+  );
+  const delete_mut = useMutation(
+    trpc.agents.delete_batch.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: trpc.agents.list_batches.queryKey() });
+        void queryClient.invalidateQueries({ queryKey: trpc.agents.list_chats.queryKey() });
+        void queryClient.invalidateQueries({ queryKey: trpc.agents.sidebar_gestures.queryKey() });
+        setConfirmDelete(false);
+        toast.success('Batch deleted');
+        void navigate({ to: '/admin/agents/batches' });
       },
       onError: (error) => toast.error(error.message)
     })
@@ -256,7 +271,17 @@ export function BatchPage({ batchId }: { batchId: number }) {
           <Button size="sm" variant="destructive" onClick={() => setConfirmCancel(true)}>
             Cancel
           </Button>
-        ) : null}
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-destructive hover:text-destructive"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2Icon />
+            Delete
+          </Button>
+        )}
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-4">
@@ -344,6 +369,28 @@ export function BatchPage({ batchId }: { batchId: number }) {
           )}
         </div>
       </div>
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this batch?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The batch and its runs&apos; chats are deleted. Gestures already saved or applied stay
+              as they are. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={delete_mut.isPending}>Keep batch</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={delete_mut.isPending}
+              onClick={() => delete_mut.mutate({ batch_id: batchId })}
+            >
+              {delete_mut.isPending ? <Spinner className="size-4" /> : null}
+              Delete batch
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
         <AlertDialogContent>
           <AlertDialogHeader>

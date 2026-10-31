@@ -129,7 +129,14 @@ export function GestureHub({ gestureId }: { gestureId: number }) {
           <div className="flex flex-col gap-3">
             <Section title={`Saved · ${strokes.length} strokes`}>
               {strokes.length > 0 ? (
-                <GesturePreview gestures={strokes} backgroundSrc={background} />
+                <GesturePreview
+                  gestures={strokes}
+                  backgroundSrc={background}
+                  inspect={{
+                    title: `${gesture.text} — saved v${gesture.revision}`,
+                    label: 'Saved'
+                  }}
+                />
               ) : (
                 <p className="flex aspect-square items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
                   No strokes yet

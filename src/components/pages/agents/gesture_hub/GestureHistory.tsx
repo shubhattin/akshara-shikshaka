@@ -5,7 +5,7 @@ import { HistoryIcon, RotateCcwIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '~/api/client';
 import { REVISION_SOURCE_META } from '~/agents/gesture_review';
-import { GesturePreview } from '~/components/gesture/GesturePreview';
+import { GesturePreview, type InspectOptions } from '~/components/gesture/GesturePreview';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +84,25 @@ export function GestureHistory({
   const current = revisions[0];
   const background = useGlyphBackground(current ? { text, ...current } : null);
   const compareBackground = useGlyphBackground(comparing ? { text, ...comparing } : null);
+  const compareInspect: InspectOptions | false =
+    comparing && current
+      ? {
+          title: `v${comparing.revision_no} vs current (v${current.revision_no})`,
+          panes: [
+            {
+              label: `v${comparing.revision_no}`,
+              gestures: saved(comparing.gestures),
+              backgroundSrc: compareBackground
+            },
+            {
+              label: `Current · v${current.revision_no}`,
+              gestures: saved(current.gestures),
+              backgroundSrc: background,
+              accent: true
+            }
+          ]
+        }
+      : false;
 
   const revert_mut = useMutation(
     trpc.agents.revert_revision.mutationOptions({
@@ -129,6 +148,11 @@ export function GestureHistory({
                 gestures={strokes}
                 backgroundSrc={isCurrent ? background : undefined}
                 showStrokeOrder={false}
+                size="thumb"
+                inspect={{
+                  title: `v${revision.revision_no}${isCurrent ? ' (current)' : ''}`,
+                  label: `v${revision.revision_no}`
+                }}
                 className="w-14 shrink-0"
               />
               <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
@@ -193,7 +217,7 @@ export function GestureHistory({
             <DialogDescription>
               {comparing && current && glyphChanged(comparing, current)
                 ? 'The glyph’s font, size or position differs between the two.'
-                : 'Press ▶ on either to play it.'}
+                : 'Press ▶ on either to play it, or ⤢ to inspect both side by side.'}
             </DialogDescription>
           </DialogHeader>
           {comparing && current ? (
@@ -205,13 +229,18 @@ export function GestureHistory({
                 <GesturePreview
                   gestures={saved(comparing.gestures)}
                   backgroundSrc={compareBackground}
+                  inspect={compareInspect}
                 />
               </figure>
               <figure className="flex flex-col gap-1.5">
                 <figcaption className="text-xs font-semibold tracking-wide text-primary uppercase">
                   Current · v{current.revision_no}
                 </figcaption>
-                <GesturePreview gestures={saved(current.gestures)} backgroundSrc={background} />
+                <GesturePreview
+                  gestures={saved(current.gestures)}
+                  backgroundSrc={background}
+                  inspect={compareInspect}
+                />
               </figure>
             </div>
           ) : null}

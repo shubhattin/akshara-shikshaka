@@ -1,124 +1,90 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { PlayIcon, SquareIcon } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Maximize2Icon, PlayIcon, SquareIcon } from 'lucide-react';
 import { Button } from '~/components/ui/button';
 import { cn } from '~/lib/utils';
-import { CANVAS_DIMS, GESTURE_GAP_DURATION, type Gesture } from '~/tools/stroke_data/types';
-import { animateGesture, sleep } from '~/tools/stroke_data/animation';
-import { getRevealClipPath, getStrokeRender } from '~/tools/stroke_data/stroke_render';
+import type { Gesture } from '~/tools/stroke_data/types';
+import { GestureInspectorDialog, type InspectPane } from './GestureInspectorDialog';
+import { GestureSvg } from './GestureSvg';
+import { orderedStrokes, useStrokePlayer } from './use_stroke_player';
 
-/** While replaying: strokes fully drawn so far, and how much of the next one is revealed. */
-type Playback = { done: number; reveal: number | null };
+/** How the inspector opened from a preview is titled, and what it shows. */
+export type InspectOptions = {
+  title?: ReactNode;
+  description?: ReactNode;
+  /** Label of this preview's pane */
+  label?: string;
+  /** Show these panes instead (e.g. saved vs proposal, compared side by side) */
+  panes?: InspectPane[];
+};
 
 /**
  * A gesture's strokes on the 400×400 gesture canvas, scaled to fit. Static by default (every
- * stroke drawn, numbered in writing order); Play animates them in order with their own timing,
- * as in practice.
+ * stroke drawn, numbered in writing order).
+ *
+ * - `full` (default): ▶ replays the strokes with their own timing, as in practice; ⤢ (on hover)
+ *   opens the inspector.
+ * - `thumb`: for small previews — no buttons on top; a click opens the inspector.
+ *
+ * `inspect={false}` turns the inspector off.
  */
 export function GesturePreview({
   gestures,
   className,
   showStrokeOrder = true,
-  backgroundSrc
+  backgroundSrc,
+  size = 'full',
+  inspect = {},
+  onInspect
 }: {
   gestures: Gesture[];
   className?: string;
   showStrokeOrder?: boolean;
   /** Image drawn under the strokes on the full canvas (e.g. the glyph being traced) */
   backgroundSrc?: string;
+  size?: 'full' | 'thumb';
+  inspect?: InspectOptions | false;
+  /**
+   * Open the inspector elsewhere instead (e.g. from a popover that would close and take the
+   * dialog with it)
+   */
+  onInspect?: () => void;
 }) {
-  const ordered = [...gestures].sort((a, b) => a.index - b.index);
-  const [playback, setPlayback] = useState<Playback | null>(null);
-  const controller = useRef<AbortController | null>(null);
-  const clipId = useId();
+  const ordered = useMemo(() => orderedStrokes(gestures), [gestures]);
+  const { playback, play, stop } = useStrokePlayer(ordered);
+  const [inspecting, setInspecting] = useState(false);
+  const canInspect = inspect !== false && ordered.length > 0;
 
-  useEffect(() => () => controller.current?.abort(), []);
-
-  const play = async () => {
-    controller.current?.abort();
-    const { signal } = (controller.current = new AbortController());
-    for (let index = 0; index < ordered.length; index++) {
-      setPlayback({ done: index, reveal: 0 });
-      const finished = await animateGesture(
-        ordered[index]!,
-        (frame) => setPlayback({ done: index, reveal: frame.reveal }),
-        { signal }
-      );
-      if (!finished || !(await sleep(GESTURE_GAP_DURATION, signal))) return;
-    }
-    setPlayback(null);
+  const openInspector = () => {
+    stop();
+    if (onInspect) onInspect();
+    else setInspecting(true);
   };
 
-  const stop = () => {
-    controller.current?.abort();
-    setPlayback(null);
-  };
-
-  const visible = playback ? ordered.slice(0, playback.done) : ordered;
-  const animating = playback ? ordered[playback.done] : undefined;
-  const animatingRender = animating ? getStrokeRender(animating) : null;
-  const animatingClip =
-    animatingRender && playback?.reveal != null
-      ? getRevealClipPath(animatingRender, playback.reveal)
-      : null;
+  const svg = (
+    <GestureSvg
+      ordered={ordered}
+      playback={playback}
+      showStrokeOrder={showStrokeOrder}
+      backgroundSrc={backgroundSrc}
+    />
+  );
 
   return (
     <div className={cn('group/gesture relative', className)}>
-      <svg
-        viewBox={`0 0 ${CANVAS_DIMS.width} ${CANVAS_DIMS.height}`}
-        className="block aspect-square w-full rounded-lg border border-border/70 bg-white"
-        role="img"
-        aria-label={`Gesture with ${ordered.length} stroke${ordered.length === 1 ? '' : 's'}`}
-      >
-        {backgroundSrc ? (
-          <image
-            href={backgroundSrc}
-            x={0}
-            y={0}
-            width={CANVAS_DIMS.width}
-            height={CANVAS_DIMS.height}
-          />
-        ) : null}
-        {visible.map((gesture) => (
-          <path key={gesture.index} d={getStrokeRender(gesture).path} fill={gesture.color} />
-        ))}
-        {animating && animatingRender ? (
-          <>
-            {animatingClip !== null ? (
-              <clipPath id={clipId}>
-                <path d={animatingClip} />
-              </clipPath>
-            ) : null}
-            <path
-              d={animatingRender.path}
-              fill={animating.color}
-              clipPath={animatingClip !== null ? `url(#${clipId})` : undefined}
-            />
-          </>
-        ) : null}
-        {showStrokeOrder && !playback
-          ? ordered.map((gesture, order) => {
-              const start = gesture.points[0];
-              if (!start) return null;
-              return (
-                <g key={`n-${gesture.index}`} className="pointer-events-none">
-                  <circle cx={start[0]} cy={start[1]} r={13} fill="#e11d48" opacity={0.9} />
-                  <text
-                    x={start[0]}
-                    y={start[1]}
-                    dy="0.35em"
-                    textAnchor="middle"
-                    fontSize={15}
-                    fontWeight={700}
-                    fill="white"
-                  >
-                    {order + 1}
-                  </text>
-                </g>
-              );
-            })
-          : null}
-      </svg>
-      {ordered.length > 0 ? (
+      {size === 'thumb' && canInspect ? (
+        <button
+          type="button"
+          onClick={openInspector}
+          aria-label="Inspect gesture"
+          title="Inspect gesture"
+          className="block w-full cursor-zoom-in rounded-lg transition-shadow hover:ring-2 hover:ring-primary/50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+        >
+          {svg}
+        </button>
+      ) : (
+        svg
+      )}
+      {size === 'full' && ordered.length > 0 ? (
         <Button
           type="button"
           size="icon-xs"
@@ -129,6 +95,28 @@ export function GesturePreview({
         >
           {playback ? <SquareIcon className="fill-current" /> : <PlayIcon />}
         </Button>
+      ) : null}
+      {size === 'full' && canInspect ? (
+        <Button
+          type="button"
+          size="icon-xs"
+          variant="secondary"
+          aria-label="Inspect gesture"
+          title="Inspect gesture"
+          className="absolute top-1.5 right-1.5 opacity-0 shadow-sm transition-opacity group-hover/gesture:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+          onClick={openInspector}
+        >
+          <Maximize2Icon />
+        </Button>
+      ) : null}
+      {inspecting && inspect !== false ? (
+        <GestureInspectorDialog
+          open
+          onOpenChange={setInspecting}
+          title={inspect.title ?? 'Inspect gesture'}
+          description={inspect.description}
+          panes={inspect.panes ?? [{ label: inspect.label ?? 'Strokes', gestures, backgroundSrc }]}
+        />
       ) : null}
     </div>
   );

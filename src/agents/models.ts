@@ -5,10 +5,10 @@ import { z } from 'zod';
  * the actual cost charged (cache discounts included), which the chat adds up.
  */
 export const AGENT_MODEL_IDS = [
-  'gemini-3.7-flash',
   'gpt-6-luna',
-  'gpt-6.1-sol',
   'claude-sonnet-5.5',
+  'gemini-3.7-flash',
+  'gpt-6.1-sol',
   'claude-opus-5.5'
 ] as const;
 
@@ -17,12 +17,12 @@ export type AgentModelId = (typeof AGENT_MODEL_IDS)[number];
 export const AGENT_MODELS = {
   'gemini-3.7-flash': {
     label: 'Gemini 3.7 Flash',
-    hint: 'Sharp vision at a low price — tracing gestures',
+    hint: 'Sharp vision at a low price',
     providerModelId: 'google/gemini-3.7-flash'
   },
   'gpt-6-luna': {
     label: 'GPT-6 Luna',
-    hint: 'Fast and cheap — everyday questions',
+    hint: 'Default — fast, cheap and reliable for chats, gestures and batches',
     providerModelId: 'openai/gpt-6-luna'
   },
   'gpt-6.1-sol': {
@@ -32,7 +32,7 @@ export const AGENT_MODELS = {
   },
   'claude-sonnet-5.5': {
     label: 'Claude Sonnet 5.5',
-    hint: 'Strong writer — summaries and explanations',
+    hint: 'Second choice — strong reasoning and writing',
     providerModelId: 'anthropic/claude-sonnet-5.5'
   },
   'claude-opus-5.5': {

@@ -113,11 +113,18 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<boolean> {
 export function animateGesture(
   gesture: Gesture,
   onFrame: (frame: GestureAnimationFrame) => void,
-  { signal }: { signal?: AbortSignal } = {}
+  {
+    signal,
+    speed = 1
+  }: {
+    signal?: AbortSignal;
+    /** Playback rate: 2 draws twice as fast (for inspecting, never in practice) */
+    speed?: number;
+  } = {}
 ): Promise<boolean> {
   if (signal?.aborted) return Promise.resolve(false);
   const { length } = getStrokeRender(gesture);
-  const duration = getStrokeDuration(gesture.duration, length);
+  const duration = getStrokeDuration(gesture.duration, length) / (speed > 0 ? speed : 1);
 
   if (length === 0 || duration === 0 || prefersReducedMotion()) {
     onFrame({ progress: 1, reveal: length, isComplete: true });

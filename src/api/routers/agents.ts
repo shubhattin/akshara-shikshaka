@@ -37,6 +37,7 @@ import {
   acceptItem,
   cancelBatch,
   createBatch,
+  deleteBatch,
   getBatch,
   listBatchProposals,
   listBatches,
@@ -252,6 +253,11 @@ const cancel_batch_route = protectedAdminProcedure
   .input(z.object({ batch_id: batch_id_schema }))
   .mutation(({ input }) => runTrpcEffect(cancelBatch(input.batch_id)));
 
+/** Delete a settled batch (refused while runs are queued or running). */
+const delete_batch_route = protectedAdminProcedure
+  .input(z.object({ batch_id: batch_id_schema }))
+  .mutation(({ input }) => runTrpcEffect(deleteBatch(input.batch_id)));
+
 /** Run failed, proposal-less, cancelled or stuck items again (all of them when no ids). */
 const rerun_batch_items_route = protectedAdminProcedure
   .input(
@@ -285,6 +291,7 @@ export const agents_router = t.router({
   get_batch: get_batch_route,
   batch_proposals: batch_proposals_route,
   cancel_batch: cancel_batch_route,
+  delete_batch: delete_batch_route,
   rerun_batch_items: rerun_batch_items_route,
   accept_batch_item: accept_batch_item_route,
   reject_batch_item: reject_batch_item_route,

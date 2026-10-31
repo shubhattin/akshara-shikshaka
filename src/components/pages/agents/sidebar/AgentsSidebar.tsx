@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from '@tanstack/react-router';
 import {
   ArrowLeftIcon,
+  BookOpenIcon,
   LayersIcon,
   ListChecksIcon,
   MoreHorizontalIcon,
@@ -12,6 +13,7 @@ import {
   PlusIcon,
   RefreshCwIcon,
   SearchIcon,
+  SplineIcon,
   Trash2Icon
 } from 'lucide-react';
 import { useTRPC } from '~/api/client';
@@ -170,16 +172,40 @@ function ChatHistory({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-col gap-2 px-3 pb-2">
-        <Button
-          render={<Link to="/admin" />}
-          nativeButton={false}
-          variant="ghost"
-          size="sm"
-          className="-ml-1 justify-start text-muted-foreground"
-        >
-          <ArrowLeftIcon />
-          Back to admin
-        </Button>
+        <div className="-ml-1 flex items-center gap-0.5">
+          <Button
+            render={<Link to="/admin" />}
+            nativeButton={false}
+            variant="ghost"
+            size="sm"
+            className="mr-auto justify-start text-muted-foreground"
+          >
+            <ArrowLeftIcon />
+            Admin
+          </Button>
+          <Button
+            render={<Link to="/lessons" />}
+            nativeButton={false}
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            title="Lessons"
+          >
+            <BookOpenIcon />
+            Lessons
+          </Button>
+          <Button
+            render={<Link to="/gestures" />}
+            nativeButton={false}
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            title="Gestures"
+          >
+            <SplineIcon />
+            Gestures
+          </Button>
+        </div>
         <div className="flex gap-1.5">
           <Button
             render={<Link to="/admin/agents" onClick={onNavigate} />}

@@ -1,9 +1,8 @@
 'use client';
 import { Link } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTRPC } from '~/api/client';
 import { useCategorySearchParam } from '~/hooks/useCategorySearchParam';
-import { Card, CardContent } from '~/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -20,13 +19,13 @@ import {
   type script_list_type
 } from '~/state/lang_list';
 import Cookie from 'js-cookie';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { LESSON_LANG_ID_COOKIE_KEY, SCRIPT_ID_COOKIE_KEY } from '~/state/cookie';
 import type { lesson_categories } from '~/db/schema';
 import type { InferSelectModel } from 'drizzle-orm';
 import { useHydrateAtoms } from 'jotai/react/utils';
-import { atom, useAtom, useAtomValue } from 'jotai';
-import { ArrowRightLeft, ArrowUpRight, ChevronsUpDown, Plus, TypeIcon, Undo2 } from 'lucide-react';
+import { atom, useAtom } from 'jotai';
+import { ChevronsUpDown, TypeIcon } from 'lucide-react';
 import { FontToolsDialog } from '~/components/pages/gesture_fonts/FontToolsDialog';
 import {
   Command,
@@ -37,27 +36,6 @@ import {
   CommandList
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter
-} from '~/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from '~/components/ui/alert-dialog';
-import { Label } from '~/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group';
-import { toast } from 'sonner';
 import { TiEdit } from 'react-icons/ti';
 import { atomWithStorage } from 'jotai/utils';
 import { cn } from '~/lib/utils';
@@ -101,7 +79,6 @@ function ListGestures({
   const trpc = useTRPC();
   const [scriptId, setScriptId] = useAtom(script_id_atom);
   const [langId, setLangId] = useAtom(lang_id_atom);
-  const [editOpen, setEditOpen] = useState(false);
   const [fontsOpen, setFontsOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedCategoryID, setSelectedCategoryID] = useAtom(selected_category_id_atom);
@@ -273,18 +250,6 @@ function ListGestures({
         </div>
       </div>
 
-      {selectedCategoryID !== null && category_gestures_q.data ? (
-        <MoveCategoryGesturesDialog
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          category_id={selectedCategoryID}
-          categoryName={categoryName}
-          gestures={category_gestures_q.data.gestures}
-          // SAFETY: validated at boundary - type assertion is safe based on prior schema check.
-          type={category_gestures_q.data.type as 'categorized' | 'uncategorized'}
-          categories={categories}
-        />
-      ) : null}
       {selectedCategoryID !== null && fontsOpen ? (
         <FontToolsDialog
           open
@@ -312,24 +277,14 @@ function ListGestures({
             <DisplayGesturesSection
               data={category_gestures_q.data}
               actions={
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => setFontsOpen(true)}
-                    title="Inspect and change the glyph fonts of this category"
-                  >
-                    <TypeIcon data-icon="inline-start" />
-                    Fonts
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setEditOpen(true)}
-                    className="border-sky-500 text-sky-700 hover:bg-sky-50 hover:text-sky-800 dark:border-sky-400 dark:text-sky-300 dark:hover:bg-sky-950 dark:hover:text-sky-200"
-                  >
-                    <ArrowRightLeft data-icon="inline-start" />
-                    Move gestures
-                  </Button>
-                </>
+                <Button
+                  variant="outline"
+                  onClick={() => setFontsOpen(true)}
+                  title="Inspect and change the glyph fonts of this category"
+                >
+                  <TypeIcon data-icon="inline-start" />
+                  Fonts
+                </Button>
               }
             />
           ) : null}
@@ -348,8 +303,6 @@ type GestureItem = {
   updated_at: Date;
   stroke_count: number;
 };
-
-type PendingMove = GestureItem & { target_category_id: number | null };
 
 function splitGestures(gestures: GestureItem[]) {
   const unordered = gestures.filter((g) => g.order === null);
@@ -461,396 +414,6 @@ function DisplayGesturesSection({
           </section>
         );
       })}
-    </div>
-  );
-}
-
-function MoveCategoryGesturesDialog({
-  open,
-  onOpenChange,
-  category_id,
-  categoryName,
-  gestures,
-  type,
-  categories
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  category_id: number;
-  categoryName: string;
-  gestures: GestureItem[];
-  type: 'categorized' | 'uncategorized';
-  categories: CategoryModel[];
-}) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const scriptId = useAtomValue(script_id_atom);
-  const langId = useAtomValue(lang_id_atom);
-
-  const [pendingMoves, setPendingMoves] = useState<PendingMove[]>([]);
-  const [discardOpen, setDiscardOpen] = useState(false);
-  const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setPendingMoves([]);
-    setDiscardOpen(false);
-    setConfirmSaveOpen(false);
-    // Only reset the draft when the dialog opens — ignore mid-edit query updates.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional open-only sync
-  }, [open]);
-
-  // gestures already moved out are hidden from the list until saved or undone
-  const remaining = gestures.filter((g) => !pendingMoves.some((m) => m.id === g.id));
-  const isDirty = pendingMoves.length > 0;
-
-  const categoryNameById = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const c of categories) map.set(c.id, c.name);
-    map.set(0, 'Uncategorized');
-    return map;
-  }, [categories]);
-
-  function requestClose() {
-    if (saving) return;
-    if (isDirty) {
-      setDiscardOpen(true);
-      return;
-    }
-    onOpenChange(false);
-  }
-
-  function handleOpenChange(next: boolean) {
-    if (next) {
-      onOpenChange(true);
-      return;
-    }
-    requestClose();
-  }
-
-  function handleUndoAll() {
-    setPendingMoves([]);
-  }
-
-  function handleMoveToCategory(item: GestureItem, target_category_id: number | null) {
-    setPendingMoves((prev) => [
-      ...prev.filter((m) => m.id !== item.id),
-      { ...item, order: null, target_category_id }
-    ]);
-  }
-
-  function undoPendingMove(move: PendingMove) {
-    setPendingMoves((prev) => prev.filter((m) => m.id !== move.id));
-  }
-
-  const add_to_category_mut = useMutation(
-    trpc.text_gestures.categories.add_update_gesture_category.mutationOptions()
-  );
-
-  async function runSave() {
-    setSaving(true);
-    try {
-      for (const move of pendingMoves) {
-        await add_to_category_mut.mutateAsync({
-          category_id: move.target_category_id,
-          lang_id: langId,
-          gesture_text_key: move.text_key
-        });
-      }
-
-      queryClient.setQueryData(
-        trpc.text_gestures.categories.get_gestures.queryKey({
-          category_id,
-          script_id: scriptId,
-          lang_id: langId
-        }),
-        category_id === 0
-          ? {
-              type: 'uncategorized' as const,
-              gestures: remaining.map((g) => ({ ...g, order: null }))
-            }
-          : { type: 'categorized' as const, gestures: remaining }
-      );
-
-      // a move changes the key's category in every script
-      await queryClient.invalidateQueries(trpc.text_gestures.categories.get_gestures.pathFilter());
-
-      toast.success('Changes saved');
-      setConfirmSaveOpen(false);
-      onOpenChange(false);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '';
-      toast.error('Failed to save changes' + (message ? `: ${message}` : ''));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="flex h-[min(90vh,720px)] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl lg:max-w-5xl">
-          <DialogHeader className="shrink-0 border-b p-4 pr-12">
-            <DialogTitle>Move gestures in {categoryName}</DialogTitle>
-            <DialogDescription>
-              Gestures with a lesson follow the lesson&apos;s category and order — move the lesson
-              to move them. Only gestures without a lesson can be moved here. Changes are draft
-              until you save.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <div className="flex flex-col gap-6">
-              {pendingMoves.length > 0 && (
-                <PendingMovesPanel
-                  moves={pendingMoves}
-                  categoryNameById={categoryNameById}
-                  onUndo={undoPendingMove}
-                />
-              )}
-
-              <MoveGesturesList
-                items={remaining}
-                excludeCategoryId={type === 'uncategorized' ? 0 : category_id}
-                onMove={handleMoveToCategory}
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="shrink-0 sm:justify-between">
-            <Button
-              variant="outline"
-              onClick={handleUndoAll}
-              disabled={!isDirty || saving}
-              className="sm:mr-auto"
-            >
-              <Undo2 data-icon="inline-start" />
-              Undo
-            </Button>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row">
-              <Button variant="secondary" onClick={requestClose} disabled={saving}>
-                Cancel
-              </Button>
-              <Button onClick={() => setConfirmSaveOpen(true)} disabled={!isDirty || saving}>
-                {saving ? 'Saving…' : 'Save'}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved changes. Are you sure you want to discard them?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setDiscardOpen(false);
-                onOpenChange(false);
-              }}
-            >
-              Discard
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={confirmSaveOpen} onOpenChange={setConfirmSaveOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save these changes?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will apply category changes for the moved gestures.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={runSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
-}
-
-function PendingMovesPanel({
-  moves,
-  categoryNameById,
-  onUndo
-}: {
-  moves: PendingMove[];
-  categoryNameById: Map<number, string>;
-  onUndo: (move: PendingMove) => void;
-}) {
-  return (
-    <section className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
-      <h3 className="text-sm font-semibold">Leaving this category</h3>
-      <ul className="flex flex-col gap-2">
-        {moves.map((m) => (
-          <li
-            key={m.id}
-            className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-3 py-2"
-          >
-            <div className="min-w-0">
-              <div className="truncate font-medium">{m.text}</div>
-              <div className="text-xs text-muted-foreground">
-                → {categoryNameById.get(m.target_category_id ?? 0) ?? 'Uncategorized'}
-              </div>
-            </div>
-            <Button size="sm" variant="outline" onClick={() => onUndo(m)}>
-              Undo
-            </Button>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function DraftAssignCategoryDialog({
-  itemId,
-  excludeCategoryId,
-  onSelect,
-  isMove
-}: {
-  itemId: number;
-  excludeCategoryId?: number;
-  onSelect: (target_category_id: number | null) => void;
-  isMove?: boolean;
-}) {
-  const trpc = useTRPC();
-  const langId = useAtomValue(lang_id_atom);
-  const categories_q = useQuery(
-    trpc.text_gestures.categories.get_categories.queryOptions({ lang_id: langId })
-  );
-  const categories = [
-    ...(categories_q.data ? categories_q.data.filter((c) => c.id !== excludeCategoryId) : []),
-    ...(excludeCategoryId && excludeCategoryId > 0
-      ? [{ id: 0, name: 'Uncategorized', order: 0 }]
-      : [])
-  ];
-  const [open, setOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-
-  return (
-    <>
-      <Dialog
-        open={open}
-        onOpenChange={(v) => {
-          setOpen(v);
-          if (!v) setSelectedCategory(null);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Select Category</DialogTitle>
-            <DialogDescription>Choose where this gesture should move.</DialogDescription>
-          </DialogHeader>
-          {categories.length > 0 ? (
-            <RadioGroup
-              value={selectedCategory?.toString() ?? ''}
-              onValueChange={(v) => setSelectedCategory(Number(v))}
-              className="flex flex-col gap-2"
-            >
-              {categories.map((cat) => (
-                <div key={cat.id} className="flex items-center gap-2">
-                  <RadioGroupItem
-                    id={`draft-cat-gesture-${itemId}-${cat.id}`}
-                    value={String(cat.id)}
-                  />
-                  <Label
-                    htmlFor={`draft-cat-gesture-${itemId}-${cat.id}`}
-                    className={cn(cat.id === 0 && 'text-muted-foreground')}
-                  >
-                    {cat.name}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          ) : (
-            <div className="text-sm text-muted-foreground">No categories found.</div>
-          )}
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (selectedCategory === null) return;
-                onSelect(selectedCategory === 0 ? null : selectedCategory);
-                setOpen(false);
-                setSelectedCategory(null);
-              }}
-              disabled={selectedCategory === null}
-            >
-              Add to Category
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Button
-        size="icon"
-        variant="ghost"
-        title="Move to another category"
-        aria-label="Move to another category"
-        onClick={() => setOpen(true)}
-      >
-        {isMove ? <ArrowRightLeft /> : <Plus />}
-      </Button>
-    </>
-  );
-}
-
-function MoveGesturesList({
-  items,
-  excludeCategoryId,
-  onMove
-}: {
-  items: GestureItem[];
-  excludeCategoryId: number;
-  onMove: (item: GestureItem, target: number | null) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      {items.map((g) => (
-        <Card key={g.id} className="p-0">
-          <CardContent className="flex items-center justify-between gap-3 p-3">
-            <span className="truncate font-medium">{g.text}</span>
-            {g.lesson_id === null ? (
-              <DraftAssignCategoryDialog
-                itemId={g.id}
-                excludeCategoryId={excludeCategoryId}
-                isMove={excludeCategoryId > 0}
-                onSelect={(target) => onMove(g, target)}
-              />
-            ) : (
-              <Link
-                to="/lessons/edit/$id"
-                params={{ id: String(g.lesson_id) }}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Open the lesson this gesture follows in a new tab"
-                className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                Follows lesson
-                <ArrowUpRight className="size-3.5" />
-              </Link>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-      {items.length === 0 && (
-        <div className="text-sm text-muted-foreground">No gestures in this list.</div>
-      )}
     </div>
   );
 }

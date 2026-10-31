@@ -20,6 +20,7 @@ import {
   gesture_categories_router,
   getGesturesByCategory
 } from './gesture_categories';
+import { settleBatchItemsOnSave } from '~/agents/server/batch_settle';
 
 type Gesture = z.infer<typeof GestureSchema>;
 
@@ -208,15 +209,22 @@ async function saveGestureInTx(
     tool_call_id: provenance.source === 'agent' ? provenance.toolCallId : null,
     reverted_from: provenance.source === 'revert' ? provenance.revertedFrom : null
   });
-  if (provenance.source === 'agent' && provenance.chatId !== null) {
+  const chatId = provenance.source === 'agent' ? provenance.chatId : null;
+  if (chatId !== null) {
     await tx
       .insert(agent_chat_gestures)
-      .values({ chat_id: provenance.chatId, text_gesture_id: input.id, applied_at: new Date() })
+      .values({ chat_id: chatId, text_gesture_id: input.id, applied_at: new Date() })
       .onConflictDoUpdate({
         target: [agent_chat_gestures.chat_id, agent_chat_gestures.text_gesture_id],
         set: { applied_at: new Date() }
       });
   }
+  await settleBatchItemsOnSave(tx, {
+    gestureId: input.id,
+    revision: row.revision,
+    userId: provenance.userId,
+    chatId
+  });
   return { ok: true, revision: row.revision };
 }
 

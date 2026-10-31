@@ -16,6 +16,7 @@ import { MAX_AGENT_NOTES_LENGTH, withNote, type ReviewStatus } from '~/agents/ge
 import { getGestureForAgent } from './gestures';
 import { listChatsForGesture } from './chat_store';
 import { savedStrokeCount } from './stroke_count';
+import { settleBatchItemsOnApprove } from './batch_settle';
 import { DEFAULT_GESTURE_CATEGORY_LANG_ID } from '~/state/lang_list';
 
 /** Display names for admin ids; history still shows (without names) if the lookup fails. */
@@ -102,22 +103,29 @@ export const revertGestureRevision = Effect.fn('gesture_review.revert')(function
   });
 });
 
+/** Approving also settles the batch proposals still waiting for the gesture (see batch_settle). */
 export const setGestureReview = Effect.fn('gesture_review.set_review')(function* (input: {
   gestureId: number;
   status: ReviewStatus;
   note: string;
+  userId: string;
 }) {
-  const rows = yield* dbRunHttp('gesture_review.set_review', (client) =>
-    client
+  const found = yield* dbTransaction('gesture_review.set_review', async (tx) => {
+    const rows = await tx
       .update(text_gestures)
       .set({
         review_status: input.status,
         review_note: input.status === 'approved' ? '' : input.note
       })
       .where(eq(text_gestures.id, input.gestureId))
-      .returning()
-  );
-  if (rows.length === 0) {
+      .returning();
+    if (rows.length === 0) return false;
+    if (input.status === 'approved') {
+      await settleBatchItemsOnApprove(tx, { gestureId: input.gestureId, userId: input.userId });
+    }
+    return true;
+  });
+  if (!found) {
     return yield* Effect.fail(
       NotFoundError.make({ resource: 'text_gesture', message: 'Gesture not found' })
     );

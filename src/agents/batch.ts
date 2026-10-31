@@ -15,6 +15,7 @@ export const BATCH_ITEM_STATUSES = [
   'failed',
   'applied',
   'rejected',
+  'superseded',
   'cancelled'
 ] as const;
 export type BatchItemStatus = (typeof BATCH_ITEM_STATUSES)[number];
@@ -27,6 +28,10 @@ export const BATCH_ITEM_STATUS_META = {
   failed: { label: 'Failed', hint: 'The run failed after its retries' },
   applied: { label: 'Applied', hint: 'The proposal was saved to the gesture' },
   rejected: { label: 'Rejected', hint: 'Reviewed and not applied (kept in the chat)' },
+  superseded: {
+    label: 'Superseded',
+    hint: 'Not applied: the gesture was saved another way or approved as it was (kept in the chat)'
+  },
   cancelled: { label: 'Cancelled', hint: 'The batch was cancelled first' }
 } as const satisfies Record<BatchItemStatus, { label: string; hint: string }>;
 

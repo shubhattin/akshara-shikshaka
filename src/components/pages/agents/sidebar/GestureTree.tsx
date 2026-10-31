@@ -125,7 +125,12 @@ function GestureRow({
   const { gesture, batchStatus } = entry;
   const containsActive = chats.some((chat) => chat.id === activeChatId);
   const [open, setOpen] = useState(containsActive);
-  if (containsActive && !open) setOpen(true);
+  // opening another chat unfolds its gesture once; folding it by hand afterwards sticks
+  const [seenChat, setSeenChat] = useState(activeChatId);
+  if (seenChat !== activeChatId) {
+    setSeenChat(activeChatId);
+    if (containsActive && !open) setOpen(true);
+  }
   const hubActive = activeGestureId === gesture.id;
   const pending = hasPendingProposal(gesture);
 
@@ -219,11 +224,23 @@ function GroupSection({
       e.gesture.id === activeGestureId ||
       rowProps.chatsOf(e.gesture.id).some((chat) => chat.id === activeChatId)
   );
-  const open = containsActive || !collapsed.has(group.key);
+  // navigating to a gesture or chat inside unfolds the group once; folding it by hand sticks
+  const activeKey = `${activeGestureId}|${activeChatId}`;
+  const [seenActive, setSeenActive] = useState(activeKey);
+  const [forced, setForced] = useState(containsActive);
+  if (seenActive !== activeKey) {
+    setSeenActive(activeKey);
+    setForced(containsActive);
+  }
+  const open = forced || !collapsed.has(group.key);
+  const onOpenChange = (next: boolean) => {
+    if (!next) setForced(false);
+    toggle(group.key, next);
+  };
   const { chatsOf, ...gestureRowProps } = rowProps;
   return (
     <section className={cn(depth === 0 ? 'mb-1.5' : 'mb-1 ml-2')}>
-      <Collapsible open={open} onOpenChange={(next) => toggle(group.key, next)}>
+      <Collapsible open={open} onOpenChange={onOpenChange}>
         <div className="group/header flex items-center gap-1 pr-1">
           <CollapsibleTrigger
             className={cn(
@@ -282,7 +299,7 @@ function GroupSection({
               />
             ))
           ) : (
-            <ul className="flex flex-col gap-0.5">
+            <ul className="flex max-h-72 flex-col gap-0.5 overflow-y-auto overscroll-contain">
               {group.entries.map((entry) => (
                 <GestureRow
                   key={`${group.key}-${entry.gesture.id}`}

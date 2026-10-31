@@ -4,8 +4,6 @@ import { GesturePreview } from '~/components/gesture/GesturePreview';
 import { useGesturePreviewById, useInViewOnce } from '~/components/gesture/useGesturePreviewById';
 import { Skeleton } from '~/components/ui/skeleton';
 import { cn } from '~/lib/utils';
-import { DEFAULT_FONT_FAMILY, type FontFamily } from '~/state/font_families';
-import { fontLabel } from '~/state/font_scripts';
 
 export type GestureCardItem = {
   id: number;
@@ -14,7 +12,6 @@ export type GestureCardItem = {
   lesson_id: number | null;
   updated_at: Date | string;
   stroke_count: number;
-  font_family: FontFamily;
 };
 
 /**
@@ -36,14 +33,6 @@ export function GestureCard({ item }: { item: GestureCardItem }) {
       )}
     >
       <div className="relative p-2 pb-0">
-        {item.font_family !== DEFAULT_FONT_FAMILY ? (
-          <span
-            title={`Glyph font: ${fontLabel(item.font_family)}`}
-            className="absolute top-3 left-3 z-10 max-w-[70%] truncate rounded-md bg-sky-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white"
-          >
-            {fontLabel(item.font_family)}
-          </span>
-        ) : null}
         {!hasStrokes ? (
           <Link
             to="/gestures/edit/$id"

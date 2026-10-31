@@ -12,7 +12,7 @@ import {
   SelectValue
 } from '~/components/ui/select';
 import { Button } from '~/components/ui/button';
-import { FONT_SCRIPTS, LANGUAGES_ADDED, type FontFamily } from '~/state/font_list';
+import { FONT_SCRIPTS, LANGUAGES_ADDED } from '~/state/font_list';
 import {
   lang_list_obj,
   script_list_obj,
@@ -347,7 +347,6 @@ type GestureItem = {
   order: number | null;
   updated_at: Date;
   stroke_count: number;
-  font_family: FontFamily;
 };
 
 type PendingMove = GestureItem & { target_category_id: number | null };

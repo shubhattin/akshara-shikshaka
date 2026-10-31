@@ -1,6 +1,15 @@
 import { Link } from '@tanstack/react-router';
 import { useAtomValue } from 'jotai';
-import { Hand, LayoutDashboard, ListTree, PencilLine, ShieldCheck } from 'lucide-react';
+import {
+  BookOpen,
+  Bot,
+  Hand,
+  LayoutDashboard,
+  ListTree,
+  PencilLine,
+  ShieldCheck,
+  Spline
+} from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useSession } from '~/lib/auth-client';
 import { cn } from '~/lib/utils';
@@ -11,7 +20,7 @@ const linkClass =
 
 /**
  * Admin entry in the app bar menu, only for admins: the admin dashboard (which links to every admin
- * page) and, on the learn page, editing what is shown there: the lesson, its gesture, its category.
+ * page), the lessons, gestures and agents pages, and, on the learn page, editing what is shown there: the lesson, its gesture, its category.
  */
 export function AdminMenuSection({ onNavigate }: { onNavigate: () => void }) {
   const session = useSession();
@@ -79,6 +88,20 @@ export function AdminMenuSection({ onNavigate }: { onNavigate: () => void }) {
           <LayoutDashboard className="size-4" />
           Admin Dashboard
         </Link>
+        <div className="grid grid-cols-3 gap-1.5">
+          <Link to="/lessons" onClick={onNavigate} className={cn(linkClass, 'justify-center')}>
+            <BookOpen className="size-4" />
+            Lessons
+          </Link>
+          <Link to="/gestures" onClick={onNavigate} className={cn(linkClass, 'justify-center')}>
+            <Spline className="size-4" />
+            Gestures
+          </Link>
+          <Link to="/admin/agents" onClick={onNavigate} className={cn(linkClass, 'justify-center')}>
+            <Bot className="size-4" />
+            Agents
+          </Link>
+        </div>
       </div>
       <Separator className="my-4 bg-slate-200 dark:bg-slate-700" />
     </>

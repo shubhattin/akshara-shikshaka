@@ -186,9 +186,14 @@ const set_review_route = protectedAdminProcedure
       note: z.string().max(1000).default('')
     })
   )
-  .mutation(({ input }) =>
+  .mutation(({ input, ctx }) =>
     runTrpcEffect(
-      setGestureReview({ gestureId: input.gesture_id, status: input.status, note: input.note })
+      setGestureReview({
+        gestureId: input.gesture_id,
+        status: input.status,
+        note: input.note,
+        userId: ctx.user.id
+      })
     )
   );
 

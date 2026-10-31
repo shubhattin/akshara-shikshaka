@@ -9,6 +9,7 @@ const STATUS_STYLE = {
   failed: 'border-destructive/40 text-destructive',
   applied: 'border-emerald-500/40 text-emerald-700 dark:text-emerald-400',
   rejected: 'border-border text-muted-foreground',
+  superseded: 'border-border text-muted-foreground',
   cancelled: 'border-border text-muted-foreground'
 } satisfies Record<BatchItemStatus, string>;
 
@@ -21,6 +22,7 @@ export const STATUS_BAR_FILL = {
   failed: 'bg-destructive',
   applied: 'bg-emerald-500',
   rejected: 'bg-muted-foreground/50',
+  superseded: 'bg-muted-foreground/35',
   cancelled: 'bg-muted-foreground/20'
 } satisfies Record<BatchItemStatus, string>;
 

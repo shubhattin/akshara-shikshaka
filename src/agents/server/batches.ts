@@ -412,11 +412,14 @@ export const runBatchItem = Effect.fn('batches.run_item')(function* (
           expectedRevision: gesture.revision
         })
       );
-      // saved meanwhile (or the glyph moved): leave it for review instead
+      // refused: the gesture was saved meanwhile (settled just below)
       if (applied._tag === 'Success') {
         return yield* finish('applied', { ...set, applied_revision: applied.success.revision });
       }
     }
+    // saved while the agent ran: the proposal replaces a version that is gone
+    const latest = yield* getGestureForAgent(gesture.id);
+    if (latest.revision !== gesture.revision) return yield* finish('superseded', set);
     return yield* finish('proposed', set);
   }).pipe(
     Effect.catch((error) => {
@@ -624,7 +627,12 @@ export const acceptItem = Effect.fn('batches.accept')(function* (input: {
     expectedRevision: current.revision
   });
   if (input.approve) {
-    yield* setGestureReview({ gestureId: current.id, status: 'approved', note: '' });
+    yield* setGestureReview({
+      gestureId: current.id,
+      status: 'approved',
+      note: '',
+      userId: input.userId
+    });
   }
   yield* updateItem(item.id, {
     status: 'applied',
@@ -678,6 +686,8 @@ const countsSelect = {
   rejected: sql<number>`count(*) filter (where ${agent_batch_items.status} = 'rejected')`.mapWith(
     Number
   ),
+  superseded:
+    sql<number>`count(*) filter (where ${agent_batch_items.status} = 'superseded')`.mapWith(Number),
   cancelled: sql<number>`count(*) filter (where ${agent_batch_items.status} = 'cancelled')`.mapWith(
     Number
   ),

@@ -56,7 +56,7 @@ export function BatchList() {
             <ul className="flex flex-col gap-2">
               {batches.map((batch) => {
                 const active = batch.queued + batch.running > 0;
-                const done = batch.applied + batch.rejected;
+                const done = batch.applied + batch.rejected + batch.superseded;
                 return (
                   <li key={batch.id}>
                     <Link

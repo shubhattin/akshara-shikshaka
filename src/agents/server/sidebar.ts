@@ -15,7 +15,8 @@ import { liveStreaming } from './chat_store';
 import { savedStrokeCount } from './stroke_count';
 
 /**
- * The sidebar's Gestures tab: every gesture with focused chats, with what it is grouped and
+ * The sidebar's Gestures tab: every gesture with focused chats or batch runs (a run's chat may
+ * be deleted while its proposal waits), with what it is grouped and
  * filtered by — its lesson category and lesson order (default language), its review state, and
  * the batches it ran in. Aggregated per gesture, so no chat limit cuts gestures off.
  */
@@ -34,6 +35,17 @@ export const listSidebarGestures = Effect.fn('agents.sidebar_gestures')(function
           .where(sql`${agent_chats.focus_gesture_id} is not null`)
           .groupBy(agent_chats.focus_gesture_id)
           .as('focused');
+        const batched = client
+          .select({
+            gesture_id: agent_batch_items.text_gesture_id,
+            latest_run:
+              sql<Date>`max(coalesce(${agent_batch_items.finished_at}, ${agent_batch_items.created_at}))`.as(
+                'latest_run'
+              )
+          })
+          .from(agent_batch_items)
+          .groupBy(agent_batch_items.text_gesture_id)
+          .as('batched');
         return client
           .select({
             id: text_gestures.id,
@@ -49,12 +61,13 @@ export const listSidebarGestures = Effect.fn('agents.sidebar_gestures')(function
             lesson_order: sql<
               number | null
             >`case when ${text_lessons.category_id} = ${gesture_text_key_lesson_category_join.lesson_category_id} then ${text_lessons.order} end`,
-            chats: focused.chats,
-            latest_activity: focused.latest_activity,
-            streaming: focused.streaming
+            chats: sql<number>`coalesce(${focused.chats}, 0)`,
+            latest_activity: sql<Date>`coalesce(${focused.latest_activity}, ${batched.latest_run})`,
+            streaming: sql<boolean>`coalesce(${focused.streaming}, false)`
           })
-          .from(focused)
-          .innerJoin(text_gestures, eq(text_gestures.id, focused.gesture_id))
+          .from(text_gestures)
+          .leftJoin(focused, eq(focused.gesture_id, text_gestures.id))
+          .leftJoin(batched, eq(batched.gesture_id, text_gestures.id))
           .leftJoin(
             gesture_text_key_lesson_category_join,
             and(
@@ -68,7 +81,8 @@ export const listSidebarGestures = Effect.fn('agents.sidebar_gestures')(function
               eq(text_lessons.text_key, text_gestures.text_key),
               eq(text_lessons.lang_id, DEFAULT_GESTURE_CATEGORY_LANG_ID)
             )
-          );
+          )
+          .where(sql`${focused.gesture_id} is not null or ${batched.gesture_id} is not null`);
       }),
       dbRunHttp('agents.sidebar_categories', (client) =>
         client

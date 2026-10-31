@@ -27,6 +27,7 @@ import {
   type SidebarGesture,
   type SidebarGroup
 } from './sidebar_tree';
+import type { BatchItemStatus } from '~/agents/batch';
 
 const FILTERS_KEY = 'agents_sidebar_gesture_filters';
 const COLLAPSED_KEY = 'agents_sidebar_collapsed_groups';
@@ -104,6 +105,9 @@ function GlyphPreview({ gesture }: { gesture: SidebarGesture }) {
   );
 }
 
+/** Batch items already reviewed one way or another: the row shows the gesture's review instead. */
+const SETTLED_ITEM_STATUSES = new Set<BatchItemStatus>(['applied', 'rejected', 'superseded']);
+
 /** One gesture: glyph (hover preview), state, chats folded under it; the name opens its hub. */
 function GestureRow({
   entry,
@@ -178,7 +182,7 @@ function GestureRow({
                 className="size-1.5 shrink-0 rounded-full bg-amber-500"
               />
             ) : null}
-            {batchStatus ? (
+            {batchStatus && !SETTLED_ITEM_STATUSES.has(batchStatus) ? (
               <BatchStatusBadge status={batchStatus} stuck={false} />
             ) : (
               <ReviewBadge status={gesture.review_status} strokes={gesture.strokes} />

@@ -46,7 +46,7 @@ export const FONT_SCRIPTS = [
   'Kannada',
   'Odia',
   'Malayalam',
-  'Tamil',
+  // 'Tamil',
   'Bengali',
   'Gujarati'
 ] as const;

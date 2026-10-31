@@ -5,7 +5,7 @@ import { TriangleAlertIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '~/api/client';
 import type { ProposedGesture } from '~/agents/gesture_creator/schemas';
-import { GesturePreview } from '~/components/gesture/GesturePreview';
+import { GesturePreview, type InspectOptions } from '~/components/gesture/GesturePreview';
 import Practice from '~/components/pages/practice/Practice';
 import {
   AlertDialog,
@@ -91,6 +91,13 @@ function PreviewPane({
   proposal: ProposedGesture;
   background?: string;
 }) {
+  const compare: InspectOptions = {
+    title: `${proposal.text} — saved vs proposed`,
+    panes: [
+      { label: 'Saved now', gestures: saved, backgroundSrc: background },
+      { label: 'Proposed', gestures: proposal.gestures, backgroundSrc: background, accent: true }
+    ]
+  };
   return (
     <>
       {isPending ? (
@@ -101,13 +108,17 @@ function PreviewPane({
             <figcaption className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               Saved now · {saved.length} strokes
             </figcaption>
-            <GesturePreview gestures={saved} backgroundSrc={background} />
+            <GesturePreview gestures={saved} backgroundSrc={background} inspect={compare} />
           </figure>
           <figure className="flex flex-col gap-1.5">
             <figcaption className="text-xs font-semibold tracking-wide text-primary uppercase">
               Proposed · {proposal.gestures.length} strokes
             </figcaption>
-            <GesturePreview gestures={proposal.gestures} backgroundSrc={background} />
+            <GesturePreview
+              gestures={proposal.gestures}
+              backgroundSrc={background}
+              inspect={compare}
+            />
           </figure>
         </div>
       ) : (
@@ -116,7 +127,7 @@ function PreviewPane({
         </div>
       )}
       <p className="mt-2 text-center text-xs text-muted-foreground">
-        Press ▶ on a preview to play it with its timing.
+        Press ▶ on a preview to play it with its timing, or ⤢ to inspect it.
       </p>
     </>
   );

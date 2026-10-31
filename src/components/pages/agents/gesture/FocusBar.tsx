@@ -5,7 +5,11 @@ import { ChevronDownIcon, Columns2Icon, CrosshairIcon, ExternalLinkIcon } from '
 import { useTRPC } from '~/api/client';
 import type { ProposedGesture } from '~/agents/gesture_creator/schemas';
 import type { AgentUIMessage } from '~/agents/ui_message';
-import { GesturePreview } from '~/components/gesture/GesturePreview';
+import {
+  GestureInspectorDialog,
+  type InspectPane
+} from '~/components/gesture/GestureInspectorDialog';
+import { GesturePreview, type InspectOptions } from '~/components/gesture/GesturePreview';
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
@@ -68,12 +72,30 @@ function CompareDialog({
   /** Undefined while the gesture loads */
   revision: number | undefined;
 }) {
+  const inspect: InspectOptions = {
+    title: 'Saved version vs latest proposal',
+    panes: [
+      { label: `Saved · v${revision ?? '…'}`, gestures: saved, backgroundSrc: background },
+      ...(proposal
+        ? [
+            {
+              label: 'Latest proposal',
+              gestures: proposal.gestures,
+              backgroundSrc: background,
+              accent: true
+            }
+          ]
+        : [])
+    ]
+  };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Saved version vs latest proposal</DialogTitle>
-          <DialogDescription>Press ▶ on either to play it with its timing.</DialogDescription>
+          <DialogDescription>
+            Press ▶ on either to play it with its timing, or ⤢ to inspect both side by side.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <figure className="flex flex-col gap-1.5">
@@ -81,7 +103,7 @@ function CompareDialog({
               Saved · v{revision ?? '…'} · {saved.length} strokes
             </figcaption>
             {saved.length > 0 ? (
-              <GesturePreview gestures={saved} backgroundSrc={background} />
+              <GesturePreview gestures={saved} backgroundSrc={background} inspect={inspect} />
             ) : (
               <p className="flex aspect-square items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
                 No strokes saved yet
@@ -93,7 +115,11 @@ function CompareDialog({
               Latest proposal{proposal ? ` · ${proposal.gestures.length} strokes` : ''}
             </figcaption>
             {proposal ? (
-              <GesturePreview gestures={proposal.gestures} backgroundSrc={background} />
+              <GesturePreview
+                gestures={proposal.gestures}
+                backgroundSrc={background}
+                inspect={inspect}
+              />
             ) : (
               <p className="flex aspect-square items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
                 No proposal in this chat yet
@@ -111,13 +137,15 @@ function ProposalRow({
   number,
   appliedAs,
   background,
-  onApply
+  onApply,
+  onInspect
 }: {
   item: ChatProposal;
   number: number;
   appliedAs: number | undefined;
   background?: string;
   onApply: () => void;
+  onInspect: () => void;
 }) {
   return (
     <li className="flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-muted/50">
@@ -125,6 +153,8 @@ function ProposalRow({
         gestures={item.proposal.gestures}
         backgroundSrc={background}
         showStrokeOrder={false}
+        size="thumb"
+        onInspect={onInspect}
         className="w-14 shrink-0"
       />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -181,6 +211,11 @@ function FocusLabel({
           gestures={saved}
           backgroundSrc={background}
           showStrokeOrder={false}
+          size="thumb"
+          inspect={{
+            title: `${gesture?.text ?? ''} — saved${gesture ? ` v${gesture.revision}` : ''}`,
+            label: 'Saved'
+          }}
           className="w-9 shrink-0"
         />
       ) : null}
@@ -251,6 +286,8 @@ export function FocusBar({
   const applied = useAppliedRevisions(gestureId);
   const [comparing, setComparing] = useState(false);
   const [applying, setApplying] = useState<ChatProposal | null>(null);
+  /** A proposal of the popover opened in the inspector (beside the saved version) */
+  const [inspecting, setInspecting] = useState<{ item: ChatProposal; number: number } | null>(null);
   const saved = gesture ? savedStrokes(gesture.gestures) : [];
   const latest = proposals.at(-1) ?? null;
 
@@ -279,6 +316,7 @@ export function FocusBar({
                     appliedAs={applied.get(item.toolCallId)}
                     background={background}
                     onApply={() => setApplying(item)}
+                    onInspect={() => setInspecting({ item, number })}
                   />
                 ))}
             </ul>
@@ -304,6 +342,31 @@ export function FocusBar({
         background={background}
         revision={gesture?.revision}
       />
+      {inspecting ? (
+        <GestureInspectorDialog
+          open
+          onOpenChange={(open) => !open && setInspecting(null)}
+          title={`${gesture?.text ?? ''} — proposal ${inspecting.number}`}
+          description={inspecting.item.proposal.summary}
+          panes={[
+            ...(saved.length > 0
+              ? [
+                  {
+                    label: `Saved · v${gesture?.revision ?? '…'}`,
+                    gestures: saved,
+                    backgroundSrc: background
+                  } satisfies InspectPane
+                ]
+              : []),
+            {
+              label: `Proposal ${inspecting.number}`,
+              gestures: inspecting.item.proposal.gestures,
+              backgroundSrc: background,
+              accent: true
+            }
+          ]}
+        />
+      ) : null}
       {applying ? (
         <ApplyGestureDialog
           open

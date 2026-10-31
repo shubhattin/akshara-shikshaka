@@ -5,7 +5,8 @@ import { ReviewQueue } from '~/components/pages/agents/gesture_hub/ReviewQueue';
 
 /** Filters live in the URL, so a reload or a shared link keeps them. */
 const queue_search_schema = z.object({
-  tab: z.enum(QUEUE_TABS).optional(),
+  // an old link's removed tab (e.g. `struggle`) falls back to All
+  tab: z.enum(QUEUE_TABS).optional().catch(undefined),
   /** Script id, or `all`; Devanagari when absent */
   script: z.union([z.literal('all'), z.coerce.number().int()]).optional(),
   /** Lesson category id, `none` (uncategorized) or `all` (default) */

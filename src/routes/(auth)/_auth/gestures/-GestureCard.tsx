@@ -46,7 +46,11 @@ export function GestureCard({ item }: { item: GestureCardItem }) {
             </span>
           </Link>
         ) : preview_q.data ? (
-          <GesturePreview gestures={preview_q.data.gestures} showStrokeOrder={false} />
+          <GesturePreview
+            gestures={preview_q.data.gestures}
+            showStrokeOrder={false}
+            inspect={{ title: `${item.text} — saved strokes`, label: 'Saved' }}
+          />
         ) : preview_q.isError ? (
           <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-lg border border-destructive/40 text-xs text-destructive">
             <AlertCircleIcon className="size-4" />

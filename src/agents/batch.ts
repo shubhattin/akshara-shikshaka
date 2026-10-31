@@ -27,14 +27,14 @@ export const BATCH_ITEM_STATUS_META = {
   failed: { label: 'Failed', hint: 'The run failed after its retries' },
   applied: { label: 'Applied', hint: 'The proposal was saved to the gesture' },
   rejected: { label: 'Rejected', hint: 'Reviewed and not applied (kept in the chat)' },
-  cancelled: { label: 'Cancelled', hint: 'The batch was cancelled or hit its budget first' }
+  cancelled: { label: 'Cancelled', hint: 'The batch was cancelled first' }
 } as const satisfies Record<BatchItemStatus, { label: string; hint: string }>;
 
 /** Still waiting for, or inside, a run. */
 export const ACTIVE_ITEM_STATUSES = ['queued', 'running'] as const satisfies BatchItemStatus[];
 
 /** What the agent is shown besides the glyph. */
-export const BATCH_REFERENCES = ['none', 'saved', 'sibling'] as const;
+export const BATCH_REFERENCES = ['none', 'saved'] as const;
 export type BatchReference = (typeof BATCH_REFERENCES)[number];
 export const batch_reference_schema = z.enum(BATCH_REFERENCES);
 
@@ -43,10 +43,6 @@ export const BATCH_REFERENCE_META = {
   saved: {
     label: 'Current strokes',
     hint: 'Shows the saved strokes to critique (gestures without strokes get the glyph only)'
-  },
-  sibling: {
-    label: 'Sibling script',
-    hint: 'Shows the same akṣara in another script (approved first) so the order matches'
   }
 } as const satisfies Record<BatchReference, { label: string; hint: string }>;
 
@@ -90,7 +86,5 @@ export const create_batch_input_schema = z.object({
   reference: batch_reference_schema,
   auto_apply: batch_auto_apply_schema,
   parallelism: z.int().min(BATCH_PARALLELISM.min).max(BATCH_PARALLELISM.max),
-  /** Stop starting runs once the batch has cost this much (USD); null = no cap */
-  budget_usd: z.number().positive().max(500).nullable(),
   title: z.string().trim().max(120).optional()
 });

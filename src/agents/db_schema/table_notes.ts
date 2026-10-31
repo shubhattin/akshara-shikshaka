@@ -43,7 +43,7 @@ export const TABLE_NOTES = new Map<string, string>([
   ],
   [
     'text_gesture_revisions',
-    "Every saved version of a gesture: revision_no matches text_gestures.revision when it was saved (the highest is the current one). source = initial (state before history was kept) | manual (saved in the editor) | agent (a Gesture Creator proposal applied; chat_id) | revert (an older version restored; reverted_from = that revision's id)"
+    "Every saved version of a gesture: revision_no matches text_gestures.revision when it was saved (the highest is the current one). source = initial (state before history was kept) | manual (saved in the editor) | agent (a Gesture Creator proposal applied; chat_id) | revert (an older version restored; reverted_from = that revision's id) | font (only the glyph font / size changed, by the bulk font tools)"
   ]
 ]);
 

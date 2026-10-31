@@ -35,7 +35,7 @@ import type { AgentUIMessage } from '~/agents/ui_message';
 import { appRuntime } from '~/effect/runtime';
 import { createAgentChat, liveStreaming, loadAgentMessages, requestChatStop } from './chat_store';
 import { getGestureForAgent, saveProposal } from './gestures';
-import { listSiblingGestures, setGestureReview } from './gesture_review';
+import { setGestureReview } from './gesture_review';
 import { startAgentTurn } from './run_turn';
 import { savedStrokeCount } from './stroke_count';
 
@@ -167,8 +167,7 @@ export const createBatch = Effect.fn('batches.create')(function* (
         prompt: input.prompt,
         reference: input.reference,
         auto_apply: input.auto_apply,
-        parallelism: input.parallelism,
-        budget_usd: input.budget_usd
+        parallelism: input.parallelism
       })
       .returning()
   );
@@ -236,32 +235,23 @@ const claimItem = Effect.fn('batches.claim')(function* (itemId: number) {
 const batchMessageId = (itemId: number) => `batch-item-${itemId}-${Date.now()}`;
 
 /** The run's first message: the batch prompt, and the reference it asks for. */
-const firstMessage = Effect.fn('batches.first_message')(function* (
-  batch: Batch,
-  item: BatchItem,
-  gesture: { id: number; text_key: string; strokes: number }
-) {
+function firstMessage(batch: Batch, item: BatchItem, gesture: { id: number; strokes: number }) {
   const parts: AgentUIMessage['parts'] = [{ type: 'text', text: batch.prompt }];
-  let viewGestureId: number | null = null;
-  let purpose: 'critique' | 'sibling' = 'critique';
-  if (batch.reference === 'saved' && gesture.strokes > 0) {
-    viewGestureId = gesture.id;
-  } else if (batch.reference === 'sibling') {
-    const siblings = (yield* listSiblingGestures(gesture)).filter((s) => s.strokes > 0);
-    const sibling = siblings.find((s) => s.review_status === 'approved') ?? siblings[0];
-    if (sibling) {
-      viewGestureId = sibling.id;
-      purpose = 'sibling';
-    }
-  }
+  // older batches may still say 'sibling' (no longer offered): those trace from the glyph
+  const viewGestureId = batch.reference === 'saved' && gesture.strokes > 0 ? gesture.id : null;
   if (viewGestureId !== null) {
     parts.push({
       type: 'data-saved_view',
-      data: { view_id: `batch-${item.id}`, gesture_id: viewGestureId, purpose, marks: [] }
+      data: {
+        view_id: `batch-${item.id}`,
+        gesture_id: viewGestureId,
+        purpose: 'critique',
+        marks: []
+      }
     });
   }
   return { id: batchMessageId(item.id), role: 'user' as const, parts };
-});
+}
 
 const CANCEL_POLL_MS = 5_000;
 
@@ -370,7 +360,7 @@ export const runBatchItem = Effect.fn('batches.run_item')(function* (
       yield* updateItem(item.id, { chat_id: chatId });
     }
 
-    const message = yield* firstMessage(batch, item, { ...gesture, strokes });
+    const message = firstMessage(batch, item, { ...gesture, strokes });
     const turn = yield* startAgentTurn({
       chatId,
       message,

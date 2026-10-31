@@ -228,7 +228,7 @@ export const getGestureHub = Effect.fn('gesture_review.hub')(function* (gestureI
   };
 });
 
-/** Practice attempts counted for the queue's "learners struggle" bucket. */
+/** Practice attempts counted for the "learners struggle" flag on queue rows. */
 const PRACTICE_WINDOW_DAYS = 30;
 
 /**

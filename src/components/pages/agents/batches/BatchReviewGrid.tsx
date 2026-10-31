@@ -5,7 +5,7 @@ import { TriangleAlertIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTRPC } from '~/api/client';
 import type { AppRouter } from '~/api/trpc_router';
-import { GesturePreview } from '~/components/gesture/GesturePreview';
+import { GesturePreview, type InspectOptions } from '~/components/gesture/GesturePreview';
 import { Button } from '~/components/ui/button';
 import { Checkbox } from '~/components/ui/checkbox';
 import { Skeleton } from '~/components/ui/skeleton';
@@ -48,6 +48,13 @@ function ReviewCard({
   const proposed = [...row.proposal.gestures]
     .sort((a, b) => a.index - b.index)
     .filter((gesture) => gesture.points.length > 0);
+  const compare: InspectOptions = {
+    title: `${row.current.text} — saved now vs proposal`,
+    panes: [
+      { label: 'Saved now', gestures: savedNow, backgroundSrc: currentBackground },
+      { label: 'Proposal', gestures: proposed, backgroundSrc: proposalBackground, accent: true }
+    ]
+  };
   const changedSinceRun =
     row.based_on_revision !== null && row.current.revision !== row.based_on_revision;
 
@@ -104,7 +111,11 @@ function ReviewCard({
             Saved now · {savedNow.length} strokes
           </figcaption>
           {savedNow.length > 0 ? (
-            <GesturePreview gestures={savedNow} backgroundSrc={currentBackground} />
+            <GesturePreview
+              gestures={savedNow}
+              backgroundSrc={currentBackground}
+              inspect={compare}
+            />
           ) : (
             <p className="flex aspect-square items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground">
               No strokes yet
@@ -115,7 +126,11 @@ function ReviewCard({
           <figcaption className="text-[11px] font-semibold tracking-wide text-primary uppercase">
             Proposal · {proposed.length} strokes
           </figcaption>
-          <GesturePreview gestures={proposed} backgroundSrc={proposalBackground} />
+          <GesturePreview
+            gestures={proposed}
+            backgroundSrc={proposalBackground}
+            inspect={compare}
+          />
         </figure>
       </div>
       <p className="text-sm text-foreground/90">{row.proposal.summary}</p>

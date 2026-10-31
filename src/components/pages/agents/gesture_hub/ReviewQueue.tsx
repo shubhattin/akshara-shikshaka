@@ -16,6 +16,7 @@ import { Checkbox } from '~/components/ui/checkbox';
 import { Skeleton } from '~/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { get_script_from_id, script_list_obj } from '~/state/lang_list';
+import { LazyGestureThumb } from '~/components/gesture/LazyGestureThumb';
 import { MobileHistoryButton } from '../sidebar/AgentsSidebar';
 import { StartBatchDialog } from '../batches/StartBatchDialog';
 import { FilterSelect, type FilterOption } from './FilterSelect';
@@ -158,10 +159,7 @@ export function ReviewQueue({
                 ))}
               </TabsList>
             </Tabs>
-            <p className="text-xs text-muted-foreground">
-              {QUEUE_TAB_META[tab].hint}
-              {tab === 'struggle' ? ` (last ${practiceDays} days).` : '.'}
-            </p>
+            <p className="text-xs text-muted-foreground">{QUEUE_TAB_META[tab].hint}.</p>
             <div className="flex items-center gap-2">
               <Checkbox
                 checked={allSelected}
@@ -218,7 +216,13 @@ export function ReviewQueue({
                     }
                     aria-label={`Select ${gesture.text} #${gesture.id}`}
                   />
-                  <span className="w-9 text-center text-xl leading-none">{gesture.text}</span>
+                  <LazyGestureThumb
+                    id={gesture.id}
+                    text={gesture.text}
+                    strokes={gesture.strokes}
+                    version={gesture.updated_at}
+                    className="w-11"
+                  />
                   <Link
                     to="/admin/agents/gestures/$gestureId"
                     params={{ gestureId: String(gesture.id) }}

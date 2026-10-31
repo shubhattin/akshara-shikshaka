@@ -76,6 +76,7 @@ function ProposalBody({ proposal, toolCallId }: { proposal: ProposedGesture; too
       <GesturePreview
         gestures={proposal.gestures}
         backgroundSrc={background}
+        inspect={{ title: `Proposed gesture for ${proposal.text}`, label: 'Proposal' }}
         className="w-full shrink-0 sm:w-44"
       />
       <div className="flex min-w-0 flex-1 flex-col gap-2">

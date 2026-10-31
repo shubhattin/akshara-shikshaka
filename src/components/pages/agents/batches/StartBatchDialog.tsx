@@ -13,7 +13,7 @@ import {
   type BatchAutoApply,
   type BatchReference
 } from '~/agents/batch';
-import { type AgentModelId } from '~/agents/models';
+import { AGENT_DEFAULT_MODEL, type AgentModelId } from '~/agents/models';
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
@@ -44,12 +44,11 @@ export function StartBatchDialog({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
-  const [model, setModel] = useState<AgentModelId>('gemini-3.7-flash');
+  const [model, setModel] = useState<AgentModelId>(AGENT_DEFAULT_MODEL);
   const [prompt, setPrompt] = useState(DEFAULT_BATCH_PROMPT);
   const [reference, setReference] = useState<BatchReference>('none');
   const [autoApply, setAutoApply] = useState<BatchAutoApply>('never');
   const [parallelism, setParallelism] = useState<number>(BATCH_PARALLELISM.default);
-  const [budget, setBudget] = useState('');
 
   const create_mut = useMutation(
     trpc.agents.create_batch.mutationOptions({
@@ -67,12 +66,6 @@ export function StartBatchDialog({
   );
 
   const submit = () => {
-    const trimmedBudget = budget.trim();
-    const parsedBudget = trimmedBudget === '' ? null : Number(trimmedBudget);
-    if (parsedBudget !== null && !(parsedBudget > 0 && parsedBudget <= 500)) {
-      toast.error('Budget must be between 0 and 500 USD, or empty for no cap.');
-      return;
-    }
     const clampedParallelism = Math.min(
       BATCH_PARALLELISM.max,
       Math.max(BATCH_PARALLELISM.min, Math.floor(parallelism) || BATCH_PARALLELISM.default)
@@ -94,7 +87,6 @@ export function StartBatchDialog({
       reference,
       auto_apply: autoApply,
       parallelism: clampedParallelism,
-      budget_usd: parsedBudget,
       title: trimmedTitle === '' ? undefined : trimmedTitle
     });
   };
@@ -188,38 +180,21 @@ export function StartBatchDialog({
               </label>
             </RadioGroup>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="batch-parallelism">Agents at once</Label>
-              <Input
-                id="batch-parallelism"
-                type="number"
-                min={BATCH_PARALLELISM.min}
-                max={BATCH_PARALLELISM.max}
-                value={parallelism}
-                onChange={(event) => setParallelism(Number(event.currentTarget.value))}
-              />
-              <p className="text-xs text-muted-foreground">
-                {BATCH_PARALLELISM.min}–{BATCH_PARALLELISM.max}, {BATCH_PARALLELISM.default}{' '}
-                recommended; QStash free plan allows up to 10 across all apps.
-              </p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="batch-budget">Budget USD (optional)</Label>
-              <Input
-                id="batch-budget"
-                type="number"
-                min={0}
-                max={500}
-                step="0.5"
-                value={budget}
-                onChange={(event) => setBudget(event.currentTarget.value)}
-                placeholder="No cap"
-              />
-              <p className="text-xs text-muted-foreground">
-                Stops starting runs once the batch has cost this much.
-              </p>
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="batch-parallelism">Agents at once</Label>
+            <Input
+              id="batch-parallelism"
+              type="number"
+              min={BATCH_PARALLELISM.min}
+              max={BATCH_PARALLELISM.max}
+              value={parallelism}
+              onChange={(event) => setParallelism(Number(event.currentTarget.value))}
+              className="w-28"
+            />
+            <p className="text-xs text-muted-foreground">
+              {BATCH_PARALLELISM.min}–{BATCH_PARALLELISM.max}, {BATCH_PARALLELISM.default}{' '}
+              recommended; QStash free plan allows up to 10 across all apps.
+            </p>
           </div>
         </div>
         <DialogFooter>

@@ -15,14 +15,15 @@ export const REVIEW_STATUS_META = {
 } as const satisfies Record<ReviewStatus, { label: string }>;
 
 /** How a saved version of a gesture came to be. */
-export const REVISION_SOURCES = ['initial', 'manual', 'agent', 'revert'] as const;
+export const REVISION_SOURCES = ['initial', 'manual', 'agent', 'revert', 'font'] as const;
 export type RevisionSource = (typeof REVISION_SOURCES)[number];
 
 export const REVISION_SOURCE_META = {
   initial: { label: 'Initial' },
   manual: { label: 'Saved in editor' },
   agent: { label: 'Applied from a chat' },
-  revert: { label: 'Restored' }
+  revert: { label: 'Restored' },
+  font: { label: 'Font changed' }
 } as const satisfies Record<RevisionSource, { label: string }>;
 
 /** Longest per-gesture note the Gesture Creator reads. */

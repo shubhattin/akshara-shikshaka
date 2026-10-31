@@ -7,6 +7,11 @@
  *   bun rescore_gesture_accuracy.ts --prod             # prod dump   (out/db_data_prod.json)
  *   bun rescore_gesture_accuracy.ts --prod --update    # also write the new scores to the prod DB
  *
+ * The stored scores are taken to come from the current scorer family (passing at
+ * `GESTURE_PASS_THRESHOLD`). For a dump still holding scores from the legacy scorer that was
+ * replaced in Oct 2026 (passing above 0.75), add `--legacy` so the before → after pass/fail
+ * comparison uses that rule. The flag changes only the report, never what is written.
+ *
  * Prints statistics and saves before/after charts to `out/rescore_<mode>/`. With `--update` the
  * changed scores are written (after confirmation) only to rows still holding the score that was in
  * the dump, so anything re-scored or edited since the dump is left alone.
@@ -20,11 +25,15 @@ import { z } from 'zod';
 import { dbMode, make_dir, take_input } from '~/tools/kry.server';
 import { get_script_from_id } from '~/state/lang_list';
 import { user_gesture_recording_vectors } from '../schema';
-import { scoreGlyphStroke, type GestureIssue } from '~/tools/stroke_data/gesture_scoring';
+import {
+  GESTURE_PASS_THRESHOLD,
+  scoreGlyphStroke,
+  type GestureIssue
+} from '~/tools/stroke_data/gesture_scoring';
 import type { GesturePoints } from '~/tools/stroke_data/types';
 
-/** The previous scorer accepted strokes scoring strictly above this */
-const OLD_PASS_THRESHOLD = 0.75;
+/** The legacy scorer (replaced in Oct 2026) accepted strokes scoring strictly above this */
+const LEGACY_PASS_THRESHOLD = 0.75;
 /** Glyphs with fewer attempts are left out of the per-glyph table and chart */
 const MIN_GLYPH_ATTEMPTS = 15;
 const UPDATE_BATCH_SIZE = 500;
@@ -35,6 +44,21 @@ const UPDATE_BATCH_SIZE = 500;
 const args = process.argv.slice(2);
 const mode = args.includes('--prod') ? 'PROD' : args.includes('--preview') ? 'PREVIEW' : 'LOCAL';
 const shouldUpdate = args.includes('--update');
+
+/** How the stored ("before") scores were judged by the scorer that produced them */
+const BEFORE_RULE = args.includes('--legacy')
+  ? {
+      threshold: LEGACY_PASS_THRESHOLD,
+      passed: (score: number) => score > LEGACY_PASS_THRESHOLD,
+      label: `pass > ${LEGACY_PASS_THRESHOLD}`,
+      source: 'legacy scorer'
+    }
+  : {
+      threshold: GESTURE_PASS_THRESHOLD,
+      passed: (score: number) => score >= GESTURE_PASS_THRESHOLD,
+      label: `pass ≥ ${GESTURE_PASS_THRESHOLD}`,
+      source: 'stored'
+    };
 
 const DATA_FILE = {
   PROD: 'db_data_prod.json',
@@ -127,7 +151,7 @@ const rescore = (dump: Dump): Row[] => {
         script: get_script_from_id(recording.script_id) ?? String(recording.script_id),
         before: v.recorded_accuracy,
         after: result.score,
-        passedBefore: v.recorded_accuracy > OLD_PASS_THRESHOLD,
+        passedBefore: BEFORE_RULE.passed(v.recorded_accuracy),
         passedAfter: result.passed,
         issue: result.issue
       });
@@ -189,6 +213,10 @@ const printReport = (rows: Row[], dump: Dump) => {
   console.log(
     `${new Set(rows.map((r) => r.glyph)).size} glyphs, ` +
       `${dump.user_gesture_recordings.length} practice sessions, ${dates[0]} → ${dates.at(-1)}`
+  );
+  console.log(
+    `Before: ${BEFORE_RULE.source} scores, ${BEFORE_RULE.label}. ` +
+      `After: current scorer, pass ≥ ${GESTURE_PASS_THRESHOLD}.`
   );
 
   heading('Score distribution');
@@ -335,18 +363,18 @@ const distributionChart = (rows: Row[]) => {
   };
   const panels = [
     {
-      name: 'Before (previous scorer)',
+      name: `Before (${BEFORE_RULE.source} scores)`,
       color: COLORS.before,
       counts: histogram(rows.map((r) => r.before)),
-      threshold: OLD_PASS_THRESHOLD,
-      label: `pass > ${OLD_PASS_THRESHOLD}`
+      threshold: BEFORE_RULE.threshold,
+      label: BEFORE_RULE.label
     },
     {
       name: 'After (current scorer)',
       color: COLORS.after,
       counts: histogram(rows.map((r) => r.after)),
-      threshold: 0.6,
-      label: 'pass ≥ 0.6'
+      threshold: GESTURE_PASS_THRESHOLD,
+      label: `pass ≥ ${GESTURE_PASS_THRESHOLD}`
     }
   ];
   const yMax = Math.max(...panels.flatMap((p) => p.counts));
@@ -401,8 +429,8 @@ const scatterChart = (rows: Row[]) => {
   for (const r of rows) {
     body += `<circle cx="${x(r.before).toFixed(1)}" cy="${y(r.after).toFixed(1)}" r="2.5" fill="${COLORS.before}" fill-opacity="0.35"/>`;
   }
-  body += `<line x1="${x(OLD_PASS_THRESHOLD)}" x2="${x(OLD_PASS_THRESHOLD)}" y1="${top}" y2="${top + S}" stroke="${COLORS.text}" stroke-dasharray="4 4"/>`;
-  body += `<line x1="${left}" x2="${left + S}" y1="${y(0.6)}" y2="${y(0.6)}" stroke="${COLORS.text}" stroke-dasharray="4 4"/>`;
+  body += `<line x1="${x(BEFORE_RULE.threshold)}" x2="${x(BEFORE_RULE.threshold)}" y1="${top}" y2="${top + S}" stroke="${COLORS.text}" stroke-dasharray="4 4"/>`;
+  body += `<line x1="${left}" x2="${left + S}" y1="${y(GESTURE_PASS_THRESHOLD)}" y2="${y(GESTURE_PASS_THRESHOLD)}" stroke="${COLORS.text}" stroke-dasharray="4 4"/>`;
   const count = (b: boolean, a: boolean) =>
     rows.filter((r) => r.passedBefore === b && r.passedAfter === a).length;
   const quadrant = (qx: number, qy: number, label: string, n: number, anchor: string) =>
@@ -416,7 +444,12 @@ const scatterChart = (rows: Row[]) => {
   body += quadrant(x(1) - 8, top + S - 10, 'pass → fail', count(true, false), 'end');
   body += quadrant(left + 8, top + 18, 'fail → pass', count(false, true), 'start');
   body += quadrant(left + 8, top + S - 10, 'fail → fail', count(false, false), 'start');
-  body += text(left + S / 2, top + S + 46, 'Before (previous scorer)', 'text-anchor="middle"');
+  body += text(
+    left + S / 2,
+    top + S + 46,
+    `Before (${BEFORE_RULE.source} scores)`,
+    'text-anchor="middle"'
+  );
   body += text(
     20,
     top + S / 2,

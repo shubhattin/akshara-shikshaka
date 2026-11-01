@@ -9,7 +9,7 @@ import {
   text_gestures,
   text_lessons
 } from '~/db/schema';
-import { dbRunHttp } from '~/effect/database';
+import { dbRun } from '~/effect/database';
 import { DEFAULT_GESTURE_CATEGORY_LANG_ID } from '~/state/lang_list';
 import { liveStreaming } from './chat_store';
 import { savedStrokeCount } from './stroke_count';
@@ -23,7 +23,7 @@ import { savedStrokeCount } from './stroke_count';
 export const listSidebarGestures = Effect.fn('agents.sidebar_gestures')(function* () {
   const [gestures, categories, batchItems] = yield* Effect.all(
     [
-      dbRunHttp('agents.sidebar_gestures', (client) => {
+      dbRun('agents.sidebar_gestures', (client) => {
         const focused = client
           .select({
             gesture_id: agent_chats.focus_gesture_id,
@@ -84,7 +84,7 @@ export const listSidebarGestures = Effect.fn('agents.sidebar_gestures')(function
           )
           .where(sql`${focused.gesture_id} is not null or ${batched.gesture_id} is not null`);
       }),
-      dbRunHttp('agents.sidebar_categories', (client) =>
+      dbRun('agents.sidebar_categories', (client) =>
         client
           .select({
             id: lesson_categories.id,
@@ -95,7 +95,7 @@ export const listSidebarGestures = Effect.fn('agents.sidebar_gestures')(function
           .where(eq(lesson_categories.lang_id, DEFAULT_GESTURE_CATEGORY_LANG_ID))
           .orderBy(asc(lesson_categories.order))
       ),
-      dbRunHttp('agents.sidebar_batch_items', (client) =>
+      dbRun('agents.sidebar_batch_items', (client) =>
         client
           .select({
             gesture_id: agent_batch_items.text_gesture_id,

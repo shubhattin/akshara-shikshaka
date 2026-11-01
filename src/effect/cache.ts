@@ -4,12 +4,12 @@ import { z } from 'zod';
 import { RedisClient } from './redis';
 import { CacheError } from './errors';
 import { BackgroundWork } from './background';
-import { DatabaseHttp, type DbHttpClient } from './database';
+import { Database, type DbClient } from './database';
 import { reportSwallowedEffect } from './posthog_error';
 
 const CACHE_EXPIRE_S = ms('30days') / 1000;
 
-type CacheEnv = RedisClient | BackgroundWork | DatabaseHttp;
+type CacheEnv = RedisClient | BackgroundWork | Database;
 export type CacheRefreshOptions = {
   deleteFirst?: boolean;
 };
@@ -22,14 +22,14 @@ export interface CacheItem<TData, TParams> {
   refresh: (
     params: TParams,
     options?: CacheRefreshOptions
-  ) => Effect.Effect<void, CacheError, RedisClient | DatabaseHttp>;
+  ) => Effect.Effect<void, CacheError, RedisClient | Database>;
 }
 
 export interface CreateCacheConfig<TSchema extends z.ZodType, TData> {
   keyPrefix: string;
   schema: TSchema;
   keyBuilder: (params: z.infer<TSchema>) => string;
-  fetch: (params: z.infer<TSchema>) => Effect.Effect<TData, CacheError, DatabaseHttp>;
+  fetch: (params: z.infer<TSchema>) => Effect.Effect<TData, CacheError, Database>;
   ttl?: number;
 }
 
@@ -184,7 +184,7 @@ export const invalidateAndRefreshCache = <TData, TParams>({
   Effect.gen(function* () {
     const background = yield* BackgroundWork;
     const redis = yield* RedisClient;
-    const database = yield* DatabaseHttp;
+    const database = yield* Database;
     // Best-effort invalidate: mutations should still succeed and refresh ahead.
     yield* cache.delete(params).pipe(
       Effect.catch((error) =>
@@ -200,15 +200,15 @@ export const invalidateAndRefreshCache = <TData, TParams>({
           .refresh(params, { deleteFirst: false })
           .pipe(
             Effect.provideService(RedisClient, redis),
-            Effect.provideService(DatabaseHttp, database)
+            Effect.provideService(Database, database)
           )
       )
     );
   });
 
-export const fromDb = <A>(operation: string, run: (client: DbHttpClient) => A | PromiseLike<A>) =>
+export const fromDb = <A>(operation: string, run: (client: DbClient) => A | PromiseLike<A>) =>
   Effect.gen(function* () {
-    const database = yield* DatabaseHttp;
+    const database = yield* Database;
     return yield* database.run(operation, run).pipe(
       Effect.mapError((cause) => CacheError.make({ operation, cause })),
       Effect.annotateLogs({ category: 'db', operation })

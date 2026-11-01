@@ -8,7 +8,7 @@ import {
   text_gestures,
   user_gesture_recordings
 } from '~/db/schema';
-import { dbRunHttp, dbTransaction } from '~/effect/database';
+import { dbRun, dbTransaction } from '~/effect/database';
 import { BadRequestError, ConflictError, NotFoundError } from '~/effect/errors';
 import { editTextGestureData } from '~/api/routers/text_gestures';
 import { resolveAuthUserNames } from '~/lib/auth_users.server';
@@ -31,7 +31,7 @@ const strokeCount = savedStrokeCount;
 export const listGestureRevisions = Effect.fn('gesture_review.list_revisions')(function* (
   gestureId: number
 ) {
-  const rows = yield* dbRunHttp('gesture_review.list_revisions', (client) =>
+  const rows = yield* dbRun('gesture_review.list_revisions', (client) =>
     client
       .select({
         id: text_gesture_revisions.id,
@@ -68,7 +68,7 @@ export const revertGestureRevision = Effect.fn('gesture_review.revert')(function
   expectedRevision: number;
   userId: string;
 }) {
-  const [revision] = yield* dbRunHttp('gesture_review.find_revision', (client) =>
+  const [revision] = yield* dbRun('gesture_review.find_revision', (client) =>
     client
       .select()
       .from(text_gesture_revisions)
@@ -204,7 +204,7 @@ export const listSiblingGestures = Effect.fn('gesture_review.siblings')(function
   id: number;
   text_key: string;
 }) {
-  return yield* dbRunHttp('gesture_review.siblings', (client) =>
+  return yield* dbRun('gesture_review.siblings', (client) =>
     client
       .select({
         id: text_gestures.id,
@@ -247,7 +247,7 @@ export const getReviewQueue = Effect.fn('gesture_review.queue')(function* () {
   const since = new Date(Date.now() - PRACTICE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const [gestures, categories, practice, focused] = yield* Effect.all(
     [
-      dbRunHttp('gesture_review.queue_gestures', (client) =>
+      dbRun('gesture_review.queue_gestures', (client) =>
         client
           .select({
             id: text_gestures.id,
@@ -271,14 +271,14 @@ export const getReviewQueue = Effect.fn('gesture_review.queue')(function* () {
             )
           )
       ),
-      dbRunHttp('gesture_review.queue_categories', (client) =>
+      dbRun('gesture_review.queue_categories', (client) =>
         client
           .select({ id: lesson_categories.id, name: lesson_categories.name })
           .from(lesson_categories)
           .where(eq(lesson_categories.lang_id, DEFAULT_GESTURE_CATEGORY_LANG_ID))
           .orderBy(asc(lesson_categories.order))
       ),
-      dbRunHttp('gesture_review.queue_practice', (client) =>
+      dbRun('gesture_review.queue_practice', (client) =>
         client
           .select({
             text: user_gesture_recordings.text,
@@ -293,7 +293,7 @@ export const getReviewQueue = Effect.fn('gesture_review.queue')(function* () {
           .where(gte(user_gesture_recordings.created_at, since))
           .groupBy(user_gesture_recordings.text, user_gesture_recordings.script_id)
       ),
-      dbRunHttp('gesture_review.queue_chats', (client) =>
+      dbRun('gesture_review.queue_chats', (client) =>
         client
           .select({
             gesture_id: agent_chats.focus_gesture_id,

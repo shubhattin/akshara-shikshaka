@@ -19,5 +19,5 @@
 
 - Never add `Co-authored-by` / `Made by <harness>` lines to commits or PRs, ever.
 - Node/npm are preinstalled; bun often isn't — reuse bun if present, else npm/npx.
-- Skip DB setup (Neon Postgres) in remote envs; validate with `bun run check`, `lint`, `test` instead.
+- Skip DB setup (PlanetScale Postgres) in remote envs; validate with `bun run check`, `lint`, `test` instead.
 - If harness supports `.worktreeinclude`, use it; else symlink each listed file from main checkout into worktree.

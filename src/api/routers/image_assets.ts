@@ -10,7 +10,7 @@ import { PROJECT_S3_ALIAS } from '~/constants';
 import { AiProvider } from '~/effect/ai';
 import { ImageProcessor } from '~/effect/image';
 import { ObjectStorage } from '~/effect/storage';
-import { dbRunHttp } from '~/effect/database';
+import { dbRun } from '~/effect/database';
 import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { BadRequestError, DatabaseError } from '~/effect/errors';
 import { reportSwallowedEffect } from '~/effect/posthog_error';
@@ -90,7 +90,7 @@ export const makeUploadImageAsset = Effect.fn('makeUploadImageAsset')(function* 
   }
   yield* Effect.logInfo('image uploaded');
 
-  const result = yield* dbRunHttp('insert_image_asset', async (db) => {
+  const result = yield* dbRun('insert_image_asset', async (db) => {
     const [row] = await db
       .insert(image_assets)
       .values({
@@ -130,7 +130,7 @@ export const makeUploadImageAsset = Effect.fn('makeUploadImageAsset')(function* 
 export const deleteImageAsset = Effect.fn('deleteImageAsset')(function* (input: { id: number }) {
   const storage = yield* ObjectStorage;
 
-  const result = yield* dbRunHttp('find_image_asset', async (db) =>
+  const result = yield* dbRun('find_image_asset', async (db) =>
     db.query.image_assets.findFirst({
       where: eq(image_assets.id, input.id),
       columns: {
@@ -161,7 +161,7 @@ export const deleteImageAsset = Effect.fn('deleteImageAsset')(function* (input: 
     };
   }
 
-  yield* dbRunHttp('delete_image_asset', async (db) => {
+  yield* dbRun('delete_image_asset', async (db) => {
     await db.delete(image_assets).where(eq(image_assets.id, input.id));
   });
 
@@ -206,13 +206,13 @@ export const listImageAssets = Effect.fn('listImageAssets')(function* (input: {
     trimmed && trimmed.length > 0 ? ilike(image_assets.description, `%${trimmed}%`) : undefined;
   const offset = (input.page - 1) * input.limit;
 
-  const countEffect = dbRunHttp('count_image_assets', async (db) =>
+  const countEffect = dbRun('count_image_assets', async (db) =>
     db
       .select({ count: count() })
       .from(image_assets)
       .where(whereClause ?? undefined)
   );
-  const listEffect = dbRunHttp('list_image_assets', async (db) =>
+  const listEffect = dbRun('list_image_assets', async (db) =>
     db
       .select({
         id: image_assets.id,
@@ -258,7 +258,7 @@ export const updateImageAsset = Effect.fn('updateImageAsset')(function* (input: 
   id: number;
   description: string;
 }) {
-  yield* dbRunHttp('update_image_asset', async (db) => {
+  yield* dbRun('update_image_asset', async (db) => {
     await db
       .update(image_assets)
       .set({ description: input.description })

@@ -2,7 +2,7 @@ import { Effect, Exit, Layer } from 'effect';
 import { describe, expect, it } from '@effect/vitest';
 import { AiProvider } from '~/effect/ai';
 import { ObjectStorage } from '~/effect/storage';
-import { DatabaseHttp } from '~/effect/database';
+import { Database } from '~/effect/database';
 import { ImageProcessor } from '~/effect/image';
 import { BackgroundWork } from '~/effect/background';
 import { StorageError, AiProviderError, DatabaseError } from '~/effect/errors';
@@ -35,8 +35,10 @@ const ImageTest = Layer.succeed(ImageProcessor)({
   resizeImage: () => Effect.succeed(Buffer.from('webp'))
 });
 
-const DatabaseUnused = Layer.succeed(DatabaseHttp)({
-  run: (operation) => Effect.fail(DatabaseError.make({ operation, cause: new Error('db unused') }))
+const DatabaseUnused = Layer.succeed(Database)({
+  run: (operation) => Effect.fail(DatabaseError.make({ operation, cause: new Error('db unused') })),
+  transaction: (operation) =>
+    Effect.fail(DatabaseError.make({ operation, cause: new Error('db unused') }))
 });
 
 describe('image upload workflow', () => {
@@ -88,8 +90,10 @@ describe('image upload workflow', () => {
         getAudioAssetUploadUrl: () => Effect.succeed('https://example.com/upload')
       });
 
-      const DatabaseFailInsert = Layer.succeed(DatabaseHttp)({
+      const DatabaseFailInsert = Layer.succeed(Database)({
         run: (operation) =>
+          Effect.fail(DatabaseError.make({ operation, cause: new Error('insert failed') })),
+        transaction: (operation) =>
           Effect.fail(DatabaseError.make({ operation, cause: new Error('insert failed') }))
       });
 
@@ -168,8 +172,10 @@ describe('audio upload workflow', () => {
         getAudioAssetUploadUrl: () => Effect.succeed('https://example.com/upload')
       });
 
-      const DatabaseFailInsert = Layer.succeed(DatabaseHttp)({
+      const DatabaseFailInsert = Layer.succeed(Database)({
         run: (operation) =>
+          Effect.fail(DatabaseError.make({ operation, cause: new Error('insert failed') })),
+        transaction: (operation) =>
           Effect.fail(DatabaseError.make({ operation, cause: new Error('insert failed') }))
       });
 

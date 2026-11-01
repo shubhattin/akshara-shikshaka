@@ -9,7 +9,7 @@ import {
   lesson_categories,
   text_gestures
 } from '~/db/schema';
-import { dbRunHttp } from '~/effect/database';
+import { dbRun } from '~/effect/database';
 import {
   AiProviderError,
   BadRequestError,
@@ -48,7 +48,7 @@ const itemMissing = () =>
   NotFoundError.make({ resource: 'agent_batch_item', message: 'Batch item not found' });
 
 const findBatch = Effect.fn('batches.find')(function* (batchId: number) {
-  const [batch] = yield* dbRunHttp('batches.find', (client) =>
+  const [batch] = yield* dbRun('batches.find', (client) =>
     client.select().from(agent_batches).where(eq(agent_batches.id, batchId)).limit(1)
   );
   if (!batch) return yield* Effect.fail(batchMissing());
@@ -56,7 +56,7 @@ const findBatch = Effect.fn('batches.find')(function* (batchId: number) {
 });
 
 const findItem = Effect.fn('batches.find_item')(function* (itemId: number) {
-  const [item] = yield* dbRunHttp('batches.find_item', (client) =>
+  const [item] = yield* dbRun('batches.find_item', (client) =>
     client.select().from(agent_batch_items).where(eq(agent_batch_items.id, itemId)).limit(1)
   );
   if (!item) return yield* Effect.fail(itemMissing());
@@ -64,7 +64,7 @@ const findItem = Effect.fn('batches.find_item')(function* (itemId: number) {
 });
 
 const updateItem = (itemId: number, set: Partial<typeof agent_batch_items.$inferInsert>) =>
-  dbRunHttp('batches.update_item', (client) =>
+  dbRun('batches.update_item', (client) =>
     client.update(agent_batch_items).set(set).where(eq(agent_batch_items.id, itemId)).returning()
   );
 
@@ -74,7 +74,7 @@ const updateItem = (itemId: number, set: Partial<typeof agent_batch_items.$infer
  * overshoot the budget by about one run each.
  */
 const batchSpent = Effect.fn('batches.spent')(function* (batchId: number, ownItemId: number) {
-  const [row] = yield* dbRunHttp('batches.spent', (client) =>
+  const [row] = yield* dbRun('batches.spent', (client) =>
     client
       .select({
         spent: sql<number>`coalesce(sum(${agent_batch_items.cost}), 0)`.mapWith(Number),
@@ -148,7 +148,7 @@ export const createBatch = Effect.fn('batches.create')(function* (
   const qstash = yield* QStashPublisher;
   yield* qstash.ready;
   const gestureIds = [...new Set(input.gesture_ids)];
-  const gestures = yield* dbRunHttp('batches.create_gestures', (client) =>
+  const gestures = yield* dbRun('batches.create_gestures', (client) =>
     client
       .select({ id: text_gestures.id })
       .from(text_gestures)
@@ -157,7 +157,7 @@ export const createBatch = Effect.fn('batches.create')(function* (
   if (gestures.length === 0) {
     return yield* Effect.fail(BadRequestError.make({ message: 'None of these gestures exist' }));
   }
-  const [batch] = yield* dbRunHttp('batches.insert', (client) =>
+  const [batch] = yield* dbRun('batches.insert', (client) =>
     client
       .insert(agent_batches)
       .values({
@@ -171,7 +171,7 @@ export const createBatch = Effect.fn('batches.create')(function* (
       })
       .returning()
   );
-  const items = yield* dbRunHttp('batches.insert_items', (client) =>
+  const items = yield* dbRun('batches.insert_items', (client) =>
     client
       .insert(agent_batch_items)
       .values(gestures.map((g) => ({ batch_id: batch!.id, text_gesture_id: g.id })))
@@ -184,7 +184,7 @@ export const createBatch = Effect.fn('batches.create')(function* (
   ).pipe(
     Effect.tapError(() =>
       Effect.ignore(
-        dbRunHttp('batches.drop_undispatched', (client) =>
+        dbRun('batches.drop_undispatched', (client) =>
           client.delete(agent_batches).where(eq(agent_batches.id, batch!.id)).returning()
         )
       )
@@ -201,7 +201,7 @@ export const createBatch = Effect.fn('batches.create')(function* (
  */
 const claimItem = Effect.fn('batches.claim')(function* (itemId: number) {
   const staleBefore = new Date(Date.now() - STALE_RUN_MS);
-  const [item] = yield* dbRunHttp('batches.claim', (client) =>
+  const [item] = yield* dbRun('batches.claim', (client) =>
     client
       .update(agent_batch_items)
       .set({
@@ -337,7 +337,7 @@ export const runBatchItem = Effect.fn('batches.run_item')(function* (
 
   return yield* Effect.gen(function* () {
     const gesture = yield* getGestureForAgent(item.text_gesture_id);
-    const [counted] = yield* dbRunHttp('batches.stroke_count', (client) =>
+    const [counted] = yield* dbRun('batches.stroke_count', (client) =>
       client
         .select({ strokes: savedStrokeCount })
         .from(text_gestures)
@@ -440,7 +440,7 @@ export const markItemUndeliverable = Effect.fn('batches.mark_undeliverable')(fun
   itemId: number,
   reason: string
 ) {
-  yield* dbRunHttp('batches.mark_undeliverable', (client) =>
+  yield* dbRun('batches.mark_undeliverable', (client) =>
     client
       .update(agent_batch_items)
       .set({ status: 'failed', error: reason, finished_at: new Date() })
@@ -467,21 +467,21 @@ export const markItemUndeliverable = Effect.fn('batches.mark_undeliverable')(fun
 export const cancelBatch = Effect.fn('batches.cancel')(function* (batchId: number) {
   const batch = yield* findBatch(batchId);
   if (batch.cancelled_at) return { cancelled: true as const };
-  yield* dbRunHttp('batches.cancel', (client) =>
+  yield* dbRun('batches.cancel', (client) =>
     client
       .update(agent_batches)
       .set({ cancelled_at: new Date() })
       .where(eq(agent_batches.id, batchId))
       .returning()
   );
-  yield* dbRunHttp('batches.cancel_queued', (client) =>
+  yield* dbRun('batches.cancel_queued', (client) =>
     client
       .update(agent_batch_items)
       .set({ status: 'cancelled', error: 'The batch was cancelled', finished_at: new Date() })
       .where(and(eq(agent_batch_items.batch_id, batchId), eq(agent_batch_items.status, 'queued')))
       .returning()
   );
-  const running = yield* dbRunHttp('batches.running_chats', (client) =>
+  const running = yield* dbRun('batches.running_chats', (client) =>
     client
       .select({ chat_id: agent_batch_items.chat_id })
       .from(agent_batch_items)
@@ -501,7 +501,7 @@ export const cancelBatch = Effect.fn('batches.cancel')(function* (batchId: numbe
 /** Delete a settled batch with its items and their run chats (applied gestures stay). */
 export const deleteBatch = Effect.fn('batches.delete')(function* (batchId: number) {
   yield* findBatch(batchId);
-  const [counts] = yield* dbRunHttp('batches.delete_counts', (client) =>
+  const [counts] = yield* dbRun('batches.delete_counts', (client) =>
     client
       .select({
         queued: sql<number>`count(*) filter (where ${agent_batch_items.status} = 'queued')`.mapWith(
@@ -520,19 +520,19 @@ export const deleteBatch = Effect.fn('batches.delete')(function* (batchId: numbe
       BadRequestError.make({ message: 'Cancel the batch before deleting it' })
     );
   }
-  const items = yield* dbRunHttp('batches.delete_chat_ids', (client) =>
+  const items = yield* dbRun('batches.delete_chat_ids', (client) =>
     client
       .select({ chat_id: agent_batch_items.chat_id })
       .from(agent_batch_items)
       .where(eq(agent_batch_items.batch_id, batchId))
   );
   // items cascade from the batch; chats are set null on the items, so delete them after
-  yield* dbRunHttp('batches.delete', (client) =>
+  yield* dbRun('batches.delete', (client) =>
     client.delete(agent_batches).where(eq(agent_batches.id, batchId)).returning()
   );
   const chatIds = items.flatMap((row) => (row.chat_id ? [row.chat_id] : []));
   if (chatIds.length > 0) {
-    yield* dbRunHttp('batches.delete_chats', (client) =>
+    yield* dbRun('batches.delete_chats', (client) =>
       client.delete(agent_chats).where(inArray(agent_chats.id, chatIds)).returning()
     );
   }
@@ -550,7 +550,7 @@ export const rerunItems = Effect.fn('batches.rerun')(function* (input: {
 }) {
   const batch = yield* findBatch(input.batchId);
   const staleBefore = new Date(Date.now() - STALE_RUN_MS);
-  const requeued = yield* dbRunHttp('batches.requeue', (client) =>
+  const requeued = yield* dbRun('batches.requeue', (client) =>
     client
       .update(agent_batch_items)
       // a fresh cycle: its own QStash retries
@@ -579,7 +579,7 @@ export const rerunItems = Effect.fn('batches.rerun')(function* (input: {
       .returning()
   );
   if (requeued.length > 0 && batch.cancelled_at) {
-    yield* dbRunHttp('batches.uncancel', (client) =>
+    yield* dbRun('batches.uncancel', (client) =>
       client
         .update(agent_batches)
         .set({ cancelled_at: null })
@@ -708,7 +708,7 @@ const userNames = (ids: string[]) =>
 
 /** Every batch, newest first, with its progress. */
 export const listBatches = Effect.fn('batches.list')(function* () {
-  const rows = yield* dbRunHttp('batches.list', (client) =>
+  const rows = yield* dbRun('batches.list', (client) =>
     client
       .select({
         id: agent_batches.id,
@@ -737,13 +737,13 @@ export const listBatches = Effect.fn('batches.list')(function* () {
  */
 export const getBatch = Effect.fn('batches.get')(function* (batchId: number) {
   const batch = yield* findBatch(batchId);
-  const [counts] = yield* dbRunHttp('batches.counts', (client) =>
+  const [counts] = yield* dbRun('batches.counts', (client) =>
     client
       .select(countsSelect)
       .from(agent_batch_items)
       .where(eq(agent_batch_items.batch_id, batchId))
   );
-  const items = yield* dbRunHttp('batches.items', (client) =>
+  const items = yield* dbRun('batches.items', (client) =>
     client
       .select({
         id: agent_batch_items.id,
@@ -812,7 +812,7 @@ export const listBatchProposals = Effect.fn('batches.proposals')(function* (inpu
   batchId: number;
   itemIds?: number[];
 }) {
-  const rows = yield* dbRunHttp('batches.proposals', (client) =>
+  const rows = yield* dbRun('batches.proposals', (client) =>
     client
       .select({
         id: agent_batch_items.id,

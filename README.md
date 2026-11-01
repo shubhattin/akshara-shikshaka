@@ -27,7 +27,7 @@ Through real-time stroke/gesture recognition, audio feedback, and structured les
 - **Runtime & Package Manager**: [Bun](https://bun.sh/)
 - **Frontend Core**: React 19, TypeScript, [Jotai](https://jotai.org/) (state management).
 - **Data Fetching**: [TanStack Query](https://tanstack.com/query/latest) (React Query) and [tRPC](https://trpc.io/).
-- **Database**: [PostgreSQL](https://www.postgresql.org/) (Neon Serverless compatibility) managed via [Drizzle ORM](https://orm.drizzle.team/).
+- **Database**: [PostgreSQL](https://www.postgresql.org/) (PlanetScale Postgres, postgres.js over TCP by default; HTTP only for public data-collection writes) managed via [Drizzle ORM](https://orm.drizzle.team/).
 - **Cache & Rate Limiting**: Redis (via Upstash Redis).
 - **Storage**: AWS S3 with CloudFront integration for low-latency media assets distribution.
 
@@ -65,7 +65,7 @@ akshara/
 ### Prerequisites
 
 - [Bun](https://bun.sh/) installed locally.
-- A PostgreSQL database instance (local or hosted e.g. on Neon).
+- A PostgreSQL database instance (local or hosted e.g. on PlanetScale).
 - Access credentials for optional external services (AWS S3, OpenAI, Upstash Redis).
 
 ### Installation

@@ -1423,6 +1423,7 @@ const PracticeSection = ({ text_data }: { text_data: text_data_type }) => {
       {displayPractice && (
         <JotaiProvider key={`practice_section_edit_page-${text_data.id}`}>
           <PracticeComponent
+            sandbox
             text_data={{
               id: text_data.id!,
               uuid: text_data.uuid!,

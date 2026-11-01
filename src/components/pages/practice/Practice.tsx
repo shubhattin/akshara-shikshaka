@@ -178,26 +178,19 @@ function Practice({ text_data, play_gesture_on_mount, sandbox, children }: Props
   const userGestureVectorsRef = useRef<
     {
       index: number;
-      recorded_vector: number[];
       drawn_vector: number[];
-      recorded_accuracy: number;
+      min_tolerance: number;
     }[]
   >([]);
 
   const flattenPoints = (pts: GesturePoints[]): number[] => pts.flatMap(([x, y]) => [x, y]);
 
-  const upsertUserVector = (
-    gestureIndex: number,
-    recorded: GesturePoints[],
-    drawn: GesturePoints[],
-    recorded_accuracy: number
-  ) => {
+  const upsertUserVector = (gestureIndex: number, drawn: GesturePoints[], minTolerance: number) => {
     const vectors = userGestureVectorsRef.current;
     const next = {
       index: gestureIndex,
-      recorded_vector: flattenPoints(recorded),
       drawn_vector: flattenPoints(drawn),
-      recorded_accuracy: recorded_accuracy
+      min_tolerance: minTolerance
     };
     // we also record the failed attempts
     vectors.push(next);
@@ -225,9 +218,9 @@ function Practice({ text_data, play_gesture_on_mount, sandbox, children }: Props
 
     if (
       vectors.length === 0 ||
-      !text_data.text ||
-      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- runtime type check for script_id before TRPC submission; validated via Zod schema at boundary
-      typeof text_data.script_id !== 'number'
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof -- runtime type check for gesture id before TRPC submission; validated via Zod schema at boundary
+      typeof text_data.id !== 'number' ||
+      !text_data.uuid
     ) {
       return;
     }
@@ -260,8 +253,8 @@ function Practice({ text_data, play_gesture_on_mount, sandbox, children }: Props
       }
 
       await submit_user_recording_mut.mutateAsync({
-        text: text_data.text,
-        script_id: text_data.script_id,
+        gesture_id: text_data.id,
+        gesture_uuid: text_data.uuid,
         vectors,
         completed,
         turnstile_token: playMetricsToken(authed, token)
@@ -383,6 +376,10 @@ function Practice({ text_data, play_gesture_on_mount, sandbox, children }: Props
     const currentGesture = gestureData[currentGestureIndex];
     if (!currentGesture) return;
 
+    // Tolerance is in logical canvas units, so a smaller on-screen canvas gets more slack.
+    // Sent with the attempt so the server re-scores against the same slack.
+    const minTolerance = MIN_TOLERANCE_CSS_PX / (scalingFactor ?? 1);
+
     // Evaluate gesture accuracy with error handling
     let result: GestureScore = { score: 0, passed: false, issue: 'mismatch', checks: {} };
     try {
@@ -390,8 +387,7 @@ function Practice({ text_data, play_gesture_on_mount, sandbox, children }: Props
         userPoints,
         gestureData.map((gesture) => gesture.points),
         currentGestureIndex,
-        // Tolerance is in logical canvas units, so a smaller on-screen canvas gets more slack
-        { minTolerance: MIN_TOLERANCE_CSS_PX / (scalingFactor ?? 1) }
+        { minTolerance }
       );
     } catch (error) {
       console.error('Error evaluating stroke accuracy:', error);
@@ -406,7 +402,7 @@ function Practice({ text_data, play_gesture_on_mount, sandbox, children }: Props
 
     // Store/override latest attempt for this gesture
     try {
-      upsertUserVector(currentGesture.index, currentGesture.points, userPoints, result.score);
+      upsertUserVector(currentGesture.index, userPoints, minTolerance);
     } catch (e) {
       console.error('Error saving user stroke vectors:', e);
     }

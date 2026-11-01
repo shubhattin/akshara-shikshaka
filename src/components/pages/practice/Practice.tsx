@@ -378,7 +378,8 @@ function Practice({ text_data, play_gesture_on_mount, sandbox, children }: Props
 
     // Tolerance is in logical canvas units, so a smaller on-screen canvas gets more slack.
     // Sent with the attempt so the server re-scores against the same slack.
-    const minTolerance = MIN_TOLERANCE_CSS_PX / (scalingFactor ?? 1);
+    // Capped to the server's max so the attempt is never rejected on tolerance alone.
+    const minTolerance = Math.min(200, MIN_TOLERANCE_CSS_PX / (scalingFactor || 1));
 
     // Evaluate gesture accuracy with error handling
     let result: GestureScore = { score: 0, passed: false, issue: 'mismatch', checks: {} };

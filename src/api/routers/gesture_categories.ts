@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Effect } from 'effect';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { gesture_text_key_lesson_category_join, text_gestures, text_lessons } from '~/db/schema';
-import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
+import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
 import { BadRequestError } from '~/effect/errors';
 import { t, protectedAdminProcedure } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
@@ -70,7 +70,7 @@ export const getGesturesByCategory = Effect.fn('getGesturesByCategory')(function
   script_id: number;
   lang_id: number;
 }) {
-  return yield* dbRunHttp('get_gestures_by_category', async (db) => {
+  return yield* dbRun('get_gestures_by_category', async (db) => {
     // the key's lesson in this language, if any
     const lessonJoin = and(
       eq(text_lessons.text_key, text_gestures.text_key),

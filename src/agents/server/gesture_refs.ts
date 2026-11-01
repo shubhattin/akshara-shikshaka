@@ -5,7 +5,7 @@ import {
   gesture_text_key_lesson_category_join,
   text_gestures
 } from '~/db/schema';
-import { dbRunHttp } from '~/effect/database';
+import { dbRun } from '~/effect/database';
 import { DEFAULT_GESTURE_CATEGORY_LANG_ID, get_script_from_id } from '~/state/lang_list';
 import type { Gesture } from '~/tools/stroke_data/types';
 import type { AgentKind } from '~/agents/agent_kinds';
@@ -109,7 +109,7 @@ export function withoutSavedStrokes(messages: AgentUIMessage[]): AgentUIMessage[
 }
 
 const loadRefGestures = Effect.fn('agents.load_ref_gestures')(function* (ids: number[]) {
-  const rows = yield* dbRunHttp('agents.ref_gestures', (client) =>
+  const rows = yield* dbRun('agents.ref_gestures', (client) =>
     client
       .select({
         id: text_gestures.id,

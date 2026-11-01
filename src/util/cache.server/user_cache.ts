@@ -9,7 +9,7 @@ import {
   type DashboardRecentRow
 } from '~/api/routers/user/user_dashboard';
 import { createCache } from '~/effect/cache';
-import { dbRunHttp } from '~/effect/database';
+import { dbRun } from '~/effect/database';
 import { CacheError } from '~/effect/errors';
 
 const TOP_GESTURE_LIMIT = 5;
@@ -43,7 +43,7 @@ export const fetchAksharaDashboard = Effect.fn('user_cache.akshara_dashboard')(f
   userId: string
 ) {
   const { countRows, accuracyRows, topGestures, recentRows } = yield* Effect.all({
-    countRows: dbRunHttp('user_cache.akshara_counts', (client) =>
+    countRows: dbRun('user_cache.akshara_counts', (client) =>
       client
         .select({
           started: count(),
@@ -55,7 +55,7 @@ export const fetchAksharaDashboard = Effect.fn('user_cache.akshara_dashboard')(f
         .from(user_gesture_recordings)
         .where(eq(user_gesture_recordings.user_id, userId))
     ),
-    accuracyRows: dbRunHttp('user_cache.akshara_accuracy', (client) =>
+    accuracyRows: dbRun('user_cache.akshara_accuracy', (client) =>
       client
         .select({
           avg_accuracy: avg(user_gesture_recording_vectors.recorded_accuracy),
@@ -68,7 +68,7 @@ export const fetchAksharaDashboard = Effect.fn('user_cache.akshara_dashboard')(f
         )
         .where(eq(user_gesture_recordings.user_id, userId))
     ),
-    topGestures: dbRunHttp('user_cache.akshara_top_gestures', (client) =>
+    topGestures: dbRun('user_cache.akshara_top_gestures', (client) =>
       client
         .select({
           text: user_gesture_recordings.text,
@@ -85,7 +85,7 @@ export const fetchAksharaDashboard = Effect.fn('user_cache.akshara_dashboard')(f
         .orderBy(desc(count()))
         .limit(TOP_GESTURE_LIMIT)
     ),
-    recentRows: dbRunHttp('user_cache.akshara_recent', (client) =>
+    recentRows: dbRun('user_cache.akshara_recent', (client) =>
       client
         .select({
           id: user_gesture_recordings.id,
@@ -126,27 +126,25 @@ export const fetchAksharaDashboard = Effect.fn('user_cache.akshara_dashboard')(f
 
   if (top_gestures.length > 0) {
     const topTexts = [...new Set(top_gestures.map((row) => row.text))];
-    const accuracyByGesture = yield* dbRunHttp(
-      'user_cache.akshara_top_gesture_accuracy',
-      (client) =>
-        client
-          .select({
-            text: user_gesture_recordings.text,
-            script_id: user_gesture_recordings.script_id,
-            avg_accuracy: avg(user_gesture_recording_vectors.recorded_accuracy)
-          })
-          .from(user_gesture_recordings)
-          .innerJoin(
-            user_gesture_recording_vectors,
-            eq(user_gesture_recording_vectors.user_gesture_recording_id, user_gesture_recordings.id)
+    const accuracyByGesture = yield* dbRun('user_cache.akshara_top_gesture_accuracy', (client) =>
+      client
+        .select({
+          text: user_gesture_recordings.text,
+          script_id: user_gesture_recordings.script_id,
+          avg_accuracy: avg(user_gesture_recording_vectors.recorded_accuracy)
+        })
+        .from(user_gesture_recordings)
+        .innerJoin(
+          user_gesture_recording_vectors,
+          eq(user_gesture_recording_vectors.user_gesture_recording_id, user_gesture_recordings.id)
+        )
+        .where(
+          and(
+            eq(user_gesture_recordings.user_id, userId),
+            inArray(user_gesture_recordings.text, topTexts)
           )
-          .where(
-            and(
-              eq(user_gesture_recordings.user_id, userId),
-              inArray(user_gesture_recordings.text, topTexts)
-            )
-          )
-          .groupBy(user_gesture_recordings.text, user_gesture_recordings.script_id)
+        )
+        .groupBy(user_gesture_recordings.text, user_gesture_recordings.script_id)
     );
 
     const byKey = new Map(

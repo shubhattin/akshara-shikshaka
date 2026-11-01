@@ -16,7 +16,7 @@ import {
 } from 'drizzle-orm';
 import { t, protectedAdminProcedure } from '../trpc_init';
 import { user_gesture_recordings, user_gesture_recording_vectors } from '~/db/schema';
-import { dbRunHttp } from '~/effect/database';
+import { dbRun } from '~/effect/database';
 import { runTrpcEffect } from '~/effect/run';
 import { resolveAuthUserNames } from '~/lib/auth_users.server';
 import { displayUserName } from './user/session_user';
@@ -83,7 +83,7 @@ const get_stats_data_route = protectedAdminProcedure
       Effect.gen(function* () {
         const { gesture_keys, script_ids, completion, all_time, start_date, end_date } = input;
 
-        const recordings = yield* dbRunHttp('gesture_stats.list_recordings', (client) =>
+        const recordings = yield* dbRun('gesture_stats.list_recordings', (client) =>
           client.query.user_gesture_recordings.findMany({
             columns: {
               id: true,
@@ -129,7 +129,7 @@ const get_stats_data_route = protectedAdminProcedure
           const perChunk = yield* Effect.forEach(
             chunkIds(recordingIds),
             (ids) =>
-              dbRunHttp('gesture_stats.list_vector_stats', (client) =>
+              dbRun('gesture_stats.list_vector_stats', (client) =>
                 client
                   .select({
                     recording_id: user_gesture_recording_vectors.user_gesture_recording_id,
@@ -173,7 +173,7 @@ const get_top_gestures_route = protectedAdminProcedure
           baseConditions.push(eq(user_gesture_recordings.script_id, script_id));
         }
 
-        const topRows = yield* dbRunHttp('gesture_stats.get_top_recordings', (client) =>
+        const topRows = yield* dbRun('gesture_stats.get_top_recordings', (client) =>
           client
             .select({
               text: user_gesture_recordings.text,
@@ -201,7 +201,7 @@ const get_top_gestures_route = protectedAdminProcedure
           accuracyConditions.push(eq(user_gesture_recordings.script_id, script_id));
         }
 
-        const accuracyRows = yield* dbRunHttp('gesture_stats.get_top_vector_stats', (client) =>
+        const accuracyRows = yield* dbRun('gesture_stats.get_top_vector_stats', (client) =>
           client
             .select({
               text: user_gesture_recordings.text,
@@ -272,7 +272,7 @@ const search_recorded_texts_route = protectedAdminProcedure
           conditions.push(eq(user_gesture_recordings.script_id, script_id));
         }
 
-        const rows = yield* dbRunHttp('gesture_stats.search_recorded_texts', (client) =>
+        const rows = yield* dbRun('gesture_stats.search_recorded_texts', (client) =>
           client
             .select({
               text: user_gesture_recordings.text,
@@ -315,7 +315,7 @@ const get_top_users_route = protectedAdminProcedure
           baseConditions.push(eq(user_gesture_recordings.script_id, script_id));
         }
 
-        const topRows = yield* dbRunHttp('gesture_stats.get_top_users', (client) =>
+        const topRows = yield* dbRun('gesture_stats.get_top_users', (client) =>
           client
             .select({
               user_id: user_gesture_recordings.user_id,
@@ -345,7 +345,7 @@ const get_top_users_route = protectedAdminProcedure
           accuracyConditions.push(eq(user_gesture_recordings.script_id, script_id));
         }
 
-        const accuracyRows = yield* dbRunHttp('gesture_stats.get_top_user_accuracy', (client) =>
+        const accuracyRows = yield* dbRun('gesture_stats.get_top_user_accuracy', (client) =>
           client
             .select({
               user_id: user_gesture_recordings.user_id,

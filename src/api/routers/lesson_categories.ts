@@ -8,7 +8,7 @@ import {
   text_lesson_words,
   text_lessons
 } from '~/db/schema';
-import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
+import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
 import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { t, protectedAdminProcedure, publicProcedure } from '~/api/trpc_init';
 import { runTrpcEffect } from '~/effect/run';
@@ -144,7 +144,7 @@ export const getTextLessonsByCategory = Effect.fn('getTextLessonsByCategory')(fu
   category_id: number;
   lang_id: number;
 }) {
-  return yield* dbRunHttp('get_text_lessons_by_category', async (db) => {
+  return yield* dbRun('get_text_lessons_by_category', async (db) => {
     if (input.category_id > 0) {
       const lessons = await db.query.text_lessons.findMany({
         columns: { id: true, text: true, order: true },
@@ -243,7 +243,7 @@ export const getTextLessonsOverview = Effect.fn('getTextLessonsOverview')(functi
   lesson_ids: number[];
 }) {
   if (input.lesson_ids.length === 0) return [];
-  return yield* dbRunHttp('get_text_lessons_overview', async (db) => {
+  return yield* dbRun('get_text_lessons_overview', async (db) => {
     const [lessons, words, gestures] = await Promise.all([
       db
         .select({ id: text_lessons.id, has_audio: isNotNull(text_lessons.audio_id) })

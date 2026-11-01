@@ -7,7 +7,7 @@ import {
   text_gesture_revisions,
   text_gestures
 } from '~/db/schema';
-import { dbRunHttp, dbTransaction, type DbTransaction } from '~/effect/database';
+import { dbRun, dbTransaction, type DbTransaction } from '~/effect/database';
 import { NotFoundError, BadRequestError, ConflictError } from '~/effect/errors';
 import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { FONT_FAMILIES, type FontFamily } from '~/state/font_list';
@@ -285,7 +285,7 @@ export const listCategoryGestureFonts = Effect.fn('listCategoryGestureFonts')(fu
   const listed = yield* getGesturesByCategory(input);
   const ids = listed.gestures.map((g) => g.id);
   if (ids.length === 0) return [];
-  const rows = yield* dbRunHttp('text_gestures.category_fonts', (client) =>
+  const rows = yield* dbRun('text_gestures.category_fonts', (client) =>
     client
       .select({
         id: text_gestures.id,
@@ -551,7 +551,7 @@ const delete_text_gesture_data_route = protectedAdminProcedure
  */
 export const getGesturePreviews = Effect.fn('getGesturePreviews')(function* (ids: number[]) {
   if (ids.length === 0) return [];
-  return yield* dbRunHttp('text_gestures.previews', (client) =>
+  return yield* dbRun('text_gestures.previews', (client) =>
     client
       .select({
         id: text_gestures.id,

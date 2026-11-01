@@ -1,30 +1,27 @@
 import { Context, Effect, Layer, Redacted } from 'effect';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
 import type { PgTransaction } from 'drizzle-orm/pg-core';
-import {
-  drizzle as drizzleNeon,
-  type NeonDatabase,
-  type NeonQueryResultHKT
-} from 'drizzle-orm/neon-serverless';
 import { drizzle as drizzleNeonHttp, type NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import {
   drizzle as drizzlePostgres,
   type PostgresJsDatabase,
   type PostgresJsQueryResultHKT
 } from 'drizzle-orm/postgres-js';
-import { neon, Pool } from '@neondatabase/serverless';
+import { neon, neonConfig } from '@neondatabase/serverless';
 import postgres from 'postgres';
 import * as schema from '~/db/schema';
 import { AppConfig } from './config';
 import { DatabaseError } from './errors';
 
-export type DbClient = PostgresJsDatabase<typeof schema> | NeonDatabase<typeof schema>;
+// PlanetScale Postgres serves the Neon HTTP protocol at `https://<host>/sql` (required override).
+neonConfig.fetchEndpoint = (host) => `https://${host}/sql`;
+
+export type DbClient = PostgresJsDatabase<typeof schema>;
 
 /** One-shot HTTP (prod) or local postgres.js — no interactive transactions. */
 export type DbHttpClient = PostgresJsDatabase<typeof schema> | NeonHttpDatabase<typeof schema>;
 
 export type DbTransaction =
-  | PgTransaction<NeonQueryResultHKT, typeof schema, ExtractTablesWithRelations<typeof schema>>
   | PgTransaction<
       PostgresJsQueryResultHKT,
       typeof schema,
@@ -40,10 +37,28 @@ const tryDb = <A>(operation: string, run: () => A | PromiseLike<A>) =>
   }).pipe(Effect.annotateLogs({ category: 'db', operation }));
 
 /**
- * Session driver (TCP locally, Neon WebSocket Pool in prod).
- *
- * `postgres()` / `new Pool()` only hold config — the TCP or WebSocket is opened
- * lazily on the first query, which is why construction is not awaited.
+ * postgres.js TCP pool, one per server instance and shared by every request.
+ * - Prod URL points at PlanetScale's PgBouncer (port 6432, transaction pooling), so prepared
+ *   statements are off — a named statement would not survive a backend switch between queries.
+ *   Kept off locally too so dev matches prod.
+ * - Idle sockets close after 20s so a suspended instance or dev hot reload never pins slots.
+ * `postgres()` only holds config; sockets open lazily on the first query.
+ */
+const createPostgres = (url: string, max: number) =>
+  postgres(url, { prepare: false, max, idle_timeout: 20, max_lifetime: 60 * 30 });
+
+const endPostgres = (sql: ReturnType<typeof postgres>) =>
+  Effect.promise(async () => {
+    try {
+      await sql.end({ timeout: 5 });
+    } catch {
+      // Ignore cleanup failures during runtime dispose.
+    }
+  });
+
+/**
+ * Session driver: postgres.js over TCP (local Postgres in dev, PgBouncer in prod).
+ * Default for everything — reads, admin writes, and interactive transactions.
  */
 export class Database extends Context.Service<
   Database,
@@ -63,51 +78,28 @@ export class Database extends Context.Service<
       const config = yield* AppConfig;
       const url = Redacted.value(config.dbUrl);
 
-      const owned = yield* Effect.acquireRelease(
-        // acquire the database client
-        Effect.tryPromise({
-          try: async () => {
-            if (config.isDev) {
-              const sql = postgres(url);
-              return {
-                kind: 'postgres' as const,
-                sql,
-                db: drizzlePostgres(sql, { schema })
-              };
-            }
-            const pool = new Pool({ connectionString: url });
-            return {
-              kind: 'neon' as const,
-              pool,
-              db: drizzleNeon(pool, { schema })
-            };
-          },
+      const sql = yield* Effect.acquireRelease(
+        Effect.try({
+          try: () => createPostgres(url, config.isDev ? 5 : 10),
           catch: (cause) => DatabaseError.make({ operation: 'connect', cause })
         }),
-        // release logic (released on ManagedRuntime/Efect.provide scope/dispose)
-        (client) =>
-          Effect.promise(async () => {
-            try {
-              if (client.kind === 'postgres') await client.sql.end({ timeout: 5 });
-              else await client.pool.end();
-            } catch {
-              // Ignore cleanup failures during runtime dispose.
-            }
-          })
+        endPostgres
       );
+      const db = drizzlePostgres(sql, { schema });
 
       return {
-        run: (operation, run) => tryDb(operation, () => run(owned.db)),
+        run: (operation, run) => tryDb(operation, () => run(db)),
         transaction: (operation, run) =>
-          tryDb(operation, () => owned.db.transaction(async (tx) => await run(tx)))
+          tryDb(operation, () => db.transaction(async (tx) => await run(tx)))
       };
     })
   );
 }
 
 /**
- * Stateless HTTP driver for one-shot queries (Neon `fetch` in prod, postgres.js locally).
- * Use `Database` for interactive transactions. Prod HTTP never holds a socket.
+ * Stateless HTTP driver (PlanetScale `/sql` via the Neon HTTP client in prod, postgres.js locally).
+ * Only for public data-collection writes, so bursts of anonymous traffic never take TCP slots.
+ * Everything else uses `Database`. No interactive transactions.
  */
 export class DatabaseHttp extends Context.Service<
   DatabaseHttp,
@@ -123,48 +115,23 @@ export class DatabaseHttp extends Context.Service<
       const config = yield* AppConfig;
       const url = Redacted.value(config.dbUrl);
 
-      type OwnedClient =
-        | {
-            kind: 'postgres';
-            sql: ReturnType<typeof postgres>;
-            db: PostgresJsDatabase<typeof schema>;
-          }
-        | {
-            kind: 'neon-http';
-            db: NeonHttpDatabase<typeof schema>;
-          };
+      if (!config.isDev) {
+        const db = yield* Effect.try({
+          try: () => drizzleNeonHttp(neon(url), { schema }),
+          catch: (cause) => DatabaseError.make({ operation: 'connect', cause })
+        });
+        return { run: (operation, run) => tryDb(operation, () => run(db)) };
+      }
 
-      const owned = yield* Effect.acquireRelease(
+      const sql = yield* Effect.acquireRelease(
         Effect.try({
-          try: (): OwnedClient => {
-            if (config.isDev) {
-              const sql = postgres(url);
-              return {
-                kind: 'postgres',
-                sql,
-                db: drizzlePostgres(sql, { schema })
-              };
-            }
-            return {
-              kind: 'neon-http',
-              db: drizzleNeonHttp(neon(url), { schema })
-            };
-          },
+          try: () => createPostgres(url, 2),
           catch: (cause) => DatabaseError.make({ operation: 'connect', cause })
         }),
-        (client) =>
-          Effect.promise(async () => {
-            try {
-              if (client.kind === 'postgres') await client.sql.end({ timeout: 5 });
-            } catch {
-              // Ignore cleanup failures during runtime dispose.
-            }
-          })
+        endPostgres
       );
-
-      return {
-        run: (operation, run) => tryDb(operation, () => run(owned.db))
-      };
+      const db = drizzlePostgres(sql, { schema });
+      return { run: (operation, run) => tryDb(operation, () => run(db)) };
     })
   );
 }
@@ -175,6 +142,7 @@ export const dbRun = <A>(operation: string, run: (client: DbClient) => A | Promi
     return yield* database.run(operation, run);
   });
 
+/** Public data-collection writes only — see `DatabaseHttp`. */
 export const dbRunHttp = <A>(
   operation: string,
   run: (client: DbHttpClient) => A | PromiseLike<A>

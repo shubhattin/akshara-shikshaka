@@ -6,7 +6,7 @@ import {
   text_gestures,
   text_lessons
 } from '~/db/schema';
-import { dbRunHttp } from '~/effect/database';
+import { dbRun } from '~/effect/database';
 import { BadRequestError, NotFoundError } from '~/effect/errors';
 import { transliterateTexts } from '~/lib/transliterateTexts.server';
 import { DEFAULT_GESTURE_CATEGORY_LANG_ID, get_script_from_id } from '~/state/lang_list';
@@ -17,7 +17,7 @@ import { savedStrokeCount } from './stroke_count';
 
 /** Gestures for the composer's `@` picker: every one, with a romanized form for search. */
 export const listMentionableGestures = Effect.fn('agents.list_mentionable_gestures')(function* () {
-  const rows = yield* dbRunHttp('agents.list_mentionable_gestures', (client) =>
+  const rows = yield* dbRun('agents.list_mentionable_gestures', (client) =>
     client
       .select({
         id: text_gestures.id,
@@ -81,7 +81,7 @@ export const listMentionableGestures = Effect.fn('agents.list_mentionable_gestur
 
 /** One gesture with everything the harness and the apply dialog need. */
 export const getGestureForAgent = Effect.fn('agents.get_gesture')(function* (id: number) {
-  const [row] = yield* dbRunHttp('agents.get_gesture', (client) =>
+  const [row] = yield* dbRun('agents.get_gesture', (client) =>
     client
       .select({
         id: text_gestures.id,

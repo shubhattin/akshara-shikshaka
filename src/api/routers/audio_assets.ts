@@ -6,7 +6,7 @@ import { get_lang_from_id } from '~/state/lang_list';
 import { PROJECT_S3_ALIAS } from '~/constants';
 import { AiProvider, VoiceTypeEnum, type VoiceType } from '~/effect/ai';
 import { ObjectStorage } from '~/effect/storage';
-import { dbRunHttp } from '~/effect/database';
+import { dbRun } from '~/effect/database';
 import { CACHE, invalidateAndRefreshCache } from '~/util/cache.server/cache_loaders';
 import { DatabaseError } from '~/effect/errors';
 import { reportSwallowedEffect } from '~/effect/posthog_error';
@@ -46,7 +46,7 @@ export const uploadAudioAsset = Effect.fn('uploadAudioAsset')(function* (input: 
 
   const description = `${input.text} (${input.text_key})`;
 
-  const result = yield* dbRunHttp('insert_audio_asset', async (db) => {
+  const result = yield* dbRun('insert_audio_asset', async (db) => {
     const [row] = await db
       .insert(audio_assets)
       .values({
@@ -83,7 +83,7 @@ export const uploadAudioAsset = Effect.fn('uploadAudioAsset')(function* (input: 
 export const deleteAudioAsset = Effect.fn('deleteAudioAsset')(function* (input: { id: number }) {
   const storage = yield* ObjectStorage;
 
-  const result = yield* dbRunHttp('find_audio_asset', async (db) =>
+  const result = yield* dbRun('find_audio_asset', async (db) =>
     db.query.audio_assets.findFirst({
       where: (tbl) => eq(tbl.id, input.id),
       columns: {
@@ -120,7 +120,7 @@ export const deleteAudioAsset = Effect.fn('deleteAudioAsset')(function* (input: 
   }
 
   // Database delete is source of truth; S3 delete is best-effort after success.
-  yield* dbRunHttp('delete_audio_asset', async (db) => {
+  yield* dbRun('delete_audio_asset', async (db) => {
     await db.delete(audio_assets).where(eq(audio_assets.id, input.id));
   });
 
@@ -182,13 +182,13 @@ const list_audio_assets_route = protectedAdminProcedure
         })();
         const offset = (input.page - 1) * input.limit;
 
-        const countEffect = dbRunHttp('count_audio_assets', async (db) =>
+        const countEffect = dbRun('count_audio_assets', async (db) =>
           db
             .select({ count: count() })
             .from(audio_assets)
             .where(whereClause ?? undefined)
         );
-        const listEffect = dbRunHttp('list_audio_assets', async (db) =>
+        const listEffect = dbRun('list_audio_assets', async (db) =>
           db
             .select({
               id: audio_assets.id,
@@ -281,7 +281,7 @@ const complete_upload_audio_asset_route = protectedAdminProcedure
     runTrpcEffect(
       Effect.gen(function* () {
         const description = `${input.text} (${input.text_key})`;
-        const result = yield* dbRunHttp('complete_upload_audio_asset', async (db) => {
+        const result = yield* dbRun('complete_upload_audio_asset', async (db) => {
           const [row] = await db
             .insert(audio_assets)
             .values({
@@ -323,7 +323,7 @@ const update_audio_asset_route = protectedAdminProcedure
   .mutation(async ({ input: { id, description, lang_id } }) =>
     runTrpcEffect(
       Effect.gen(function* () {
-        yield* dbRunHttp('update_audio_asset', async (db) => {
+        yield* dbRun('update_audio_asset', async (db) => {
           await db
             .update(audio_assets)
             .set({ description, lang_id })

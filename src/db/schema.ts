@@ -158,12 +158,15 @@ export const gesture_text_key_lesson_category_join = pgTable(
   {
     id: serial().primaryKey(),
     gesture_text_key: text().notNull(),
-    lesson_category_id: integer()
-      .notNull()
-      .references(() => lesson_categories.id, { onDelete: 'cascade' }),
+    lesson_category_id: integer().notNull(),
     lang_id: smallint().notNull()
   },
   (table) => [
+    foreignKey({
+      name: 'gtk_lc_join_category_fk',
+      columns: [table.lesson_category_id],
+      foreignColumns: [lesson_categories.id]
+    }).onDelete('cascade'),
     unique('gesture_text_key_lesson_category_join_key_lang_unique').on(
       table.gesture_text_key,
       table.lang_id

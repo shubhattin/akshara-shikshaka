@@ -1,0 +1,3 @@
+ALTER TABLE "gesture_text_key_lesson_category_join" DROP CONSTRAINT IF EXISTS "gesture_text_key_lesson_category_join_lesson_category_id_lesson";--> statement-breakpoint
+ALTER TABLE "gesture_text_key_lesson_category_join" DROP CONSTRAINT IF EXISTS "gesture_text_key_lesson_category_join_lesson_category_id_lesson_categories_id_fk";--> statement-breakpoint
+ALTER TABLE "gesture_text_key_lesson_category_join" ADD CONSTRAINT "gtk_lc_join_category_fk" FOREIGN KEY ("lesson_category_id") REFERENCES "public"."lesson_categories"("id") ON DELETE cascade ON UPDATE no action;

@@ -1,0 +1,1 @@
+DROP INDEX "user_gesture_recordings_user_id_idx";

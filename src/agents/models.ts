@@ -7,7 +7,7 @@ import { z } from 'zod';
 export const AGENT_MODEL_IDS = [
   'gpt-6-luna',
   'claude-sonnet-5.5',
-  'gemini-3.7-flash',
+  'gemini-4-neon',
   'gpt-6.1-sol',
   'claude-opus-5.5'
 ] as const;
@@ -15,10 +15,10 @@ export const AGENT_MODEL_IDS = [
 export type AgentModelId = (typeof AGENT_MODEL_IDS)[number];
 
 export const AGENT_MODELS = {
-  'gemini-3.7-flash': {
-    label: 'Gemini 3.7 Flash',
-    hint: 'Sharp vision at a low price',
-    providerModelId: 'google/gemini-3.7-flash'
+  'gemini-4-neon': {
+    label: 'Gemini 4 Neon',
+    hint: "Google's newest — sharp vision, mid-tier price",
+    providerModelId: 'google/gemini-4-neon'
   },
   'gpt-6-luna': {
     label: 'GPT-6 Luna',

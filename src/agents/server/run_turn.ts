@@ -113,6 +113,8 @@ export const startAgentTurn = Effect.fn('agents.start_turn')(function* (input: {
   message: unknown;
   model: AgentModelId;
   withClientStream: boolean;
+  /** Batch runs: end the reply at the first successful proposal. */
+  endAtProposal?: boolean;
 }) {
   const { chatId: id, model } = input;
   const chat = yield* chatForTurn(id);
@@ -122,7 +124,13 @@ export const startAgentTurn = Effect.fn('agents.start_turn')(function* (input: {
     chat.focus_gesture_id === null ? null : yield* loadFocusContext(chat.focus_gesture_id);
   // What the tools look traces up in: the stored history, then the new message too.
   let known: readonly AgentUIMessage[] = previous;
-  const { agent, tools } = yield* createAgent(model, chat.agent_kind, () => known, focus);
+  const { agent, tools } = yield* createAgent(
+    model,
+    chat.agent_kind,
+    () => known,
+    focus,
+    input.endAtProposal ?? false
+  );
 
   const validatedIncoming = yield* Effect.tryPromise({
     try: () =>

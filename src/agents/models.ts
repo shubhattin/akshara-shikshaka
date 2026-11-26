@@ -31,6 +31,11 @@ export type AgentModelConfig = {
    * which bills every image the same (~1,090 tokens) whatever its size.
    */
   imageView: ImageView;
+  /**
+   * Gemini only: the image detail it reads (`media_resolution`). Unset keeps the provider's
+   * default (~1,090 tokens per image); MEDIUM is about half.
+   */
+  mediaResolution?: 'MEDIA_RESOLUTION_MEDIUM' | 'MEDIA_RESOLUTION_HIGH';
 };
 
 export const AGENT_MODELS = {
@@ -43,14 +48,14 @@ export const AGENT_MODELS = {
   },
   'gemini-4-hydrogen': {
     label: 'Gemini 4 Hydrogen',
-    hint: 'Efficient Gemini — about a third of Neon per gesture',
+    hint: 'Default for gestures — traces complex akṣaras about as well as Neon, ~30% cheaper',
     providerModelId: 'google/gemini-4-hydrogen',
     gestureEffort: 'high',
     imageView: 'canvas'
   },
   'gpt-6-luna': {
     label: 'GPT-6 Luna',
-    hint: 'Default — fast, cheap and reliable for chats, gestures and batches',
+    hint: 'Default for chats — fast and cheap; weaker gesture drafts',
     providerModelId: 'openai/gpt-6-luna',
     gestureEffort: 'high',
     imageView: 'crop'

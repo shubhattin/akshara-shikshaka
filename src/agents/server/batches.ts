@@ -365,7 +365,8 @@ export const runBatchItem = Effect.fn('batches.run_item')(function* (
       chatId,
       message,
       model: batch.model,
-      withClientStream: false
+      withClientStream: false,
+      endAtProposal: true
     });
     // A cancel while the reply streams stops it (cancelBatch's stop may have landed before the
     // reply started, when there was nothing to stop yet).

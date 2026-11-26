@@ -29,7 +29,7 @@ import {
   type BatchItemStatus,
   type create_batch_input_schema
 } from '~/agents/batch';
-import { agent_model_id_schema } from '~/agents/models';
+import { agent_model_id_schema, coerceAgentModelId } from '~/agents/models';
 import { proposed_gesture_schema, type ProposedGesture } from '~/agents/gesture_creator/schemas';
 import type { AgentUIMessage } from '~/agents/ui_message';
 import { appRuntime } from '~/effect/runtime';
@@ -346,11 +346,13 @@ export const runBatchItem = Effect.fn('batches.run_item')(function* (
     const strokes = counted?.strokes ?? 0;
     yield* updateItem(item.id, { based_on_revision: gesture.revision });
 
+    // a batch started on a model since removed runs on the default one
+    const model = coerceAgentModelId(batch.model);
     let chatId = item.chat_id;
     if (!chatId) {
       const chat = yield* createAgentChat({
         id: crypto.randomUUID(),
-        model: batch.model,
+        model,
         agent_kind: 'gesture_creator',
         user_id: batch.user_id,
         focus_gesture_id: gesture.id,
@@ -364,8 +366,9 @@ export const runBatchItem = Effect.fn('batches.run_item')(function* (
     const turn = yield* startAgentTurn({
       chatId,
       message,
-      model: batch.model,
-      withClientStream: false
+      model,
+      withClientStream: false,
+      endAtProposal: true
     });
     // A cancel while the reply streams stops it (cancelBatch's stop may have landed before the
     // reply started, when there was nothing to stop yet).

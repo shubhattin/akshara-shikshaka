@@ -1,6 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { createGestureHarness, findTraceInMessages } from '~/agents/gesture_creator/harness';
+import type { ImageView } from '~/agents/gesture_creator/render_images';
 import { serverCanvasEnv } from '~/agents/gesture_creator/server_canvas.server';
 import { getGestureForAgent } from '~/agents/server/gestures';
 import type { AgentUIMessage } from '~/agents/ui_message';
@@ -31,7 +32,7 @@ type ContentPart =
   | { type: 'image-data'; data: string; mediaType: string };
 
 const IMAGE_CAPTIONS = {
-  glyph: 'The glyph on the 400×400 canvas with a coordinate grid (labels every 50).',
+  glyph: 'The glyph on a grid in canvas coordinates (400×400 canvas, labels every 50).',
   skeleton:
     'Skeleton graph over the faint glyph: coloured, labelled edges (E…), black nodes (N…), dots ringed (D…).',
   strokes:
@@ -160,7 +161,8 @@ function assertFocus(focusId: number | null, id: number) {
 /** The harness on the server, reading gestures from the database. */
 export const createServerGestureHarness = (
   findTrace: (traceId: string) => TraceStrokesOutput | undefined,
-  focusId: number | null = null
+  focusId: number | null = null,
+  imageView: ImageView = 'crop'
 ) =>
   createGestureHarness({
     env: serverCanvasEnv,
@@ -168,7 +170,8 @@ export const createServerGestureHarness = (
       assertFocus(focusId, id);
       return appRuntime.runPromise(getGestureForAgent(id));
     },
-    findTrace
+    findTrace,
+    imageView
   });
 
 const suggestGestureNoteTool = tool<SuggestGestureNoteInput, SuggestGestureNoteOutput>({
@@ -192,12 +195,15 @@ const suggestGestureNoteTool = tool<SuggestGestureNoteInput, SuggestGestureNoteO
 export function createGestureCreatorTools(
   history: () => readonly AgentUIMessage[],
   /** A focused chat's gesture (null in free chats) */
-  focusId: number | null = null
+  focusId: number | null = null,
+  /** How the images frame the glyph for the chat's model */
+  imageView: ImageView = 'crop'
 ) {
   const traces = new Map<string, TraceStrokesOutput>();
   const harness = createServerGestureHarness(
     (traceId) => traces.get(traceId) ?? findTraceInMessages(history(), traceId),
-    focusId
+    focusId,
+    imageView
   );
   const signalOf = (signal: AbortSignal | undefined) => signal ?? new AbortController().signal;
   return {

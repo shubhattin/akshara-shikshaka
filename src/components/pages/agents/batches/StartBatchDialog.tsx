@@ -13,7 +13,8 @@ import {
   type BatchAutoApply,
   type BatchReference
 } from '~/agents/batch';
-import { AGENT_DEFAULT_MODEL, type AgentModelId } from '~/agents/models';
+import { AGENT_KIND_META } from '~/agents/agent_kinds';
+import type { AgentModelId } from '~/agents/models';
 import { Button } from '~/components/ui/button';
 import {
   Dialog,
@@ -44,7 +45,7 @@ export function StartBatchDialog({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
-  const [model, setModel] = useState<AgentModelId>(AGENT_DEFAULT_MODEL);
+  const [model, setModel] = useState<AgentModelId>(AGENT_KIND_META.gesture_creator.defaultModel);
   const [prompt, setPrompt] = useState(DEFAULT_BATCH_PROMPT);
   const [reference, setReference] = useState<BatchReference>('none');
   const [autoApply, setAutoApply] = useState<BatchAutoApply>('never');

@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { describeDirection } from '~/agents/gesture_creator/draft_plan';
 import { rasterizeGlyph } from '~/agents/gesture_creator/glyph_raster';
-import { renderStrokesImage } from '~/agents/gesture_creator/render_images';
+import { renderStrokesImage, type ImageView } from '~/agents/gesture_creator/render_images';
 import type { SavedViewData } from '~/agents/gesture_creator/schemas';
 import { serverCanvasEnv } from '~/agents/gesture_creator/server_canvas.server';
 import { savedViewAllowed, type FocusContext } from '~/agents/focus';
@@ -66,7 +66,9 @@ function savedViewContext(
 /** Fill the message's saved view (one per message); parts are dropped outside focused chats. */
 export const resolveSavedView = Effect.fn('agents.resolve_saved_view')(function* (
   message: AgentUIMessage,
-  focus: FocusContext | null
+  focus: FocusContext | null,
+  /** How the image frames the glyph for the chat's model */
+  imageView: ImageView = 'crop'
 ) {
   const viewPart = message.parts.find((part) => part.type === 'data-saved_view');
   const rest = message.parts.filter(
@@ -104,7 +106,7 @@ export const resolveSavedView = Effect.fn('agents.resolve_saved_view')(function*
           serverCanvasEnv,
           await rasterizeGlyph(gesture, serverCanvasEnv),
           saved.map((g) => ({ points: g.points, width: g.width })),
-          { marks: view.marks }
+          { marks: view.marks, view: imageView }
         )
       );
       parts.push({ type: 'data-draft_image', data: { edit_id: view.view_id, url: image } });

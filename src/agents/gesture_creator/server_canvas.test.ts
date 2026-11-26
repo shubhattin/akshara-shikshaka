@@ -53,6 +53,39 @@ describe('server canvas', () => {
     expect(traced.images.order).toMatch(PNG);
   });
 
+  it('crops the images to the glyph, or shows the whole canvas', async () => {
+    /** Width × height of a PNG data URL, from its IHDR chunk */
+    const size = (url: string) => {
+      const png = Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
+      return [png.readUInt32BE(16), png.readUInt32BE(20)];
+    };
+    const signal = new AbortController().signal;
+    const sizes = async (imageView: 'crop' | 'canvas') => {
+      const harness = createGestureHarness({
+        env: serverCanvasEnv,
+        loadGesture: async () => KA,
+        findTrace: () => undefined,
+        imageView
+      });
+      const inspected = await harness.inspect({ gesture_id: 1 }, signal);
+      const strokes = inspected.edges.map((edge) => ({ path: [edge.from, edge.id, edge.to] }));
+      const traced = await harness.trace({ gesture_id: 1, strokes }, signal);
+      return [inspected.images.glyph!, inspected.images.skeleton!, traced.images.strokes!].map(
+        size
+      );
+    };
+    expect(await sizes('crop')).toEqual([
+      [560, 560],
+      [560, 560],
+      [560, 560]
+    ]);
+    expect(await sizes('canvas')).toEqual([
+      [800, 800],
+      [800, 800],
+      [800, 800]
+    ]);
+  });
+
   it('rejects a font it does not bundle', async () => {
     await expect(serverCanvasEnv.loadGlyphFont('Comic_Sans')).rejects.toThrow(
       'Unknown font family'

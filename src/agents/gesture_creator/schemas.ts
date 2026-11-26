@@ -189,7 +189,13 @@ export const propose_gesture_input_schema = z.object({
     .max(GESTURE_WIDTH_RANGE.max)
     .optional()
     .describe('Brush width, default 12'),
-  summary: z.string().min(1).max(600).describe('Stroke order in words, shown to the admin')
+  summary: z
+    .string()
+    .min(1)
+    .max(600)
+    .describe(
+      'The strokes in order by label (one line), then anything you were unsure of; shown to the admin on the proposal card'
+    )
 });
 export type ProposeGestureInput = z.infer<typeof propose_gesture_input_schema>;
 

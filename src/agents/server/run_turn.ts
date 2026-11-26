@@ -7,7 +7,7 @@ import {
 import { Effect } from 'effect';
 import { dataPartToModel, AGENT_DATA_SCHEMAS } from '~/agents/gesture_refs';
 import { findTraceInMessages } from '~/agents/gesture_creator/harness';
-import type { AgentModelId } from '~/agents/models';
+import { AGENT_MODELS, type AgentModelId } from '~/agents/models';
 import { createAgent } from '~/agents/server/create_agent';
 import {
   findAgentChat,
@@ -113,6 +113,8 @@ export const startAgentTurn = Effect.fn('agents.start_turn')(function* (input: {
   message: unknown;
   model: AgentModelId;
   withClientStream: boolean;
+  /** Batch runs: end the reply at the first successful proposal. */
+  endAtProposal?: boolean;
 }) {
   const { chatId: id, model } = input;
   const chat = yield* chatForTurn(id);
@@ -122,7 +124,13 @@ export const startAgentTurn = Effect.fn('agents.start_turn')(function* (input: {
     chat.focus_gesture_id === null ? null : yield* loadFocusContext(chat.focus_gesture_id);
   // What the tools look traces up in: the stored history, then the new message too.
   let known: readonly AgentUIMessage[] = previous;
-  const { agent, tools } = yield* createAgent(model, chat.agent_kind, () => known, focus);
+  const { agent, tools } = yield* createAgent(
+    model,
+    chat.agent_kind,
+    () => known,
+    focus,
+    input.endAtProposal ?? false
+  );
 
   const validatedIncoming = yield* Effect.tryPromise({
     try: () =>
@@ -175,7 +183,8 @@ export const startAgentTurn = Effect.fn('agents.start_turn')(function* (input: {
               earlier,
               createServerGestureHarness(
                 (traceId) => findTraceInMessages(earlier, traceId),
-                focus?.gesture.id ?? null
+                focus?.gesture.id ?? null,
+                AGENT_MODELS[model].imageView
               ),
               signal
             ),
@@ -183,7 +192,7 @@ export const startAgentTurn = Effect.fn('agents.start_turn')(function* (input: {
         })
       : withoutDraftParts(withRefs);
   // Saved strokes the admin chose to show (focused chats only), drawn here.
-  const incoming = yield* resolveSavedView(edited, focus);
+  const incoming = yield* resolveSavedView(edited, focus, AGENT_MODELS[model].imageView);
   const messages = [...earlier, incoming];
   // What the model reads: older images dropped; the Gesture Creator never sees saved strokes.
   const modelView = (all: AgentUIMessage[]) => {

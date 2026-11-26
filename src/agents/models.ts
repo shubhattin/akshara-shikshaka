@@ -10,7 +10,6 @@ export const AGENT_MODEL_IDS = [
   'claude-sonnet-5.5',
   'gemini-4-neon',
   'gemini-4-hydrogen',
-  'gpt-6.1-sol',
   'claude-opus-5.5'
 ] as const;
 
@@ -57,13 +56,6 @@ export const AGENT_MODELS = {
     label: 'GPT-6 Luna',
     hint: 'Default for chats — fast and cheap; weaker gesture drafts',
     providerModelId: 'openai/gpt-6-luna',
-    gestureEffort: 'high',
-    imageView: 'crop'
-  },
-  'gpt-6.1-sol': {
-    label: 'GPT-6.1 Sol',
-    hint: 'Stronger reasoning — harder questions',
-    providerModelId: 'openai/gpt-6.1-sol',
     gestureEffort: 'high',
     imageView: 'crop'
   },

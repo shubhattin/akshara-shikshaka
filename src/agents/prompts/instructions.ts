@@ -67,13 +67,21 @@ export function agentContext(kind: AgentKind = 'general', focus: FocusContext | 
   };
 }
 
+const EPHEMERAL = { openrouter: { cacheControl: { type: 'ephemeral' } } } as const;
+
+/**
+ * OpenAI caches prefixes automatically; Anthropic (via OpenRouter) needs breakpoints, and only
+ * reuses a prefix that ends at one. So the last section is marked, and in a focused chat also the
+ * section before the focus: every chat (each batch run is a new focused chat) then reads the
+ * shared instructions from the cache instead of writing them again. With the history's two marks
+ * that is Anthropic's limit of four.
+ */
 export function toSystemMessages(sections: InstructionSection[]): SystemModelMessage[] {
-  const messages: SystemModelMessage[] = sections.map((section) => ({
-    role: 'system',
-    content: section.content
-  }));
-  // OpenAI caches prefixes automatically; Anthropic (via OpenRouter) needs the breakpoint.
-  const last = messages.at(-1);
-  if (last) last.providerOptions = { openrouter: { cacheControl: { type: 'ephemeral' } } };
-  return messages;
+  return sections.map((section, index) => {
+    const next = sections[index + 1];
+    const marked = !next || next.id === 'focus';
+    return marked
+      ? { role: 'system', content: section.content, providerOptions: EPHEMERAL }
+      : { role: 'system', content: section.content };
+  });
 }

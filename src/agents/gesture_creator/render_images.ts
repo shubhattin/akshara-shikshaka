@@ -8,13 +8,96 @@ import type { GlyphMask, SkeletonGraph } from './skeleton';
 /**
  * The pictures the Gesture Creator looks at (and the admin sees in the trace): the glyph on a
  * coordinate grid, the labelled skeleton graph, and drafted strokes with their direction and
- * order. Drawn on an 800×800 canvas (2 px per canvas unit) and returned as PNG data URLs.
+ * order. Returned as PNG data URLs.
+ *
+ * The full-glyph images show a square crop around the ink (the glyph is usually under half the
+ * 400×400 canvas), always VIEW_PX wide: more pixels per canvas unit than the whole canvas at
+ * 800 px, at about half the image tokens. The grid keeps its canvas-unit labels.
  */
 
 type Pt = [number, number];
 
+/** Pixels per canvas unit of the order strip and close-up panels' source raster */
 const SCALE = 2;
 const SIZE = CANVAS_DIMS.width * SCALE;
+
+/** Side of the cropped full-glyph images, px */
+const VIEW_PX = 560;
+/** Canvas units of margin around the ink */
+const VIEW_PAD = 28;
+/** Smallest crop, canvas units (a tiny glyph is not blown up past ~3.5 px per unit) */
+const VIEW_MIN = 160;
+
+/** The square of the canvas an image shows: top-left corner, side (canvas units), px per unit. */
+type View = { x0: number; y0: number; side: number; k: number };
+
+const inkBoxes = new WeakMap<GlyphMask, [number, number, number, number] | null>();
+
+/** Bounding box of the glyph ink in canvas units (null for an empty mask). */
+function inkBox(mask: GlyphMask): [number, number, number, number] | null {
+  if (inkBoxes.has(mask)) return inkBoxes.get(mask)!;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (let i = 0; i < mask.data.length; i++) {
+    if (!mask.data[i]) continue;
+    const x = i % mask.width;
+    const y = (i - x) / mask.width;
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  }
+  const box: [number, number, number, number] | null =
+    x1 < 0
+      ? null
+      : [x0 / mask.scale, y0 / mask.scale, (x1 + 1) / mask.scale, (y1 + 1) / mask.scale];
+  inkBoxes.set(mask, box);
+  return box;
+}
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** The crop around the ink and anything else drawn (strokes, marked areas). */
+function viewAround(mask: GlyphMask, extra: readonly Pt[] = []): View {
+  const box = inkBox(mask);
+  const pts: Pt[] = box ? [[box[0], box[1]], [box[2], box[3]], ...extra] : [...extra];
+  if (pts.length === 0)
+    return { x0: 0, y0: 0, side: CANVAS_DIMS.width, k: VIEW_PX / CANVAS_DIMS.width };
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const [bx0, bx1, by0, by1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const side = Math.round(
+    clamp(Math.max(bx1 - bx0, by1 - by0) + 2 * VIEW_PAD, VIEW_MIN, CANVAS_DIMS.width)
+  );
+  const x0 = Math.round(clamp((bx0 + bx1) / 2 - side / 2, 0, CANVAS_DIMS.width - side));
+  const y0 = Math.round(clamp((by0 + by1) / 2 - side / 2, 0, CANVAS_DIMS.height - side));
+  return { x0, y0, side, k: VIEW_PX / side };
+}
+
+const toView = (view: View, [x, y]: Pt): Pt => [(x - view.x0) * view.k, (y - view.y0) * view.k];
+
+/** The glyph ink of the view, scaled to fill the image. */
+function drawGlyphView(
+  ctx: CanvasRenderingContext2D,
+  layer: HTMLCanvasElement,
+  mask: GlyphMask,
+  view: View
+) {
+  const s = mask.scale;
+  ctx.drawImage(
+    layer,
+    view.x0 * s,
+    view.y0 * s,
+    view.side * s,
+    view.side * s,
+    0,
+    0,
+    VIEW_PX,
+    VIEW_PX
+  );
+}
 
 function canvas(env: CanvasEnv, width = SIZE, height = SIZE) {
   const el = env.createCanvas(width, height);
@@ -48,25 +131,44 @@ function glyphLayer(env: CanvasEnv, mask: GlyphMask, rgba: [number, number, numb
   return el;
 }
 
-function paintGrid(env: CanvasEnv, ctx: CanvasRenderingContext2D, strong: boolean) {
+/** Grid lines every 25 canvas units, labelled every 50 along the top and left edges. */
+function paintGrid(env: CanvasEnv, ctx: CanvasRenderingContext2D, view: View, strong: boolean) {
+  const lines = (from: number) => {
+    const out: number[] = [];
+    for (let v = Math.ceil(from / 25) * 25; v <= from + view.side; v += 25) out.push(v);
+    return out;
+  };
   ctx.save();
-  for (let v = 0; v <= CANVAS_DIMS.width; v += 25) {
-    const major = v % 50 === 0;
-    ctx.strokeStyle = major ? (strong ? '#a3a3a3' : '#d4d4d4') : strong ? '#d4d4d4' : '#ececec';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(v * SCALE + 0.5, 0);
-    ctx.lineTo(v * SCALE + 0.5, SIZE);
-    ctx.moveTo(0, v * SCALE + 0.5);
-    ctx.lineTo(SIZE, v * SCALE + 0.5);
-    ctx.stroke();
+  for (const [axis, from] of [
+    ['x', view.x0],
+    ['y', view.y0]
+  ] as const) {
+    for (const v of lines(from)) {
+      const major = v % 50 === 0;
+      ctx.strokeStyle = major ? (strong ? '#a3a3a3' : '#d4d4d4') : strong ? '#d4d4d4' : '#ececec';
+      ctx.lineWidth = 1;
+      const at = Math.round((v - from) * view.k) + 0.5;
+      ctx.beginPath();
+      if (axis === 'x') {
+        ctx.moveTo(at, 0);
+        ctx.lineTo(at, VIEW_PX);
+      } else {
+        ctx.moveTo(0, at);
+        ctx.lineTo(VIEW_PX, at);
+      }
+      ctx.stroke();
+    }
   }
   ctx.fillStyle = '#c2410c';
   ctx.font = `600 14px ${env.labelFamily}`;
   ctx.textBaseline = 'top';
-  for (let v = 50; v < CANVAS_DIMS.width; v += 50) {
-    ctx.fillText(String(v), v * SCALE + 3, 3);
-    ctx.fillText(String(v), 3, v * SCALE + 3);
+  for (const v of lines(view.x0)) {
+    const at = (v - view.x0) * view.k;
+    if (v % 50 === 0 && v > 0 && at > 24 && at < VIEW_PX - 30) ctx.fillText(String(v), at + 3, 3);
+  }
+  for (const v of lines(view.y0)) {
+    const at = (v - view.y0) * view.k;
+    if (v % 50 === 0 && v > 0 && at > 24 && at < VIEW_PX - 18) ctx.fillText(String(v), 3, at + 3);
   }
   ctx.restore();
 }
@@ -129,20 +231,29 @@ const toRaster = (pts: readonly Pt[]): Pt[] => pts.map(([x, y]) => [x * SCALE, y
 
 /** The glyph in dark ink on the coordinate grid. */
 export function renderGlyphImage(env: CanvasEnv, mask: GlyphMask): string {
-  const { el, ctx } = canvas(env);
-  ctx.drawImage(glyphLayer(env, mask, [38, 38, 38, 255]), 0, 0, SIZE, SIZE);
-  paintGrid(env, ctx, true);
+  const view = viewAround(mask);
+  const { el, ctx } = canvas(env, VIEW_PX, VIEW_PX);
+  drawGlyphView(ctx, glyphLayer(env, mask, [38, 38, 38, 255]), mask, view);
+  paintGrid(env, ctx, view, true);
   return el.toDataURL('image/png');
 }
 
 /** The skeleton graph over the faint glyph: coloured, labelled edges and black nodes. */
 export function renderSkeletonImage(env: CanvasEnv, mask: GlyphMask, graph: SkeletonGraph): string {
-  const { el, ctx } = canvas(env);
-  ctx.drawImage(glyphLayer(env, mask, [212, 212, 212, 255]), 0, 0, SIZE, SIZE);
-  paintGrid(env, ctx, false);
+  const view = viewAround(mask, [
+    ...graph.nodes.map((n): Pt => [n.x, n.y]),
+    ...graph.dots.flatMap((d): Pt[] => [
+      [d.x - d.r, d.y - d.r],
+      [d.x + d.r, d.y + d.r]
+    ])
+  ]);
+  const at = (p: Pt) => toView(view, p);
+  const { el, ctx } = canvas(env, VIEW_PX, VIEW_PX);
+  drawGlyphView(ctx, glyphLayer(env, mask, [212, 212, 212, 255]), mask, view);
+  paintGrid(env, ctx, view, false);
   graph.edges.forEach((edge, index) => {
     const color = strokeColor(index);
-    const pts = toRaster(edge.points);
+    const pts = edge.points.map(at);
     ctx.save();
     ctx.strokeStyle = color;
     ctx.lineWidth = 4;
@@ -155,8 +266,7 @@ export function renderSkeletonImage(env: CanvasEnv, mask: GlyphMask, graph: Skel
     label(env, ctx, edge.closed ? `${edge.id} loop` : edge.id, mid[0], mid[1], color);
   });
   for (const node of graph.nodes) {
-    const x = node.x * SCALE;
-    const y = node.y * SCALE;
+    const [x, y] = at([node.x, node.y]);
     ctx.fillStyle = '#000000';
     ctx.beginPath();
     ctx.arc(x, y, 7, 0, Math.PI * 2);
@@ -173,38 +283,35 @@ export function renderSkeletonImage(env: CanvasEnv, mask: GlyphMask, graph: Skel
     ctx.strokeStyle = '#ea580c';
     ctx.lineWidth = 3;
     ctx.setLineDash([8, 5]);
+    const [kx, ky] = at([knot.x, knot.y]);
     ctx.beginPath();
-    ctx.arc(knot.x * SCALE, knot.y * SCALE, knot.r * SCALE + 6, 0, Math.PI * 2);
+    ctx.arc(kx, ky, knot.r * view.k + 6, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
-    label(
-      env,
-      ctx,
-      knot.id,
-      (knot.x + knot.r) * SCALE + 16,
-      (knot.y - knot.r) * SCALE - 8,
-      '#ea580c'
-    );
+    label(env, ctx, knot.id, kx + knot.r * view.k + 16, ky - knot.r * view.k - 8, '#ea580c');
   }
   for (const dot of graph.dots) {
+    const [dx, dy] = at([dot.x, dot.y]);
     ctx.strokeStyle = '#7c3aed';
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(dot.x * SCALE, dot.y * SCALE, dot.r * SCALE + 6, 0, Math.PI * 2);
+    ctx.arc(dx, dy, dot.r * view.k + 6, 0, Math.PI * 2);
     ctx.stroke();
-    label(env, ctx, dot.id, dot.x * SCALE, (dot.y - dot.r) * SCALE - 18, '#7c3aed');
+    label(env, ctx, dot.id, dx, dy - dot.r * view.k - 18, '#7c3aed');
   }
   return el.toDataURL('image/png');
 }
 
 export type DrawnStroke = { points: Pt[]; width: number };
 
+/** Stroke fill in canvas units; `view` maps them to the image, else to the SCALE raster. */
 function paintStroke(
   env: CanvasEnv,
   ctx: CanvasRenderingContext2D,
   stroke: DrawnStroke,
   color: string,
-  alpha: number
+  alpha: number,
+  view?: View
 ) {
   const render = getStrokeRender({
     points: stroke.points,
@@ -212,7 +319,8 @@ function paintStroke(
     simulate_pressure: false
   });
   ctx.save();
-  ctx.scale(SCALE, SCALE);
+  if (view) ctx.transform(view.k, 0, 0, view.k, -view.x0 * view.k, -view.y0 * view.k);
+  else ctx.scale(SCALE, SCALE);
   ctx.globalAlpha = alpha;
   ctx.fillStyle = color;
   if (render.path) ctx.fill(env.createPath(render.path));
@@ -226,12 +334,20 @@ export function renderStrokesImage(
   strokes: DrawnStroke[],
   options: { uncovered?: { from: Pt; to: Pt; points: Pt[] }[]; marks?: DraftMark[] } = {}
 ): string {
-  const { el, ctx } = canvas(env);
-  ctx.drawImage(glyphLayer(env, mask, [200, 200, 200, 255]), 0, 0, SIZE, SIZE);
-  paintGrid(env, ctx, false);
-  strokes.forEach((stroke, index) => paintStroke(env, ctx, stroke, strokeColor(index), 0.35));
+  const view = viewAround(mask, [
+    ...strokes.flatMap((stroke) => stroke.points),
+    ...(options.marks ?? []).flatMap((m): Pt[] => [
+      [m.x - m.r, m.y - m.r],
+      [m.x + m.r, m.y + m.r]
+    ])
+  ]);
+  const at = (p: Pt) => toView(view, p);
+  const { el, ctx } = canvas(env, VIEW_PX, VIEW_PX);
+  drawGlyphView(ctx, glyphLayer(env, mask, [200, 200, 200, 255]), mask, view);
+  paintGrid(env, ctx, view, false);
+  strokes.forEach((stroke, index) => paintStroke(env, ctx, stroke, strokeColor(index), 0.35, view));
   for (const gap of options.uncovered ?? []) {
-    const pts = toRaster(gap.points);
+    const pts = gap.points.map(at);
     ctx.save();
     ctx.strokeStyle = '#dc2626';
     ctx.lineWidth = 5;
@@ -243,7 +359,7 @@ export function renderStrokesImage(
   }
   strokes.forEach((stroke, index) => {
     const color = strokeColor(index);
-    const pts = toRaster(stroke.points);
+    const pts = stroke.points.map(at);
     ctx.save();
     ctx.strokeStyle = color;
     ctx.lineWidth = 2.5;
@@ -256,7 +372,7 @@ export function renderStrokesImage(
   });
   strokes.forEach((stroke, index) => {
     const color = strokeColor(index);
-    const [sx, sy] = toRaster([stroke.points[0]!])[0]!;
+    const [sx, sy] = at(stroke.points[0]!);
     ctx.fillStyle = color;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2.5;
@@ -266,15 +382,14 @@ export function renderStrokesImage(
     ctx.stroke();
     label(env, ctx, String(index + 1), sx + 18, sy - 18, color);
   });
-  for (const mark of options.marks ?? []) paintMark(env, ctx, mark);
+  for (const mark of options.marks ?? []) paintMark(env, ctx, mark, view);
   return el.toDataURL('image/png');
 }
 
 /** An area the admin marked: a dashed red ring with its letter. */
-function paintMark(env: CanvasEnv, ctx: CanvasRenderingContext2D, mark: DraftMark) {
-  const x = mark.x * SCALE;
-  const y = mark.y * SCALE;
-  const r = mark.r * SCALE;
+function paintMark(env: CanvasEnv, ctx: CanvasRenderingContext2D, mark: DraftMark, view: View) {
+  const [x, y] = toView(view, [mark.x, mark.y]);
+  const r = mark.r * view.k;
   ctx.save();
   ctx.fillStyle = 'rgba(220,38,38,0.08)';
   ctx.strokeStyle = '#dc2626';
@@ -303,7 +418,7 @@ export function renderOrderStrip(
   const side = Math.max(bx1 - bx0, by1 - by0) + pad * 2;
   const cx = (bx0 + bx1) / 2;
   const cy = (by0 + by1) / 2;
-  const panel = 300;
+  const panel = 240;
   const perRow = Math.min(4, Math.max(1, strokes.length));
   const rows = Math.ceil(strokes.length / perRow);
   const { el, ctx } = canvas(env, panel * perRow, panel * rows);

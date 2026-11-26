@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentContext, agentInstructionSections } from './instructions';
+import { agentContext, agentInstructionSections, toSystemMessages } from './instructions';
 import { styleGuideMarkdown } from './style_guides';
 
 describe('context dialog', () => {
@@ -26,5 +26,26 @@ describe('context dialog', () => {
     expect(styleGuideMarkdown('\nOrder\n- one\n  more\n\nStrokes\n- two\n')).toBe(
       '### Order\n- one\n  more\n\n### Strokes\n- two'
     );
+  });
+});
+
+describe('system cache breakpoints', () => {
+  const marked = (messages: ReturnType<typeof toSystemMessages>) =>
+    messages.map((message) => message.providerOptions !== undefined);
+
+  it('marks the last section of a free chat', () => {
+    expect(marked(toSystemMessages(agentInstructionSections('gesture_creator')))).toEqual([
+      false,
+      false,
+      true
+    ]);
+  });
+
+  it('also marks the shared prefix before a focused chat’s own section', () => {
+    const sections = [
+      ...agentInstructionSections('gesture_creator'),
+      { id: 'focus' as const, title: 'Focused gesture', content: '<focus/>' }
+    ];
+    expect(marked(toSystemMessages(sections))).toEqual([false, false, true, true]);
   });
 });

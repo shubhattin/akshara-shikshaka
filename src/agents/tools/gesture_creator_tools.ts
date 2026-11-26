@@ -31,7 +31,8 @@ type ContentPart =
   | { type: 'image-data'; data: string; mediaType: string };
 
 const IMAGE_CAPTIONS = {
-  glyph: 'The glyph on the 400×400 canvas with a coordinate grid (labels every 50).',
+  glyph:
+    'The glyph, cropped from the 400×400 canvas, on a grid in canvas coordinates (labels every 50).',
   skeleton:
     'Skeleton graph over the faint glyph: coloured, labelled edges (E…), black nodes (N…), dots ringed (D…).',
   strokes:

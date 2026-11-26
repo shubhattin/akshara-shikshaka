@@ -38,7 +38,12 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
   const searchModel = yield* resolveAgentModel(AGENT_UTILITY_MODEL);
   const tools: AgentTools = {
     sql_query: sqlQueryTool,
-    web_search: createWebSearchTool(searchModel)
+    web_search: createWebSearchTool(
+      searchModel,
+      // Stroke-order pages are rare and a native search costs more than a whole traced reply:
+      // the Gesture Creator gets one fixed-price lookup per reply.
+      kind === 'gesture_creator' ? { engine: 'exa', maxResults: 3, maxCalls: 1 } : {}
+    )
   };
   if (kind === 'gesture_creator') {
     Object.assign(tools, createGestureCreatorTools(history, focus?.gesture.id ?? null));
@@ -51,8 +56,9 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
       ? // SAFETY: Object.keys of the tools record yields exactly its tool names.
         (Object.keys(tools) as (keyof AgentTools)[]).filter((name) => name !== 'sql_query')
       : undefined;
-  // Tracing is spatial work: give the creator more room to think.
-  const effort = kind === 'gesture_creator' ? 'high' : 'medium';
+  // Tracing is spatial work: give the creator more room to think (per model: some trace as well
+  // with less, and their reasoning tokens are most of the reply's output).
+  const effort = kind === 'gesture_creator' ? AGENT_MODELS[modelId].gestureEffort : 'medium';
   const agent = new ToolLoopAgent({
     model,
     instructions: toSystemMessages(agentInstructionSections(kind, focus)),

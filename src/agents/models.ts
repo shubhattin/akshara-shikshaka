@@ -8,39 +8,62 @@ export const AGENT_MODEL_IDS = [
   'gpt-6-luna',
   'claude-sonnet-5.5',
   'gemini-4-neon',
+  'gemini-4-hydrogen',
   'gpt-6.1-sol',
   'claude-opus-5.5'
 ] as const;
 
 export type AgentModelId = (typeof AGENT_MODEL_IDS)[number];
 
+export type AgentModelConfig = {
+  label: string;
+  hint: string;
+  providerModelId: string;
+  /**
+   * Reasoning effort of the Gesture Creator on this model (other agents use medium). Medium
+   * where an A/B on the same akṣaras traced as well as high for about half the output tokens.
+   */
+  gestureEffort: 'high' | 'medium';
+};
+
 export const AGENT_MODELS = {
   'gemini-4-neon': {
     label: 'Gemini 4 Neon',
     hint: "Google's newest — sharp vision, mid-tier price",
-    providerModelId: 'google/gemini-4-neon'
+    providerModelId: 'google/gemini-4-neon',
+    gestureEffort: 'medium'
+  },
+  'gemini-4-hydrogen': {
+    label: 'Gemini 4 Hydrogen',
+    hint: 'Efficient Gemini — about a third of Neon per gesture',
+    providerModelId: 'google/gemini-4-hydrogen',
+    gestureEffort: 'high'
   },
   'gpt-6-luna': {
     label: 'GPT-6 Luna',
     hint: 'Default — fast, cheap and reliable for chats, gestures and batches',
-    providerModelId: 'openai/gpt-6-luna'
+    providerModelId: 'openai/gpt-6-luna',
+    gestureEffort: 'high'
   },
   'gpt-6.1-sol': {
     label: 'GPT-6.1 Sol',
     hint: 'Stronger reasoning — harder questions',
-    providerModelId: 'openai/gpt-6.1-sol'
+    providerModelId: 'openai/gpt-6.1-sol',
+    gestureEffort: 'high'
   },
   'claude-sonnet-5.5': {
     label: 'Claude Sonnet 5.5',
     hint: 'Second choice — strong reasoning and writing',
-    providerModelId: 'anthropic/claude-sonnet-5.5'
+    providerModelId: 'anthropic/claude-sonnet-5.5',
+    gestureEffort: 'medium'
   },
   'claude-opus-5.5': {
     label: 'Claude Opus 5.5',
     hint: 'Best quality — heavier analysis',
-    providerModelId: 'anthropic/claude-opus-5.5'
+    providerModelId: 'anthropic/claude-opus-5.5',
+    gestureEffort: 'high'
   }
-} as const satisfies Record<AgentModelId, { label: string; hint: string; providerModelId: string }>;
+} as const satisfies Record<AgentModelId, AgentModelConfig>;
 
 export const agent_model_id_schema = z.enum(AGENT_MODEL_IDS);
 

@@ -7,7 +7,7 @@ import {
 import { Effect } from 'effect';
 import { dataPartToModel, AGENT_DATA_SCHEMAS } from '~/agents/gesture_refs';
 import { findTraceInMessages } from '~/agents/gesture_creator/harness';
-import type { AgentModelId } from '~/agents/models';
+import { AGENT_MODELS, type AgentModelId } from '~/agents/models';
 import { createAgent } from '~/agents/server/create_agent';
 import {
   findAgentChat,
@@ -175,7 +175,8 @@ export const startAgentTurn = Effect.fn('agents.start_turn')(function* (input: {
               earlier,
               createServerGestureHarness(
                 (traceId) => findTraceInMessages(earlier, traceId),
-                focus?.gesture.id ?? null
+                focus?.gesture.id ?? null,
+                AGENT_MODELS[model].imageView
               ),
               signal
             ),
@@ -183,7 +184,7 @@ export const startAgentTurn = Effect.fn('agents.start_turn')(function* (input: {
         })
       : withoutDraftParts(withRefs);
   // Saved strokes the admin chose to show (focused chats only), drawn here.
-  const incoming = yield* resolveSavedView(edited, focus);
+  const incoming = yield* resolveSavedView(edited, focus, AGENT_MODELS[model].imageView);
   const messages = [...earlier, incoming];
   // What the model reads: older images dropped; the Gesture Creator never sees saved strokes.
   const modelView = (all: AgentUIMessage[]) => {

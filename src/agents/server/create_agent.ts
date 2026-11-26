@@ -46,7 +46,10 @@ export const createAgent = Effect.fn('agents.create_agent')(function* (
     )
   };
   if (kind === 'gesture_creator') {
-    Object.assign(tools, createGestureCreatorTools(history, focus?.gesture.id ?? null));
+    Object.assign(
+      tools,
+      createGestureCreatorTools(history, focus?.gesture.id ?? null, AGENT_MODELS[modelId].imageView)
+    );
   }
   // The Gesture Creator draws from the glyph alone: no database reads, so it cannot look up the
   // strokes saved for a gesture. sql_query stays registered so older chats that used it still

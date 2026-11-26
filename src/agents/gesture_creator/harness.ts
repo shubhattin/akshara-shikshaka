@@ -11,7 +11,8 @@ import {
   renderOrderStrip,
   renderSkeletonImage,
   renderStrokesImage,
-  type CloseupArea
+  type CloseupArea,
+  type ImageView
 } from './render_images';
 import {
   type DraftMark,
@@ -149,8 +150,11 @@ export function createGestureHarness(deps: {
   loadGesture: (id: number) => Promise<HarnessGesture>;
   /** An earlier trace of this chat by its tool call id (what a proposal refers to). */
   findTrace: (traceId: string) => TraceStrokesOutput | undefined;
+  /** How the full-glyph images frame the glyph (per model); cropped by default. */
+  imageView?: ImageView;
 }) {
   const { env } = deps;
+  const view = deps.imageView ?? 'crop';
   /** Rendered glyph + skeleton per gesture and glyph settings (stable node/edge ids across calls). */
   const sessions = new Map<string, Promise<Session>>();
 
@@ -184,8 +188,8 @@ export function createGestureHarness(deps: {
     if (signal.aborted) throw new HarnessCancelledError();
     // The strokes saved for the gesture are never shown: the agent works from the glyph alone.
     const images: HarnessImages = {
-      glyph: renderGlyphImage(env, mask),
-      skeleton: renderSkeletonImage(env, mask, graph)
+      glyph: renderGlyphImage(env, mask, view),
+      skeleton: renderSkeletonImage(env, mask, graph, view)
     };
     return {
       gesture_id: gesture.id,
@@ -260,8 +264,8 @@ export function createGestureHarness(deps: {
   async function trace(input: TraceStrokesInput, signal: AbortSignal): Promise<TraceStrokesOutput> {
     const { output, mask, graph, drawn, gaps } = await traceCore(input, signal);
     output.images = {
-      strokes: renderStrokesImage(env, mask, drawn, { uncovered: gaps }),
-      order: renderOrderStrip(env, mask, drawn, graph.box)
+      strokes: renderStrokesImage(env, mask, drawn, { uncovered: gaps, view }),
+      order: renderOrderStrip(env, mask, drawn, graph.box, view)
     };
     const areas = closeupAreas(graph);
     if (areas.length > 0) output.images.closeups = renderCloseups(env, mask, drawn, areas);
@@ -299,7 +303,7 @@ export function createGestureHarness(deps: {
         ok: true,
         trace: output,
         mark_info: input.marks.map((mark) => placeMark(mark, graph, strokes)),
-        image: renderStrokesImage(env, mask, drawn, { uncovered: gaps, marks: input.marks })
+        image: renderStrokesImage(env, mask, drawn, { uncovered: gaps, marks: input.marks, view })
       };
     } catch (error) {
       if (error instanceof HarnessCancelledError) throw error;

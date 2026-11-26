@@ -10,10 +10,16 @@ import type { GlyphMask, SkeletonGraph } from './skeleton';
  * coordinate grid, the labelled skeleton graph, and drafted strokes with their direction and
  * order. Returned as PNG data URLs.
  *
- * The full-glyph images show a square crop around the ink (the glyph is usually under half the
- * 400×400 canvas), always VIEW_PX wide: more pixels per canvas unit than the whole canvas at
- * 800 px, at about half the image tokens. The grid keeps its canvas-unit labels.
+ * The full-glyph images come in two views (per model, see `AgentModelConfig.imageView`):
+ * - "crop": a square crop around the ink (the glyph is usually under half the 400×400 canvas),
+ *   always CROP_PX wide: more pixels per canvas unit than the whole canvas at 800 px, at about
+ *   half the image tokens for models billed by pixels (Claude, GPT).
+ * - "canvas": the whole canvas at 800 px, for models that bill every image the same whatever
+ *   its size (Gemini), where a crop saves nothing.
+ * Either way the grid is labelled in canvas units.
  */
+
+export type ImageView = 'crop' | 'canvas';
 
 type Pt = [number, number];
 
@@ -22,14 +28,19 @@ const SCALE = 2;
 const SIZE = CANVAS_DIMS.width * SCALE;
 
 /** Side of the cropped full-glyph images, px */
-const VIEW_PX = 560;
+const CROP_PX = 560;
 /** Canvas units of margin around the ink */
 const VIEW_PAD = 28;
 /** Smallest crop, canvas units (a tiny glyph is not blown up past ~3.5 px per unit) */
 const VIEW_MIN = 160;
 
-/** The square of the canvas an image shows: top-left corner, side (canvas units), px per unit. */
-type View = { x0: number; y0: number; side: number; k: number };
+/**
+ * The square of the canvas an image shows: top-left corner and side (canvas units), px per unit,
+ * and the image's side in px.
+ */
+type View = { x0: number; y0: number; side: number; k: number; px: number };
+
+const CANVAS_VIEW: View = { x0: 0, y0: 0, side: CANVAS_DIMS.width, k: SCALE, px: SIZE };
 
 const inkBoxes = new WeakMap<GlyphMask, [number, number, number, number] | null>();
 
@@ -59,12 +70,14 @@ function inkBox(mask: GlyphMask): [number, number, number, number] | null {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-/** The crop around the ink and anything else drawn (strokes, marked areas). */
-function viewAround(mask: GlyphMask, extra: readonly Pt[] = []): View {
+/** The crop around the ink and anything else drawn (strokes, marked areas), or the whole canvas. */
+function viewAround(mask: GlyphMask, mode: ImageView, extra: readonly Pt[] = []): View {
+  if (mode === 'canvas') return CANVAS_VIEW;
   const box = inkBox(mask);
   const pts: Pt[] = box ? [[box[0], box[1]], [box[2], box[3]], ...extra] : [...extra];
-  if (pts.length === 0)
-    return { x0: 0, y0: 0, side: CANVAS_DIMS.width, k: VIEW_PX / CANVAS_DIMS.width };
+  if (pts.length === 0) {
+    return { x0: 0, y0: 0, side: CANVAS_DIMS.width, k: CROP_PX / CANVAS_DIMS.width, px: CROP_PX };
+  }
   const xs = pts.map((p) => p[0]);
   const ys = pts.map((p) => p[1]);
   const [bx0, bx1, by0, by1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
@@ -73,7 +86,7 @@ function viewAround(mask: GlyphMask, extra: readonly Pt[] = []): View {
   );
   const x0 = Math.round(clamp((bx0 + bx1) / 2 - side / 2, 0, CANVAS_DIMS.width - side));
   const y0 = Math.round(clamp((by0 + by1) / 2 - side / 2, 0, CANVAS_DIMS.height - side));
-  return { x0, y0, side, k: VIEW_PX / side };
+  return { x0, y0, side, k: CROP_PX / side, px: CROP_PX };
 }
 
 const toView = (view: View, [x, y]: Pt): Pt => [(x - view.x0) * view.k, (y - view.y0) * view.k];
@@ -94,8 +107,8 @@ function drawGlyphView(
     view.side * s,
     0,
     0,
-    VIEW_PX,
-    VIEW_PX
+    view.px,
+    view.px
   );
 }
 
@@ -151,10 +164,10 @@ function paintGrid(env: CanvasEnv, ctx: CanvasRenderingContext2D, view: View, st
       ctx.beginPath();
       if (axis === 'x') {
         ctx.moveTo(at, 0);
-        ctx.lineTo(at, VIEW_PX);
+        ctx.lineTo(at, view.px);
       } else {
         ctx.moveTo(0, at);
-        ctx.lineTo(VIEW_PX, at);
+        ctx.lineTo(view.px, at);
       }
       ctx.stroke();
     }
@@ -164,11 +177,11 @@ function paintGrid(env: CanvasEnv, ctx: CanvasRenderingContext2D, view: View, st
   ctx.textBaseline = 'top';
   for (const v of lines(view.x0)) {
     const at = (v - view.x0) * view.k;
-    if (v % 50 === 0 && v > 0 && at > 24 && at < VIEW_PX - 30) ctx.fillText(String(v), at + 3, 3);
+    if (v % 50 === 0 && v > 0 && at > 24 && at < view.px - 30) ctx.fillText(String(v), at + 3, 3);
   }
   for (const v of lines(view.y0)) {
     const at = (v - view.y0) * view.k;
-    if (v % 50 === 0 && v > 0 && at > 24 && at < VIEW_PX - 18) ctx.fillText(String(v), 3, at + 3);
+    if (v % 50 === 0 && v > 0 && at > 24 && at < view.px - 18) ctx.fillText(String(v), 3, at + 3);
   }
   ctx.restore();
 }
@@ -230,17 +243,26 @@ function arrowsAlong(ctx: CanvasRenderingContext2D, pts: Pt[], color: string, ev
 const toRaster = (pts: readonly Pt[]): Pt[] => pts.map(([x, y]) => [x * SCALE, y * SCALE]);
 
 /** The glyph in dark ink on the coordinate grid. */
-export function renderGlyphImage(env: CanvasEnv, mask: GlyphMask): string {
-  const view = viewAround(mask);
-  const { el, ctx } = canvas(env, VIEW_PX, VIEW_PX);
+export function renderGlyphImage(
+  env: CanvasEnv,
+  mask: GlyphMask,
+  mode: ImageView = 'crop'
+): string {
+  const view = viewAround(mask, mode);
+  const { el, ctx } = canvas(env, view.px, view.px);
   drawGlyphView(ctx, glyphLayer(env, mask, [38, 38, 38, 255]), mask, view);
   paintGrid(env, ctx, view, true);
   return el.toDataURL('image/png');
 }
 
 /** The skeleton graph over the faint glyph: coloured, labelled edges and black nodes. */
-export function renderSkeletonImage(env: CanvasEnv, mask: GlyphMask, graph: SkeletonGraph): string {
-  const view = viewAround(mask, [
+export function renderSkeletonImage(
+  env: CanvasEnv,
+  mask: GlyphMask,
+  graph: SkeletonGraph,
+  mode: ImageView = 'crop'
+): string {
+  const view = viewAround(mask, mode, [
     ...graph.nodes.map((n): Pt => [n.x, n.y]),
     ...graph.dots.flatMap((d): Pt[] => [
       [d.x - d.r, d.y - d.r],
@@ -248,7 +270,7 @@ export function renderSkeletonImage(env: CanvasEnv, mask: GlyphMask, graph: Skel
     ])
   ]);
   const at = (p: Pt) => toView(view, p);
-  const { el, ctx } = canvas(env, VIEW_PX, VIEW_PX);
+  const { el, ctx } = canvas(env, view.px, view.px);
   drawGlyphView(ctx, glyphLayer(env, mask, [212, 212, 212, 255]), mask, view);
   paintGrid(env, ctx, view, false);
   graph.edges.forEach((edge, index) => {
@@ -332,9 +354,13 @@ export function renderStrokesImage(
   env: CanvasEnv,
   mask: GlyphMask,
   strokes: DrawnStroke[],
-  options: { uncovered?: { from: Pt; to: Pt; points: Pt[] }[]; marks?: DraftMark[] } = {}
+  options: {
+    uncovered?: { from: Pt; to: Pt; points: Pt[] }[];
+    marks?: DraftMark[];
+    view?: ImageView;
+  } = {}
 ): string {
-  const view = viewAround(mask, [
+  const view = viewAround(mask, options.view ?? 'crop', [
     ...strokes.flatMap((stroke) => stroke.points),
     ...(options.marks ?? []).flatMap((m): Pt[] => [
       [m.x - m.r, m.y - m.r],
@@ -342,7 +368,7 @@ export function renderStrokesImage(
     ])
   ]);
   const at = (p: Pt) => toView(view, p);
-  const { el, ctx } = canvas(env, VIEW_PX, VIEW_PX);
+  const { el, ctx } = canvas(env, view.px, view.px);
   drawGlyphView(ctx, glyphLayer(env, mask, [200, 200, 200, 255]), mask, view);
   paintGrid(env, ctx, view, false);
   strokes.forEach((stroke, index) => paintStroke(env, ctx, stroke, strokeColor(index), 0.35, view));
@@ -411,14 +437,16 @@ export function renderOrderStrip(
   env: CanvasEnv,
   mask: GlyphMask,
   strokes: DrawnStroke[],
-  box: [number, number, number, number]
+  box: [number, number, number, number],
+  mode: ImageView = 'crop'
 ): string {
   const pad = 24;
   const [bx0, by0, bx1, by1] = box;
   const side = Math.max(bx1 - bx0, by1 - by0) + pad * 2;
   const cx = (bx0 + bx1) / 2;
   const cy = (by0 + by1) / 2;
-  const panel = 240;
+  // smaller panels where pixels are billed; Gemini bills the strip the same at any size
+  const panel = mode === 'crop' ? 240 : 300;
   const perRow = Math.min(4, Math.max(1, strokes.length));
   const rows = Math.ceil(strokes.length / perRow);
   const { el, ctx } = canvas(env, panel * perRow, panel * rows);
